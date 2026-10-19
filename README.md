@@ -4,7 +4,7 @@ A map-first land intelligence platform for Rwanda, starting with Kigali City and
 
 ## Project status
 
-This repository is being initialised in phases. The current commit establishes the application foundation only; it does not yet contain live parcel data, cadastral boundaries, zoning overlays, or market metrics.
+This repository currently contains the application foundation only. It does not yet contain a connected map, live parcel data, cadastral boundaries, zoning overlays, or market metrics.
 
 ## Product rules
 
@@ -41,6 +41,20 @@ npm run build
 
 See `.env.example`. The setup shell intentionally does not connect to a live basemap, land registry, GIS service, or database until the data-access and provider decisions are approved.
 
+## Product specifications
+
+The companion specifications produced during planning are currently separate working documents and still need to be committed into this repository before feature implementation begins:
+
+- `PRD.md` — product requirements
+- `DESIGN.md` — design system and interactions
+- `ARCHITECTURE.md` — system architecture
+- `DATABASE.md` — data model
+- `API.md` — API contracts
+- `AGENTS.md` — coding rules
+- `IMPLEMENTATION_PLAN.md` — phased implementation plan
+
+Do not begin map/data feature work until those specifications have been reviewed and made available alongside the code, and the relevant data-access blockers have been resolved.
+
 ## Planned sequence
 
 1. Application foundation and design tokens.
@@ -50,5 +64,3 @@ See `.env.example`. The setup shell intentionally does not connect to a live bas
 5. Planning/zoning and contextual layers.
 6. Evidence-based price intelligence and area comparison.
 7. Verification, security, QA, and release readiness.
-
-The approved product/design/architecture/data/API specifications and coding rules must remain the source of truth for subsequent work.
