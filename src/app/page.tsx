@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const plannedTools = [
   "Developers",
   "Projects",
@@ -52,13 +54,13 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <a aria-label="Rwanda Land Intelligence home" className="brand" href="/">
+        <Link aria-label="Rwanda Land Intelligence home" className="brand" href="/">
           <BrandMark />
           <span className="brand-copy">
             <span className="brand-name">Land Intelligence</span>
             <span className="brand-country">RWANDA</span>
           </span>
-        </a>
+        </Link>
 
         <nav aria-label="Primary navigation" className="primary-navigation">
           <button
