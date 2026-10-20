@@ -16,7 +16,6 @@ const RWANDA_BOUNDS = {
   north: -1.0
 };
 
-type Level = "district" | "sector";
 type Bounds = [number, number, number, number];
 
 type UpstreamFeature = {
