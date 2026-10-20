@@ -42,8 +42,6 @@ type MapViewProps = {
 
 const DEFAULT_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SECTOR_ZOOM = 9.55;
-const ADMIN_SOURCE_URL =
-  "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
 
 function emptyFeatureCollection(): MapFeatureCollection {
   return { type: "FeatureCollection", features: [] };
@@ -292,7 +290,7 @@ export function MapView({
           source: "admin-districts",
           layout: {
             "text-field": ["get", "district"],
-            "text-font": ["Open Sans Semibold", "Arial Unicode MS Regular"],
+            "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
             "text-size": ["interpolate", ["linear"], ["zoom"], 7.5, 11, 9.4, 13],
             "text-max-width": 12,
             "text-allow-overlap": false,
@@ -370,7 +368,7 @@ export function MapView({
           layout: {
             visibility: "none",
             "text-field": ["get", "sector"],
-            "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+            "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
             "text-size": ["interpolate", ["linear"], ["zoom"], 9.5, 9, 12.5, 12],
             "text-max-width": 10,
             "text-allow-overlap": false,
@@ -383,6 +381,11 @@ export function MapView({
             "text-halo-blur": 0.3
           }
         });
+      }
+
+      // Keep the parent district outline visible above sector fills at deeper zoom.
+      if (map.getLayer("district-outline")) {
+        map.moveLayer("district-outline");
       }
     };
 
