@@ -15,6 +15,8 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /Bugesera/i);
   assert.match(route, /FeatureServer/);
   assert.match(route, /geometryType/);
+  assert.match(route, /arcGisPolygonToGeoJson/);
+  assert.match(route, /f: "json"/);
 });
 
 test("the map view progressively switches from districts to sectors", async () => {
@@ -26,11 +28,22 @@ test("the map view progressively switches from districts to sectors", async () =
   assert.match(mapView, /setFeatureState/);
 });
 
+test("the basemap has a documented fallback style", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  assert.match(mapView, /styles\/liberty/);
+  assert.match(mapView, /map\.setStyle\(FALLBACK_STYLE_URL\)/);
+});
+
 test("the UI distinguishes administrative boundaries from parcel and ownership data", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   assert.match(experience, /not a cadastral plot/);
   assert.match(experience, /Land records not connected yet/);
   assert.match(experience, /reuse terms must be confirmed before production/i);
+});
+
+test("hydration warning suppression is scoped to the body element", async () => {
+  const layout = await readProjectFile("src/app/layout.tsx");
+  assert.match(layout, /<body suppressHydrationWarning>/);
 });
 
 test("the experience provides responsive focus controls and reduced-motion support", async () => {

@@ -4,11 +4,11 @@ A map-first land intelligence platform for Rwanda, initially focused on Kigali C
 
 ## Current stage
 
-The application now includes a live, interactive MapLibre basemap focused on Kigali City and Bugesera, with pan/zoom, metric scale, navigation controls, and quick camera focus buttons.
+The application includes an interactive MapLibre base map, a fallback basemap style, and viewport-based district/sector overlays from the Rwanda Environment Ministry GIS FeatureServer.
 
-**The base map is not a land registry.** Parcel boundaries, listing counts, official zoning overlays, owner records, and market metrics are not yet connected. The interface states this explicitly.
+**The basemap and administrative polygons are not a land registry.** Cadastral parcel boundaries, listing counts, ownership records, official zoning overlays, and market metrics are not yet connected.
 
-The initial public basemap is OpenFreeMap Positron using OpenStreetMap-derived data. Review the provider's current terms and capacity before production launch. Set `NEXT_PUBLIC_MAP_STYLE_URL` to another approved MapLibre style URL when necessary.
+The administrative GIS service describes its district and sector layers as based on village boundaries established during the 2022 census. The source is publicly queryable, but its reuse and redistribution terms must be confirmed before production.
 
 ## Local development
 
@@ -22,14 +22,21 @@ npm run dev
 
 Open http://localhost:3000.
 
-## Validation
+If an older `.env.local` still points to a style that will not load, the map will try the Liberty style as a fallback. You can also update `NEXT_PUBLIC_MAP_STYLE_URL` in `.env.local` to:
 
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+```text
+https://tiles.openfreemap.org/styles/liberty
 ```
+
+## Troubleshooting
+
+- The hydration warning containing `data-new-gr-c-s-check-loaded` or `data-gr-ext-installed` usually comes from Grammarly modifying the page before React hydrates. The body uses `suppressHydrationWarning` for this known extension-injected attribute mismatch. To verify the page without the extension, disable Grammarly on localhost or test in a clean browser profile.
+- A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
+- If the basemap fails, check the browser Network tab for the style request and tile requests. The status badge should report the failure, and the code tries the documented OpenFreeMap Liberty style when a configured style fails.
+
+## Valhalla's role
+
+Valhalla is a routing and map-matching engine. It can later support driving/walking routes, trace a GPS trace onto the road network, route distances, and travel-time isochrones around a plot or landmark. It does **not** derive legally meaningful cadastral parcel boundaries or administrative polygons. Those outlines must come from appropriately sourced land or administrative GIS data.
 
 ## Data integrity rules
 
@@ -38,14 +45,12 @@ npm run build
 - Show source, date, and confidence where available.
 - Do not publish private documents or seller information without authorization.
 - Never treat a listing or planning layer as proof of legal ownership.
-- Administrative boundary data must not be redistributed until the appropriate source permissions have been confirmed.
 
-## Planned sequence
+## Validation
 
-1. Live basemap and camera navigation. (Initial implementation)
-2. Confirm terms/permissions and integrate administrative boundaries from approved sources.
-3. Source registry, spatial data model, and viewport-based map API.
-4. Listing records, parcel identity, subdivision relationships, hover/selection states, and details panel.
-5. Planning/zoning and contextual layers.
-6. Evidence-based price intelligence and area comparison.
-7. Verification, security, QA, and release readiness.
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```

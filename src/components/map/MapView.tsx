@@ -10,7 +10,7 @@ import {
   type Map as MapLibreMapInstance,
   type MapGeoJSONFeature
 } from "maplibre-gl";
-import type { FeatureCollection, Geometry } from "geojson";
+import type { FeatureCollection, Geometry, Position } from "geojson";
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
@@ -40,7 +40,7 @@ type MapViewProps = {
   onAreaSelected: (area: SelectedArea | null) => void;
 };
 
-const DEFAULT_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const SECTOR_ZOOM = 9.55;
 
 function emptyFeatureCollection(): MapFeatureCollection {
@@ -93,8 +93,8 @@ function fitFeature(
 
   const mobile = window.matchMedia("(max-width: 720px)").matches;
   const padding = mobile
-    ? { top: 150, bottom: 150, left: 24, right: 24 }
-    : { top: 112, bottom: 74, left: 326, right: 72 };
+    ? { top: 154, bottom: 145, left: 20, right: 20 }
+    : { top: 118, bottom: 78, left: 336, right: 78 };
 
   map.fitBounds(
     [
@@ -118,18 +118,15 @@ function featureToArea(
   const properties = feature.properties as AreaProperties | null;
   if (!properties?.district) return null;
 
-  const districtId = properties.district_id ?? null;
-  const sectorId = properties.sector_id ?? null;
   const sectorName = properties.sector ?? null;
-
   if (level === "sector" && !sectorName) return null;
 
   return {
     level,
     name: level === "sector" ? sectorName as string : properties.district,
     district: properties.district,
-    districtId,
-    sectorId
+    districtId: properties.district_id ?? null,
+    sectorId: properties.sector_id ?? null
   };
 }
 
@@ -148,12 +145,12 @@ export function MapView({
     onStatusChange("loading");
     onBoundaryStatusChange("loading");
 
-    const styleUrl =
-      process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || DEFAULT_STYLE_URL;
+    const configuredStyleUrl = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim();
+    const initialStyleUrl = configuredStyleUrl || FALLBACK_STYLE_URL;
 
     const map = new MapLibreMap({
       container,
-      style: styleUrl,
+      style: initialStyleUrl,
       center: [30.13, -2.1],
       zoom: 8.35,
       minZoom: 5,
@@ -177,13 +174,17 @@ export function MapView({
       new AttributionControl({
         compact: false,
         customAttribution:
-          "© OpenFreeMap · Administrative areas: Rwanda Environment Ministry GIS (2022 census basis; reuse terms to confirm)"
+          "Administrative areas: Rwanda Environment Ministry GIS (2022 census basis; reuse terms to confirm)"
       }),
       "bottom-left"
     );
 
-    let initialStyleLoaded = false;
+    let styleLoaded = false;
+    let fallbackAttempted = initialStyleUrl === FALLBACK_STYLE_URL;
+    let layerInteractionsAttached = false;
+    let viewportListenersAttached = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let activeController: AbortController | null = null;
     let refreshSequence = 0;
     let hoveredFeature: { source: string; id: string | number } | null = null;
@@ -384,9 +385,7 @@ export function MapView({
       }
 
       // Keep the parent district outline visible above sector fills at deeper zoom.
-      if (map.getLayer("district-outline")) {
-        map.moveLayer("district-outline");
-      }
+      if (map.getLayer("district-outline")) map.moveLayer("district-outline");
     };
 
     const updateLayerVisibility = () => {
@@ -442,24 +441,19 @@ export function MapView({
       try {
         const districts = await fetchAreas("district", controller.signal);
         if (sequence !== refreshSequence) return;
-
         (map.getSource("admin-districts") as GeoJSONSource).setData(districts);
 
-        const showSectors = map.getZoom() >= SECTOR_ZOOM;
-        if (showSectors) {
+        if (map.getZoom() >= SECTOR_ZOOM) {
           const sectors = await fetchAreas("sector", controller.signal);
           if (sequence !== refreshSequence) return;
           (map.getSource("admin-sectors") as GeoJSONSource).setData(sectors);
         } else {
-          (map.getSource("admin-sectors") as GeoJSONSource).setData(
-            emptyFeatureCollection()
-          );
+          (map.getSource("admin-sectors") as GeoJSONSource).setData(emptyFeatureCollection());
         }
 
         updateLayerVisibility();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
-
         onBoundaryStatusChange("ready");
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -525,31 +519,64 @@ export function MapView({
       fitFeature(map, feature, level);
     };
 
-    map.on("load", () => {
-      initialStyleLoaded = true;
-      addAdministrativeLayers();
-      updateLayerVisibility();
-      onStatusChange("ready");
-      void refreshAreas();
-
-      map.on("moveend", scheduleRefresh);
-      map.on("zoomend", scheduleRefresh);
+    const attachInteractionHandlers = () => {
+      if (layerInteractionsAttached) return;
+      layerInteractionsAttached = true;
 
       map.on("mousemove", "district-fill", handleDistrictMove);
       map.on("mouseleave", "district-fill", handleLeave);
       map.on("click", "district-fill", (event) =>
         handleAreaClick("district", "admin-districts", event.features?.[0])
       );
-
       map.on("mousemove", "sector-fill", handleSectorMove);
       map.on("mouseleave", "sector-fill", handleLeave);
       map.on("click", "sector-fill", (event) =>
         handleAreaClick("sector", "admin-sectors", event.features?.[0])
       );
+    };
+
+    map.on("style.load", () => {
+      styleLoaded = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      addAdministrativeLayers();
+      updateLayerVisibility();
+      onStatusChange("ready");
+      void refreshAreas();
+      attachInteractionHandlers();
+
+      if (!viewportListenersAttached) {
+        map.on("moveend", scheduleRefresh);
+        map.on("zoomend", scheduleRefresh);
+        viewportListenersAttached = true;
+      }
     });
 
     map.on("error", (event) => {
-      if (!initialStyleLoaded && event.error) onStatusChange("error");
+      if (styleLoaded || !event.error) return;
+
+      if (!fallbackAttempted) {
+        fallbackAttempted = true;
+        onStatusChange("loading");
+        map.setStyle(FALLBACK_STYLE_URL);
+
+        // Do not declare final failure during the brief style-switch window.
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        fallbackTimer = setTimeout(() => {
+          if (!styleLoaded) onStatusChange("error");
+        }, 12_000);
+        return;
+      }
+
+      if (initialStyleUrl === FALLBACK_STYLE_URL) {
+        onStatusChange("error");
+      } else if (fallbackAttempted && !styleLoaded) {
+        // Wait for the fallback's style.load event before marking it failed.
+        if (!fallbackTimer) {
+          fallbackTimer = setTimeout(() => {
+            if (!styleLoaded) onStatusChange("error");
+          }, 12_000);
+        }
+      }
     });
 
     onMapReady(map);
@@ -562,6 +589,7 @@ export function MapView({
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();
       map.remove();
