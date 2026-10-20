@@ -66,6 +66,14 @@ const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
 
+// Approximate geographic envelope of Rwanda with a small safety margin.
+// maxBounds constrains panning; a viewport-derived min zoom prevents zooming
+// so far out that the full country extent no longer fits on screen.
+const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
+  [28.82, -2.87],
+  [30.93, -1.02]
+];
+
 // Esri World Imagery is provided as raster tiles. Keep its required attribution
 // attached to the source so MapLibre's attribution control can display it.
 const SATELLITE_STYLE: StyleSpecification = {
@@ -303,6 +311,7 @@ export function MapView({
       zoom: 8.35,
       minZoom: 5,
       maxZoom: 19,
+      maxBounds: RWANDA_CAMERA_BOUNDS,
       pitch: 0,
       bearing: 0,
       maxPitch: 0,
@@ -329,6 +338,21 @@ export function MapView({
 
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
+
+    const updateRwandaZoomFloor = () => {
+      const mobile = window.matchMedia("(max-width: 720px)").matches;
+      const camera = map.cameraForBounds(RWANDA_CAMERA_BOUNDS, {
+        padding: mobile ? 18 : 36
+      });
+
+      if (typeof camera?.zoom === "number" && Number.isFinite(camera.zoom)) {
+        map.setMinZoom(Math.max(5, camera.zoom));
+      }
+    };
+
+    // Calculate the widest zoom-out that still fits Rwanda in the current
+    // viewport. Recalculate on resize so the rule also works on mobile.
+    updateRwandaZoomFloor();
 
     let styleLoaded = false;
     let fallbackAttempted = initialStyleUrl === FALLBACK_STYLE_URL;
@@ -397,10 +421,10 @@ export function MapView({
             "fill-opacity": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              0.36,
+              0.62,
               ["boolean", ["feature-state", "selected"], false],
-              0.3,
-              0.2
+              0.5,
+              0.35
             ]
           }
         });
@@ -681,7 +705,10 @@ export function MapView({
 
     const resizeObserver =
       typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => map.resize())
+        ? new ResizeObserver(() => {
+            map.resize();
+            updateRwandaZoomFloor();
+          })
         : null;
     resizeObserver?.observe(container);
 
