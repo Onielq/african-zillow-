@@ -97,7 +97,7 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /aria-label="Property type"/);
   assert.match(experience, /aria-label="Analysis period"/);
   assert.match(experience, /time series is not connected and validated here/i);
-  assert.match(experience, /No project markers or prices are fabricated/);
+  assert.match(experience, /No project markers\s+or prices are fabricated/);
 });
 
 test("area comparison supports up to four areas without fabricating unavailable metrics", async () => {
