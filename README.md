@@ -4,7 +4,7 @@ A map-first land intelligence platform for Rwanda, initially focused on Kigali C
 
 ## Current stage
 
-The application includes an interactive MapLibre base map, a fallback basemap style, and viewport-based administrative polygons for four pilot districts: Gasabo, Kicukiro, Nyarugenge, and Bugesera.
+The application includes an interactive MapLibre base map, a Map/Satellite switcher, a fallback basemap style, and viewport-based administrative polygons for four pilot districts: Gasabo, Kicukiro, Nyarugenge, and Bugesera. Satellite mode uses Esri World Imagery raster tiles; administrative overlays are rebuilt above the imagery when the style changes.
 
 **The ordinary road map remains visible.** As users zoom in, the map switches from district boundaries to sectors, cells, and villages. Area fills use 20% opacity by default, with stronger highlighting on hover and selection. Clicking a polygon identifies the area and fits the map to its extent.
 
@@ -36,6 +36,14 @@ https://tiles.openfreemap.org/styles/liberty
 - **Hydration warning containing `data-new-gr-c-s-check-loaded` or `data-gr-ext-installed`.** These attributes are commonly injected by Grammarly before React hydrates. The body uses `suppressHydrationWarning` for this known extension-injected attribute mismatch. To verify the page without the extension, disable Grammarly on localhost or test in a clean browser profile.
 - A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
 - If the basemap fails after the worker is available, check the browser Network tab for style and tile requests. A working worker is necessary but does not guarantee that a third-party style or tile service is reachable.
+
+## Satellite imagery source and licensing
+
+The prototype's Satellite view uses the Esri World Imagery tile service and includes imagery attribution in MapLibre's attribution control. See [Esri's World Imagery attribution guidance](https://support.esri.com/en-us/knowledge-base/what-is-the-correct-way-to-cite-an-arcgis-online-basema-000012040) and [Esri's terms for websites and services](https://www.esri.com/en-us/legal/terms/web-site-service).
+
+Before public or commercial production, confirm that this access method and the service's imagery licenses permit the app's intended use. The imagery may contain third-party data with additional terms, and Esri can change service availability. For production, use a provider and plan whose terms explicitly cover the expected commercial usage, traffic, caching, and attribution.
+
+Satellite imagery helps people visually understand the ground. It does not prove legal ownership and must not be used to infer cadastral plot boundaries.
 
 ## Geographic hierarchy and source plan
 
