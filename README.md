@@ -37,6 +37,24 @@ https://tiles.openfreemap.org/styles/liberty
 - A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
 - If the basemap fails after the worker is available, check the browser Network tab for style and tile requests. A working worker is necessary but does not guarantee that a third-party style or tile service is reachable.
 
+## Investment intelligence workspace
+
+The map workspace now includes a six-metric selector, property-type and analysis-period filters, an Areas / Projects mode switch, a source register, and an area comparison shortlist for up to four selected administrative areas.
+
+These controls establish the product workflow; they do **not** imply that the market data is already connected. The current map has verified administrative boundaries, but it does not yet recolor areas by sale price, rental yield, appreciation, available listing supply, or upcoming project supply. The selected metric's data status is shown in the interface instead of inventing values.
+
+### Metric source readiness
+
+- **Transaction volume:** the Rwanda Data Sharing Platform lists National Land Authority / Rwanda Land Dashboard aggregate land transaction datasets. The normalized data import and join to map areas are not connected yet.
+- **Market supply:** registered land-parcel summaries may help describe parcel stock, but they are not the same as homes or plots actively listed for sale.
+- **Average price per m² and capital appreciation:** require a verified price dataset and comparable historical observations.
+- **Rental yield:** requires consistent, verified rental and sale-price observations.
+- **Upcoming supply and project pages:** require verified project/developer records, milestones, availability, and payment-plan data.
+
+Useful public starting point: [Rwanda Data Sharing Platform datasets](https://data.gov.rw/datasets). The platform describes some land datasets as aggregated summaries derived from the Land Administration Information System (LAIS), not individual parcel-title records. Follow each dataset's citation and reuse rules; its published terms may restrict redistribution.
+
+The comparison panel can shortlist area names and levels, but numeric metric cells are intentionally labelled unavailable until the underlying dataset is validated. The Projects mode similarly avoids creating project markers, prices, payment plans, or construction percentages without a source.
+
 ## Rwanda viewport limits and boundary opacity
 
 - Administrative polygon opacity: 35% by default, 50% when selected, and 62% on hover.
