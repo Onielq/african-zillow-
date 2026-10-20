@@ -221,14 +221,16 @@ function arcGisPolygonToGeoJson(geometry: ArcGisGeometry | null | undefined) {
 }
 
 export async function GET(request: NextRequest) {
-  const levelParam = request.nextUrl.searchParams.get("level");
-  if (levelParam !== "district" && levelParam !== "sector") {
+  const rawLevel = request.nextUrl.searchParams.get("level");
+  const validLevels = ["district", "sector", "cell", "village"] as const;
+  if (!validLevels.includes(rawLevel as (typeof validLevels)[number])) {
     return NextResponse.json(
-      { error: "level must be district or sector" },
+      { error: "level must be district, sector, cell, or village" },
       { status: 400 }
     );
   }
 
+  const level = rawLevel as (typeof validLevels)[number];
   const hasBounds = request.nextUrl.searchParams.has("bbox");
   const bounds = parseBounds(request.nextUrl.searchParams.get("bbox"));
   if (!bounds) {
@@ -247,13 +249,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const layerId = levelParam === "district" ? 0 : 1;
-  const fields =
-    levelParam === "district"
-      ? "objectid,province,province_id,district,district_id"
-      : "objectid,province,province_id,district,district_id,sector,sector_id";
+  const layerIds = { district: 0, sector: 1, cell: 2, village: 3 } as const;
+  const fields = {
+    district: "objectid,province,province_id,district,district_id",
+    sector: "objectid,province,province_id,district,district_id,sector,sector_id",
+    cell: "objectid,province,province_id,district,district_id,sector,sector_id,cell,cell_id",
+    village: "objectid,province,province_id,district,district_id,sector,sector_id,cell,cell_id,village,village_id"
+  } as const;
 
-  const upstreamUrl = new URL(`${FEATURE_SERVER}/${layerId}/query`);
+  const upstreamUrl = new URL(`${FEATURE_SERVER}/${layerIds[level]}/query`);
   upstreamUrl.search = new URLSearchParams({
     where: DISTRICT_WHERE,
     geometry: bounds.join(","),
@@ -261,9 +265,9 @@ export async function GET(request: NextRequest) {
     inSR: "4326",
     outSR: "4326",
     spatialRel: "esriSpatialRelIntersects",
-    outFields: fields,
+    outFields: fields[level],
     returnGeometry: "true",
-    resultRecordCount: "1000",
+    resultRecordCount: level === "village" ? "1500" : "1000",
     f: "json"
   }).toString();
 
@@ -301,23 +305,36 @@ export async function GET(request: NextRequest) {
         const districtId = textValue(attributes.district_id);
         const sector = textValue(attributes.sector);
         const sectorId = textValue(attributes.sector_id);
+        const cell = textValue(attributes.cell);
+        const cellId = textValue(attributes.cell_id);
+        const village = textValue(attributes.village);
+        const villageId = textValue(attributes.village_id);
         const geometry = arcGisPolygonToGeoJson(feature.geometry);
 
         if (!district || !geometry) return null;
 
+        const nameByLevel = { district, sector, cell, village };
+        if (!nameByLevel[level]) return null;
+
+        const idByLevel = {
+          district: districtId ?? district,
+          sector: sectorId ?? `${districtId ?? district}-${sector ?? "unknown"}`,
+          cell: cellId ?? `${sectorId ?? "unknown"}-${cell ?? "unknown"}`,
+          village: villageId ?? `${cellId ?? "unknown"}-${village ?? "unknown"}`
+        };
+
         return {
           type: "Feature" as const,
-          id:
-            levelParam === "district"
-              ? `district-${districtId ?? district}`
-              : `sector-${sectorId ?? `${districtId ?? "unknown"}-${sector ?? "unknown"}`}`,
+          id: `${level}-${idByLevel[level]}`,
           geometry,
           properties: {
             province: textValue(attributes.province),
             province_id: textValue(attributes.province_id),
             district,
             district_id: districtId,
-            ...(levelParam === "sector" ? { sector, sector_id: sectorId } : {})
+            ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
+            ...(level === "cell" || level === "village" ? { cell, cell_id: cellId } : {}),
+            ...(level === "village" ? { village, village_id: villageId } : {})
           }
         };
       })

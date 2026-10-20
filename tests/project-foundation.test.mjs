@@ -14,18 +14,25 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /Nyarugenge/i);
   assert.match(route, /Bugesera/i);
   assert.match(route, /FeatureServer/);
+  assert.match(route, /district, sector, cell, or village/);
+  assert.match(route, /layerIds = \{ district: 0, sector: 1, cell: 2, village: 3 \}/);
   assert.match(route, /geometryType/);
   assert.match(route, /arcGisPolygonToGeoJson/);
   assert.match(route, /f: "json"/);
 });
 
-test("the map view progressively switches from districts to sectors", async () => {
+test("the map view progressively switches from districts to sectors, cells, and villages", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /SECTOR_ZOOM/);
+  assert.match(mapView, /CELL_ZOOM/);
+  assert.match(mapView, /VILLAGE_ZOOM/);
   assert.match(mapView, /district-fill/);
   assert.match(mapView, /sector-fill/);
+  assert.match(mapView, /cell-fill/);
+  assert.match(mapView, /village-fill/);
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
+  assert.match(mapView, /0\.2/);
 });
 
 test("the basemap has a documented fallback style", async () => {

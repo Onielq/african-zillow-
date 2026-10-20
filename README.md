@@ -4,11 +4,13 @@ A map-first land intelligence platform for Rwanda, initially focused on Kigali C
 
 ## Current stage
 
-The application includes an interactive MapLibre base map, a fallback basemap style, and viewport-based district/sector overlays from the Rwanda Environment Ministry GIS FeatureServer.
+The application includes an interactive MapLibre base map, a fallback basemap style, and viewport-based administrative polygons for four pilot districts: Gasabo, Kicukiro, Nyarugenge, and Bugesera.
 
-**The basemap and administrative polygons are not a land registry.** Cadastral parcel boundaries, listing counts, ownership records, official zoning overlays, and market metrics are not yet connected.
+**The ordinary road map remains visible.** As users zoom in, the map switches from district boundaries to sectors, cells, and villages. Area fills use 20% opacity by default, with stronger highlighting on hover and selection. Clicking a polygon identifies the area and fits the map to its extent.
 
-The administrative GIS service describes its district and sector layers as based on village boundaries established during the 2022 census. The source is publicly queryable, but its reuse and redistribution terms must be confirmed before production.
+**The basemap and administrative polygons are not a land registry.** Official cadastral parcel boundaries, listing counts, ownership records, verified zoning overlays, and market metrics are not yet connected. The app must not draw or infer individual plots from roads, satellite imagery, or administrative borders.
+
+The current administrative API uses the Rwanda Environment Ministry GIS FeatureServer. Its district, sector, cell, and village layer descriptions reference boundaries based on the 2022 census. The service is publicly queryable, but access, version, and reuse terms must be confirmed before production.
 
 ## Local development
 
@@ -35,9 +37,26 @@ https://tiles.openfreemap.org/styles/liberty
 - A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
 - If the basemap fails after the worker is available, check the browser Network tab for style and tile requests. A working worker is necessary but does not guarantee that a third-party style or tile service is reachable.
 
+## Geographic hierarchy and source plan
+
+The visible navigation hierarchy is:
+
+`District → Sector → Cell → Village → Land parcel`
+
+The first four levels are administrative polygons. They come from the current pilot API and are revealed by zoom level. The last level is different: an individual land parcel is a cadastral record, not an administrative unit. Parcel outlines and identifiers must come from an authorized, current Rwanda Land Authority (RLA/LAIS) cadastral source.
+
+Potential data references to validate before production:
+
+- [Rwanda Environment Ministry GIS — 2022 census-based administrative boundaries](https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer)
+- [geodata.rw — district boundaries](https://geodata.rw/server/rest/services/basemap/District_boundary/FeatureServer/0)
+- [geodata.rw — sector boundaries](https://geodata.rw/server/rest/services/basemap/Sector_Boundary/FeatureServer)
+- [geodata.rw — 2022 village boundaries](https://geodata.rw/server/rest/services/village_boundary/MapServer)
+
+Important: some geodata.rw National Geodatabase metadata describes older 2006/2012 boundary vintages and says the dataset must not be transferred to third parties without RLA permission. Confirm the latest official version and written reuse rights before replacing the currently used boundary service or republishing its geometry. The app currently does not serve geodata.rw cadastral parcel records.
+
 ## Valhalla's role
 
-Valhalla is a routing and map-matching engine. It can later support driving/walking routes, trace a GPS trace onto the road network, route distances, and travel-time isochrones around a plot or landmark. It does **not** derive legally meaningful cadastral parcel boundaries or administrative polygons. Those outlines must come from appropriately sourced land or administrative GIS data.
+Valhalla is a routing and map-matching engine. It can support driving/walking routes, snap a user-supplied GPS trace to mapped roads, calculate route distances, and produce travel-time isochrones around a plot or landmark. It does **not** derive legally meaningful cadastral parcel boundaries or administrative polygons. Use geographic boundary data for the district/sector/cell/village edges and RLA-approved cadastral data for plot edges.
 
 ## Data integrity rules
 
