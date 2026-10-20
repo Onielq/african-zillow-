@@ -6,7 +6,7 @@ A map-first land intelligence platform for Rwanda, initially focused on Kigali C
 
 The application includes an interactive MapLibre base map, a Map/Satellite switcher, a fallback basemap style, and viewport-based administrative polygons for four pilot districts: Gasabo, Kicukiro, Nyarugenge, and Bugesera. Satellite mode uses Esri World Imagery raster tiles; administrative overlays are rebuilt above the imagery when the style changes.
 
-**The ordinary road map remains visible.** As users zoom in, the map switches from district boundaries to sectors, cells, and villages. Area fills use 20% opacity by default, with stronger highlighting on hover and selection. Clicking a polygon identifies the area and fits the map to its extent.
+**The ordinary road map remains visible.** As users zoom in, the map switches from district boundaries to sectors, cells, and villages. Area fills use 35% opacity by default, 50% for selected areas, and 62% on hover. The map's zoom-out floor is calculated from the current viewport so the full padded Rwanda extent fits on screen. Panning is constrained to Rwanda's geographic envelope. Clicking a polygon identifies the area and fits the map to its extent.
 
 **The basemap and administrative polygons are not a land registry.** Official cadastral parcel boundaries, listing counts, ownership records, verified zoning overlays, and market metrics are not yet connected. The app must not draw or infer individual plots from roads, satellite imagery, or administrative borders.
 
@@ -36,6 +36,13 @@ https://tiles.openfreemap.org/styles/liberty
 - **Hydration warning containing `data-new-gr-c-s-check-loaded` or `data-gr-ext-installed`.** These attributes are commonly injected by Grammarly before React hydrates. The body uses `suppressHydrationWarning` for this known extension-injected attribute mismatch. To verify the page without the extension, disable Grammarly on localhost or test in a clean browser profile.
 - A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
 - If the basemap fails after the worker is available, check the browser Network tab for style and tile requests. A working worker is necessary but does not guarantee that a third-party style or tile service is reachable.
+
+## Rwanda viewport limits and boundary opacity
+
+- Administrative polygon opacity: 35% by default, 50% when selected, and 62% on hover.
+- Zooming out stops at a minimum zoom derived from the current map size so Rwanda's full geographic extent fits in view on desktop and mobile.
+- Map panning is constrained to a padded longitude/latitude envelope around Rwanda.
+- This is a camera constraint using a geographic envelope, not a polygon mask that removes every pixel outside Rwanda's exact international border.
 
 ## Satellite imagery source and licensing
 
