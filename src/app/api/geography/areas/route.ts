@@ -6,6 +6,20 @@ const FEATURE_SERVER =
   "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
 
 const INCLUDED_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE", "BUGESERA"] as const;
+
+// Snapshot transcribed from the Rwanda Land Dashboard's "Average Land Price
+// per District" table. The dashboard page does not expose an observation date
+// in its rendered table, so treat these as sourced snapshot values, not a live
+// feed, until the official dataset/API with timestamps is connected.
+const DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2: Record<string, number> = {
+  GASABO: 36013,
+  KICUKIRO: 61491,
+  NYARUGENGE: 50735,
+  BUGESERA: 4033
+};
+const DISTRICT_LAND_PRICE_SOURCE =
+  "https://rwandalanddashboard.lands.rw/prices";
+
 const DISTRICT_WHERE =
   "UPPER(district) IN ('GASABO','KICUKIRO','NYARUGENGE','BUGESERA')";
 
@@ -332,6 +346,15 @@ export async function GET(request: NextRequest) {
             province_id: textValue(attributes.province_id),
             district,
             district_id: districtId,
+            ...(level === "district" &&
+            DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[district.toUpperCase()] !== undefined
+              ? {
+                  average_land_price_per_m2:
+                    DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[district.toUpperCase()],
+                  average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
+                  average_land_price_date_status: "source observation date not exposed"
+                }
+              : {}),
             ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
             ...(level === "cell" || level === "village" ? { cell, cell_id: cellId } : {}),
             ...(level === "village" ? { village, village_id: villageId } : {})
