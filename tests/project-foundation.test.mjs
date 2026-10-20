@@ -7,19 +7,30 @@ import test from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const readProjectFile = (path) => readFile(join(root, path), "utf8");
 
-test("the map view uses a real configured style and an honest default", async () => {
-  const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  assert.match(mapView, /NEXT_PUBLIC_MAP_STYLE_URL/);
-  assert.match(mapView, /tiles\.openfreemap\.org\/styles\/positron/);
-  assert.match(mapView, /NavigationControl/);
-  assert.match(mapView, /AttributionControl/);
+test("the administrative API restricts requests to the four pilot districts", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  assert.match(route, /Gasabo/);
+  assert.match(route, /Kicukiro/);
+  assert.match(route, /Nyarugenge/);
+  assert.match(route, /Bugesera/);
+  assert.match(route, /FeatureServer/);
+  assert.match(route, /geometryType/);
 });
 
-test("the UI explicitly distinguishes the basemap from land records", async () => {
+test("the map view progressively switches from districts to sectors", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  assert.match(mapView, /SECTOR_ZOOM/);
+  assert.match(mapView, /district-fill/);
+  assert.match(mapView, /sector-fill/);
+  assert.match(mapView, /fitBounds/);
+  assert.match(mapView, /setFeatureState/);
+});
+
+test("the UI distinguishes administrative boundaries from parcel and ownership data", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
-  assert.match(experience, /Parcel boundaries,\s*official zoning,\s*and listing counts are not\s*connected yet/);
-  assert.match(experience, /Kigali City/);
-  assert.match(experience, /Bugesera/);
+  assert.match(experience, /not a cadastral plot/);
+  assert.match(experience, /Land records not connected yet/);
+  assert.match(experience, /reuse terms must be confirmed before production/i);
 });
 
 test("the experience provides responsive focus controls and reduced-motion support", async () => {

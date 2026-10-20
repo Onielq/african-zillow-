@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import type { Map as MapLibreMapInstance } from "maplibre-gl";
-import { MapView, type BasemapStatus } from "@/components/map/MapView";
+import {
+  MapView,
+  type BasemapStatus,
+  type BoundaryStatus,
+  type SelectedArea
+} from "@/components/map/MapView";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
 
@@ -24,13 +29,13 @@ const FOCUS_OPTIONS: Array<{
     id: "kigali",
     label: "Kigali City",
     center: [30.0619, -1.9441],
-    zoom: 10.2
+    zoom: 9.35
   },
   {
     id: "bugesera",
     label: "Bugesera",
     center: [30.18, -2.28],
-    zoom: 10.2
+    zoom: 9.35
   }
 ];
 
@@ -63,10 +68,16 @@ function BrandMark() {
   );
 }
 
-function getStatusLabel(status: BasemapStatus) {
+function getBasemapLabel(status: BasemapStatus) {
   if (status === "ready") return "Basemap connected";
   if (status === "error") return "Basemap could not load";
   return "Loading basemap";
+}
+
+function getBoundaryLabel(status: BoundaryStatus) {
+  if (status === "ready") return "Administrative boundaries loaded";
+  if (status === "error") return "Boundary service unavailable";
+  return "Loading administrative boundaries";
 }
 
 export function MapExperience() {
@@ -75,19 +86,33 @@ export function MapExperience() {
   );
   const [basemapStatus, setBasemapStatus] =
     useState<BasemapStatus>("loading");
+  const [boundaryStatus, setBoundaryStatus] =
+    useState<BoundaryStatus>("loading");
   const [activeFocus, setActiveFocus] = useState<FocusArea>("combined");
+  const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef<HTMLDivElement>(null);
+  const areaPanelRef = useRef<HTMLElement>(null);
 
   const handleMapReady = useCallback(
     (map: MapLibreMapInstance | null) => setMapInstance(map),
     []
   );
+  const handleAreaSelected = useCallback(
+    (area: SelectedArea | null) => setSelectedArea(area),
+    []
+  );
+  const handleBasemapStatus = useCallback(
+    (status: BasemapStatus) => setBasemapStatus(status),
+    []
+  );
+  const handleBoundaryStatus = useCallback(
+    (status: BoundaryStatus) => setBoundaryStatus(status),
+    []
+  );
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const context = gsap.context(() => {
       gsap.fromTo(
@@ -107,15 +132,28 @@ export function MapExperience() {
     return () => context.revert();
   }, []);
 
+  useEffect(() => {
+    if (!selectedArea || !areaPanelRef.current) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const context = gsap.context(() => {
+      gsap.fromTo(
+        areaPanelRef.current,
+        { x: -12, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.28, ease: "power2.out" }
+      );
+    }, areaPanelRef);
+
+    return () => context.revert();
+  }, [selectedArea]);
+
   const focusMap = (focus: FocusArea) => {
     setActiveFocus(focus);
 
     const option = FOCUS_OPTIONS.find((item) => item.id === focus);
+    if (!option || !mapInstance) return;
 
-    if (!option || !mapInstance) {
-      return;
-    }
-
+    setSelectedArea(null);
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
@@ -177,7 +215,9 @@ export function MapExperience() {
       <section aria-label="Map workspace" className="map-workspace">
         <MapView
           onMapReady={handleMapReady}
-          onStatusChange={setBasemapStatus}
+          onStatusChange={handleBasemapStatus}
+          onBoundaryStatusChange={handleBoundaryStatus}
+          onAreaSelected={handleAreaSelected}
         />
 
         <div className="map-vignette" aria-hidden="true" />
@@ -187,9 +227,15 @@ export function MapExperience() {
             aria-hidden="true"
             className={`status-dot status-dot-${basemapStatus}`}
           />
-          <span aria-live="polite">{getStatusLabel(basemapStatus)}</span>
+          <span aria-live="polite">{getBasemapLabel(basemapStatus)}</span>
           <span className="status-divider" />
-          <span className="status-secondary">Kigali City &amp; Bugesera</span>
+          <span
+            aria-hidden="true"
+            className={`status-dot status-dot-${boundaryStatus}`}
+          />
+          <span aria-live="polite" className="status-secondary">
+            {getBoundaryLabel(boundaryStatus)}
+          </span>
         </div>
 
         <div className="map-floating-toolbar" ref={toolbarRef}>
@@ -204,9 +250,7 @@ export function MapExperience() {
                 type="button"
               >
                 {label}
-                <span aria-hidden="true" className="control-chevron">
-                  ⌄
-                </span>
+                <span aria-hidden="true" className="control-chevron">⌄</span>
               </button>
             ))}
           </nav>
@@ -233,19 +277,71 @@ export function MapExperience() {
           </div>
         </div>
 
-        <aside aria-label="Data availability" className="data-note">
-          <div className="data-note-heading">
-            <span aria-hidden="true" className="data-note-icon">
-              i
-            </span>
-            <strong>Land layers are next</strong>
-          </div>
-          <p>
-            Parcel boundaries, official zoning, and listing counts are not
-            connected yet. The map below is a live base map, not a land-record
-            or ownership map.
-          </p>
-        </aside>
+        {selectedArea ? (
+          <aside
+            aria-label="Selected administrative area"
+            aria-live="polite"
+            className="selected-area-panel"
+            ref={areaPanelRef}
+          >
+            <button
+              aria-label="Close selected area panel"
+              className="panel-close"
+              onClick={() => setSelectedArea(null)}
+              type="button"
+            >
+              ×
+            </button>
+            <p className="panel-eyebrow">
+              {selectedArea.level === "district" ? "DISTRICT" : "SECTOR"}
+            </p>
+            <h2>
+              {selectedArea.name}
+              {selectedArea.level === "district" ? " District" : " Sector"}
+            </h2>
+            {selectedArea.level === "sector" ? (
+              <p className="panel-parent">Within {selectedArea.district} District</p>
+            ) : null}
+            <div className="panel-divider" />
+            <div className="source-status">
+              <span className="source-status-mark" />
+              Administrative boundary
+            </div>
+            <p className="panel-copy">
+              Boundary layer served by Rwanda Environment Ministry GIS. Its
+              published description references boundaries based on the 2022
+              census. Reuse terms must be confirmed before production.
+            </p>
+            <div className="panel-notice">
+              <strong>Land records not connected yet</strong>
+              <p>
+                This outline is an administrative area, not a cadastral plot.
+                Land-listing counts, plot boundaries, and ownership records are
+                not available in this view.
+              </p>
+            </div>
+          </aside>
+        ) : (
+          <aside aria-label="Boundary layer information" className="data-note">
+            <div className="data-note-heading">
+              <span aria-hidden="true" className="data-note-icon">i</span>
+              <strong>
+                {boundaryStatus === "error"
+                  ? "Boundary service unavailable"
+                  : "Districts and sectors"}
+              </strong>
+            </div>
+            <p>
+              Hover to highlight an area. Click a district to reveal its
+              sectors. These are administrative boundaries, not land plots.
+              Plot counts and cadastral boundaries are not connected yet.
+            </p>
+            <p className="data-source-note">
+              Source: Rwanda Environment Ministry GIS · 2022 census boundary
+              basis · reuse terms to confirm before production.
+            </p>
+          </aside>
+        )}
       </section>
     </main>
   );
