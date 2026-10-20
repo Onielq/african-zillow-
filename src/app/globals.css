@@ -561,6 +561,73 @@ button:disabled {
   color: #765A2B !important;
 }
 
+.land-price-legend {
+  margin: 10px 0 12px;
+  padding: 9px 10px 8px;
+  border: 1px solid #E2E9E3;
+  border-radius: 10px;
+  background: #FBFCFB;
+}
+
+.land-price-legend > span {
+  color: #586A60;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.land-price-legend-scale {
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #E2F0E5 0%, #C7DFAE 28%, #F0D16B 53%, #E98B59 78%, #B94943 100%);
+}
+
+.land-price-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: #7A887F;
+  font-size: 9px;
+}
+
+.area-price-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 13px 0 2px;
+  padding: 12px;
+  border: 1px solid #D7E6DC;
+  border-radius: 12px;
+  background: #F5FAF6;
+}
+
+.area-price-metric > span {
+  color: #63736A;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.area-price-metric > strong {
+  color: #176B50;
+  font-size: 23px;
+  font-weight: 780;
+  letter-spacing: -.045em;
+  line-height: 1.1;
+}
+
+.area-price-metric > small {
+  color: #748177;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.area-price-unavailable {
+  font-size: 10px !important;
+  line-height: 1.55 !important;
+}
+
 .sources-panel,
 .comparison-panel {
   position: absolute;
