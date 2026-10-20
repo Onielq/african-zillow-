@@ -180,7 +180,7 @@ export function MapExperience() {
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
   const [selectedMetric, setSelectedMetric] =
     useState<MarketMetric>("averageLandPricePerM2");
-  const [propertyScope, setPropertyScope] = useState<PropertyScope>("all");
+  const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -440,7 +440,19 @@ export function MapExperience() {
                 aria-label="Market metric"
                 className="toolbar-select"
                 value={selectedMetric}
-                onChange={(event) => setSelectedMetric(event.target.value as MarketMetric)}
+                onChange={(event) => {
+                  const metric = event.target.value as MarketMetric;
+                  setSelectedMetric(metric);
+                  if (
+                    metric === "averageLandPricePerM2" ||
+                    metric === "transactionVolume" ||
+                    metric === "capitalAppreciation"
+                  ) {
+                    setPropertyScope("land");
+                  } else {
+                    setPropertyScope("all");
+                  }
+                }}
               >
                 {MARKET_METRICS.map((metric) => (
                   <option key={metric.id} value={metric.id}>{metric.label}</option>
@@ -452,10 +464,26 @@ export function MapExperience() {
               <select
                 aria-label="Property type"
                 className="toolbar-select"
-                value={propertyScope}
+                disabled={
+                  selectedMetric === "averageLandPricePerM2" ||
+                  selectedMetric === "transactionVolume" ||
+                  selectedMetric === "capitalAppreciation"
+                }
+                value={
+                  selectedMetric === "averageLandPricePerM2" ||
+                  selectedMetric === "transactionVolume" ||
+                  selectedMetric === "capitalAppreciation"
+                    ? "land"
+                    : propertyScope
+                }
                 onChange={(event) => setPropertyScope(event.target.value as PropertyScope)}
               >
-                {PROPERTY_SCOPES.map((scope) => (
+                {(selectedMetric === "averageLandPricePerM2" ||
+                selectedMetric === "transactionVolume" ||
+                selectedMetric === "capitalAppreciation"
+                  ? PROPERTY_SCOPES.filter((scope) => scope.value === "land")
+                  : PROPERTY_SCOPES
+                ).map((scope) => (
                   <option key={scope.value} value={scope.value}>{scope.label}</option>
                 ))}
               </select>
@@ -465,6 +493,12 @@ export function MapExperience() {
               <select
                 aria-label="Analysis period"
                 className="toolbar-select"
+                disabled={selectedMetric === "averageLandPricePerM2"}
+                title={
+                  selectedMetric === "averageLandPricePerM2"
+                    ? "The available district price snapshot has no observation date; period filtering is not applied."
+                    : undefined
+                }
                 value={analysisPeriod}
                 onChange={(event) => setAnalysisPeriod(event.target.value as AnalysisPeriod)}
               >
