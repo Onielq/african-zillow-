@@ -50,7 +50,7 @@ const MARKET_METRICS: Array<{
     label: "Capital appreciation",
     shortLabel: "Appreciation",
     description: "How comparable prices changed over a selected period.",
-    dataStatus: "A consistent historical price series is required; no verified series is connected."
+    dataStatus: "The Rwanda Land Dashboard displays a land-price trend, but its time series is not connected and validated here. It must not be treated as a house-price index."
   },
   {
     id: "rentalYield",
@@ -647,10 +647,10 @@ export function MapExperience() {
               </div>
             </div>
             <div className="source-register-item">
-              <span className="source-register-status source-register-connected" />
+              <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Average district land prices</strong>
-                <p>Initial RWF/m² snapshot mapped for four pilot districts; official observation date not exposed on the page</p>
+                <p>Initial RWF/m² snapshot mapped for four pilot districts; live feed and source observation date need validation</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -667,6 +667,14 @@ export function MapExperience() {
                 <p>Developer and construction pipeline required</p>
               </div>
             </div>
+            <a
+              className="source-register-link"
+              href="https://rwandalanddashboard.lands.rw/prices"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open National Land Dashboard prices ↗
+            </a>
             <a
               className="source-register-link"
               href="https://data.gov.rw/datasets"
@@ -732,19 +740,50 @@ export function MapExperience() {
                     </div>
                   ))}
                 </div>
-                <div className="comparison-data-heading">
-                  <span>Metric</span>
-                  <span>Verified values</span>
+                <div className="comparison-table-scroll">
+                  <table className="comparison-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Metric</th>
+                        {comparedAreas.map((area) => (
+                          <th
+                            scope="col"
+                            key={`${area.level}-${area.district}-${area.name}`}
+                          >
+                            {area.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MARKET_METRICS.map((metric) => (
+                        <tr key={metric.id}>
+                          <th scope="row">{metric.shortLabel}</th>
+                          {comparedAreas.map((area) => {
+                            const landPrice =
+                              metric.id === "averageLandPricePerM2" &&
+                              area.level === "district"
+                                ? area.averageLandPricePerM2
+                                : null;
+                            return (
+                              <td key={`${metric.id}-${area.level}-${area.district}-${area.name}`}>
+                                {landPrice !== null
+                                  ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`
+                                  : metric.id === "averageLandPricePerM2" && area.level !== "district"
+                                    ? "No value at this level"
+                                    : "Pending"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                {MARKET_METRICS.map((metric) => (
-                  <div className="comparison-metric-row" key={metric.id}>
-                    <span>{metric.shortLabel}</span>
-                    <span>Not connected</span>
-                  </div>
-                ))}
                 <p className="data-source-note">
-                  Comparison layout is connected. Numeric market comparison
-                  becomes available when verified datasets are joined to areas.
+                  The district land-price snapshot is populated where available.
+                  Other metrics are pending validated data feeds; finer-level
+                  prices are not inferred from district averages.
                 </p>
                 <button
                   className="comparison-clear"
