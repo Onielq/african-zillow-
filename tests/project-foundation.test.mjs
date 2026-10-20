@@ -61,6 +61,49 @@ test("the map supports a satellite basemap without removing administrative overl
   assert.match(css, /\.basemap-switcher/);
 });
 
+test("the investment workspace exposes six metrics, property scope, and period filters", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  for (const metric of [
+    "averagePricePerM2",
+    "transactionVolume",
+    "capitalAppreciation",
+    "rentalYield",
+    "marketSupply",
+    "upcomingSupply"
+  ]) {
+    assert.match(experience, new RegExp(metric));
+  }
+
+  assert.match(experience, /aria-label="Market metric"/);
+  assert.match(experience, /aria-label="Property type"/);
+  assert.match(experience, /aria-label="Analysis period"/);
+  assert.match(experience, /verified price series is connected/i);
+  assert.match(experience, /No project markers or prices are fabricated/);
+});
+
+test("area comparison supports up to four areas without fabricating unavailable metrics", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(experience, /setComparedAreas/);
+  assert.match(experience, /comparedAreas\.length >= 4/);
+  assert.match(experience, /Add to comparison/);
+  assert.match(experience, /Not connected/);
+  assert.match(experience, /Clear shortlist/);
+  assert.match(css, /\.comparison-panel/);
+});
+
+test("the source register separates connected boundaries from pending market feeds", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(experience, /Market data sources/);
+  assert.match(experience, /Administrative boundaries/);
+  assert.match(experience, /Land transaction summaries/);
+  assert.match(experience, /Sale prices and rental yields/);
+  assert.match(experience, /Projects and upcoming supply/);
+  assert.match(experience, /https:\/\/data\.gov\.rw\/datasets/);
+});
+
 test("the basemap has a documented fallback style", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /styles\/liberty/);
