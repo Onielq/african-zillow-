@@ -9,6 +9,7 @@ import {
   type GeoJSONSource,
   type Map as MapLibreMapInstance,
   type MapGeoJSONFeature,
+  type StyleSpecification,
   getVersion,
   setWorkerUrl
 } from "maplibre-gl";
@@ -21,6 +22,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
+export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village";
 
 export type SelectedArea = {
@@ -53,6 +55,7 @@ type AreaProperties = {
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 
 type MapViewProps = {
+  basemapMode: BasemapMode;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -60,6 +63,36 @@ type MapViewProps = {
 };
 
 const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const NORMAL_STYLE_URL =
+  process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
+
+// Esri World Imagery is provided as raster tiles. Keep its required attribution
+// attached to the source so MapLibre's attribution control can display it.
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    "world-imagery": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      ],
+      tileSize: 256,
+      minzoom: 0,
+      maxzoom: 19,
+      attribution:
+        "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    }
+  },
+  layers: [
+    {
+      id: "world-imagery",
+      type: "raster",
+      source: "world-imagery",
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
 // Administrative boundaries are real geographic polygons, not routes.
 // The thresholds reveal one progressively finer level at a time.
@@ -233,12 +266,26 @@ function featureToArea(
 }
 
 export function MapView({
+  basemapMode,
   onMapReady,
   onStatusChange,
   onBoundaryStatusChange,
   onAreaSelected
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMapInstance | null>(null);
+  const activeBasemapModeRef = useRef<BasemapMode>("map");
+
+  // Change only the style, not the map instance. Camera position and the
+  // administrative zoom hierarchy therefore remain connected to the same map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || activeBasemapModeRef.current === basemapMode) return;
+
+    activeBasemapModeRef.current = basemapMode;
+    onStatusChange("loading");
+    map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
+  }, [basemapMode, onStatusChange]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -247,8 +294,7 @@ export function MapView({
     onStatusChange("loading");
     onBoundaryStatusChange("loading");
 
-    const configuredStyleUrl = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim();
-    const initialStyleUrl = configuredStyleUrl || FALLBACK_STYLE_URL;
+    const initialStyleUrl = NORMAL_STYLE_URL;
 
     const map = new MapLibreMap({
       container,
@@ -280,6 +326,9 @@ export function MapView({
       }),
       "bottom-left"
     );
+
+    mapRef.current = map;
+    activeBasemapModeRef.current = "map";
 
     let styleLoaded = false;
     let fallbackAttempted = initialStyleUrl === FALLBACK_STYLE_URL;
@@ -642,6 +691,8 @@ export function MapView({
       activeController?.abort();
       resizeObserver?.disconnect();
       map.remove();
+      mapRef.current = null;
+      activeBasemapModeRef.current = "map";
       onMapReady(null);
     };
   }, [
