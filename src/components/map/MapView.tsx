@@ -37,6 +37,7 @@ export type SelectedArea = {
   cellId: string | null;
   village: string | null;
   villageId: string | null;
+  averageLandPricePerM2: number | null;
 };
 
 type AreaProperties = {
@@ -50,12 +51,16 @@ type AreaProperties = {
   cell_id?: string | null;
   village?: string | null;
   village_id?: string | null;
+  average_land_price_per_m2?: number | null;
+  average_land_price_source?: string | null;
+  average_land_price_date_status?: string | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 
 type MapViewProps = {
   basemapMode: BasemapMode;
+  showLandPriceHeatmap: boolean;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -269,12 +274,17 @@ function featureToArea(
     cell: properties.cell ?? null,
     cellId: properties.cell_id ?? null,
     village: properties.village ?? null,
-    villageId: properties.village_id ?? null
+    villageId: properties.village_id ?? null,
+    averageLandPricePerM2:
+      typeof properties.average_land_price_per_m2 === "number"
+        ? properties.average_land_price_per_m2
+        : null
   };
 }
 
 export function MapView({
   basemapMode,
+  showLandPriceHeatmap,
   onMapReady,
   onStatusChange,
   onBoundaryStatusChange,
@@ -283,6 +293,7 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
+  const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
@@ -294,6 +305,59 @@ export function MapView({
     onStatusChange("loading");
     map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
   }, [basemapMode, onStatusChange]);
+
+  useEffect(() => {
+    showLandPriceHeatmapRef.current = showLandPriceHeatmap;
+    const map = mapRef.current;
+    if (!map || !map.getLayer("district-fill")) return;
+
+    map.setPaintProperty("district-fill", "fill-color", [
+      "case",
+      ["boolean", ["feature-state", "hover"], false],
+      "#81BDA0",
+      ["boolean", ["feature-state", "selected"], false],
+      "#A3D3B9",
+      showLandPriceHeatmap
+        ? [
+            "case",
+            ["has", "average_land_price_per_m2"],
+            [
+              "interpolate",
+              ["linear"],
+              ["get", "average_land_price_per_m2"],
+              4033, "#E2F0E5",
+              10000, "#C7DFAE",
+              25000, "#F0D16B",
+              40000, "#E98B59",
+              61491, "#B94943"
+            ],
+            "#DCE5DD"
+          ]
+        : "#DCEAE1"
+    ]);
+
+    map.setPaintProperty(
+      "district-fill",
+      "fill-opacity",
+      showLandPriceHeatmap
+        ? [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            0.84,
+            ["boolean", ["feature-state", "selected"], false],
+            0.76,
+            0.68
+          ]
+        : [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            0.62,
+            ["boolean", ["feature-state", "selected"], false],
+            0.5,
+            0.35
+          ]
+    );
+  }, [showLandPriceHeatmap]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -415,16 +479,31 @@ export function MapView({
               "#81BDA0",
               ["boolean", ["feature-state", "selected"], false],
               "#A3D3B9",
-              layer.color
+              level === "district" && showLandPriceHeatmapRef.current
+                ? [
+                    "case",
+                    ["has", "average_land_price_per_m2"],
+                    [
+                      "interpolate",
+                      ["linear"],
+                      ["get", "average_land_price_per_m2"],
+                      4033, "#E2F0E5",
+                      10000, "#C7DFAE",
+                      25000, "#F0D16B",
+                      40000, "#E98B59",
+                      61491, "#B94943"
+                    ],
+                    "#DCE5DD"
+                  ]
+                : layer.color
             ],
-            // User-facing area tint stays light: 20% opacity by default.
             "fill-opacity": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              0.62,
+              level === "district" && showLandPriceHeatmapRef.current ? 0.84 : 0.62,
               ["boolean", ["feature-state", "selected"], false],
-              0.5,
-              0.35
+              level === "district" && showLandPriceHeatmapRef.current ? 0.76 : 0.5,
+              level === "district" && showLandPriceHeatmapRef.current ? 0.68 : 0.35
             ]
           }
         });
