@@ -17,7 +17,7 @@ test("the map view uses a real configured style and an honest default", async ()
 
 test("the UI explicitly distinguishes the basemap from land records", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
-  assert.match(experience, /Parcel boundaries, official zoning, and listing counts are not connected yet/);
+  assert.match(experience, /Parcel boundaries,\s*official zoning,\s*and listing counts are not\s*connected yet/);
   assert.match(experience, /Kigali City/);
   assert.match(experience, /Bugesera/);
 });
