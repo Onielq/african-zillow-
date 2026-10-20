@@ -17,7 +17,7 @@ type WorkspaceMode = "areas" | "projects";
 type PropertyScope = "all" | "residential" | "land";
 type AnalysisPeriod = "3m" | "6m" | "12m";
 type MarketMetric =
-  | "averagePricePerM2"
+  | "averageLandPricePerM2"
   | "transactionVolume"
   | "capitalAppreciation"
   | "rentalYield"
@@ -32,11 +32,11 @@ const MARKET_METRICS: Array<{
   dataStatus: string;
 }> = [
   {
-    id: "averagePricePerM2",
-    label: "Average price / m²",
-    shortLabel: "Price / m²",
-    description: "Typical registered sale price for comparable property or land.",
-    dataStatus: "A verified, time-stamped sale-price dataset is not connected."
+    id: "averageLandPricePerM2",
+    label: "Average land price / m²",
+    shortLabel: "Land price / m²",
+    description: "Published average land price by district, in Rwandan francs per square metre.",
+    dataStatus: "A sourced district snapshot is mapped for the four pilot districts. The source page does not expose the observation date, and this is not a house-sale price series."
   },
   {
     id: "transactionVolume",
@@ -179,7 +179,7 @@ export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
   const [selectedMetric, setSelectedMetric] =
-    useState<MarketMetric>("averagePricePerM2");
+    useState<MarketMetric>("averageLandPricePerM2");
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("all");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -379,6 +379,7 @@ export function MapExperience() {
       <section aria-label="Map workspace" className="map-workspace">
         <MapView
           basemapMode={basemapMode}
+          showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -524,6 +525,21 @@ export function MapExperience() {
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             <h2>{selectedArea.name}</h2>
+            {selectedMetric === "averageLandPricePerM2" ? (
+              selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null ? (
+                <div className="area-price-metric">
+                  <span>Average land price / m²</span>
+                  <strong>
+                    {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF
+                  </strong>
+                  <small>Rwanda Land Dashboard · source observation date not exposed</small>
+                </div>
+              ) : (
+                <p className="metric-status-copy area-price-unavailable">
+                  District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped here yet.
+                </p>
+              )
+            ) : null}
             {getAreaParent(selectedArea) ? (
               <p className="panel-parent">Within {getAreaParent(selectedArea)}</p>
             ) : null}
@@ -580,11 +596,19 @@ export function MapExperience() {
               <>
                 <p>{activeMetric.description}</p>
                 <p className="metric-status-copy">{activeMetric.dataStatus}</p>
+                {selectedMetric === "averageLandPricePerM2" ? (
+                  <div className="land-price-legend" aria-label="Land price heatmap legend">
+                    <span>RWF/m²</span>
+                    <div className="land-price-legend-scale" />
+                    <div className="land-price-legend-labels"><span>Lower</span><span>Higher</span></div>
+                  </div>
+                ) : null}
                 <p>
                   Current filters: {PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label}
                   {" · "}{ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label}.
-                  The map keeps its verified administrative colors until market
-                  data can be joined to the polygons.
+{selectedMetric === "averageLandPricePerM2"
+                    ? "District polygons are shaded by the sourced land-price snapshot. Price values are not yet mapped at sector, cell or village level."
+                    : "The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
                 </p>
               </>
             )}
@@ -623,10 +647,17 @@ export function MapExperience() {
               </div>
             </div>
             <div className="source-register-item">
+              <span className="source-register-status source-register-connected" />
+              <div>
+                <strong>Average district land prices</strong>
+                <p>Initial RWF/m² snapshot mapped for four pilot districts; official observation date not exposed on the page</p>
+              </div>
+            </div>
+            <div className="source-register-item">
               <span className="source-register-status source-register-pending" />
               <div>
-                <strong>Sale prices and rental yields</strong>
-                <p>Verified historical price and rent data required</p>
+                <strong>Rental yields and house-sale prices</strong>
+                <p>Verified house-price and rent records still required</p>
               </div>
             </div>
             <div className="source-register-item">
