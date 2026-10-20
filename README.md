@@ -39,21 +39,20 @@ https://tiles.openfreemap.org/styles/liberty
 
 ## Investment intelligence workspace
 
-The map workspace now includes a six-metric selector, property-type and analysis-period filters, an Areas / Projects mode switch, a source register, and an area comparison shortlist for up to four selected administrative areas.
-
-These controls establish the product workflow; they do **not** imply that the market data is already connected. The current map has verified administrative boundaries, but it does not yet recolor areas by sale price, rental yield, appreciation, available listing supply, or upcoming project supply. The selected metric's data status is shown in the interface instead of inventing values.
+The map workspace includes a six-metric selector, property-type and analysis-period filters, an Areas / Projects mode switch, a data-source register, and a comparison shortlist for up to four areas.
 
 ### Metric source readiness
 
-- **Transaction volume:** the Rwanda Data Sharing Platform lists National Land Authority / Rwanda Land Dashboard aggregate land transaction datasets. The normalized data import and join to map areas are not connected yet.
-- **Market supply:** registered land-parcel summaries may help describe parcel stock, but they are not the same as homes or plots actively listed for sale.
-- **Average price per m² and capital appreciation:** require a verified price dataset and comparable historical observations.
-- **Rental yield:** requires consistent, verified rental and sale-price observations.
-- **Upcoming supply and project pages:** require verified project/developer records, milestones, availability, and payment-plan data.
+- **Average land price / m²:** an initial district-level snapshot from the [Rwanda Land Dashboard prices page](https://rwandalanddashboard.lands.rw/prices) is mapped for Gasabo, Kicukiro, Nyarugenge, and Bugesera. The source page does not expose the observation date in its displayed table. The snapshot is not a live feed, is only shown at district level, and must not be treated as the price of a built house. Sector, cell, and village price values are not populated in this map layer.
+- **Transaction volume:** the Rwanda Data Sharing Platform lists National Land Authority / Rwanda Land Dashboard aggregate land-transaction datasets. The data feed and geographic join are not connected yet.
+- **Capital appreciation:** the Land Dashboard shows a land-price trend, but that time series has not been imported, quality-checked, or joined to map areas. It is not a house-price index.
+- **Market supply:** registered parcel summaries can describe registered parcel stock, but they are not the same as properties actively listed for sale or rent.
+- **Rental yield:** requires consistent, verified rental observations and comparable purchase-price data.
+- **Upcoming supply and project pages:** require verified developer records, construction milestones, unit availability, and payment-plan data.
 
-Useful public starting point: [Rwanda Data Sharing Platform datasets](https://data.gov.rw/datasets). The platform describes some land datasets as aggregated summaries derived from the Land Administration Information System (LAIS), not individual parcel-title records. Follow each dataset's citation and reuse rules; its published terms may restrict redistribution.
+Useful public starting points are the [Rwanda Land Dashboard](https://rwandalanddashboard.lands.rw/) and the [Rwanda Data Sharing Platform](https://data.gov.rw/datasets). The platform describes some land datasets as aggregated summaries derived from the Land Administration Information System (LAIS), not individual parcel-title records. Follow each dataset's citation and reuse rules; its published terms may restrict redistribution.
 
-The comparison panel can shortlist area names and levels, but numeric metric cells are intentionally labelled unavailable until the underlying dataset is validated. The Projects mode similarly avoids creating project markers, prices, payment plans, or construction percentages without a source.
+The comparison panel can shortlist area names and levels, but numeric comparison rows remain unavailable until their source feeds are validated. Projects mode does not fabricate project markers, prices, payment plans, or construction percentages.
 
 ## Rwanda viewport limits and boundary opacity
 
