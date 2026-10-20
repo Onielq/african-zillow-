@@ -13,6 +13,79 @@ import {
 } from "@/components/map/MapView";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
+type WorkspaceMode = "areas" | "projects";
+type PropertyScope = "all" | "residential" | "land";
+type AnalysisPeriod = "3m" | "6m" | "12m";
+type MarketMetric =
+  | "averagePricePerM2"
+  | "transactionVolume"
+  | "capitalAppreciation"
+  | "rentalYield"
+  | "marketSupply"
+  | "upcomingSupply";
+
+const MARKET_METRICS: Array<{
+  id: MarketMetric;
+  label: string;
+  shortLabel: string;
+  description: string;
+  dataStatus: string;
+}> = [
+  {
+    id: "averagePricePerM2",
+    label: "Average price / m²",
+    shortLabel: "Price / m²",
+    description: "Typical registered sale price for comparable property or land.",
+    dataStatus: "A verified, time-stamped sale-price dataset is not connected."
+  },
+  {
+    id: "transactionVolume",
+    label: "Transaction volume",
+    shortLabel: "Transactions",
+    description: "How many registered land transactions take place in an area.",
+    dataStatus: "The Rwanda Land Dashboard publishes aggregate transaction summaries. The data feed and geographic join are not connected yet."
+  },
+  {
+    id: "capitalAppreciation",
+    label: "Capital appreciation",
+    shortLabel: "Appreciation",
+    description: "How comparable prices changed over a selected period.",
+    dataStatus: "A consistent historical price series is required; no verified series is connected."
+  },
+  {
+    id: "rentalYield",
+    label: "Rental yield",
+    shortLabel: "Rental yield",
+    description: "Annual rent relative to purchase price, before costs.",
+    dataStatus: "Verified rent and sale-price records are both required; neither feed is connected."
+  },
+  {
+    id: "marketSupply",
+    label: "Market supply",
+    shortLabel: "Market supply",
+    description: "Properties actively available to buy or rent.",
+    dataStatus: "Active property inventory is not connected. Registered parcel totals are not the same as properties for sale."
+  },
+  {
+    id: "upcomingSupply",
+    label: "Upcoming supply",
+    shortLabel: "Upcoming supply",
+    description: "Verified planned developments and units expected to enter the market.",
+    dataStatus: "A verified developer and construction pipeline is not connected."
+  }
+];
+
+const PROPERTY_SCOPES: Array<{ value: PropertyScope; label: string }> = [
+  { value: "all", label: "All property" },
+  { value: "residential", label: "Residential" },
+  { value: "land", label: "Land" }
+];
+
+const ANALYSIS_PERIODS: Array<{ value: AnalysisPeriod; label: string }> = [
+  { value: "3m", label: "3 months" },
+  { value: "6m", label: "6 months" },
+  { value: "12m", label: "12 months" }
+];
 
 const FOCUS_OPTIONS: Array<{
   id: FocusArea;
@@ -40,7 +113,7 @@ const FOCUS_OPTIONS: Array<{
   }
 ];
 
-const TOOLBAR_ITEMS = ["Developers", "Projects", "Metrics", "Sources", "Show"];
+
 
 function BrandMark() {
   return (
@@ -104,6 +177,15 @@ function getAreaParent(area: SelectedArea): string | null {
 
 export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
+  const [selectedMetric, setSelectedMetric] =
+    useState<MarketMetric>("averagePricePerM2");
+  const [propertyScope, setPropertyScope] = useState<PropertyScope>("all");
+  const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
+  const [comparisonFeedback, setComparisonFeedback] = useState("");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
   );
@@ -133,6 +215,51 @@ export function MapExperience() {
     (status: BoundaryStatus) => setBoundaryStatus(status),
     []
   );
+
+  const addSelectedAreaToComparison = () => {
+    if (!selectedArea) return;
+
+    const exists = comparedAreas.some(
+      (area) =>
+        area.level === selectedArea.level &&
+        area.name === selectedArea.name &&
+        area.district === selectedArea.district
+    );
+
+    if (exists) {
+      setComparisonFeedback(`${selectedArea.name} is already on your comparison list.`);
+      setCompareOpen(true);
+      return;
+    }
+
+    if (comparedAreas.length >= 4) {
+      setComparisonFeedback("Compare up to four areas. Remove one to add another.");
+      setCompareOpen(true);
+      return;
+    }
+
+    setComparedAreas((areas) => [...areas, selectedArea]);
+    setComparisonFeedback(`${selectedArea.name} added to comparison.`);
+    setCompareOpen(true);
+  };
+
+  const removeComparedArea = (areaToRemove: SelectedArea) => {
+    setComparedAreas((areas) =>
+      areas.filter(
+        (area) =>
+          !(
+            area.level === areaToRemove.level &&
+            area.name === areaToRemove.name &&
+            area.district === areaToRemove.district
+          )
+      )
+    );
+    setComparisonFeedback("");
+  };
+
+  const activeMetric =
+    MARKET_METRICS.find((metric) => metric.id === selectedMetric) ??
+    MARKET_METRICS[0];
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -202,9 +329,9 @@ export function MapExperience() {
 
         <nav aria-label="Primary navigation" className="primary-navigation">
           <button
+            aria-expanded={compareOpen}
             className="compare-control"
-            disabled
-            title="Area comparison will be connected after market data is available."
+            onClick={() => setCompareOpen((open) => !open)}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -216,18 +343,29 @@ export function MapExperience() {
                 strokeLinejoin="round"
               />
             </svg>
-            Compare
+            Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}/4` : ""}
           </button>
         </nav>
 
         <div aria-label="Application modes" className="topbar-actions">
-          <span aria-current="page" className="mode-chip mode-chip-active">
-            Areas
-          </span>
           <button
-            className="mode-chip"
-            disabled
-            title="Projects will be developed in a later phase."
+            aria-pressed={workspaceMode === "areas"}
+            className={workspaceMode === "areas" ? "mode-chip mode-chip-active" : "mode-chip"}
+            onClick={() => {
+              setWorkspaceMode("areas");
+              setSelectedArea(null);
+            }}
+            type="button"
+          >
+            Areas
+          </button>
+          <button
+            aria-pressed={workspaceMode === "projects"}
+            className={workspaceMode === "projects" ? "mode-chip mode-chip-active" : "mode-chip"}
+            onClick={() => {
+              setWorkspaceMode("projects");
+              setSelectedArea(null);
+            }}
             type="button"
           >
             Projects
@@ -291,21 +429,55 @@ export function MapExperience() {
         </div>
 
         <div className="map-floating-toolbar" ref={toolbarRef}>
-          <nav aria-label="Map tools" className="map-toolbar">
-            {TOOLBAR_ITEMS.map((label) => (
-              <button
-                aria-label={`${label}, planned for a later phase`}
-                className="toolbar-control"
-                disabled
-                key={label}
-                title="This tool will be connected in a later phase."
-                type="button"
+          <div aria-label="Investment map filters" className="map-toolbar investment-toolbar">
+            <label className="investment-field investment-field-metric">
+              <span>Metric</span>
+              <select
+                aria-label="Market metric"
+                className="toolbar-select"
+                value={selectedMetric}
+                onChange={(event) => setSelectedMetric(event.target.value as MarketMetric)}
               >
-                {label}
-                <span aria-hidden="true" className="control-chevron">⌄</span>
-              </button>
-            ))}
-          </nav>
+                {MARKET_METRICS.map((metric) => (
+                  <option key={metric.id} value={metric.id}>{metric.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="investment-field">
+              <span>Type</span>
+              <select
+                aria-label="Property type"
+                className="toolbar-select"
+                value={propertyScope}
+                onChange={(event) => setPropertyScope(event.target.value as PropertyScope)}
+              >
+                {PROPERTY_SCOPES.map((scope) => (
+                  <option key={scope.value} value={scope.value}>{scope.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="investment-field investment-field-period">
+              <span>Period</span>
+              <select
+                aria-label="Analysis period"
+                className="toolbar-select"
+                value={analysisPeriod}
+                onChange={(event) => setAnalysisPeriod(event.target.value as AnalysisPeriod)}
+              >
+                {ANALYSIS_PERIODS.map((period) => (
+                  <option key={period.value} value={period.value}>{period.label}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              aria-expanded={sourcesOpen}
+              className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => setSourcesOpen((open) => !open)}
+              type="button"
+            >
+              Sources
+            </button>
+          </div>
         </div>
 
         <div className="map-focus-panel" ref={focusRef}>
@@ -349,6 +521,16 @@ export function MapExperience() {
             {getAreaParent(selectedArea) ? (
               <p className="panel-parent">Within {getAreaParent(selectedArea)}</p>
             ) : null}
+            <button
+              className="add-comparison-button"
+              onClick={addSelectedAreaToComparison}
+              type="button"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+                <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              Add to comparison
+            </button>
             <div className="panel-divider" />
             <div className="source-status">
               <span className="source-status-mark" />
@@ -370,28 +552,177 @@ export function MapExperience() {
             </div>
           </aside>
         ) : (
-          <aside aria-label="Boundary layer information" className="data-note">
+          <aside aria-label={workspaceMode === "projects" ? "Project data status" : "Market metric data status"} className="data-note">
             <div className="data-note-heading">
               <span aria-hidden="true" className="data-note-icon">i</span>
               <strong>
                 {boundaryStatus === "error"
                   ? "Boundary service unavailable"
-                  : "Explore the land hierarchy"}
+                  : workspaceMode === "projects"
+                    ? "Projects mode"
+                    : activeMetric.label}
               </strong>
             </div>
-            <p>
-              Hover or click an area to identify it. Zoom through districts,
-              sectors, cells, and villages. Boundary colors now use a stronger
-              35% fill, and zoom-out stops at the full Rwanda extent. These
-              administrative outlines are not individual land plots.
-            </p>
+            {workspaceMode === "projects" ? (
+              <p>
+                Project mode is ready for a verified project feed, but developer
+                launches, starting prices, payment plans, construction progress
+                and unit availability are not connected yet. No project markers
+                or prices are fabricated.
+              </p>
+            ) : (
+              <>
+                <p>{activeMetric.description}</p>
+                <p className="metric-status-copy">{activeMetric.dataStatus}</p>
+                <p>
+                  Current filters: {PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label}
+                  {" · "}{ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label}.
+                  The map keeps its verified administrative colors until market
+                  data can be joined to the polygons.
+                </p>
+              </>
+            )}
             <p className="data-source-note">
-              Admin source: Rwanda Environment Ministry GIS · 2022 census
-              boundary basis. Geodata.rw / Rwanda Land Authority cadastral
-              data still needs version, access, and reuse validation.
+              Boundaries: Rwanda Environment Ministry GIS. Aggregated land
+              statistics are listed on the Rwanda Data Sharing Platform.
+              Administrative outlines are not individual land plots.
             </p>
           </aside>
         )}
+
+        {sourcesOpen ? (
+          <aside aria-label="Market data sources" className="sources-panel">
+            <button
+              aria-label="Close data sources"
+              className="panel-close"
+              onClick={() => setSourcesOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+            <p className="panel-eyebrow">DATA REGISTER</p>
+            <h2>Market data sources</h2>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-connected" />
+              <div>
+                <strong>Administrative boundaries</strong>
+                <p>Connected · Ministry of Environment GIS</p>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-pending" />
+              <div>
+                <strong>Land transaction summaries</strong>
+                <p>Source identified · normalized feed not connected</p>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-pending" />
+              <div>
+                <strong>Sale prices and rental yields</strong>
+                <p>Verified historical price and rent data required</p>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-pending" />
+              <div>
+                <strong>Projects and upcoming supply</strong>
+                <p>Developer and construction pipeline required</p>
+              </div>
+            </div>
+            <a
+              className="source-register-link"
+              href="https://data.gov.rw/datasets"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Rwanda Data Sharing Platform ↗
+            </a>
+            <p className="data-source-note">
+              Public land-summary datasets describe aggregated records, not
+              individual title documents. Confirm reuse terms before ingestion.
+            </p>
+          </aside>
+        ) : null}
+
+        {compareOpen ? (
+          <aside aria-label="Area comparison" className="comparison-panel">
+            <button
+              aria-label="Close area comparison"
+              className="panel-close"
+              onClick={() => setCompareOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+            <p className="panel-eyebrow">INVESTMENT SHORTLIST</p>
+            <div className="comparison-title-row">
+              <h2>Compare areas</h2>
+              <span>{comparedAreas.length}/4</span>
+            </div>
+            <p className="panel-copy">
+              Click an area on the map, then choose “Add to comparison”.
+              Compare the same metric and period across your shortlist.
+            </p>
+            {comparisonFeedback ? (
+              <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
+            ) : null}
+            {comparedAreas.length === 0 ? (
+              <div className="comparison-empty">
+                <strong>Your shortlist is empty</strong>
+                <p>Add up to four districts, sectors, cells or villages from the map.</p>
+              </div>
+            ) : (
+              <>
+                <div className="comparison-area-list">
+                  {comparedAreas.map((area) => (
+                    <div
+                      className="comparison-area-item"
+                      key={`${area.level}-${area.district}-${area.name}`}
+                    >
+                      <div>
+                        <strong>{area.name}</strong>
+                        <span>{area.level} · {area.district} District</span>
+                      </div>
+                      <button
+                        aria-label={`Remove ${area.name} from comparison`}
+                        className="comparison-remove"
+                        onClick={() => removeComparedArea(area)}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="comparison-data-heading">
+                  <span>Metric</span>
+                  <span>Verified values</span>
+                </div>
+                {MARKET_METRICS.map((metric) => (
+                  <div className="comparison-metric-row" key={metric.id}>
+                    <span>{metric.shortLabel}</span>
+                    <span>Not connected</span>
+                  </div>
+                ))}
+                <p className="data-source-note">
+                  Comparison layout is connected. Numeric market comparison
+                  becomes available when verified datasets are joined to areas.
+                </p>
+                <button
+                  className="comparison-clear"
+                  onClick={() => {
+                    setComparedAreas([]);
+                    setComparisonFeedback("");
+                  }}
+                  type="button"
+                >
+                  Clear shortlist
+                </button>
+              </>
+            )}
+          </aside>
+        ) : null}
       </section>
     </main>
   );
