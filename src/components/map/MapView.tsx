@@ -75,6 +75,7 @@ function fitFeature(
   level: AreaLevel
 ) {
   const positions: Array<[number, number]> = [];
+  if (!("coordinates" in feature.geometry)) return;
   collectPositions(feature.geometry.coordinates, positions);
   if (positions.length === 0) return;
 
@@ -187,7 +188,6 @@ export function MapView({
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let activeController: AbortController | null = null;
     let refreshSequence = 0;
-    let boundaryDataLoaded = false;
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
 
@@ -218,8 +218,7 @@ export function MapView({
       if (!map.getSource("admin-districts")) {
         map.addSource("admin-districts", {
           type: "geojson",
-          data: empty,
-          promoteId: undefined
+          data: empty
         });
       }
 
@@ -458,7 +457,6 @@ export function MapView({
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
 
-        boundaryDataLoaded = true;
         onBoundaryStatusChange("ready");
       } catch (error) {
         if (controller.signal.aborted) return;
