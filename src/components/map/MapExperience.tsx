@@ -638,10 +638,9 @@ export function MapExperience() {
                   </div>
                 ) : null}
                 <p>
-                  Current filters: {PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label}
-                  {" · "}{ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label}.
-{selectedMetric === "averageLandPricePerM2"
-                    ? "District polygons are shaded by the sourced land-price snapshot. Price values are not yet mapped at sector, cell or village level."
+                  Current filters: {selectedMetric === "averageLandPricePerM2" ? "Land · static district snapshot" : `${PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label} · ${ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label}`}.
+                  {selectedMetric === "averageLandPricePerM2"
+                    ? "District polygons are shaded by the sourced land-price snapshot. Period filtering is not applied because the source observation date is not exposed; finer-level prices are not inferred."
                     : "The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
                 </p>
               </>
