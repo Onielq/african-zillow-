@@ -392,11 +392,7 @@ export function MapView({
     );
     map.addControl(new ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
     map.addControl(
-      new AttributionControl({
-        compact: false,
-        customAttribution:
-          "Administrative areas: Rwanda Environment Ministry GIS (2022 census basis; reuse terms to confirm)"
-      }),
+      new AttributionControl({ compact: false }),
       "bottom-left"
     );
 
