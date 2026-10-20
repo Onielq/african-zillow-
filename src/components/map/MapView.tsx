@@ -21,21 +21,33 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
-export type AreaLevel = "district" | "sector";
+export type AreaLevel = "district" | "sector" | "cell" | "village";
 
 export type SelectedArea = {
   level: AreaLevel;
   name: string;
+  province: string | null;
   district: string;
   districtId: string | null;
+  sector: string | null;
   sectorId: string | null;
+  cell: string | null;
+  cellId: string | null;
+  village: string | null;
+  villageId: string | null;
 };
 
 type AreaProperties = {
+  province?: string | null;
+  province_id?: string | null;
   district?: string | null;
   district_id?: string | null;
   sector?: string | null;
   sector_id?: string | null;
+  cell?: string | null;
+  cell_id?: string | null;
+  village?: string | null;
+  village_id?: string | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -48,7 +60,84 @@ type MapViewProps = {
 };
 
 const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+// Administrative boundaries are real geographic polygons, not routes.
+// The thresholds reveal one progressively finer level at a time.
 const SECTOR_ZOOM = 9.55;
+const CELL_ZOOM = 12.15;
+const VILLAGE_ZOOM = 14.75;
+
+const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village"];
+
+const AREA_LAYERS: Record<
+  AreaLevel,
+  {
+    source: string;
+    fill: string;
+    outline: string;
+    label: string;
+    property: "district" | "sector" | "cell" | "village";
+    minZoom: number;
+    color: string;
+  }
+> = {
+  district: {
+    source: "admin-districts",
+    fill: "district-fill",
+    outline: "district-outline",
+    label: "district-label",
+    property: "district",
+    minZoom: 5,
+    color: "#DCEAE1"
+  },
+  sector: {
+    source: "admin-sectors",
+    fill: "sector-fill",
+    outline: "sector-outline",
+    label: "sector-label",
+    property: "sector",
+    minZoom: SECTOR_ZOOM,
+    color: "#D4E8DD"
+  },
+  cell: {
+    source: "admin-cells",
+    fill: "cell-fill",
+    outline: "cell-outline",
+    label: "cell-label",
+    property: "cell",
+    minZoom: CELL_ZOOM,
+    color: "#D7E7F0"
+  },
+  village: {
+    source: "admin-villages",
+    fill: "village-fill",
+    outline: "village-outline",
+    label: "village-label",
+    property: "village",
+    minZoom: VILLAGE_ZOOM,
+    color: "#F0E4C9"
+  }
+};
+
+function activeAreaLevel(zoom: number): AreaLevel {
+  if (zoom >= VILLAGE_ZOOM) return "village";
+  if (zoom >= CELL_ZOOM) return "cell";
+  if (zoom >= SECTOR_ZOOM) return "sector";
+  return "district";
+}
+
+function zoomForLevel(level: AreaLevel): number {
+  switch (level) {
+    case "district":
+      return 10.8;
+    case "sector":
+      return 12.6;
+    case "cell":
+      return 15.0;
+    case "village":
+      return 17.2;
+  }
+}
 
 function emptyFeatureCollection(): MapFeatureCollection {
   return { type: "FeatureCollection", features: [] };
@@ -110,7 +199,7 @@ function fitFeature(
     ],
     {
       padding,
-      maxZoom: level === "district" ? 10.8 : 12.6,
+      maxZoom: zoomForLevel(level),
       duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? 0
         : 620
@@ -125,15 +214,21 @@ function featureToArea(
   const properties = feature.properties as AreaProperties | null;
   if (!properties?.district) return null;
 
-  const sectorName = properties.sector ?? null;
-  if (level === "sector" && !sectorName) return null;
+  const name = properties[level] ?? null;
+  if (!name) return null;
 
   return {
     level,
-    name: level === "sector" ? sectorName as string : properties.district,
+    name,
+    province: properties.province ?? null,
     district: properties.district,
     districtId: properties.district_id ?? null,
-    sectorId: properties.sector_id ?? null
+    sector: properties.sector ?? null,
+    sectorId: properties.sector_id ?? null,
+    cell: properties.cell ?? null,
+    cellId: properties.cell_id ?? null,
+    village: properties.village ?? null,
+    villageId: properties.village_id ?? null
   };
 }
 
@@ -221,85 +316,102 @@ export function MapView({
     const addAdministrativeLayers = () => {
       const empty = emptyFeatureCollection();
 
-      if (!map.getSource("admin-districts")) {
-        map.addSource("admin-districts", {
-          type: "geojson",
-          data: empty
-        });
+      // Each source contains only the features intersecting the current map view.
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
+        if (!map.getSource(layer.source)) {
+          map.addSource(layer.source, { type: "geojson", data: empty });
+        }
       }
 
-      if (!map.getSource("admin-sectors")) {
-        map.addSource("admin-sectors", {
-          type: "geojson",
-          data: empty
-        });
-      }
+      // Add every fill first, then outlines, then labels. This keeps the base
+      // road map visible underneath and makes boundary lines crisp at every level.
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
+        if (map.getLayer(layer.fill)) continue;
 
-      if (!map.getLayer("district-fill")) {
         map.addLayer({
-          id: "district-fill",
+          id: layer.fill,
           type: "fill",
-          source: "admin-districts",
+          source: layer.source,
+          layout: { visibility: level === "district" ? "visible" : "none" },
           paint: {
             "fill-color": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              "#A7D4B8",
+              "#81BDA0",
               ["boolean", ["feature-state", "selected"], false],
-              "#B6DCC4",
-              "#DCEAE1"
+              "#A3D3B9",
+              layer.color
             ],
+            // User-facing area tint stays light: 20% opacity by default.
             "fill-opacity": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              0.72,
+              0.36,
               ["boolean", ["feature-state", "selected"], false],
-              0.66,
-              0.34
+              0.3,
+              0.2
             ]
           }
         });
       }
 
-      if (!map.getLayer("district-outline")) {
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
+        if (map.getLayer(layer.outline)) continue;
+
         map.addLayer({
-          id: "district-outline",
+          id: layer.outline,
           type: "line",
-          source: "admin-districts",
+          source: layer.source,
+          layout: { visibility: level === "district" ? "visible" : "none" },
           paint: {
             "line-color": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              "#176B50",
+              "#126347",
               ["boolean", ["feature-state", "selected"], false],
-              "#176B50",
-              "#728F7E"
+              "#126347",
+              level === "village" ? "#A68A56" : "#668878"
             ],
             "line-width": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              7,
-              1,
-              11,
-              2.2,
-              14,
-              2.8
+              layer.minZoom,
+              0.75,
+              layer.minZoom + 2,
+              1.35,
+              layer.minZoom + 4,
+              2
             ],
-            "line-opacity": 0.9
+            "line-opacity": 0.94
           }
         });
       }
 
-      if (!map.getLayer("district-label")) {
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
+        if (map.getLayer(layer.label)) continue;
+
         map.addLayer({
-          id: "district-label",
+          id: layer.label,
           type: "symbol",
-          source: "admin-districts",
+          source: layer.source,
           layout: {
-            "text-field": ["get", "district"],
+            visibility: level === "district" ? "visible" : "none",
+            "text-field": ["get", layer.property],
             "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
-            "text-size": ["interpolate", ["linear"], ["zoom"], 7.5, 11, 9.4, 13],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              layer.minZoom,
+              level === "district" ? 10 : 8,
+              layer.minZoom + 3,
+              level === "district" ? 13 : 11
+            ],
             "text-max-width": 12,
             "text-allow-overlap": false,
             "text-ignore-placement": false
@@ -312,105 +424,30 @@ export function MapView({
           }
         });
       }
-
-      if (!map.getLayer("sector-fill")) {
-        map.addLayer({
-          id: "sector-fill",
-          type: "fill",
-          source: "admin-sectors",
-          layout: { visibility: "none" },
-          paint: {
-            "fill-color": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              "#9FCFB0",
-              ["boolean", ["feature-state", "selected"], false],
-              "#B5DFC2",
-              "#E2EEE6"
-            ],
-            "fill-opacity": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              0.82,
-              ["boolean", ["feature-state", "selected"], false],
-              0.74,
-              0.44
-            ]
-          }
-        });
-      }
-
-      if (!map.getLayer("sector-outline")) {
-        map.addLayer({
-          id: "sector-outline",
-          type: "line",
-          source: "admin-sectors",
-          layout: { visibility: "none" },
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              "#176B50",
-              ["boolean", ["feature-state", "selected"], false],
-              "#176B50",
-              "#88A393"
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              2.5,
-              ["boolean", ["feature-state", "selected"], false],
-              2.4,
-              ["interpolate", ["linear"], ["zoom"], 9.5, 0.8, 13, 1.5, 16, 2]
-            ],
-            "line-opacity": 0.95
-          }
-        });
-      }
-
-      if (!map.getLayer("sector-label")) {
-        map.addLayer({
-          id: "sector-label",
-          type: "symbol",
-          source: "admin-sectors",
-          layout: {
-            visibility: "none",
-            "text-field": ["get", "sector"],
-            "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
-            "text-size": ["interpolate", ["linear"], ["zoom"], 9.5, 9, 12.5, 12],
-            "text-max-width": 10,
-            "text-allow-overlap": false,
-            "text-ignore-placement": false
-          },
-          paint: {
-            "text-color": "#2D4B39",
-            "text-halo-color": "#FFFFFF",
-            "text-halo-width": 1.2,
-            "text-halo-blur": 0.3
-          }
-        });
-      }
-
-      // Keep the parent district outline visible above sector fills at deeper zoom.
-      if (map.getLayer("district-outline")) map.moveLayer("district-outline");
     };
 
     const updateLayerVisibility = () => {
-      if (!map.getLayer("district-fill")) return;
-      const showSectors = map.getZoom() >= SECTOR_ZOOM;
+      const activeLevel = activeAreaLevel(map.getZoom());
+      const activeIndex = AREA_LEVELS.indexOf(activeLevel);
 
-      map.setLayoutProperty("district-fill", "visibility", showSectors ? "none" : "visible");
-      map.setLayoutProperty("district-label", "visibility", showSectors ? "none" : "visible");
-      map.setLayoutProperty("sector-fill", "visibility", showSectors ? "visible" : "none");
-      map.setLayoutProperty("sector-outline", "visibility", showSectors ? "visible" : "none");
-      map.setLayoutProperty("sector-label", "visibility", showSectors ? "visible" : "none");
-      map.setPaintProperty(
-        "district-outline",
-        "line-width",
-        showSectors
-          ? ["interpolate", ["linear"], ["zoom"], 9.5, 1.5, 13, 2.4, 16, 2.8]
-          : ["interpolate", ["linear"], ["zoom"], 7, 1, 11, 2.2, 14, 2.8]
-      );
+      for (let index = 0; index < AREA_LEVELS.length; index += 1) {
+        const level = AREA_LEVELS[index];
+        const layer = AREA_LAYERS[level];
+        const isActive = level === activeLevel;
+        // Keep one parent level's outline for geographic context; show only the
+        // active level's fill and labels to avoid stacking opaque polygons.
+        const showOutline = index >= Math.max(0, activeIndex - 1) && index <= activeIndex;
+
+        if (map.getLayer(layer.fill)) {
+          map.setLayoutProperty(layer.fill, "visibility", isActive ? "visible" : "none");
+        }
+        if (map.getLayer(layer.outline)) {
+          map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
+        }
+        if (map.getLayer(layer.label)) {
+          map.setLayoutProperty(layer.label, "visibility", isActive ? "visible" : "none");
+        }
+      }
     };
 
     const fetchAreas = async (
@@ -444,18 +481,26 @@ export function MapView({
       activeController?.abort();
       const controller = new AbortController();
       activeController = controller;
+      const activeLevel = activeAreaLevel(map.getZoom());
+      const activeIndex = AREA_LEVELS.indexOf(activeLevel);
+      const requestedLevels = AREA_LEVELS.slice(0, activeIndex + 1);
 
       try {
-        const districts = await fetchAreas("district", controller.signal);
+        const results = await Promise.all(
+          requestedLevels.map(async (level) => ({
+            level,
+            data: await fetchAreas(level, controller.signal)
+          }))
+        );
         if (sequence !== refreshSequence) return;
-        (map.getSource("admin-districts") as GeoJSONSource).setData(districts);
 
-        if (map.getZoom() >= SECTOR_ZOOM) {
-          const sectors = await fetchAreas("sector", controller.signal);
-          if (sequence !== refreshSequence) return;
-          (map.getSource("admin-sectors") as GeoJSONSource).setData(sectors);
-        } else {
-          (map.getSource("admin-sectors") as GeoJSONSource).setData(emptyFeatureCollection());
+        for (const result of results) {
+          const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;
+          source.setData(result.data);
+        }
+        for (const level of AREA_LEVELS.slice(activeIndex + 1)) {
+          const source = map.getSource(AREA_LAYERS[level].source) as GeoJSONSource;
+          source.setData(emptyFeatureCollection());
         }
 
         updateLayerVisibility();
@@ -495,13 +540,12 @@ export function MapView({
       }
     };
 
-    const handleDistrictMove = (event: { features?: MapGeoJSONFeature[] }) => {
-      setHover("admin-districts", event.features?.[0]);
-      map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
-    };
-
-    const handleSectorMove = (event: { features?: MapGeoJSONFeature[] }) => {
-      setHover("admin-sectors", event.features?.[0]);
+    const handleAreaMove = (
+      level: AreaLevel,
+      event: { features?: MapGeoJSONFeature[] }
+    ) => {
+      const layer = AREA_LAYERS[level];
+      setHover(layer.source, event.features?.[0]);
       map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
     };
 
@@ -530,16 +574,14 @@ export function MapView({
       if (layerInteractionsAttached) return;
       layerInteractionsAttached = true;
 
-      map.on("mousemove", "district-fill", handleDistrictMove);
-      map.on("mouseleave", "district-fill", handleLeave);
-      map.on("click", "district-fill", (event) =>
-        handleAreaClick("district", "admin-districts", event.features?.[0])
-      );
-      map.on("mousemove", "sector-fill", handleSectorMove);
-      map.on("mouseleave", "sector-fill", handleLeave);
-      map.on("click", "sector-fill", (event) =>
-        handleAreaClick("sector", "admin-sectors", event.features?.[0])
-      );
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
+        map.on("mousemove", layer.fill, (event) => handleAreaMove(level, event));
+        map.on("mouseleave", layer.fill, handleLeave);
+        map.on("click", layer.fill, (event) =>
+          handleAreaClick(level, layer.source, event.features?.[0])
+        );
+      }
     };
 
     map.on("style.load", () => {
