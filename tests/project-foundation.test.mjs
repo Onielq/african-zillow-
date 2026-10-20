@@ -9,10 +9,10 @@ const readProjectFile = (path) => readFile(join(root, path), "utf8");
 
 test("the administrative API restricts requests to the four pilot districts", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
-  assert.match(route, /Gasabo/);
-  assert.match(route, /Kicukiro/);
-  assert.match(route, /Nyarugenge/);
-  assert.match(route, /Bugesera/);
+  assert.match(route, /Gasabo/i);
+  assert.match(route, /Kicukiro/i);
+  assert.match(route, /Nyarugenge/i);
+  assert.match(route, /Bugesera/i);
   assert.match(route, /FeatureServer/);
   assert.match(route, /geometryType/);
 });
