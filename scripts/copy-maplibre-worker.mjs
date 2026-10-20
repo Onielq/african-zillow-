@@ -1,9 +1,8 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join, parse } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const require = createRequire(import.meta.url);
-const resolvedEntry = require.resolve("maplibre-gl");
+const resolvedEntry = fileURLToPath(import.meta.resolve("maplibre-gl"));
 
 function findPackageRoot(startPath) {
   let current = dirname(startPath);
