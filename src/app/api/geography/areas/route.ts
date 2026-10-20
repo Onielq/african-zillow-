@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 const FEATURE_SERVER =
   "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
 
-const INCLUDED_DISTRICTS = ["Gasabo", "Kicukiro", "Nyarugenge", "Bugesera"] as const;
+const INCLUDED_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE", "BUGESERA"] as const;
 const DISTRICT_WHERE =
   "UPPER(district) IN ('GASABO','KICUKIRO','NYARUGENGE','BUGESERA')";
 
@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
       })
       .filter((feature) =>
         INCLUDED_DISTRICTS.includes(
-          feature.properties.district as (typeof INCLUDED_DISTRICTS)[number]
+          (feature.properties.district ?? "").toUpperCase() as (typeof INCLUDED_DISTRICTS)[number]
         )
       );
 
