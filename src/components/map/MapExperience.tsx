@@ -331,7 +331,10 @@ export function MapExperience() {
           <button
             aria-expanded={compareOpen}
             className="compare-control"
-            onClick={() => setCompareOpen((open) => !open)}
+            onClick={() => {
+              setSourcesOpen(false);
+              setCompareOpen((open) => !open);
+            }}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -472,7 +475,10 @@ export function MapExperience() {
             <button
               aria-expanded={sourcesOpen}
               className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
-              onClick={() => setSourcesOpen((open) => !open)}
+              onClick={() => {
+                setCompareOpen(false);
+                setSourcesOpen((open) => !open);
+              }}
               type="button"
             >
               Sources
