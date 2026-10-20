@@ -96,7 +96,7 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /aria-label="Market metric"/);
   assert.match(experience, /aria-label="Property type"/);
   assert.match(experience, /aria-label="Analysis period"/);
-  assert.match(experience, /no verified series is connected/i);
+  assert.match(experience, /time series is not connected and validated here/i);
   assert.match(experience, /No project markers or prices are fabricated/);
 });
 
@@ -107,7 +107,7 @@ test("area comparison supports up to four areas without fabricating unavailable 
   assert.match(experience, /setComparedAreas/);
   assert.match(experience, /comparedAreas\.length >= 4/);
   assert.match(experience, /Add to comparison/);
-  assert.match(experience, /Not connected/);
+  assert.match(experience, /Pending/);
   assert.match(experience, /Clear shortlist/);
   assert.match(css, /\.comparison-panel/);
 });
@@ -117,6 +117,7 @@ test("the source register separates connected boundaries from pending market fee
   assert.match(experience, /Market data sources/);
   assert.match(experience, /Administrative boundaries/);
   assert.match(experience, /Land transaction summaries/);
+  assert.match(experience, /Average district land prices/);
   assert.match(experience, /Rental yields and house-sale prices/);
   assert.match(experience, /Projects and upcoming supply/);
   assert.match(experience, /https:\/\/data\.gov\.rw\/datasets/);
