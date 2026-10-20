@@ -37,6 +37,24 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /0\.62/);
 });
 
+test("the average land price metric uses sourced district values and marks snapshot freshness limitations", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(route, /DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2/);
+  assert.match(route, /GASABO: 36013/);
+  assert.match(route, /KICUKIRO: 61491/);
+  assert.match(route, /NYARUGENGE: 50735/);
+  assert.match(route, /BUGESERA: 4033/);
+  assert.match(route, /average_land_price_per_m2/);
+  assert.match(route, /rwandalanddashboard\.lands\.rw\/prices/);
+  assert.match(mapView, /showLandPriceHeatmap/);
+  assert.match(mapView, /average_land_price_per_m2/);
+  assert.match(experience, /source observation date not exposed/i);
+  assert.match(experience, /district-level land prices are not a valid substitute/i);
+});
+
 test("the map cannot zoom out past the Rwanda extent and constrains panning", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /RWANDA_CAMERA_BOUNDS/);
@@ -65,7 +83,7 @@ test("the investment workspace exposes six metrics, property scope, and period f
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
 
   for (const metric of [
-    "averagePricePerM2",
+    "averageLandPricePerM2",
     "transactionVolume",
     "capitalAppreciation",
     "rentalYield",
@@ -78,7 +96,7 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /aria-label="Market metric"/);
   assert.match(experience, /aria-label="Property type"/);
   assert.match(experience, /aria-label="Analysis period"/);
-  assert.match(experience, /verified price series is connected/i);
+  assert.match(experience, /no verified series is connected/i);
   assert.match(experience, /No project markers or prices are fabricated/);
 });
 
@@ -99,7 +117,7 @@ test("the source register separates connected boundaries from pending market fee
   assert.match(experience, /Market data sources/);
   assert.match(experience, /Administrative boundaries/);
   assert.match(experience, /Land transaction summaries/);
-  assert.match(experience, /Sale prices and rental yields/);
+  assert.match(experience, /Rental yields and house-sale prices/);
   assert.match(experience, /Projects and upcoming supply/);
   assert.match(experience, /https:\/\/data\.gov\.rw\/datasets/);
 });
