@@ -21,7 +21,7 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /f: "json"/);
 });
 
-test("the map view progressively switches from districts to sectors, cells, and villages", async () => {
+test("the map view progressively switches administrative levels and increases boundary opacity", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /SECTOR_ZOOM/);
   assert.match(mapView, /CELL_ZOOM/);
@@ -32,7 +32,18 @@ test("the map view progressively switches from districts to sectors, cells, and 
   assert.match(mapView, /village-fill/);
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
-  assert.match(mapView, /0\.2/);
+  assert.match(mapView, /0\.35/);
+  assert.match(mapView, /0\.5/);
+  assert.match(mapView, /0\.62/);
+});
+
+test("the map cannot zoom out past the Rwanda extent and constrains panning", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  assert.match(mapView, /RWANDA_CAMERA_BOUNDS/);
+  assert.match(mapView, /maxBounds: RWANDA_CAMERA_BOUNDS/);
+  assert.match(mapView, /cameraForBounds\(RWANDA_CAMERA_BOUNDS/);
+  assert.match(mapView, /map\.setMinZoom/);
+  assert.match(mapView, /updateRwandaZoomFloor\(\)/);
 });
 
 test("the map supports a satellite basemap without removing administrative overlays", async () => {
