@@ -8,9 +8,16 @@ import {
   ScaleControl,
   type GeoJSONSource,
   type Map as MapLibreMapInstance,
-  type MapGeoJSONFeature
+  type MapGeoJSONFeature,
+  getVersion,
+  setWorkerUrl
 } from "maplibre-gl";
 import type { FeatureCollection, Geometry, Position } from "geojson";
+
+// Next.js 16 defaults to Turbopack. Serve both MapLibre worker modules from
+// the same versioned public directory so the worker can resolve its sibling.
+const mapLibreVersion = getVersion();
+setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${mapLibreVersion}`);
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";

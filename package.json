@@ -11,7 +11,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "node --test",
+    "postinstall": "node scripts/copy-maplibre-worker.mjs",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "gsap": "^3.15.0",

@@ -59,3 +59,18 @@ test("MapLibre and GSAP are declared dependencies", async () => {
   assert.ok(packageJson.dependencies["maplibre-gl"]);
   assert.ok(packageJson.dependencies.gsap);
 });
+
+
+test("MapLibre worker and shared modules are copied to a versioned public path", async () => {
+  const packageJson = JSON.parse(await readProjectFile("package.json"));
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const copyScript = await readProjectFile("scripts/copy-maplibre-worker.mjs");
+
+  assert.equal(packageJson.scripts.postinstall, "node scripts/copy-maplibre-worker.mjs");
+  assert.equal(packageJson.scripts.predev, "node scripts/copy-maplibre-worker.mjs");
+  assert.equal(packageJson.scripts.prebuild, "node scripts/copy-maplibre-worker.mjs");
+  assert.match(mapView, /setWorkerUrl/);
+  assert.match(mapView, /vendor\/maplibre-gl/);
+  assert.match(copyScript, /maplibre-gl-worker\.mjs/);
+  assert.match(copyScript, /maplibre-gl-shared\.mjs/);
+});
