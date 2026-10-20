@@ -80,6 +80,27 @@ function getBoundaryLabel(status: BoundaryStatus) {
   return "Loading administrative boundaries";
 }
 
+function getAreaParent(area: SelectedArea): string | null {
+  switch (area.level) {
+    case "district":
+      return area.province;
+    case "sector":
+      return `${area.district} District`;
+    case "cell":
+      return [area.sector ? `${area.sector} Sector` : null, `${area.district} District`]
+        .filter(Boolean)
+        .join(" · ");
+    case "village":
+      return [
+        area.cell ? `${area.cell} Cell` : null,
+        area.sector ? `${area.sector} Sector` : null,
+        `${area.district} District`
+      ]
+        .filter(Boolean)
+        .join(" · ");
+  }
+}
+
 export function MapExperience() {
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
@@ -292,15 +313,10 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">
-              {selectedArea.level === "district" ? "DISTRICT" : "SECTOR"}
-            </p>
-            <h2>
-              {selectedArea.name}
-              {selectedArea.level === "district" ? " District" : " Sector"}
-            </h2>
-            {selectedArea.level === "sector" ? (
-              <p className="panel-parent">Within {selectedArea.district} District</p>
+            <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
+            <h2>{selectedArea.name}</h2>
+            {getAreaParent(selectedArea) ? (
+              <p className="panel-parent">Within {getAreaParent(selectedArea)}</p>
             ) : null}
             <div className="panel-divider" />
             <div className="source-status">
@@ -308,16 +324,17 @@ export function MapExperience() {
               Administrative boundary
             </div>
             <p className="panel-copy">
-              Boundary layer served by Rwanda Environment Ministry GIS. Its
-              published description references boundaries based on the 2022
+              This outline comes from the Rwanda Environment Ministry GIS
+              boundary service. Its layer descriptions reference the 2022
               census. Reuse terms must be confirmed before production.
             </p>
             <div className="panel-notice">
               <strong>Land records not connected yet</strong>
               <p>
                 This outline is an administrative area, not a cadastral plot.
-                Land-listing counts, plot boundaries, and ownership records are
-                not available in this view.
+                The official Rwanda Land Authority land-parcel feed is not
+                connected or validated yet, so this map will not guess plot
+                edges from roads, imagery, or village borders.
               </p>
             </div>
           </aside>
@@ -328,17 +345,18 @@ export function MapExperience() {
               <strong>
                 {boundaryStatus === "error"
                   ? "Boundary service unavailable"
-                  : "Districts and sectors"}
+                  : "Explore the land hierarchy"}
               </strong>
             </div>
             <p>
-              Hover to highlight an area. Click a district to reveal its
-              sectors. These are administrative boundaries, not land plots.
-              Plot counts and cadastral boundaries are not connected yet.
+              Hover or click an area to identify it. Zoom through districts,
+              sectors, cells, and villages. The ordinary road map stays visible
+              beneath a light 20% area tint. These outlines are not land plots.
             </p>
             <p className="data-source-note">
-              Source: Rwanda Environment Ministry GIS · 2022 census boundary
-              basis · reuse terms to confirm before production.
+              Admin source: Rwanda Environment Ministry GIS · 2022 census
+              boundary basis. Geodata.rw / Rwanda Land Authority cadastral
+              data still needs version, access, and reuse validation.
             </p>
           </aside>
         )}
