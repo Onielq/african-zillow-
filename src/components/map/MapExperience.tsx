@@ -381,8 +381,9 @@ export function MapExperience() {
             </div>
             <p>
               Hover or click an area to identify it. Zoom through districts,
-              sectors, cells, and villages. The ordinary road map stays visible
-              beneath a light 20% area tint. These outlines are not land plots.
+              sectors, cells, and villages. Boundary colors now use a stronger
+              35% fill, and zoom-out stops at the full Rwanda extent. These
+              administrative outlines are not individual land plots.
             </p>
             <p className="data-source-note">
               Admin source: Rwanda Environment Ministry GIS · 2022 census
