@@ -8,6 +8,7 @@ import {
   MapView,
   type BasemapStatus,
   type BoundaryStatus,
+  type BasemapMode,
   type SelectedArea
 } from "@/components/map/MapView";
 
@@ -102,6 +103,7 @@ function getAreaParent(area: SelectedArea): string | null {
 }
 
 export function MapExperience() {
+  const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
   );
@@ -235,6 +237,7 @@ export function MapExperience() {
 
       <section aria-label="Map workspace" className="map-workspace">
         <MapView
+          basemapMode={basemapMode}
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -242,6 +245,34 @@ export function MapExperience() {
         />
 
         <div className="map-vignette" aria-hidden="true" />
+
+        <div className="basemap-switcher" role="group" aria-label="Basemap view">
+          <button
+            aria-pressed={basemapMode === "map"}
+            className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
+            onClick={() => setBasemapMode("map")}
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+              <path d="m2.5 5.2 5-2.1 5 2.1 5-2.1v11.7l-5 2.1-5-2.1-5 2.1V5.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+              <path d="M7.5 3.3v11.6m5-9.7v11.6" stroke="currentColor" strokeWidth="1.2" />
+            </svg>
+            Map
+          </button>
+          <button
+            aria-pressed={basemapMode === "satellite"}
+            className={basemapMode === "satellite" ? "basemap-button basemap-button-active" : "basemap-button"}
+            onClick={() => setBasemapMode("satellite")}
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+              <path d="m10 2.2 2.15 2.15-2.15 2.15-2.15-2.15L10 2.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+              <path d="m4.6 7.6 2.15 2.15L4.6 11.9 2.45 9.75 4.6 7.6Zm10.8 0 2.15 2.15-2.15 2.15-2.15-2.15 2.15-2.15Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+              <path d="m10 12.2 2.15 2.15L10 16.5l-2.15-2.15L10 12.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+            </svg>
+            Satellite
+          </button>
+        </div>
 
         <div className="map-status-card">
           <span

@@ -35,6 +35,21 @@ test("the map view progressively switches from districts to sectors, cells, and 
   assert.match(mapView, /0\.2/);
 });
 
+test("the map supports a satellite basemap without removing administrative overlays", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(mapView, /SATELLITE_STYLE/);
+  assert.match(mapView, /World_Imagery/);
+  assert.match(mapView, /Imagery © Esri/);
+  assert.match(mapView, /map\.setStyle\(basemapMode === "satellite"/);
+  assert.match(experience, /aria-label="Basemap view"/);
+  assert.match(experience, /setBasemapMode\("satellite"\)/);
+  assert.match(experience, /setBasemapMode\("map"\)/);
+  assert.match(css, /\.basemap-switcher/);
+});
+
 test("the basemap has a documented fallback style", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /styles\/liberty/);
