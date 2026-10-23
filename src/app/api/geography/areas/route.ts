@@ -441,7 +441,7 @@ async function getAdministrativeAreas(
         bounds
       );
       if (source.id === "bugesera" && level === "cell") {
-        console.info(
+        console.error(
           "Bugesera cell layer inspection",
           upstreamFeatures.length,
           Object.keys(upstreamFeatures[0]?.attributes ?? upstreamFeatures[0]?.properties ?? {}),
