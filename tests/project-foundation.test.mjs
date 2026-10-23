@@ -16,6 +16,8 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /Masterplan2020_22Apr2026\/MapServer/);
   assert.match(route, /Overlays\/Bugesera_Masterplan\/MapServer/);
   assert.match(route, /Kigali_Parcels_1June2026_for_search\/FeatureServer\/0/);
+  assert.match(route, /cellule_1/);
+  assert.match(route, /code_cell_/);
   assert.match(route, /district, sector, cell, village, or parcel/);
   assert.match(route, /district: 4, sector: 5, cell: 6, village: 7/);
   assert.match(route, /district: 2, sector: 4, cell: 3, village: 5/);
