@@ -172,6 +172,15 @@ function getAreaParent(area: SelectedArea): string | null {
       ]
         .filter(Boolean)
         .join(" · ");
+    case "parcel":
+      return [
+        area.village ? `${area.village} Village` : null,
+        area.cell ? `${area.cell} Cell` : null,
+        area.sector ? `${area.sector} Sector` : null,
+        `${area.district} District`
+      ]
+        .filter(Boolean)
+        .join(" · ");
   }
 }
 
@@ -559,7 +568,40 @@ export function MapExperience() {
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             <h2>{selectedArea.name}</h2>
-            {selectedMetric === "averageLandPricePerM2" ? (
+            {selectedArea.level === "parcel" ? (
+              <div className="parcel-details">
+                <div>
+                  <span>Unique parcel identifier (UPI)</span>
+                  <strong>{selectedArea.upi ?? "Not published"}</strong>
+                </div>
+                <div>
+                  <span>Parcel number</span>
+                  <strong>{selectedArea.parcelNumber ?? "Not published"}</strong>
+                </div>
+                <div>
+                  <span>Parcel area</span>
+                  <strong>
+                    {typeof selectedArea.parcelSizeM2 === "number"
+                      ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m²`
+                      : "Not published"}
+                  </strong>
+                </div>
+                {typeof selectedArea.wetlandAreaM2 === "number" && selectedArea.wetlandAreaM2 > 0 ? (
+                  <div>
+                    <span>Area intersecting wetlands</span>
+                    <strong>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.wetlandAreaM2)} m²</strong>
+                  </div>
+                ) : null}
+                <div>
+                  <span>Last updated in source</span>
+                  <strong>
+                    {typeof selectedArea.lastUpdatedOn === "number"
+                      ? new Date(selectedArea.lastUpdatedOn).toLocaleDateString("en-RW")
+                      : "Date not supplied"}
+                  </strong>
+                </div>
+              </div>
+            ) : selectedMetric === "averageLandPricePerM2" ? (
               selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null ? (
                 <div className="area-price-metric">
                   <span>Average land price / m²</span>
@@ -590,20 +632,21 @@ export function MapExperience() {
             <div className="panel-divider" />
             <div className="source-status">
               <span className="source-status-mark" />
-              Administrative boundary
+              {selectedArea.level === "parcel" ? "Land parcel identification" : "Administrative boundary"}
             </div>
             <p className="panel-copy">
-              This outline comes from the Rwanda Environment Ministry GIS
-              boundary service. Its layer descriptions reference the 2022
-              census. Reuse terms must be confirmed before production.
+              {selectedArea.sourceLabel ?? "Official administrative GIS source"}
             </p>
             <div className="panel-notice">
-              <strong>Land records not connected yet</strong>
+              <strong>
+                {selectedArea.level === "parcel"
+                  ? "Verify legal title before a transaction"
+                  : "Area boundaries are not individual plots"}
+              </strong>
               <p>
-                This outline is an administrative area, not a cadastral plot.
-                The official Rwanda Land Authority land-parcel feed is not
-                connected or validated yet, so this map will not guess plot
-                edges from roads, imagery, or village borders.
+                {selectedArea.level === "parcel"
+                  ? "The UPI, parcel outline, area and source update date are published in the City of Kigali Master Plan parcel layer. Use these details to identify the plot, then confirm title, ownership, restrictions and current records with the competent land authority."
+                  : "Zoom further to see individual parcel outlines where an official parcel layer is available. Kigali parcel polygons are connected; the linked Bugesera portal provides administrative and masterplan layers, but an individual cadastral parcel feed has not been verified there. The map will not invent plot edges from roads or imagery."}
               </p>
             </div>
           </aside>
@@ -646,9 +689,7 @@ export function MapExperience() {
               </>
             )}
             <p className="data-source-note">
-              Boundaries: Rwanda Environment Ministry GIS. Aggregated land
-              statistics are listed on the Rwanda Data Sharing Platform.
-              Administrative outlines are not individual land plots.
+              Boundaries: Kigali City Master Plan and Geodata Rwanda Bugesera Masterplan. Kigali parcel polygons are separately sourced from the City of Kigali parcel layer. Bugesera masterplan/zoning polygons are not treated as individual legal plots.
             </p>
           </aside>
         )}
@@ -669,7 +710,14 @@ export function MapExperience() {
               <span className="source-register-status source-register-connected" />
               <div>
                 <strong>Administrative boundaries</strong>
-                <p>Connected · Ministry of Environment GIS</p>
+                <p>Connected · Kigali City Master Plan + Geodata Rwanda Bugesera Masterplan</p>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-connected" />
+              <div>
+                <strong>Individual land parcels</strong>
+                <p>Connected for Kigali · UPI, parcel number, area and source update date. Bugesera needs a verified cadastral parcel layer.</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -700,6 +748,22 @@ export function MapExperience() {
                 <p>Developer and construction pipeline required</p>
               </div>
             </div>
+            <a
+              className="source-register-link"
+              href="https://masterplan.kigalicity.gov.rw/portal/apps/webappviewer/index.html?id=fdd2e30cbc15401d9daee5f68982d755"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Kigali Master Plan map ↗
+            </a>
+            <a
+              className="source-register-link"
+              href="https://geodata.rw/portal/apps/experiencebuilder/experience/?id=8b259ba9599747898ca728dba4e6d215"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Bugesera Masterplan map ↗
+            </a>
             <a
               className="source-register-link"
               href="https://rwandalanddashboard.lands.rw/prices"
