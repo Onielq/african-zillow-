@@ -32,6 +32,7 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /CELL_ZOOM/);
   assert.match(mapView, /VILLAGE_ZOOM/);
   assert.match(mapView, /PARCEL_ZOOM/);
+  assert.match(mapView, /cellNameByCode/);
   assert.match(mapView, /source: "land-parcels"/);
   assert.match(mapView, /district-fill/);
   assert.match(mapView, /sector-fill/);
