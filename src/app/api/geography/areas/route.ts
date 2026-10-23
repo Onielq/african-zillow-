@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const FEATURE_SERVER =
-  "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
+const KIGALI_MASTERPLAN_MAP_SERVER =
+  "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer";
+const BUGESERA_MASTERPLAN_MAP_SERVER =
+  "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
+const KIGALI_PARCEL_FEATURE_LAYER =
+  "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
 
 const INCLUDED_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE", "BUGESERA"] as const;
+const KIGALI_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE"] as const;
 
-// Snapshot transcribed from the Rwanda Land Dashboard's "Average Land Price
-// per District" table. The dashboard page does not expose an observation date
-// in its rendered table, so treat these as sourced snapshot values, not a live
-// feed, until the official dataset/API with timestamps is connected.
+// The public Kigali parcels layer includes UPI, parcel number, size, wetland
+// overlap and last-updated date. It is an identification layer, not proof of
+// current ownership or encumbrances.
 const DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2: Record<string, number> = {
   GASABO: 36013,
   KICUKIRO: 61491,
@@ -20,8 +24,18 @@ const DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2: Record<string, number> = {
 const DISTRICT_LAND_PRICE_SOURCE =
   "https://rwandalanddashboard.lands.rw/prices";
 
-const DISTRICT_WHERE =
-  "UPPER(district) IN ('GASABO','KICUKIRO','NYARUGENGE','BUGESERA')";
+// Broad service extents are used only to avoid requesting an unrelated GIS
+// service for a viewport outside its coverage.
+const KIGALI_GIS_EXTENT: Bounds = [29.58, -2.12, 30.32, -1.47];
+const BUGESERA_GIS_EXTENT: Bounds = [29.82, -2.62, 30.56, -1.92];
+const KIGALI_PARCEL_EXTENT: Bounds = [29.6223, -2.0794, 30.2772, -1.4870];
+
+const RWANDA_BOUNDS = {
+  west: 28.7,
+  south: -2.95,
+  east: 31.05,
+  north: -1.0
+};
 
 const RWANDA_BOUNDS = {
   west: 28.7,
@@ -234,12 +248,332 @@ function arcGisPolygonToGeoJson(geometry: ArcGisGeometry | null | undefined) {
   };
 }
 
+type AreaLevel = "district" | "sector" | "cell" | "village";
+
+function boundsIntersect(a: Bounds, b: Bounds): boolean {
+  return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+}
+
+function normaliseFieldName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function attributeValue(
+  attributes: Record<string, unknown>,
+  candidates: string[]
+): unknown {
+  const entries = Object.entries(attributes).map(([key, value]) => ({
+    key: normaliseFieldName(key),
+    value
+  }));
+
+  // Prefer exact field names before trying schema variants such as District_1.
+  for (const candidate of candidates) {
+    const wanted = normaliseFieldName(candidate);
+    const match = entries.find((entry) => entry.key === wanted);
+    if (match) return match.value;
+  }
+
+  for (const candidate of candidates) {
+    const wanted = normaliseFieldName(candidate);
+    const match = entries.find((entry) => entry.key.startsWith(wanted));
+    if (match) return match.value;
+  }
+
+  return null;
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return null;
+}
+
+async function queryArcGisLayer(
+  layerUrl: string,
+  bounds: Bounds,
+  resultRecordCount: number,
+  where = "1=1"
+): Promise<UpstreamFeature[]> {
+  const upstreamUrl = new URL(`${layerUrl}/query`);
+  upstreamUrl.search = new URLSearchParams({
+    where,
+    geometry: bounds.join(","),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "4326",
+    outSR: "4326",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields: "*",
+    returnGeometry: "true",
+    resultRecordCount: String(resultRecordCount),
+    f: "json"
+  }).toString();
+
+  const response = await fetch(upstreamUrl, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(15_000)
+  });
+
+  if (!response.ok) {
+    throw new Error(`ArcGIS layer request failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as UpstreamCollection;
+  if (payload.error) {
+    throw new Error(
+      `ArcGIS error ${payload.error.code ?? "unknown"}: ${payload.error.message ?? "request failed"}`
+    );
+  }
+
+  return payload.features ?? [];
+}
+
+function normaliseAdministrativeFeature(
+  feature: UpstreamFeature,
+  level: AreaLevel,
+  sourceId: "kigali" | "bugesera"
+) {
+  const attributes = feature.attributes ?? feature.properties ?? {};
+  const activeNameCandidates: Record<AreaLevel, string[]> = {
+    district: ["district", "district_name", "district_1", "dist_name", "name"],
+    sector: ["sector", "sector_name", "sector_1", "name"],
+    cell: ["cell", "cell_name", "cell_1", "name"],
+    village: ["village", "village_name", "village_1", "name"]
+  };
+  const activeName = textValue(attributeValue(attributes, activeNameCandidates[level]));
+  const district =
+    (level === "district" ? activeName : textValue(attributeValue(attributes, [
+      "district", "district_name", "district_1", "dist_name"
+    ]))) ?? (sourceId === "bugesera" ? "Bugesera" : null);
+  const sector =
+    (level === "sector" ? activeName : textValue(attributeValue(attributes, [
+      "sector", "sector_name", "sector_1"
+    ])));
+  const cell =
+    (level === "cell" ? activeName : textValue(attributeValue(attributes, [
+      "cell", "cell_name", "cell_1"
+    ])));
+  const village =
+    (level === "village" ? activeName : textValue(attributeValue(attributes, [
+      "village", "village_name", "village_1"
+    ])));
+  const province = textValue(attributeValue(attributes, [
+    "province", "prov_name", "province_name", "province_e"
+  ])) ?? (sourceId === "bugesera" ? "Eastern Province" : "Kigali City");
+  const geometry = arcGisPolygonToGeoJson(feature.geometry);
+
+  if (!activeName || !district || !geometry) return null;
+  if (!({ district, sector, cell, village }[level])) return null;
+
+  const objectId = textValue(attributeValue(attributes, [
+    "objectid", "objectid_1", "objectid_12", "fid", "id"
+  ]));
+  const districtId = textValue(attributeValue(attributes, [
+    "district_id", "districtid", "dist_id", "distid"
+  ]));
+  const sectorId = textValue(attributeValue(attributes, [
+    "sector_id", "sectorid", "sect_id", "sectid"
+  ]));
+  const cellId = textValue(attributeValue(attributes, [
+    "cell_id", "cellid"
+  ]));
+  const villageId = textValue(attributeValue(attributes, [
+    "village_id", "villageid"
+  ]));
+  const idByLevel = {
+    district: districtId ?? objectId ?? district,
+    sector: sectorId ?? objectId ?? `${district}-${sector ?? "unknown"}`,
+    cell: cellId ?? objectId ?? `${district}-${sector ?? "unknown"}-${cell ?? "unknown"}`,
+    village: villageId ?? objectId ?? `${district}-${sector ?? "unknown"}-${cell ?? "unknown"}-${village ?? "unknown"}`
+  };
+  const upperDistrict = district.toUpperCase();
+
+  return {
+    type: "Feature" as const,
+    id: `${sourceId}-${level}-${idByLevel[level]}`,
+    geometry,
+    properties: {
+      province,
+      province_id: textValue(attributeValue(attributes, ["province_id", "prov_id"])),
+      district,
+      district_id: districtId,
+      ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
+      ...(level === "cell" || level === "village" ? { cell, cell_id: cellId } : {}),
+      ...(level === "village" ? { village, village_id: villageId } : {}),
+      source_label: sourceId === "kigali"
+        ? "Kigali City Master Plan administrative boundaries (April 2026 map service)"
+        : "Bugesera Masterplan GIS administrative boundaries",
+      source_type: "administrative-boundary",
+      ...(level === "district" &&
+      DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict] !== undefined
+        ? {
+            average_land_price_per_m2:
+              DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict],
+            average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
+            average_land_price_date_status: "source observation date not exposed"
+          }
+        : {})
+    }
+  };
+}
+
+async function getAdministrativeAreas(
+  level: AreaLevel,
+  bounds: Bounds
+): Promise<NextResponse> {
+  const sources = [
+    {
+      id: "kigali" as const,
+      baseUrl: KIGALI_MASTERPLAN_MAP_SERVER,
+      layerId: { district: 4, sector: 5, cell: 6, village: 7 }[level],
+      extent: KIGALI_GIS_EXTENT
+    },
+    {
+      id: "bugesera" as const,
+      baseUrl: BUGESERA_MASTERPLAN_MAP_SERVER,
+      layerId: { district: 2, sector: 4, cell: 3, village: 5 }[level],
+      extent: BUGESERA_GIS_EXTENT
+    }
+  ].filter((source) => boundsIntersect(bounds, source.extent));
+
+  const results = await Promise.all(sources.map(async (source) => {
+    try {
+      const upstreamFeatures = await queryArcGisLayer(
+        `${source.baseUrl}/${source.layerId}`,
+        bounds,
+        level === "village" ? 1500 : 1000
+      );
+      return {
+        sourceId: source.id,
+        features: upstreamFeatures,
+        failed: false
+      };
+    } catch (error) {
+      console.error(`Administrative GIS request failed for ${source.id}.`, error);
+      return { sourceId: source.id, features: [], failed: true };
+    }
+  }));
+
+  if (sources.length > 0 && results.every((result) => result.failed)) {
+    return NextResponse.json(
+      { error: "The administrative boundary sources are temporarily unavailable." },
+      { status: 502, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const features = results
+    .flatMap((result) => result.features.map((feature) =>
+      normaliseAdministrativeFeature(feature, level, result.sourceId)
+    ))
+    .filter((feature): feature is NonNullable<typeof feature> => feature !== null)
+    .filter((feature) =>
+      INCLUDED_DISTRICTS.includes(
+        feature.properties.district.toUpperCase() as (typeof INCLUDED_DISTRICTS)[number]
+      )
+    );
+
+  return NextResponse.json(
+    { type: "FeatureCollection", features },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan",
+        "X-Data-Basis": "Kigali administrative map service dated April 2026; Bugesera Masterplan GIS"
+      }
+    }
+  );
+}
+
+async function getKigaliParcels(bounds: Bounds): Promise<NextResponse> {
+  // The linked Bugesera portal exposes administrative and planning/zoning
+  // layers, but we could not verify an individual cadastral parcel layer there.
+  // Never substitute zoning polygons or satellite imagery for legal plot edges.
+  if (!boundsIntersect(bounds, KIGALI_PARCEL_EXTENT)) {
+    return NextResponse.json(emptyCollection(), {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300",
+        "X-Data-Source": "Kigali City Master Plan parcel service",
+        "X-Parcel-Coverage": "Individual parcel polygons are currently connected for Kigali only; Bugesera needs a verified cadastral parcel feed."
+      }
+    });
+  }
+
+  try {
+    const upstreamFeatures = await queryArcGisLayer(
+      KIGALI_PARCEL_FEATURE_LAYER,
+      bounds,
+      2000,
+      "upi IS NOT NULL"
+    );
+
+    const features = upstreamFeatures
+      .map((feature, index) => {
+        const attributes = feature.attributes ?? feature.properties ?? {};
+        const upi = textValue(attributeValue(attributes, ["upi"]));
+        const parcelNumber = textValue(attributeValue(attributes, ["parcel_number", "parcelnumber"]));
+        const district = textValue(attributeValue(attributes, ["district", "district_name"]));
+        const geometry = arcGisPolygonToGeoJson(feature.geometry);
+        if (!geometry || (!upi && !parcelNumber) || !district) return null;
+        if (!KIGALI_DISTRICTS.includes(district.toUpperCase() as (typeof KIGALI_DISTRICTS)[number])) {
+          return null;
+        }
+
+        const objectId = textValue(attributeValue(attributes, ["objectid", "fid", "id"]));
+        return {
+          type: "Feature" as const,
+          id: `parcel-${objectId ?? upi ?? parcelNumber ?? index}`,
+          geometry,
+          properties: {
+            province: textValue(attributeValue(attributes, ["province"])) ?? "Kigali City",
+            province_id: null,
+            district,
+            district_id: null,
+            sector: textValue(attributeValue(attributes, ["sector"])),
+            sector_id: null,
+            cell: textValue(attributeValue(attributes, ["cell"])),
+            cell_id: null,
+            village: textValue(attributeValue(attributes, ["village"])),
+            village_id: null,
+            upi,
+            parcel_number: parcelNumber,
+            parcel_size_m2: numberValue(attributeValue(attributes, ["size"])),
+            wetland_area_m2: numberValue(attributeValue(attributes, ["area_in_wetland"])),
+            last_updated_on: numberValue(attributeValue(attributes, ["last_updated_on"])),
+            source_type: "cadastral-parcel",
+            source_label: "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)"
+          }
+        };
+      })
+      .filter((feature): feature is NonNullable<typeof feature> => feature !== null);
+
+    return NextResponse.json(
+      { type: "FeatureCollection", features },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
+          "X-Data-Source": "City of Kigali Master Plan Kigali Parcels FeatureServer",
+          "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last updated"
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Kigali parcel GIS request failed.", error);
+    return NextResponse.json(
+      { error: "The Kigali parcel boundary source is temporarily unavailable." },
+      { status: 502, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   const rawLevel = request.nextUrl.searchParams.get("level");
-  const validLevels = ["district", "sector", "cell", "village"] as const;
+  const validLevels = ["district", "sector", "cell", "village", "parcel"] as const;
   if (!validLevels.includes(rawLevel as (typeof validLevels)[number])) {
     return NextResponse.json(
-      { error: "level must be district, sector, cell, or village" },
+      { error: "level must be district, sector, cell, village, or parcel" },
       { status: 400 }
     );
   }
@@ -252,7 +586,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(emptyCollection(), {
         headers: {
           "Cache-Control": "public, max-age=60",
-          "X-Data-Source": "Rwanda Environment Ministry GIS"
+          "X-Data-Source": level === "parcel"
+            ? "City of Kigali Master Plan Kigali Parcels FeatureServer"
+            : "Kigali City Master Plan and Bugesera Masterplan GIS"
         }
       });
     }
@@ -263,129 +599,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const layerIds = { district: 0, sector: 1, cell: 2, village: 3 } as const;
-  const fields = {
-    district: "objectid,province,province_id,district,district_id",
-    sector: "objectid,province,province_id,district,district_id,sector,sector_id",
-    cell: "objectid,province,province_id,district,district_id,sector,sector_id,cell,cell_id",
-    village: "objectid,province,province_id,district,district_id,sector,sector_id,cell,cell_id,village,village_id"
-  } as const;
-
-  const upstreamUrl = new URL(`${FEATURE_SERVER}/${layerIds[level]}/query`);
-  upstreamUrl.search = new URLSearchParams({
-    where: DISTRICT_WHERE,
-    geometry: bounds.join(","),
-    geometryType: "esriGeometryEnvelope",
-    inSR: "4326",
-    outSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
-    outFields: fields[level],
-    returnGeometry: "true",
-    resultRecordCount: level === "village" ? "1500" : "1000",
-    f: "json"
-  }).toString();
-
-  try {
-    const response = await fetch(upstreamUrl, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 300 },
-      signal: AbortSignal.timeout(12_000)
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "The administrative boundary source is temporarily unavailable." },
-        { status: 502, headers: { "Cache-Control": "no-store" } }
-      );
-    }
-
-    const payload = (await response.json()) as UpstreamCollection;
-    if (payload.error) {
-      console.error(
-        "Administrative GIS query returned an error.",
-        payload.error.code,
-        payload.error.message
-      );
-      return NextResponse.json(
-        { error: "The administrative boundary source returned an error." },
-        { status: 502, headers: { "Cache-Control": "no-store" } }
-      );
-    }
-
-    const features = (payload.features ?? [])
-      .map((feature) => {
-        const attributes = feature.properties ?? feature.attributes ?? {};
-        const district = textValue(attributes.district);
-        const districtId = textValue(attributes.district_id);
-        const sector = textValue(attributes.sector);
-        const sectorId = textValue(attributes.sector_id);
-        const cell = textValue(attributes.cell);
-        const cellId = textValue(attributes.cell_id);
-        const village = textValue(attributes.village);
-        const villageId = textValue(attributes.village_id);
-        const geometry = arcGisPolygonToGeoJson(feature.geometry);
-
-        if (!district || !geometry) return null;
-
-        const nameByLevel = { district, sector, cell, village };
-        if (!nameByLevel[level]) return null;
-
-        const idByLevel = {
-          district: districtId ?? district,
-          sector: sectorId ?? `${districtId ?? district}-${sector ?? "unknown"}`,
-          cell: cellId ?? `${sectorId ?? "unknown"}-${cell ?? "unknown"}`,
-          village: villageId ?? `${cellId ?? "unknown"}-${village ?? "unknown"}`
-        };
-
-        return {
-          type: "Feature" as const,
-          id: `${level}-${idByLevel[level]}`,
-          geometry,
-          properties: {
-            province: textValue(attributes.province),
-            province_id: textValue(attributes.province_id),
-            district,
-            district_id: districtId,
-            ...(level === "district" &&
-            DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[district.toUpperCase()] !== undefined
-              ? {
-                  average_land_price_per_m2:
-                    DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[district.toUpperCase()],
-                  average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
-                  average_land_price_date_status: "source observation date not exposed"
-                }
-              : {}),
-            ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
-            ...(level === "cell" || level === "village" ? { cell, cell_id: cellId } : {}),
-            ...(level === "village" ? { village, village_id: villageId } : {})
-          }
-        };
-      })
-      .filter((feature): feature is NonNullable<typeof feature> => feature !== null)
-      .filter((feature) =>
-        INCLUDED_DISTRICTS.includes(
-          (feature.properties.district ?? "").toUpperCase() as (typeof INCLUDED_DISTRICTS)[number]
-        )
-      );
-
-    return NextResponse.json(
-      {
-        type: "FeatureCollection",
-        features
-      },
-      {
-        headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
-          "X-Data-Source": "Rwanda Environment Ministry GIS",
-          "X-Data-Basis": "Layer descriptions reference 2022 census boundaries"
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Administrative boundary fetch failed.", error);
-    return NextResponse.json(
-      { error: "The administrative boundary source could not be reached." },
-      { status: 502, headers: { "Cache-Control": "no-store" } }
-    );
-  }
+  if (level === "parcel") return getKigaliParcels(bounds);
+  return getAdministrativeAreas(level, bounds);
 }
