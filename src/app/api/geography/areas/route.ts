@@ -274,12 +274,6 @@ function attributeValue(
     if (match) return match.value;
   }
 
-  for (const candidate of candidates) {
-    const wanted = normaliseFieldName(candidate);
-    const match = entries.find((entry) => entry.key.startsWith(wanted));
-    if (match) return match.value;
-  }
-
   return null;
 }
 
