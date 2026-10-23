@@ -159,7 +159,7 @@ test("parcel coverage includes the NLA-hosted Bugesera polygon layer without req
   assert.match(route, /BUGESERA_PARCEL_FEATURE_LAYER/);
   assert.match(route, /provider\.id === "bugesera"/);
   assert.match(route, /"upi"/);
-  assert.match(route, /geometry: arcGisPolygonToGeoJson\(feature\.geometry\)/);
+  assert.match(route, /const geometry = arcGisPolygonToGeoJson\(feature\.geometry\)/);
   assert.match(route, /reuse terms, completeness, and current survey accuracy still need confirmation/i);
   assert.match(experience, /Bugesera parcel polygons are connected/i);
   assert.match(experience, /reuse terms, completeness and survey accuracy still need confirmation/i);
