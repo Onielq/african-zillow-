@@ -10,7 +10,7 @@ The application is a MapLibre map for Kigali City and Bugesera District, with a 
 
 **Land parcels are a separate data layer, not the next administrative level.** At high zoom, the map requests published parcel polygons from the City of Kigali Master Plan's “Kigali Parcels” FeatureServer (1 June 2026 dataset). Clicking a parcel shows its UPI, parcel number, area, wetland overlap when supplied, and source update date when supplied.
 
-The linked Bugesera Masterplan service provides administrative boundaries and planning/masterplan overlays. I did not verify an individual cadastral parcel layer in that service, so the app does not label Bugesera planning zones as legal plots or fabricate parcel outlines there. A verified parcel source for Bugesera is still required.
+The linked Bugesera Masterplan service provides administrative boundaries and planning/masterplan overlays. The cell-boundary layer's metadata lists NISR as its source and a 2012 capture year, so confirm whether a newer authoritative version is available before relying on those cells for legal or investment decisions. I did not verify an individual cadastral parcel layer in that service, so the app does not label Bugesera planning zones as legal plots or fabricate parcel outlines there. A verified parcel source for Bugesera is still required.
 
 **These layers are not proof of ownership or encumbrance status.** Buyers should verify title, ownership, restrictions, and current records with the competent land authority before a transaction. The source maps' version, access and reuse terms also need confirmation before commercial production.
 
