@@ -46,6 +46,19 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
 });
 
+test("parcel boundary requests preserve source vertices and use a precise viewport envelope", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(route, /Number\(west\.toFixed\(6\)\)/);
+  assert.match(route, /Number\(south\.toFixed\(6\)\)/);
+  assert.match(route, /do not set maxAllowableOffset/);
+  assert.match(route, /returnGeometry: "true"/);
+  assert.match(mapView, /toFixed\(6\)\)\.join\(","\)/);
+  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85/);
+  assert.match(mapView, /feature-state.*selected/s);
+});
+
 test("the average land price metric uses sourced district values and marks snapshot freshness limitations", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
