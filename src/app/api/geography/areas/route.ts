@@ -8,6 +8,8 @@ const BUGESERA_MASTERPLAN_MAP_SERVER =
   "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
 const KIGALI_PARCEL_FEATURE_LAYER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
+const BUGESERA_PARCEL_FEATURE_LAYER =
+  "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0";
 
 const INCLUDED_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE", "BUGESERA"] as const;
 const KIGALI_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE"] as const;
@@ -284,7 +286,8 @@ async function queryArcGisLayer(
   layerUrl: string,
   bounds: Bounds,
   resultRecordCount?: number,
-  where = "1=1"
+  where = "1=1",
+  outFields = "*"
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
   // Request the provider's full polygon geometry. Do not set maxAllowableOffset
@@ -296,7 +299,7 @@ async function queryArcGisLayer(
     inSR: "4326",
     outSR: "4326",
     spatialRel: "esriSpatialRelIntersects",
-    outFields: "*",
+    outFields,
     returnGeometry: "true",
     f: "json"
   });
@@ -489,85 +492,151 @@ async function getAdministrativeAreas(
   );
 }
 
-async function getKigaliParcels(bounds: Bounds): Promise<NextResponse> {
-  // The linked Bugesera portal exposes administrative and planning/zoning
-  // layers, but we could not verify an individual cadastral parcel layer there.
-  // Never substitute zoning polygons or satellite imagery for legal plot edges.
-  if (!boundsIntersect(bounds, KIGALI_PARCEL_EXTENT)) {
+type ParcelProvider = {
+  id: "kigali" | "bugesera";
+  layerUrl: string;
+  extent: Bounds;
+};
+
+async function getParcels(bounds: Bounds): Promise<NextResponse> {
+  // These providers publish individual parcel polygons. Do not replace a
+  // missing cadastral polygon with a road edge, image trace, or zoning polygon.
+  const providers: ParcelProvider[] = [
+    {
+      id: "kigali",
+      layerUrl: KIGALI_PARCEL_FEATURE_LAYER,
+      extent: KIGALI_PARCEL_EXTENT
+    },
+    {
+      id: "bugesera",
+      layerUrl: BUGESERA_PARCEL_FEATURE_LAYER,
+      extent: BUGESERA_GIS_EXTENT
+    }
+  ].filter((provider) => boundsIntersect(bounds, provider.extent));
+
+  if (providers.length === 0) {
     return NextResponse.json(emptyCollection(), {
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=300",
-        "X-Data-Source": "Kigali City Master Plan parcel service",
-        "X-Parcel-Coverage": "Individual parcel polygons are currently connected for Kigali only; Bugesera needs a verified cadastral parcel feed."
+        "X-Data-Source": "National Land Authority Bugesera LAIS and City of Kigali parcel services",
+        "X-Parcel-Coverage": "Individual cadastral parcel polygons are connected for Kigali and Bugesera within the published service extents."
       }
     });
   }
 
-  try {
-    const upstreamFeatures = await queryArcGisLayer(
-      KIGALI_PARCEL_FEATURE_LAYER,
-      bounds,
-      2000,
-      "upi IS NOT NULL"
-    );
+  const results = await Promise.all(providers.map(async (provider) => {
+    try {
+      // Request only public identification fields. In Bugesera, query only
+      // UPI; do not fetch owner or other land-management attributes.
+      const upstreamFeatures = await queryArcGisLayer(
+        provider.layerUrl,
+        bounds,
+        2000,
+        "upi IS NOT NULL",
+        provider.id === "bugesera"
+          ? "upi"
+          : "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on"
+      );
+      return { provider, upstreamFeatures, failed: false };
+    } catch (error) {
+      console.error(`Cadastral parcel GIS request failed for ${provider.id}.`, error);
+      return { provider, upstreamFeatures: [] as UpstreamFeature[], failed: true };
+    }
+  }));
 
-    const features = upstreamFeatures
-      .map((feature, index) => {
-        const attributes = feature.attributes ?? feature.properties ?? {};
-        const upi = textValue(attributeValue(attributes, ["upi"]));
-        const parcelNumber = textValue(attributeValue(attributes, ["parcel_number", "parcelnumber"]));
-        const district = textValue(attributeValue(attributes, ["district", "district_name"]));
-        const geometry = arcGisPolygonToGeoJson(feature.geometry);
-        if (!geometry || (!upi && !parcelNumber) || !district) return null;
-        if (!KIGALI_DISTRICTS.includes(district.toUpperCase() as (typeof KIGALI_DISTRICTS)[number])) {
-          return null;
-        }
-
-        const objectId = textValue(attributeValue(attributes, ["objectid", "fid", "id"]));
-        return {
-          type: "Feature" as const,
-          id: `parcel-${objectId ?? upi ?? parcelNumber ?? index}`,
-          geometry,
-          properties: {
-            province: textValue(attributeValue(attributes, ["province"])) ?? "Kigali City",
-            province_id: null,
-            district,
-            district_id: null,
-            sector: textValue(attributeValue(attributes, ["sector"])),
-            sector_id: null,
-            cell: textValue(attributeValue(attributes, ["cell"])),
-            cell_id: null,
-            village: textValue(attributeValue(attributes, ["village"])),
-            village_id: null,
-            upi,
-            parcel_number: parcelNumber,
-            parcel_size_m2: numberValue(attributeValue(attributes, ["size"])),
-            wetland_area_m2: numberValue(attributeValue(attributes, ["area_in_wetland"])),
-            last_updated_on: numberValue(attributeValue(attributes, ["last_updated_on"])),
-            source_type: "cadastral-parcel",
-            source_label: "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)"
-          }
-        };
-      })
-      .filter((feature): feature is NonNullable<typeof feature> => feature !== null);
-
+  if (results.every((result) => result.failed)) {
     return NextResponse.json(
-      { type: "FeatureCollection", features },
-      {
-        headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
-          "X-Data-Source": "City of Kigali Master Plan Kigali Parcels FeatureServer",
-          "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last updated"
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Kigali parcel GIS request failed.", error);
-    return NextResponse.json(
-      { error: "The Kigali parcel boundary source is temporarily unavailable." },
+      { error: "The cadastral parcel boundary sources are temporarily unavailable." },
       { status: 502, headers: { "Cache-Control": "no-store" } }
     );
   }
+
+  const features = results.flatMap(({ provider, upstreamFeatures }) =>
+    upstreamFeatures.map((feature, index) => {
+      const attributes = feature.attributes ?? feature.properties ?? {};
+      const upi = textValue(attributeValue(attributes, ["upi"]));
+      const geometry = arcGisPolygonToGeoJson(feature.geometry);
+      if (!upi || !geometry) return null;
+
+      if (provider.id === "bugesera") {
+        // Small public polygon samples and UPI were found for this NLA-hosted
+        // LAIS layer. Reuse terms, completeness and live survey currency still
+        // need confirmation, so return only polygon geometry plus the UPI.
+        return {
+          type: "Feature" as const,
+          id: `parcel-bugesera-${upi ?? index}`,
+          geometry,
+          properties: {
+            province: "Eastern Province",
+            province_id: null,
+            district: "Bugesera",
+            district_id: null,
+            sector: null,
+            sector_id: null,
+            cell: null,
+            cell_id: null,
+            village: null,
+            village_id: null,
+            upi,
+            parcel_number: null,
+            parcel_size_m2: null,
+            wetland_area_m2: null,
+            last_updated_on: null,
+            source_type: "cadastral-parcel",
+            source_label: "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse terms and completeness to confirm)"
+          }
+        };
+      }
+
+      const parcelNumber = textValue(attributeValue(attributes, ["parcel_number", "parcelnumber"]));
+      const district = textValue(attributeValue(attributes, ["district", "district_name"]));
+      if (!district || !KIGALI_DISTRICTS.includes(district.toUpperCase() as (typeof KIGALI_DISTRICTS)[number])) {
+        return null;
+      }
+
+      const objectId = textValue(attributeValue(attributes, ["objectid", "fid", "id"]));
+      return {
+        type: "Feature" as const,
+        id: `parcel-kigali-${objectId ?? upi ?? parcelNumber ?? index}`,
+        geometry,
+        properties: {
+          province: textValue(attributeValue(attributes, ["province"])) ?? "Kigali City",
+          province_id: null,
+          district,
+          district_id: null,
+          sector: textValue(attributeValue(attributes, ["sector"])),
+          sector_id: null,
+          cell: textValue(attributeValue(attributes, ["cell"])),
+          cell_id: null,
+          village: textValue(attributeValue(attributes, ["village"])),
+          village_id: null,
+          upi,
+          parcel_number: parcelNumber,
+          parcel_size_m2: numberValue(attributeValue(attributes, ["size"])),
+          wetland_area_m2: numberValue(attributeValue(attributes, ["area_in_wetland"])),
+          last_updated_on: numberValue(attributeValue(attributes, ["last_updated_on"])),
+          source_type: "cadastral-parcel",
+          source_label: "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)"
+        }
+      };
+    }).filter((feature): feature is NonNullable<typeof feature> => feature !== null)
+  );
+
+  const failedProviders = results.filter((result) => result.failed).map((result) => result.provider.id);
+  return NextResponse.json(
+    { type: "FeatureCollection", features },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
+        "X-Data-Source": "City of Kigali Master Plan parcels; National Land Authority LAIS Bugesera_Parcels",
+        "X-Parcel-Coverage": "Kigali and Bugesera parcel polygons queried for this viewport",
+        "X-Parcel-Provider-Warning": failedProviders.length
+          ? `Some parcel source(s) unavailable: ${failedProviders.join(", ")}`
+          : "Bugesera source reuse terms, completeness, and current survey accuracy still need confirmation",
+        "X-Parcel-Record-Fields": "UPI; Kigali additionally exposes parcel number, area, wetland overlap, and last update"
+      }
+    }
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -601,6 +670,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (level === "parcel") return getKigaliParcels(bounds);
+  if (level === "parcel") return getParcels(bounds);
   return getAdministrativeAreas(level, bounds);
 }
