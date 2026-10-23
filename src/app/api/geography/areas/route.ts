@@ -335,7 +335,7 @@ function normaliseAdministrativeFeature(
   const activeNameCandidates: Record<AreaLevel, string[]> = {
     district: ["district", "district_name", "district_1", "dist_name", "name"],
     sector: ["sector", "sector_name", "sector_1", "name"],
-    cell: ["cell", "cell_name", "cell_1", "name"],
+    cell: ["cell", "cell_name", "cell_1", "cellule_1", "name"],
     village: ["village", "village_name", "village_1", "name"]
   };
   const activeName = textValue(attributeValue(attributes, activeNameCandidates[level]));
@@ -349,15 +349,17 @@ function normaliseAdministrativeFeature(
     ])));
   const cell =
     (level === "cell" ? activeName : textValue(attributeValue(attributes, [
-      "cell", "cell_name", "cell_1"
+      "cell", "cell_name", "cell_1", "cellule_1"
     ])));
   const village =
     (level === "village" ? activeName : textValue(attributeValue(attributes, [
       "village", "village_name", "village_1"
     ])));
-  const province = textValue(attributeValue(attributes, [
-    "province", "prov_name", "province_name", "province_e"
-  ])) ?? (sourceId === "bugesera" ? "Eastern Province" : "Kigali City");
+  const province = sourceId === "bugesera"
+    ? "Eastern Province"
+    : textValue(attributeValue(attributes, [
+        "province", "prov_name", "province_name", "province_e"
+      ])) ?? "Kigali City";
   const geometry = arcGisPolygonToGeoJson(feature.geometry);
 
   if (!activeName || !district || !geometry) return null;
@@ -367,16 +369,16 @@ function normaliseAdministrativeFeature(
     "objectid", "objectid_1", "objectid_12", "fid", "id"
   ]));
   const districtId = textValue(attributeValue(attributes, [
-    "district_id", "districtid", "dist_id", "distid"
+    "district_id", "districtid", "dist_id", "distid", "code_dist"
   ]));
   const sectorId = textValue(attributeValue(attributes, [
-    "sector_id", "sectorid", "sect_id", "sectid"
+    "sector_id", "sectorid", "sect_id", "sectid", "code_sect"
   ]));
   const cellId = textValue(attributeValue(attributes, [
-    "cell_id", "cellid"
+    "cell_id", "cellid", "code_cell_"
   ]));
   const villageId = textValue(attributeValue(attributes, [
-    "village_id", "villageid"
+    "village_id", "villageid", "code_village", "code_vill"
   ]));
   const idByLevel = {
     district: districtId ?? objectId ?? district,
@@ -392,7 +394,7 @@ function normaliseAdministrativeFeature(
     geometry,
     properties: {
       province,
-      province_id: textValue(attributeValue(attributes, ["province_id", "prov_id"])),
+      province_id: textValue(attributeValue(attributes, ["province_id", "prov_id", "code_prov"])),
       district,
       district_id: districtId,
       ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
@@ -440,14 +442,6 @@ async function getAdministrativeAreas(
         `${source.baseUrl}/${source.layerId}`,
         bounds
       );
-      if (source.id === "bugesera" && level === "cell") {
-        console.error(
-          "Bugesera cell layer inspection",
-          upstreamFeatures.length,
-          Object.keys(upstreamFeatures[0]?.attributes ?? upstreamFeatures[0]?.properties ?? {}),
-          upstreamFeatures[0]?.attributes ?? upstreamFeatures[0]?.properties ?? {}
-        );
-      }
       return {
         sourceId: source.id,
         features: upstreamFeatures,
