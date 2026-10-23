@@ -645,8 +645,8 @@ export function MapExperience() {
               </strong>
               <p>
                 {selectedArea.level === "parcel"
-                  ? "The UPI, parcel outline, area and source update date are published in the City of Kigali Master Plan parcel layer. Use these details to identify the plot, then confirm title, ownership, restrictions and current records with the competent land authority."
-                  : "Zoom further to see individual parcel outlines where an official parcel layer is available. Kigali parcel polygons are connected; the linked Bugesera portal provides administrative and masterplan layers, but an individual cadastral parcel feed has not been verified there. The map will not invent plot edges from roads or imagery."}
+                  ? `The selected UPI and parcel outline come from: ${selectedArea.sourceLabel ?? "the connected cadastral source"}. Some attributes, including parcel area, may not be available for every district. This map identifies the plot; it does not prove legal title, ownership, restrictions or current survey accuracy. Confirm those details with the competent land authority before a transaction.`
+                  : "Zoom further to see individual parcel outlines from the connected cadastral feeds. Kigali and Bugesera parcel polygons are connected; the map will not invent plot edges from roads, satellite imagery or zoning."}
               </p>
             </div>
           </aside>
@@ -689,7 +689,7 @@ export function MapExperience() {
               </>
             )}
             <p className="data-source-note">
-              Boundaries: Kigali City Master Plan and Geodata Rwanda Bugesera Masterplan. Kigali parcel polygons are separately sourced from the City of Kigali parcel layer. Bugesera masterplan/zoning polygons are not treated as individual legal plots.
+              Administrative boundaries: Kigali City Master Plan and Geodata Rwanda Bugesera Masterplan. Individual parcel polygons: City of Kigali parcel layer for Kigali and an NLA-hosted LAIS Bugesera_Parcels service for Bugesera. Bugesera reuse terms, completeness and current survey accuracy still need confirmation; zoning layers remain separate.
             </p>
           </aside>
         )}
@@ -717,7 +717,7 @@ export function MapExperience() {
               <span className="source-register-status source-register-connected" />
               <div>
                 <strong>Individual land parcels</strong>
-                <p>Connected for Kigali · UPI, parcel number, area and source update date. Bugesera needs a verified cadastral parcel layer.</p>
+                <p>Polygon + UPI connected for Kigali and Bugesera. Kigali additionally exposes parcel number, area, wetland overlap and update date. Bugesera reuse terms, completeness and survey accuracy still need confirmation.</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -766,6 +766,14 @@ export function MapExperience() {
             </a>
             <a
               className="source-register-link"
+              href="https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open NLA Bugesera parcel layer ↗
+            </a>
+            <a
+              className="source-register-link"
               href="https://rwandalanddashboard.lands.rw/prices"
               rel="noreferrer"
               target="_blank"
@@ -782,7 +790,7 @@ export function MapExperience() {
             </a>
             <p className="data-source-note">
               Public land-summary datasets describe aggregated records, not
-              individual title documents. Confirm reuse terms before ingestion.
+              individual title documents. The Bugesera cadastral endpoint exposes polygon + UPI in the checked sample; permission to reuse/redistribute, data completeness and current survey accuracy must be confirmed before commercial reliance.
             </p>
           </aside>
         ) : null}
