@@ -560,17 +560,44 @@ export function MapView({
                   ? "#A68A56"
                   : "#668878"
             ],
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              layer.minZoom,
-              0.75,
-              layer.minZoom + 2,
-              1.35,
-              layer.minZoom + 4,
-              2
-            ],
+            "line-width": level === "parcel"
+              ? [
+                  "case",
+                  ["boolean", ["feature-state", "selected"], false],
+                  [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    PARCEL_ZOOM,
+                    1.7,
+                    PARCEL_ZOOM + 2,
+                    2.5,
+                    PARCEL_ZOOM + 3.85,
+                    3.2
+                  ],
+                  [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    PARCEL_ZOOM,
+                    0.9,
+                    PARCEL_ZOOM + 1.5,
+                    1.7,
+                    PARCEL_ZOOM + 3.85,
+                    2.7
+                  ]
+                ]
+              : [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  layer.minZoom,
+                  0.75,
+                  layer.minZoom + 2,
+                  1.35,
+                  layer.minZoom + 4,
+                  2
+                ],
             "line-opacity": 0.94
           }
         });
@@ -647,7 +674,7 @@ export function MapView({
         bounds.getSouth(),
         bounds.getEast(),
         bounds.getNorth()
-      ].map((value) => value.toFixed(4)).join(",");
+      ].map((value) => value.toFixed(6)).join(",");
 
       const response = await fetch(
         `/api/geography/areas?level=${level}&bbox=${encodeURIComponent(bbox)}`,
