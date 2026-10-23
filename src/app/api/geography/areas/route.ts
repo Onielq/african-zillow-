@@ -369,7 +369,7 @@ function normaliseAdministrativeFeature(
     "objectid", "objectid_1", "objectid_12", "fid", "id"
   ]));
   const districtId = textValue(attributeValue(attributes, [
-    "district_id", "districtid", "dist_id", "distid", "code_dist"
+    "district_id", "districtid", "dist_id", "distr_id", "distid", "code_dist"
   ]));
   const sectorId = textValue(attributeValue(attributes, [
     "sector_id", "sectorid", "sect_id", "sectid", "code_sect"
