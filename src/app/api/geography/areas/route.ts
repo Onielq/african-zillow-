@@ -281,11 +281,11 @@ function numberValue(value: unknown): number | null {
 async function queryArcGisLayer(
   layerUrl: string,
   bounds: Bounds,
-  resultRecordCount: number,
+  resultRecordCount?: number,
   where = "1=1"
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
-  upstreamUrl.search = new URLSearchParams({
+  const params = new URLSearchParams({
     where,
     geometry: bounds.join(","),
     geometryType: "esriGeometryEnvelope",
@@ -294,9 +294,17 @@ async function queryArcGisLayer(
     spatialRel: "esriSpatialRelIntersects",
     outFields: "*",
     returnGeometry: "true",
-    resultRecordCount: String(resultRecordCount),
     f: "json"
-  }).toString();
+  });
+
+  // Older MapServer layers reject resultRecordCount because they do not
+  // support pagination. Leave that parameter off for admin boundaries, and
+  // set it only for the newer parcel FeatureServer, which supports pagination.
+  if (typeof resultRecordCount === "number") {
+    params.set("resultRecordCount", String(resultRecordCount));
+  }
+
+  upstreamUrl.search = params.toString();
 
   const response = await fetch(upstreamUrl, {
     headers: { Accept: "application/json" },
@@ -430,8 +438,7 @@ async function getAdministrativeAreas(
     try {
       const upstreamFeatures = await queryArcGisLayer(
         `${source.baseUrl}/${source.layerId}`,
-        bounds,
-        level === "village" ? 1500 : 1000
+        bounds
       );
       return {
         sourceId: source.id,
