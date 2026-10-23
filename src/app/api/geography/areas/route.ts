@@ -440,6 +440,14 @@ async function getAdministrativeAreas(
         `${source.baseUrl}/${source.layerId}`,
         bounds
       );
+      if (source.id === "bugesera" && level === "cell") {
+        console.info(
+          "Bugesera cell layer inspection",
+          upstreamFeatures.length,
+          Object.keys(upstreamFeatures[0]?.attributes ?? upstreamFeatures[0]?.properties ?? {}),
+          upstreamFeatures[0]?.attributes ?? upstreamFeatures[0]?.properties ?? {}
+        );
+      }
       return {
         sourceId: source.id,
         features: upstreamFeatures,
