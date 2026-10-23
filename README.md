@@ -90,6 +90,12 @@ Individual Kigali parcels are requested only at high zoom to keep map requests b
 
 Before production, validate data currency, access and redistribution terms with the respective publishers, and keep source date/attribution visible wherever provided.
 
+## Parcel edge fidelity
+
+The parcel API preserves the publisher's polygon vertices: it does not request ArcGIS geometry simplification (maxAllowableOffset) or coordinate rounding (geometryPrecision). The map's viewport envelope is passed at six decimal places so coarse bounding-box rounding is less likely to omit parcels near the visible edge. Parcel outlines become more distinct at close zoom, with a thicker outline for a selected plot. These are rendering and query-coverage improvements, not a claim of survey-grade accuracy: the underlying cadastral publisher's geometry, currency, and legal status remain the limiting factors.
+
+The app must never draw or "repair" legal parcel edges by snapping them to nearby roads, satellite pixels, or inferred straight lines. When a source omits a boundary or a plot falls outside its coverage, show that gap and obtain an authoritative cadastral feed rather than fabricating an outline.
+
 ## Valhalla's role
 
 Valhalla is a routing and map-matching engine. It can support driving/walking routes, snap a user-supplied GPS trace to mapped roads, calculate route distances, and produce travel-time isochrones around a plot or landmark. It does **not** derive legally meaningful cadastral parcel boundaries or administrative polygons. Use geographic boundary data for the district/sector/cell/village edges and RLA-approved cadastral data for plot edges.

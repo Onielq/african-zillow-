@@ -93,11 +93,13 @@ function parseBounds(value: string | null): Bounds | null {
 
   if (west >= east || south >= north) return null;
 
+  // Keep the viewport query envelope at sub-metre coordinate precision.
+  // Rounding to 3 decimals can skip parcels near the visible map edges.
   return [
-    Number(west.toFixed(3)),
-    Number(south.toFixed(3)),
-    Number(east.toFixed(3)),
-    Number(north.toFixed(3))
+    Number(west.toFixed(6)),
+    Number(south.toFixed(6)),
+    Number(east.toFixed(6)),
+    Number(north.toFixed(6))
   ];
 }
 
@@ -285,6 +287,8 @@ async function queryArcGisLayer(
   where = "1=1"
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
+  // Request the provider's full polygon geometry. Do not set maxAllowableOffset
+  // or geometryPrecision: either can generalize or round parcel boundary vertices.
   const params = new URLSearchParams({
     where,
     geometry: bounds.join(","),
