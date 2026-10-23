@@ -592,6 +592,36 @@ button:disabled {
   font-size: 9px;
 }
 
+.parcel-details {
+  display: grid;
+  gap: 10px;
+  margin: 13px 0 2px;
+  padding: 12px;
+  border: 1px solid #D7E6DC;
+  border-radius: 12px;
+  background: #F8FBF8;
+}
+
+.parcel-details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.parcel-details span {
+  color: #63736A;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.parcel-details strong {
+  color: #243B30;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .area-price-metric {
   display: flex;
   flex-direction: column;
