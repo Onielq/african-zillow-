@@ -37,13 +37,6 @@ const RWANDA_BOUNDS = {
   north: -1.0
 };
 
-const RWANDA_BOUNDS = {
-  west: 28.7,
-  south: -2.95,
-  east: 31.05,
-  north: -1.0
-};
-
 type Bounds = [number, number, number, number];
 type Position2D = [number, number];
 
