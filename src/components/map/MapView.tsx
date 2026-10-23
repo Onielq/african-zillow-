@@ -554,7 +554,11 @@ export function MapView({
               "#126347",
               ["boolean", ["feature-state", "selected"], false],
               "#126347",
-              level === "village" ? "#A68A56" : "#668878"
+              level === "parcel"
+                ? "#A56A0A"
+                : level === "village"
+                  ? "#A68A56"
+                  : "#668878"
             ],
             "line-width": [
               "interpolate",
