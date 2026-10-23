@@ -681,6 +681,44 @@ export function MapView({
         );
         if (sequence !== refreshSequence) return;
 
+        // Some Bugesera village records publish cell_id but not the cell name.
+        // Parent cell polygons have already been fetched at this zoom, so join
+        // those names by the official district + cell code rather than leaving
+        // an incomplete village hierarchy in the selection panel.
+        const cellNameByCode = new Map<string, string>();
+        for (const result of results) {
+          if (result.level !== "cell") continue;
+          for (const feature of result.data.features) {
+            const cellId = feature.properties?.cell_id;
+            const cellName = feature.properties?.cell;
+            if (!cellId || !cellName) continue;
+            const key = `${feature.properties?.district_id ?? feature.properties?.district ?? ""}|${cellId}`;
+            cellNameByCode.set(key, cellName);
+          }
+        }
+
+        const villageResult = results.find((result) => result.level === "village");
+        if (villageResult && cellNameByCode.size > 0) {
+          villageResult.data = {
+            ...villageResult.data,
+            features: villageResult.data.features.map((feature) => {
+              if (feature.properties?.cell) return feature;
+              const cellId = feature.properties?.cell_id;
+              if (!cellId) return feature;
+              const key = `${feature.properties?.district_id ?? feature.properties?.district ?? ""}|${cellId}`;
+              const cellName = cellNameByCode.get(key);
+              if (!cellName) return feature;
+              return {
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  cell: cellName
+                }
+              };
+            })
+          };
+        }
+
         for (const result of results) {
           const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;
           source.setData(result.data);
