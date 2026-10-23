@@ -501,7 +501,7 @@ type ParcelProvider = {
 async function getParcels(bounds: Bounds): Promise<NextResponse> {
   // These providers publish individual parcel polygons. Do not replace a
   // missing cadastral polygon with a road edge, image trace, or zoning polygon.
-  const providers: ParcelProvider[] = [
+  const parcelProviders: ParcelProvider[] = [
     {
       id: "kigali",
       layerUrl: KIGALI_PARCEL_FEATURE_LAYER,
@@ -512,7 +512,10 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
       layerUrl: BUGESERA_PARCEL_FEATURE_LAYER,
       extent: BUGESERA_GIS_EXTENT
     }
-  ].filter((provider) => boundsIntersect(bounds, provider.extent));
+  ];
+  const providers = parcelProviders.filter((provider) =>
+    boundsIntersect(bounds, provider.extent)
+  );
 
   if (providers.length === 0) {
     return NextResponse.json(emptyCollection(), {
