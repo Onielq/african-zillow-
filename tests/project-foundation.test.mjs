@@ -52,7 +52,7 @@ test("parcel boundary requests preserve source vertices and use a precise viewpo
 
   assert.match(route, /Number\(west\.toFixed\(6\)\)/);
   assert.match(route, /Number\(south\.toFixed\(6\)\)/);
-  assert.match(route, /do not set maxAllowableOffset/);
+  assert.match(route, /do not set maxAllowableOffset/i);
   assert.match(route, /returnGeometry: "true"/);
   assert.match(mapView, /toFixed\(6\)\)\.join\(","\)/);
   assert.match(mapView, /PARCEL_ZOOM \+ 3\.85/);
