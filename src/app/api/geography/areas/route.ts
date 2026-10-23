@@ -402,7 +402,9 @@ function normaliseAdministrativeFeature(
       ...(level === "village" ? { village, village_id: villageId } : {}),
       source_label: sourceId === "kigali"
         ? "Kigali City Master Plan administrative boundaries (April 2026 map service)"
-        : "Bugesera Masterplan GIS administrative boundaries",
+        : level === "cell"
+          ? "Bugesera Masterplan GIS · NISR cell boundary metadata lists capture year 2012"
+          : "Bugesera Masterplan GIS administrative boundaries (source vintage to confirm)",
       source_type: "administrative-boundary",
       ...(level === "district" &&
       DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict] !== undefined
@@ -477,7 +479,7 @@ async function getAdministrativeAreas(
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
         "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan",
-        "X-Data-Basis": "Kigali administrative map service dated April 2026; Bugesera Masterplan GIS"
+        "X-Data-Basis": "Kigali admin service dated April 2026; Bugesera cell layer metadata lists NISR capture 2012"
       }
     }
   );
