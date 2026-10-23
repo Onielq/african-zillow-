@@ -13,9 +13,12 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /Kicukiro/i);
   assert.match(route, /Nyarugenge/i);
   assert.match(route, /Bugesera/i);
-  assert.match(route, /FeatureServer/);
-  assert.match(route, /district, sector, cell, or village/);
-  assert.match(route, /layerIds = \{ district: 0, sector: 1, cell: 2, village: 3 \}/);
+  assert.match(route, /Masterplan2020_22Apr2026\/MapServer/);
+  assert.match(route, /Overlays\/Bugesera_Masterplan\/MapServer/);
+  assert.match(route, /Kigali_Parcels_1June2026_for_search\/FeatureServer\/0/);
+  assert.match(route, /district, sector, cell, village, or parcel/);
+  assert.match(route, /district: 4, sector: 5, cell: 6, village: 7/);
+  assert.match(route, /district: 2, sector: 4, cell: 3, village: 5/);
   assert.match(route, /geometryType/);
   assert.match(route, /arcGisPolygonToGeoJson/);
   assert.match(route, /f: "json"/);
@@ -26,15 +29,18 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /SECTOR_ZOOM/);
   assert.match(mapView, /CELL_ZOOM/);
   assert.match(mapView, /VILLAGE_ZOOM/);
+  assert.match(mapView, /PARCEL_ZOOM/);
+  assert.match(mapView, /source: "land-parcels"/);
   assert.match(mapView, /district-fill/);
   assert.match(mapView, /sector-fill/);
   assert.match(mapView, /cell-fill/);
   assert.match(mapView, /village-fill/);
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
+  assert.match(mapView, /0\.2/);
   assert.match(mapView, /0\.35/);
   assert.match(mapView, /0\.5/);
-  assert.match(mapView, /0\.62/);
+  assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
 });
 
 test("the average land price metric uses sourced district values and marks snapshot freshness limitations", async () => {
@@ -129,11 +135,16 @@ test("the basemap has a documented fallback style", async () => {
   assert.match(mapView, /map\.setStyle\(FALLBACK_STYLE_URL\)/);
 });
 
-test("the UI distinguishes administrative boundaries from parcel and ownership data", async () => {
+test("the UI identifies Kigali parcels without presenting them as proof of ownership", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
-  assert.match(experience, /not a cadastral plot/);
-  assert.match(experience, /Land records not connected yet/);
-  assert.match(experience, /reuse terms must be confirmed before production/i);
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  assert.match(experience, /Unique parcel identifier \(UPI\)/);
+  assert.match(experience, /Verify legal title before a transaction/);
+  assert.match(experience, /Bugesera.*individual cadastral parcel feed has not been verified/i);
+  assert.match(route, /KIGALI_PARCEL_FEATURE_LAYER/);
+  assert.match(route, /upi IS NOT NULL/);
+  assert.match(route, /parcel_size_m2/);
+  assert.match(route, /wetland_area_m2/);
 });
 
 test("hydration warning suppression is scoped to the body element", async () => {
