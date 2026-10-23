@@ -23,7 +23,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite";
-export type AreaLevel = "district" | "sector" | "cell" | "village";
+export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type SelectedArea = {
   level: AreaLevel;
@@ -38,6 +38,13 @@ export type SelectedArea = {
   village: string | null;
   villageId: string | null;
   averageLandPricePerM2: number | null;
+  sourceLabel?: string | null;
+  sourceType?: "administrative-boundary" | "cadastral-parcel";
+  upi?: string | null;
+  parcelNumber?: string | null;
+  parcelSizeM2?: number | null;
+  wetlandAreaM2?: number | null;
+  lastUpdatedOn?: number | null;
 };
 
 type AreaProperties = {
@@ -54,6 +61,13 @@ type AreaProperties = {
   average_land_price_per_m2?: number | null;
   average_land_price_source?: string | null;
   average_land_price_date_status?: string | null;
+  source_label?: string | null;
+  source_type?: string | null;
+  upi?: string | null;
+  parcel_number?: string | null;
+  parcel_size_m2?: number | null;
+  wetland_area_m2?: number | null;
+  last_updated_on?: number | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -112,8 +126,9 @@ const SATELLITE_STYLE: StyleSpecification = {
 const SECTOR_ZOOM = 9.55;
 const CELL_ZOOM = 12.15;
 const VILLAGE_ZOOM = 14.75;
+const PARCEL_ZOOM = 16.15;
 
-const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village"];
+const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village", "parcel"];
 
 const AREA_LAYERS: Record<
   AreaLevel,
@@ -122,7 +137,7 @@ const AREA_LAYERS: Record<
     fill: string;
     outline: string;
     label: string;
-    property: "district" | "sector" | "cell" | "village";
+    property: "district" | "sector" | "cell" | "village" | "parcel_number";
     minZoom: number;
     color: string;
   }
@@ -162,10 +177,20 @@ const AREA_LAYERS: Record<
     property: "village",
     minZoom: VILLAGE_ZOOM,
     color: "#F0E4C9"
+  },
+  parcel: {
+    source: "land-parcels",
+    fill: "parcel-fill",
+    outline: "parcel-outline",
+    label: "parcel-label",
+    property: "parcel_number",
+    minZoom: PARCEL_ZOOM,
+    color: "#E9B65B"
   }
 };
 
 function activeAreaLevel(zoom: number): AreaLevel {
+  if (zoom >= PARCEL_ZOOM) return "parcel";
   if (zoom >= VILLAGE_ZOOM) return "village";
   if (zoom >= CELL_ZOOM) return "cell";
   if (zoom >= SECTOR_ZOOM) return "sector";
@@ -182,6 +207,8 @@ function zoomForLevel(level: AreaLevel): number {
       return 15.0;
     case "village":
       return 17.2;
+    case "parcel":
+      return 19.0;
   }
 }
 
@@ -260,7 +287,13 @@ function featureToArea(
   const properties = feature.properties as AreaProperties | null;
   if (!properties?.district) return null;
 
-  const name = properties[level] ?? null;
+  const name = level === "parcel"
+    ? properties.parcel_number
+      ? `Parcel ${properties.parcel_number}`
+      : properties.upi
+        ? `Parcel ${properties.upi}`
+        : null
+    : properties[level] ?? null;
   if (!name) return null;
 
   return {
@@ -278,7 +311,16 @@ function featureToArea(
     averageLandPricePerM2:
       typeof properties.average_land_price_per_m2 === "number"
         ? properties.average_land_price_per_m2
-        : null
+        : null,
+    sourceLabel: properties.source_label ?? null,
+    sourceType: properties.source_type === "cadastral-parcel"
+      ? "cadastral-parcel"
+      : "administrative-boundary",
+    upi: properties.upi ?? null,
+    parcelNumber: properties.parcel_number ?? null,
+    parcelSizeM2: properties.parcel_size_m2 ?? null,
+    wetlandAreaM2: properties.wetland_area_m2 ?? null,
+    lastUpdatedOn: properties.last_updated_on ?? null
   };
 }
 
@@ -339,23 +381,14 @@ export function MapView({
     map.setPaintProperty(
       "district-fill",
       "fill-opacity",
-      showLandPriceHeatmap
-        ? [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.84,
-            ["boolean", ["feature-state", "selected"], false],
-            0.76,
-            0.68
-          ]
-        : [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.62,
-            ["boolean", ["feature-state", "selected"], false],
-            0.5,
-            0.35
-          ]
+      [
+        "case",
+        ["boolean", ["feature-state", "hover"], false],
+        0.5,
+        ["boolean", ["feature-state", "selected"], false],
+        0.35,
+        0.2
+      ]
     );
   }, [showLandPriceHeatmap]);
 
@@ -374,7 +407,7 @@ export function MapView({
       center: [30.13, -2.1],
       zoom: 8.35,
       minZoom: 5,
-      maxZoom: 19,
+      maxZoom: 20,
       maxBounds: RWANDA_CAMERA_BOUNDS,
       pitch: 0,
       bearing: 0,
@@ -496,10 +529,10 @@ export function MapView({
             "fill-opacity": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              level === "district" && showLandPriceHeatmapRef.current ? 0.84 : 0.62,
+              0.5,
               ["boolean", ["feature-state", "selected"], false],
-              level === "district" && showLandPriceHeatmapRef.current ? 0.76 : 0.5,
-              level === "district" && showLandPriceHeatmapRef.current ? 0.68 : 0.35
+              0.35,
+              0.2
             ]
           }
         });
@@ -521,7 +554,11 @@ export function MapView({
               "#126347",
               ["boolean", ["feature-state", "selected"], false],
               "#126347",
-              level === "village" ? "#A68A56" : "#668878"
+              level === "parcel"
+                ? "#A56A0A"
+                : level === "village"
+                  ? "#A68A56"
+                  : "#668878"
             ],
             "line-width": [
               "interpolate",
@@ -549,7 +586,9 @@ export function MapView({
           source: layer.source,
           layout: {
             visibility: level === "district" ? "visible" : "none",
-            "text-field": ["get", layer.property],
+            "text-field": level === "parcel"
+              ? ["to-string", ["get", layer.property]]
+              : ["get", layer.property],
             "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
             "text-size": [
               "interpolate",
@@ -641,6 +680,44 @@ export function MapView({
           }))
         );
         if (sequence !== refreshSequence) return;
+
+        // Some Bugesera village records publish cell_id but not the cell name.
+        // Parent cell polygons have already been fetched at this zoom, so join
+        // those names by the official district + cell code rather than leaving
+        // an incomplete village hierarchy in the selection panel.
+        const cellNameByCode = new Map<string, string>();
+        for (const result of results) {
+          if (result.level !== "cell") continue;
+          for (const feature of result.data.features) {
+            const cellId = feature.properties?.cell_id;
+            const cellName = feature.properties?.cell;
+            if (!cellId || !cellName) continue;
+            const key = `${feature.properties?.district_id ?? feature.properties?.district ?? ""}|${cellId}`;
+            cellNameByCode.set(key, cellName);
+          }
+        }
+
+        const villageResult = results.find((result) => result.level === "village");
+        if (villageResult && cellNameByCode.size > 0) {
+          villageResult.data = {
+            ...villageResult.data,
+            features: villageResult.data.features.map((feature) => {
+              if (feature.properties?.cell) return feature;
+              const cellId = feature.properties?.cell_id;
+              if (!cellId) return feature;
+              const key = `${feature.properties?.district_id ?? feature.properties?.district ?? ""}|${cellId}`;
+              const cellName = cellNameByCode.get(key);
+              if (!cellName) return feature;
+              return {
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  cell: cellName
+                }
+              };
+            })
+          };
+        }
 
         for (const result of results) {
           const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;

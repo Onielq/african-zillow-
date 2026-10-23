@@ -4,13 +4,15 @@ A map-first land intelligence platform for Rwanda, initially focused on Kigali C
 
 ## Current stage
 
-The application includes an interactive MapLibre base map, a Map/Satellite switcher, a fallback basemap style, and viewport-based administrative polygons for four pilot districts: Gasabo, Kicukiro, Nyarugenge, and Bugesera. Satellite mode uses Esri World Imagery raster tiles; administrative overlays are rebuilt above the imagery when the style changes.
+The application is a MapLibre map for Kigali City and Bugesera District, with a normal road basemap, a Map/Satellite switcher, and click-to-inspect polygons. Administrative boundaries are loaded from the official Kigali City Master Plan map service for Kigali and the Geodata Rwanda Bugesera Masterplan service for Bugesera.
 
-**The ordinary road map remains visible.** As users zoom in, the map switches from district boundaries to sectors, cells, and villages. Area fills use 35% opacity by default, 50% for selected areas, and 62% on hover. The map's zoom-out floor is calculated from the current viewport so the full padded Rwanda extent fits on screen. Panning is constrained to Rwanda's geographic envelope. Clicking a polygon identifies the area and fits the map to its extent.
+**Zoom hierarchy:** `District → Sector → Cell → Village → Land parcel`. District, sector, cell, and village fills use 20% opacity by default, 35% on selection, and 50% on hover, keeping roads and satellite imagery visible beneath the boundaries.
 
-**The basemap and administrative polygons are not a land registry.** Official cadastral parcel boundaries, listing counts, ownership records, verified zoning overlays, and market metrics are not yet connected. The app must not draw or infer individual plots from roads, satellite imagery, or administrative borders.
+**Land parcels are a separate data layer, not the next administrative level.** At high zoom, the map requests published parcel polygons from the City of Kigali Master Plan's “Kigali Parcels” FeatureServer (1 June 2026 dataset). Clicking a parcel shows its UPI, parcel number, area, wetland overlap when supplied, and source update date when supplied.
 
-The current administrative API uses the Rwanda Environment Ministry GIS FeatureServer. Its district, sector, cell, and village layer descriptions reference boundaries based on the 2022 census. The service is publicly queryable, but access, version, and reuse terms must be confirmed before production.
+The linked Bugesera Masterplan service provides administrative boundaries and planning/masterplan overlays. The cell-boundary layer's metadata lists NISR as its source and a 2012 capture year, so confirm whether a newer authoritative version is available before relying on those cells for legal or investment decisions. I did not verify an individual cadastral parcel layer in that service, so the app does not label Bugesera planning zones as legal plots or fabricate parcel outlines there. A verified parcel source for Bugesera is still required.
+
+**These layers are not proof of ownership or encumbrance status.** Buyers should verify title, ownership, restrictions, and current records with the competent land authority before a transaction. The source maps' version, access and reuse terms also need confirmation before commercial production.
 
 ## Local development
 
@@ -56,8 +58,8 @@ The comparison panel can shortlist area names and levels. It shows the sourced d
 
 ## Rwanda viewport limits and boundary opacity
 
-- Administrative polygon opacity: 35% by default, 50% when selected, and 62% on hover.
-- Zooming out stops at a minimum zoom derived from the current map size so Rwanda's full geographic extent fits in view on desktop and mobile.
+- Administrative and parcel fill opacity: 20% by default, 35% when selected, and 50% on hover.
+- Zooming out stops at a minimum zoom derived from the current map size so Rwanda's padded geographic extent fits on desktop and mobile.
 - Map panning is constrained to a padded longitude/latitude envelope around Rwanda.
 - This is a camera constraint using a geographic envelope, not a polygon mask that removes every pixel outside Rwanda's exact international border.
 
@@ -75,16 +77,18 @@ The visible navigation hierarchy is:
 
 `District → Sector → Cell → Village → Land parcel`
 
-The first four levels are administrative polygons. They come from the current pilot API and are revealed by zoom level. The last level is different: an individual land parcel is a cadastral record, not an administrative unit. Parcel outlines and identifiers must come from an authorized, current Rwanda Land Authority (RLA/LAIS) cadastral source.
+The first four levels are administrative polygons. The last is a distinct cadastral record and is fetched from a parcel-specific source at high zoom; it must not be generated from roads, imagery, village boundaries, or zoning.
 
-Potential data references to validate before production:
+Connected sources:
 
-- [Rwanda Environment Ministry GIS — 2022 census-based administrative boundaries](https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer)
-- [geodata.rw — district boundaries](https://geodata.rw/server/rest/services/basemap/District_boundary/FeatureServer/0)
-- [geodata.rw — sector boundaries](https://geodata.rw/server/rest/services/basemap/Sector_Boundary/FeatureServer)
-- [geodata.rw — 2022 village boundaries](https://geodata.rw/server/rest/services/village_boundary/MapServer)
+- [Kigali City Master Plan map](https://masterplan.kigalicity.gov.rw/portal/apps/webappviewer/index.html?id=fdd2e30cbc15401d9daee5f68982d755) — administrative levels from `Masterplan2020/Masterplan2020_22Apr2026/MapServer` (district 4, sector 5, cell 6, village 7).
+- [Kigali Parcels FeatureServer](https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0) — parcel polygons and attributes including UPI, parcel number, size, wetland overlap, and last update.
+- [Bugesera Masterplan map](https://geodata.rw/portal/apps/experiencebuilder/experience/?id=8b259ba9599747898ca728dba4e6d215) — administrative levels from `Overlays/Bugesera_Masterplan/MapServer` (district 2, sector 4, cell 3, village 5) plus planning overlays.
+- [Bugesera land-use / zoning service](https://geodata.rw/server/rest/services/masterplan/Bugesera_DLUP/FeatureServer/0) — land-use planning zones. These features are **not** individual cadastral plots and must remain visually and semantically separate from parcel polygons.
 
-Important: some geodata.rw National Geodatabase metadata describes older 2006/2012 boundary vintages and says the dataset must not be transferred to third parties without RLA permission. Confirm the latest official version and written reuse rights before replacing the currently used boundary service or republishing its geometry. The app currently does not serve geodata.rw cadastral parcel records.
+Individual Kigali parcels are requested only at high zoom to keep map requests bounded. The app currently does not have a verified individual-parcel service connected for Bugesera. Do not use Bugesera zoning polygons as a replacement.
+
+Before production, validate data currency, access and redistribution terms with the respective publishers, and keep source date/attribution visible wherever provided.
 
 ## Valhalla's role
 
