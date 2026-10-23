@@ -16,6 +16,7 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /Masterplan2020_22Apr2026\/MapServer/);
   assert.match(route, /Overlays\/Bugesera_Masterplan\/MapServer/);
   assert.match(route, /Kigali_Parcels_1June2026_for_search\/FeatureServer\/0/);
+  assert.match(route, /Bugesera_Parcels\/FeatureServer\/0/);
   assert.match(route, /cellule_1/);
   assert.match(route, /code_cell_/);
   assert.match(route, /district, sector, cell, village, or parcel/);
@@ -151,12 +152,25 @@ test("the basemap has a documented fallback style", async () => {
   assert.match(mapView, /map\.setStyle\(FALLBACK_STYLE_URL\)/);
 });
 
+test("parcel coverage includes the NLA-hosted Bugesera polygon layer without requesting ownership fields", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(route, /BUGESERA_PARCEL_FEATURE_LAYER/);
+  assert.match(route, /provider\.id === "bugesera"/);
+  assert.match(route, /"upi"/);
+  assert.match(route, /geometry: arcGisPolygonToGeoJson\(feature\.geometry\)/);
+  assert.match(route, /reuse terms, completeness, and current survey accuracy still need confirmation/i);
+  assert.match(experience, /Bugesera parcel polygons are connected/i);
+  assert.match(experience, /reuse terms, completeness and survey accuracy still need confirmation/i);
+});
+
 test("the UI identifies Kigali parcels without presenting them as proof of ownership", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   assert.match(experience, /Unique parcel identifier \(UPI\)/);
   assert.match(experience, /Verify legal title before a transaction/);
-  assert.match(experience, /Bugesera.*individual cadastral parcel feed has not been verified/i);
+  assert.match(experience, /Bugesera.*parcel polygons are connected/i);
   assert.match(route, /KIGALI_PARCEL_FEATURE_LAYER/);
   assert.match(route, /upi IS NOT NULL/);
   assert.match(route, /parcel_size_m2/);
