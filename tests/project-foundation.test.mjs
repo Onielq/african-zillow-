@@ -227,6 +227,6 @@ test("the standalone data source register exposes provenance, limitations, and s
   assert.match(page, /data-status/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(docs, /DATA_SOURCE_REGISTER|Data source register/);
-  assert.match(docs, /approved users/);
+  assert.match(docs, /approved sharing/);
   assert.match(experience, /href="\/data-sources"/);
 });
