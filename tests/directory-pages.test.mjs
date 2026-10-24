@@ -10,6 +10,7 @@ const readProjectFile = (path) => readFile(join(root, path), "utf8");
 test("project and developer directories remain evidence-gated until a feed is verified", async () => {
   const projects = await readProjectFile("src/app/projects/page.tsx");
   const developers = await readProjectFile("src/app/developers/page.tsx");
+  const candidateData = await readProjectFile("src/data/developer-directory.ts");
   const directory = await readProjectFile("src/components/directories/DirectoryLandingPage.tsx");
   const mapExperience = await readProjectFile("src/components/map/MapExperience.tsx");
 
@@ -17,12 +18,25 @@ test("project and developer directories remain evidence-gated until a feed is ve
   assert.match(projects, /No verified project feed is connected yet/i);
   assert.match(projects, /Source and display permission/i);
   assert.match(developers, /kind="developers"/);
-  assert.match(developers, /No verified profiles published yet/i);
+  assert.match(developers, /Supplied candidates are ready for review/i);
+  assert.match(developers, /RWANDA_DEVELOPER_CANDIDATES/);
+  assert.match(candidateData, /Homart Properties/);
+  assert.match(candidateData, /Ultimate Developers Ltd \(UDL\)/);
+  assert.match(candidateData, /Groupe Palmeraie Développement/);
+  assert.equal((candidateData.match(/\{ id: "/g) ?? []).length, 20);
+  assert.match(candidateData, /125\+/);
+  assert.match(candidateData, /2,978/);
+  assert.match(candidateData, /sourceMetrics/);
+  assert.match(candidateData, /Needs verification/);
+  assert.match(directory, /Supplied field/);
+  assert.match(directory, /original column headings/);
   assert.match(developers, /Property developers/i);
   assert.match(developers, /Estate agencies/i);
   assert.match(developers, /Independent agents/i);
   assert.match(developers, /developer-directory-template\.csv/);
   assert.match(directory, /An agent is not labelled a developer/i);
+  assert.match(directory, /candidateRecords/);
+  assert.match(directory, /candidate organizations supplied/);
   assert.match(developers, /Verified market role/i);
   assert.match(directory, /This means no records are verified and published in this directory/i);
   assert.ok(directory.includes('href: "/projects"'));

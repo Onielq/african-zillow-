@@ -13,6 +13,14 @@ type ProfileTypeItem = {
   publicationRule: string;
 };
 
+type CandidateRecord = {
+  id: string;
+  name: string;
+  segment: string;
+  sourceMetrics: [string, string, string, string, string, string];
+  status: string;
+};
+
 type DirectoryKind = "projects" | "developers";
 
 type DirectoryLandingPageProps = {
@@ -30,6 +38,7 @@ type DirectoryLandingPageProps = {
   profileTypes?: ProfileTypeItem[];
   templateHref?: string;
   templateLabel?: string;
+  candidateRecords?: CandidateRecord[];
 };
 
 const NAV_ITEMS = [
@@ -53,7 +62,8 @@ export function DirectoryLandingPage({
   evidence,
   profileTypes,
   templateHref,
-  templateLabel
+  templateLabel,
+  candidateRecords
 }: DirectoryLandingPageProps) {
   return (
     <main className={styles.page} data-directory={kind}>
@@ -92,7 +102,7 @@ export function DirectoryLandingPage({
           <div className={styles.heroMeta}>
             <span className={styles.statusPill}>
               <span aria-hidden="true" className={styles.statusDot} />
-              {status}
+              {candidateRecords?.length ? `${candidateRecords.length} candidate organizations supplied · 0 verified` : status}
             </span>
             <span className={styles.geography}>Pilot geography · Kigali City + Bugesera</span>
           </div>
@@ -116,11 +126,67 @@ export function DirectoryLandingPage({
             <span className={styles.statusIcon} aria-hidden="true">
               {kind === "projects" ? "◇" : "◎"}
             </span>
-            <strong>0</strong>
-            <span>{recordLabel}</span>
-            <small>This means no records are verified and published in this directory; it does not mean none exist in Rwanda.</small>
+            <strong>{candidateRecords?.length ?? 0}</strong>
+            <span>{candidateRecords?.length ? "candidate organizations supplied" : recordLabel}</span>
+            <small>
+              {candidateRecords?.length
+                ? `${candidateRecords.length} supplied leads · 0 verified profiles published. This is an intake count, not an endorsement.`
+                : "This means no records are verified and published in this directory; it does not mean none exist in Rwanda."}
+            </small>
           </aside>
         </section>
+
+        {candidateRecords?.length ? (
+          <section className={styles.candidateSection} aria-labelledby="candidate-list-title">
+            <div className={styles.candidateHeading}>
+              <div>
+                <p className={styles.eyebrow}>SUPPLIED CANDIDATE LIST</p>
+                <h2 id="candidate-list-title">{candidateRecords.length} organizations ready for review</h2>
+              </div>
+              <p>
+                These names and descriptions came from the table supplied for this project.
+                They are intake records, not verified endorsements or confirmed current project records.
+              </p>
+            </div>
+            <div
+              className={styles.candidateTableFrame}
+              role="region"
+              aria-label="Supplied developer candidates. Scroll horizontally to view all fields."
+              tabIndex={0}
+            >
+              <table className={styles.candidateTable}>
+                <thead>
+                  <tr>
+                    <th scope="col">Organization</th>
+                    <th scope="col">Focus supplied</th>
+                    {["1", "2", "3", "4", "5", "6"].map((field) => (
+                      <th scope="col" key={field}>Supplied field {field}</th>
+                    ))}
+                    <th scope="col">Review state</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidateRecords.map((record) => (
+                    <tr key={record.id}>
+                      <th scope="row">{record.name}</th>
+                      <td>{record.segment}</td>
+                      {record.sourceMetrics.map((value, index) => (
+                        <td className={styles.candidateMetric} key={index}>{value}</td>
+                      ))}
+                      <td><span className={styles.candidateStatus}>{record.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className={styles.candidateDataNote}>
+              <strong>Important data limitation:</strong> the six numeric columns are preserved in their
+              original order, but their headings were not included in the pasted table. They are therefore
+              labelled “Supplied field 1–6” and have not been interpreted, scored, or presented as verified
+              counts. Replace these labels when you provide the original column headings.
+            </p>
+          </section>
+        ) : null}
 
         {profileTypes?.length ? (
           <section className={styles.profileTypes} aria-labelledby="profile-types-title">
