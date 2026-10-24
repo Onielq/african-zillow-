@@ -129,11 +129,19 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AreaLevel, 
   if (!nameField) return [];
 
   const escaped = query.replace(/'/g, "''");
+  // Query only fields needed to label and distinguish matching areas. This
+  // keeps administrative search payloads small while preserving hierarchy IDs.
+  const requestedFields = new Set<string>([nameField]);
+  for (const key of ["district", "sector", "cell", "village"] as const) {
+    const field = chooseField(fields, candidate[key]);
+    if (field) requestedFields.add(field);
+    const idField = chooseField(fields, candidate.ids[key]);
+    if (idField) requestedFields.add(idField);
+  }
   const params = new URLSearchParams({
     where: nameField + " LIKE " + "'%" + escaped + "%'",
-    outFields: "*",
+    outFields: Array.from(requestedFields).join(","),
     returnGeometry: "false",
-    resultRecordCount: "30",
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
