@@ -409,6 +409,9 @@ test("Show menu exposes sourced overlays and scopes queries to the active pilot 
   assert.match(places, /OVERPASS_ENDPOINTS/);
   assert.match(places, /KIGALI_EXTENT/);
   assert.match(places, /BUGESERA_EXTENT/);
+  assert.match(places, /getPilotDistrictFeatures/);
+  assert.match(places, /clipFeatureToDistricts/);
+  assert.match(places, /official pilot district polygons/);
   assert.match(places, /© OpenStreetMap contributors, ODbL/);
   assert.match(css, /\.show-menu/);
 });
@@ -439,6 +442,7 @@ test("transaction volume explains district priorities, transaction types, and no
   assert.match(experience, /Voluntary sale, succession, expropriation/);
   assert.match(experience, /not proof of price appreciation/);
   assert.match(experience, /rwandalanddashboard\.lands\.rw\/transactions/);
-  assert.match(experience, /4,350 Bugesera monthly count/);
+  assert.match(experience, /Bugesera month-to-date total of 4,350/);
   assert.match(experience, /4,031/);
+  assert.match(experience, /4,350\*/);
 });
