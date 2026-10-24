@@ -474,6 +474,7 @@ export function MapExperience() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
+  const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
@@ -485,8 +486,15 @@ export function MapExperience() {
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
-  const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
+  const [comparisonSearchResults, setComparisonSearchResults] = useState<AreaSearchResult[]>([]);
+  const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
+  const [compareProjectName, setCompareProjectName] = useState("");
+  const [compareProjectUrl, setCompareProjectUrl] = useState("");
+  const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
+  const [selectedTransactionEstimateKey, setSelectedTransactionEstimateKey] = useState<string | null>(null);
+  const [selectedTransactionEstimateStatus, setSelectedTransactionEstimateStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
   );
