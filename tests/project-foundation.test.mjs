@@ -457,7 +457,7 @@ test("transaction volume explains sourced baselines, model caveats, and current 
   assert.match(experience, /Transaction types to track/);
   assert.match(experience, /Voluntary sale, succession, expropriation/);
   assert.match(experience, /not proof of price appreciation/);
-  assert.match(experience, /rwandalanddashboard\.lands\.rw\/transactions/);
+  assert.match(experience, /TRANSACTION_DASHBOARD_SOURCE/);
   assert.match(experience, /annual district transaction totals for 2023/);
   assert.match(experience, /User-reported Bugesera month-to-date dashboard reading/);
   assert.match(experience, /4,031/);
