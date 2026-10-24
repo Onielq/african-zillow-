@@ -39,10 +39,6 @@ function parseBounds(value: string | null): Bounds | null {
   return [west, south, east, north];
 }
 
-function intersects(a: Bounds, b: Bounds): boolean {
-  return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
-}
-
 function intersection(a: Bounds, b: Bounds): Bounds | null {
   const result: Bounds = [
     Math.max(a[0], b[0]),
@@ -226,22 +222,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const collections = await Promise.all(targetBounds.map(async (target) => {
-      const jobs: Array<Promise<{ category: OverlayCategory; elements: OsmElement[] }>> = [
-        queryOverpass(queryFor(categories, target, false)).then((elements) => ({
-          category: "landmarks" as OverlayCategory,
-          elements
-        }))
+      const jobs: Array<Promise<OsmElement[]>> = [
+        queryOverpass(queryFor(categories, target, false))
       ];
       if (categories.includes("transportation")) {
-        jobs.push(
-          queryOverpass(queryFor(categories, target, true)).then((elements) => ({
-            category: "transportation" as OverlayCategory,
-            elements
-          }))
-        );
+        jobs.push(queryOverpass(queryFor(categories, target, true)));
       }
       const results = await Promise.all(jobs);
-      return results.flatMap(({ category: _category, elements }) =>
+      return results.flatMap((elements) =>
         elements.flatMap((element) => {
           const tags = element.tags ?? {};
           let actualCategory: OverlayCategory | null = null;
