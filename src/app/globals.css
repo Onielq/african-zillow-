@@ -2758,3 +2758,105 @@ button:disabled {
   line-height: 1.55;
 }
 
+
+
+/* Selected parcel estimate and flexible mixed-area comparison */
+.parcel-estimate-card {
+  grid-column: 1 / -1;
+  gap: 8px;
+  margin-top: 3px;
+  padding: 14px;
+  border: 1px solid #cfe2d4;
+  border-radius: 12px;
+  background: #eff8f1;
+}
+.parcel-estimate-card > span {
+  color: #456451;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.parcel-estimate-card > strong {
+  color: #165c3d;
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 820;
+  line-height: 1.15;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+.parcel-estimate-card > p {
+  margin: 0;
+  color: #2d5a40;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.parcel-estimate-card > small {
+  color: #667a6d;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.comparison-project-add {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5ebe6;
+}
+.comparison-project-add-title {
+  color: #5a6a60;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+.comparison-project-add .comparison-search {
+  min-height: 36px;
+}
+.comparison-project-add-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #cfe0d4;
+  border-radius: 9px;
+  background: #edf6ef;
+  color: #21583b;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.comparison-project-add-button:hover {
+  background: #e3f0e6;
+}
+.comparison-project-add > small {
+  color: #7a887f;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.comparison-table thead th small {
+  display: block;
+  margin-top: 5px;
+  color: #758178;
+  font-size: 9px;
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: normal;
+}
+.comparison-table .comparison-price-cell > small {
+  display: block;
+  margin-top: 4px;
+  color: #7a887f;
+  font-size: 9px;
+  line-height: 1.45;
+  white-space: normal;
+}
+@media (max-width: 460px) {
+  .parcel-estimate-card {
+    padding: 12px;
+  }
+  .comparison-project-add {
+    gap: 6px;
+  }
+}
