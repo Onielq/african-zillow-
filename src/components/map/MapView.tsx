@@ -725,6 +725,48 @@ export function MapView({
         }
 
         const villageResult = results.find((result) => result.level === "village");
+        const parcelResult = results.find((result) => result.level === "parcel");
+
+        // Join Bugesera village IDs from the official village polygons. Village
+        // names can repeat across cells, so use cell ID + normalized exact name;
+        // ambiguous matches are left blank rather than guessing.
+        const normalisePlaceName = (value: string) =>
+          value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase().replace(/\\s+/g, " ");
+        const villageIdByCellAndName = new Map<string, string>();
+        const ambiguousVillageKeys = new Set<string>();
+        if (villageResult) {
+          for (const feature of villageResult.data.features) {
+            const cellId = feature.properties?.cell_id;
+            const village = feature.properties?.village;
+            const villageId = feature.properties?.village_id;
+            if (!cellId || !village || !villageId) continue;
+            const key = `${cellId}|${normalisePlaceName(village)}`;
+            const existing = villageIdByCellAndName.get(key);
+            if (existing && existing !== villageId) {
+              villageIdByCellAndName.delete(key);
+              ambiguousVillageKeys.add(key);
+            } else if (!ambiguousVillageKeys.has(key)) {
+              villageIdByCellAndName.set(key, villageId);
+            }
+          }
+        }
+
+        if (parcelResult) {
+          parcelResult.data = {
+            ...parcelResult.data,
+            features: parcelResult.data.features.map((feature) => {
+              if (feature.properties?.village_id || !feature.properties?.cell_id || !feature.properties?.village) {
+                return feature;
+              }
+              const key = `${feature.properties.cell_id}|${normalisePlaceName(feature.properties.village)}`;
+              const villageId = ambiguousVillageKeys.has(key) ? null : villageIdByCellAndName.get(key) ?? null;
+              return villageId
+                ? { ...feature, properties: { ...feature.properties, village_id: villageId } }
+                : feature;
+            })
+          };
+        }
+
         if (villageResult && cellNameByCode.size > 0) {
           villageResult.data = {
             ...villageResult.data,
