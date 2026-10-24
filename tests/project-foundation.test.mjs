@@ -249,6 +249,10 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.match(experience, /area-market-grid/);
   assert.match(experience, /Projects in selected area/);
   assert.match(experience, /Not connected/);
+  assert.match(experience, /metric-info-panel/);
+  assert.match(experience, /activeMetric\.dataStatus/);
+  assert.match(experience, /Expected unit/);
   assert.match(css, /comparison-modal-backdrop/);
   assert.match(css, /area-market-card/);
+  assert.match(css, /metric definition popover/i);
 });
