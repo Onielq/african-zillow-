@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const runtime = "nodejs";
 
@@ -277,6 +279,106 @@ function attributeValue(
   return null;
 }
 
+type CellPriceEntry = {
+  price: number | null;
+  conflict: boolean;
+  sourceRows: number[];
+};
+type SectorPriceEntry = {
+  mean: number | null;
+  pricedCells: number;
+  conflictingCells: number;
+};
+type LandPriceIndex = {
+  cells: Map<string, CellPriceEntry>;
+  sectors: Map<string, SectorPriceEntry>;
+};
+let landPriceIndexPromise: Promise<LandPriceIndex> | null = null;
+
+function normalisePricePart(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .trim()
+    .replace(/\\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+function cellPriceKey(district: string, sector: string, cell: string): string {
+  return [district, sector, cell].map(normalisePricePart).join("|");
+}
+
+function sectorPriceKey(district: string, sector: string): string {
+  return [district, sector].map(normalisePricePart).join("|");
+}
+
+async function getLandPriceIndex(): Promise<LandPriceIndex> {
+  if (!landPriceIndexPromise) {
+    landPriceIndexPromise = (async () => {
+      const source = await readFile(join(process.cwd(), "public", "land-price-reference.tsv"), "utf8");
+      const groups = new Map<string, {
+        district: string;
+        sector: string;
+        cell: string;
+        prices: Set<number>;
+        sourceRows: number[];
+      }>();
+      const lines = source.split(/\\r?\\n/);
+      for (let index = 1; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (!line?.trim()) continue;
+        const fields = line.split("\\t");
+        if (fields.length !== 5 || fields.slice(0, 4).some((field) => !field.trim())) continue;
+        const district = fields[1].trim();
+        const sector = fields[2].trim();
+        const cell = fields[3].trim();
+        const price = Number(fields[4].replace(/,/g, "").trim());
+        if (!Number.isFinite(price) || price <= 0) continue;
+        const key = cellPriceKey(district, sector, cell);
+        const group = groups.get(key) ?? {
+          district,
+          sector,
+          cell,
+          prices: new Set<number>(),
+          sourceRows: []
+        };
+        group.prices.add(price);
+        group.sourceRows.push(index + 1);
+        groups.set(key, group);
+      }
+
+      const cells = new Map<string, CellPriceEntry>();
+      const sectorValues = new Map<string, { prices: number[]; conflicts: number }>();
+      for (const [key, group] of groups) {
+        const conflict = group.prices.size !== 1;
+        const price = conflict ? null : (Array.from(group.prices)[0] ?? null);
+        cells.set(key, { price, conflict, sourceRows: group.sourceRows });
+        const sectorKey = sectorPriceKey(group.district, group.sector);
+        const aggregate = sectorValues.get(sectorKey) ?? { prices: [], conflicts: 0 };
+        if (price !== null) aggregate.prices.push(price);
+        if (conflict) aggregate.conflicts += 1;
+        sectorValues.set(sectorKey, aggregate);
+      }
+
+      const sectors = new Map<string, SectorPriceEntry>();
+      for (const [key, aggregate] of sectorValues) {
+        sectors.set(key, {
+          mean: aggregate.prices.length
+            ? aggregate.prices.reduce((sum, value) => sum + value, 0) / aggregate.prices.length
+            : null,
+          pricedCells: aggregate.prices.length,
+          conflictingCells: aggregate.conflicts
+        });
+      }
+      return { cells, sectors };
+    })().catch((error) => {
+      landPriceIndexPromise = null;
+      throw error;
+    });
+  }
+  return landPriceIndexPromise;
+}
+
 function numberValue(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
@@ -375,7 +477,8 @@ async function queryArcGisLayer(
 function normaliseAdministrativeFeature(
   feature: UpstreamFeature,
   level: AreaLevel,
-  sourceId: "kigali" | "bugesera"
+  sourceId: "kigali" | "bugesera",
+  priceIndex: LandPriceIndex
 ) {
   const attributes = feature.attributes ?? feature.properties ?? {};
   const activeNameCandidates: Record<AreaLevel, string[]> = {
@@ -433,6 +536,12 @@ function normaliseAdministrativeFeature(
     village: villageId ?? objectId ?? `${district}-${sector ?? "unknown"}-${cell ?? "unknown"}-${village ?? "unknown"}`
   };
   const upperDistrict = district.toUpperCase();
+  const sectorPrice = level === "sector" && sector
+    ? priceIndex.sectors.get(sectorPriceKey(district, sector))
+    : undefined;
+  const cellPrice = level === "cell" && sector && cell
+    ? priceIndex.cells.get(cellPriceKey(district, sector, cell))
+    : undefined;
 
   return {
     type: "Feature" as const,
@@ -446,6 +555,31 @@ function normaliseAdministrativeFeature(
       ...(level !== "district" ? { sector, sector_id: sectorId } : {}),
       ...(level === "cell" || level === "village" ? { cell, cell_id: cellId } : {}),
       ...(level === "village" ? { village, village_id: villageId } : {}),
+      ...(level === "sector" && sectorPrice?.mean !== null && sectorPrice?.mean !== undefined
+        ? {
+            average_land_price_per_m2: Math.round(sectorPrice.mean),
+            average_land_price_kind: "derived-unweighted-cell-mean",
+            average_land_price_sample_size: sectorPrice.pricedCells,
+            average_land_price_conflicting_cells: sectorPrice.conflictingCells,
+            average_land_price_source: "public/land-price-reference.tsv",
+            average_land_price_date_status: "Derived unweighted mean of unambiguous cell-level weighted averages; not an official sector weighted average. Source effective date and method are unknown."
+          }
+        : {}),
+      ...(level === "cell" && cellPrice?.price !== null && cellPrice?.price !== undefined
+        ? {
+            average_land_price_per_m2: cellPrice.price,
+            average_land_price_kind: "supplied-cell-price-snapshot",
+            average_land_price_source: "public/land-price-reference.tsv",
+            average_land_price_date_status: "Supplied cell snapshot; effective date and calculation method are unknown."
+          }
+        : {}),
+      ...(level === "cell" && cellPrice?.conflict
+        ? {
+            average_land_price_conflicting: true,
+            average_land_price_conflicting_cells: 1,
+            average_land_price_source: "public/land-price-reference.tsv"
+          }
+        : {}),
       source_label: sourceId === "kigali"
         ? "Kigali City Master Plan administrative boundaries (April 2026 map service)"
         : level === "cell"
@@ -508,9 +642,10 @@ async function getAdministrativeAreas(
     );
   }
 
+  const priceIndex = await getLandPriceIndex();
   const features = results
     .flatMap((result) => result.features.map((feature) =>
-      normaliseAdministrativeFeature(feature, level, result.sourceId)
+      normaliseAdministrativeFeature(feature, level, result.sourceId, priceIndex)
     ))
     .filter((feature): feature is NonNullable<typeof feature> => feature !== null)
     .filter((feature) =>
