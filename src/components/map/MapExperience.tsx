@@ -42,6 +42,27 @@ type LandPriceLookup = {
   pricedCells: number;
 };
 
+type CellParcelRecord = {
+  id: string;
+  upi: string;
+  parcelNumber: string | null;
+  district: string;
+  sector: string;
+  cell: string;
+  village: string | null;
+  areaM2: number | null;
+  wetlandAreaM2: number | null;
+  lastUpdatedOn: number | null;
+  bounds: [number, number, number, number];
+};
+
+type CellParcelResponse = {
+  totalSourceRecords: number;
+  returnedRecords: number;
+  capped: boolean;
+  parcels: CellParcelRecord[];
+};
+
 function normalizeAreaName(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFD")
@@ -190,7 +211,7 @@ const MARKET_METRICS: Array<{
     label: "Transaction volume",
     shortLabel: "Transactions",
     description: "How many registered land transactions take place in an area.",
-    dataStatus: "The Rwanda Land Dashboard publishes aggregate transaction summaries. The data feed and geographic join are not connected yet."
+    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized, date-stamped feed is not connected. A 4,350 Bugesera monthly count was reported during the current product review, while a cached overview snapshot indexed earlier showed 4,031; the period/as-of date must be reconciled before either value is stored as current. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
   },
   {
     id: "capitalAppreciation",
@@ -413,6 +434,10 @@ export function MapExperience() {
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
+  const [cellParcelsStatus, setCellParcelsStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [cellParcelsTotal, setCellParcelsTotal] = useState(0);
+  const [cellParcelsCapped, setCellParcelsCapped] = useState(false);
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
@@ -543,6 +568,46 @@ export function MapExperience() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const level = selectedArea?.level;
+    const district = selectedArea?.district;
+    const sector = selectedArea?.sector;
+    const cell = selectedArea?.level === "cell" ? selectedArea.name : null;
+    if (level !== "cell" || !district || !sector || !cell) {
+      setCellParcels([]);
+      setCellParcelsStatus("idle");
+      setCellParcelsTotal(0);
+      setCellParcelsCapped(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadCellParcels = async () => {
+      setCellParcelsStatus("loading");
+      setCellParcels([]);
+      setCellParcelsTotal(0);
+      setCellParcelsCapped(false);
+      try {
+        const params = new URLSearchParams({ district, sector, cell });
+        const response = await fetch("/api/geography/cell-parcels?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Cell parcel list request failed.");
+        const payload = await response.json() as CellParcelResponse;
+        if (controller.signal.aborted) return;
+        setCellParcels(payload.parcels ?? []);
+        setCellParcelsTotal(payload.totalSourceRecords ?? payload.returnedRecords ?? 0);
+        setCellParcelsCapped(payload.capped ?? false);
+        setCellParcelsStatus("loaded");
+      } catch {
+        if (controller.signal.aborted) return;
+        setCellParcelsStatus("error");
+      }
+    };
+    void loadCellParcels();
+    return () => controller.abort();
+  }, [selectedArea?.level, selectedArea?.district, selectedArea?.sector, selectedArea?.name]);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1184,9 +1249,13 @@ export function MapExperience() {
                   <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
                     Open Rwanda Land Dashboard ↗
                   </a>
-                ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
+                ) : selectedMetric === "transactionVolume" ? (
+                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                    Open official transaction dashboard ↗
+                  </a>
+                ) : selectedMetric === "capitalAppreciation" ? (
                   <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
-                    Review transaction dataset and access terms ↗
+                    Review annual transaction dataset and access terms ↗
                   </a>
                 ) : (
                   <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
@@ -1313,13 +1382,15 @@ export function MapExperience() {
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
                   <article className="area-market-card area-market-card-featured">
-                    <span>Weighted average land price / m²</span>
+                    <span>{selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean" ? "Indicative sector mean / m²" : "Weighted average land price / m²"}</span>
                     <strong>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
-                        : selectedArea.level === "cell" && selectedLandPrice?.status === "found" && selectedLandPrice.price !== null
-                          ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
-                          : selectedLandPrice?.status === "ambiguous"
+                        : selectedArea.level === "sector" && selectedArea.averageLandPricePerM2 !== null
+                          ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
+                          : selectedArea.level === "cell" && selectedLandPrice?.status === "found" && selectedLandPrice.price !== null
+                            ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
+                            : selectedLandPrice?.status === "ambiguous"
                             ? "Conflicting source values"
                             : selectedArea.level === "sector"
                               ? "Sector average not supplied"
@@ -1328,13 +1399,15 @@ export function MapExperience() {
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? "Rwanda Land Dashboard /prices · provisional indexed snapshot reviewed 24 Oct 2026; effective date and calculation method are not disclosed."
-                        : landPriceLoadStatus === "loading"
-                          ? "Loading the supplied sector/cell reference table…"
-                          : landPriceLoadStatus === "error"
-                            ? "The supplied reference table could not be loaded; no value is inferred."
-                            : selectedArea.level === "sector"
-                              ? `The file reports values by cell, not a sector-level weighted average. ${selectedLandPrice?.pricedCells ?? 0} cells have one unambiguous value.`
-                              : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
+                        : selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean"
+                          ? `Indicative arithmetic mean of ${selectedArea.averageLandPriceSampleSize ?? 0} unambiguous cell-level weighted-average snapshots, rounded to RWF. This is not an official sector weighted average. ${selectedArea.averageLandPriceConflictingCells ?? 0} conflicting cell values were excluded; source dates and methodology remain unverified.`
+                          : landPriceLoadStatus === "loading"
+                            ? "Loading the supplied sector/cell reference table…"
+                            : landPriceLoadStatus === "error"
+                              ? "The supplied reference table could not be loaded; no value is inferred."
+                              : selectedArea.level === "sector"
+                                ? `No defensible sector estimate is available. The source file contains cell-level values, not an official sector weighted average.`
+                                : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
                                 ? `Supplied cell-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
                                   ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}. The dashboard /prices table also repeats some location keys; no value is selected until the publisher clarifies row identity.`
@@ -1346,7 +1419,12 @@ export function MapExperience() {
                   <article className="area-market-card">
                     <span>Transaction volume</span>
                     <strong>Not connected</strong>
-                    <small>Approved transaction aggregates are not yet joined to this area.</small>
+                    <small>
+                      Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation.
+                    </small>
+                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                      Open transaction dashboard ↗
+                    </a>
                   </article>
                   <article className="area-market-card">
                     <span>Rental yield</span>
