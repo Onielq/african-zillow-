@@ -758,7 +758,7 @@ export function MapView({
           type: "line",
           source: "show-overlays",
           minzoom: 8.6,
-          filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "overlay_category"], "transportation"]],
+          filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
           paint: {
             "line-color": "#2675C7",
             "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 1.2, 12, 2.2, 16, 3],
