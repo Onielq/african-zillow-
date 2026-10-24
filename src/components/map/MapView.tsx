@@ -23,6 +23,8 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite";
+export type ShowLayer = "none" | "landmarks" | "medical" | "schools" | "transport" | "nature";
+export type OverlayScope = "combined" | "kigali" | "bugesera";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type SelectedArea = {
@@ -38,6 +40,10 @@ export type SelectedArea = {
   village: string | null;
   villageId: string | null;
   averageLandPricePerM2: number | null;
+  averageLandPriceStatus?: string | null;
+  averageLandPriceDateStatus?: string | null;
+  pricedCellCount?: number | null;
+  bounds?: [number, number, number, number] | null;
   sourceLabel?: string | null;
   sourceType?: "administrative-boundary" | "cadastral-parcel";
   upi?: string | null;
@@ -61,6 +67,9 @@ type AreaProperties = {
   average_land_price_per_m2?: number | null;
   average_land_price_source?: string | null;
   average_land_price_date_status?: string | null;
+  average_land_price_status?: string | null;
+  priced_cell_count?: number | null;
+  price_source_lines?: number[] | null;
   source_label?: string | null;
   source_type?: string | null;
   upi?: string | null;
@@ -75,6 +84,8 @@ type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 type MapViewProps = {
   basemapMode: BasemapMode;
   showLandPriceHeatmap: boolean;
+  showLayer: ShowLayer;
+  overlayScope: OverlayScope;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -189,6 +200,38 @@ const AREA_LAYERS: Record<
   }
 };
 
+function areaFillColorExpression(level: AreaLevel, showLandPriceHeatmap: boolean) {
+  const supportsPriceRamp = showLandPriceHeatmap &&
+    (level === "district" || level === "sector" || level === "cell");
+  return [
+    "case",
+    ["boolean", ["feature-state", "hover"], false],
+    "#81BDA0",
+    ["boolean", ["feature-state", "selected"], false],
+    "#A3D3B9",
+    supportsPriceRamp
+      ? [
+          "case",
+          ["has", "average_land_price_per_m2"],
+          [
+            "interpolate",
+            ["linear"],
+            ["get", "average_land_price_per_m2"],
+            1000, "#52CDAA",
+            2500, "#77D9AF",
+            5000, "#BCE6A5",
+            10000, "#F0E66B",
+            25000, "#F7B05A",
+            50000, "#EE765D",
+            100000, "#D34A4A",
+            220000, "#7E263D"
+          ],
+          "#D9DEDA"
+        ]
+      : AREA_LAYERS[level].color
+  ];
+}
+
 function activeAreaLevel(zoom: number): AreaLevel {
   if (zoom >= PARCEL_ZOOM) return "parcel";
   if (zoom >= VILLAGE_ZOOM) return "village";
@@ -296,6 +339,20 @@ function featureToArea(
     : properties[level] ?? null;
   if (!name) return null;
 
+  const positions: Array<[number, number]> = [];
+  if ("coordinates" in feature.geometry) collectPositions(feature.geometry.coordinates, positions);
+  const validPositions = positions.filter(([longitude, latitude]) =>
+    Number.isFinite(longitude) && Number.isFinite(latitude)
+  );
+  const bounds: [number, number, number, number] | null = validPositions.length
+    ? [
+        Math.min(...validPositions.map((position) => position[0])),
+        Math.min(...validPositions.map((position) => position[1])),
+        Math.max(...validPositions.map((position) => position[0])),
+        Math.max(...validPositions.map((position) => position[1]))
+      ]
+    : null;
+
   return {
     level,
     name,
@@ -312,6 +369,10 @@ function featureToArea(
       typeof properties.average_land_price_per_m2 === "number"
         ? properties.average_land_price_per_m2
         : null,
+    averageLandPriceStatus: properties.average_land_price_status ?? null,
+    averageLandPriceDateStatus: properties.average_land_price_date_status ?? null,
+    pricedCellCount: typeof properties.priced_cell_count === "number" ? properties.priced_cell_count : null,
+    bounds,
     sourceLabel: properties.source_label ?? null,
     sourceType: properties.source_type === "cadastral-parcel"
       ? "cadastral-parcel"
@@ -327,6 +388,8 @@ function featureToArea(
 export function MapView({
   basemapMode,
   showLandPriceHeatmap,
+  showLayer,
+  overlayScope,
   onMapReady,
   onStatusChange,
   onBoundaryStatusChange,
@@ -336,6 +399,9 @@ export function MapView({
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
+  const showLayerRef = useRef<ShowLayer>(showLayer);
+  const overlayScopeRef = useRef<OverlayScope>(overlayScope);
+  const refreshShowOverlayRef = useRef<(() => void) | null>(null);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
@@ -351,46 +417,28 @@ export function MapView({
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
     const map = mapRef.current;
-    if (!map || !map.getLayer("district-fill")) return;
+    if (!map) return;
 
-    map.setPaintProperty("district-fill", "fill-color", [
-      "case",
-      ["boolean", ["feature-state", "hover"], false],
-      "#81BDA0",
-      ["boolean", ["feature-state", "selected"], false],
-      "#A3D3B9",
-      showLandPriceHeatmap
-        ? [
-            "case",
-            ["has", "average_land_price_per_m2"],
-            [
-              "interpolate",
-              ["linear"],
-              ["get", "average_land_price_per_m2"],
-              4038, "#E2F0E5",
-              10000, "#C7DFAE",
-              25000, "#F0D16B",
-              40000, "#E98B59",
-              61499, "#B94943"
-            ],
-            "#DCE5DD"
-          ]
-        : "#DCEAE1"
-    ]);
-
-    map.setPaintProperty(
-      "district-fill",
-      "fill-opacity",
-      [
+    for (const level of AREA_LEVELS) {
+      const layer = AREA_LAYERS[level];
+      if (!map.getLayer(layer.fill)) continue;
+      map.setPaintProperty(layer.fill, "fill-color", areaFillColorExpression(level, showLandPriceHeatmap));
+      map.setPaintProperty(layer.fill, "fill-opacity", [
         "case",
         ["boolean", ["feature-state", "hover"], false],
-        0.5,
+        0.52,
         ["boolean", ["feature-state", "selected"], false],
-        0.35,
-        0.2
-      ]
-    );
+        0.4,
+        0.23
+      ]);
+    }
   }, [showLandPriceHeatmap]);
+
+  useEffect(() => {
+    showLayerRef.current = showLayer;
+    overlayScopeRef.current = overlayScope;
+    refreshShowOverlayRef.current?.();
+  }, [showLayer, overlayScope]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -502,37 +550,14 @@ export function MapView({
           source: layer.source,
           layout: { visibility: level === "district" ? "visible" : "none" },
           paint: {
-            "fill-color": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              "#81BDA0",
-              ["boolean", ["feature-state", "selected"], false],
-              "#A3D3B9",
-              level === "district" && showLandPriceHeatmapRef.current
-                ? [
-                    "case",
-                    ["has", "average_land_price_per_m2"],
-                    [
-                      "interpolate",
-                      ["linear"],
-                      ["get", "average_land_price_per_m2"],
-                      4038, "#E2F0E5",
-                      10000, "#C7DFAE",
-                      25000, "#F0D16B",
-                      40000, "#E98B59",
-                      61499, "#B94943"
-                    ],
-                    "#DCE5DD"
-                  ]
-                : layer.color
-            ],
+            "fill-color": areaFillColorExpression(level, showLandPriceHeatmapRef.current),
             "fill-opacity": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              0.5,
+              0.52,
               ["boolean", ["feature-state", "selected"], false],
-              0.35,
-              0.2
+              0.4,
+              0.23
             ]
           }
         });
@@ -638,6 +663,99 @@ export function MapView({
           }
         });
       }
+
+      if (!map.getSource("show-overlays")) {
+        map.addSource("show-overlays", { type: "geojson", data: empty });
+      }
+      if (!map.getLayer("show-overlay-area-fill")) {
+        map.addLayer({
+          id: "show-overlay-area-fill",
+          type: "fill",
+          source: "show-overlays",
+          filter: ["==", ["geometry-type"], "Polygon"],
+          paint: {
+            "fill-color": ["match", ["get", "category"], "nature", "#53B789", "#4EBDC5"],
+            "fill-opacity": 0.24
+          }
+        });
+      }
+      if (!map.getLayer("show-overlay-road-lines")) {
+        map.addLayer({
+          id: "show-overlay-road-lines",
+          type: "line",
+          source: "show-overlays",
+          filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "kind"], "road"]],
+          paint: {
+            "line-color": "#18A7C0",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 13, 2.1, 17, 3.2],
+            "line-opacity": 0.92
+          }
+        });
+      }
+      if (!map.getLayer("show-overlay-points")) {
+        map.addLayer({
+          id: "show-overlay-points",
+          type: "circle",
+          source: "show-overlays",
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3, 13, 5, 17, 7],
+            "circle-color": [
+              "match", ["get", "category"],
+              "landmarks", "#D29A2E", "medical", "#D95361",
+              "schools", "#3E8CC8", "transport", "#18A7C0",
+              "nature", "#23845A", "#64766C"
+            ],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 1.4,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("show-overlay-labels")) {
+        map.addLayer({
+          id: "show-overlay-labels",
+          type: "symbol",
+          source: "show-overlays",
+          filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "name"]],
+          minzoom: 11,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.15],
+            "text-anchor": "top",
+            "text-max-width": 12,
+            "text-allow-overlap": false
+          },
+          paint: {
+            "text-color": "#203D31",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.3
+          }
+        });
+      }
+      if (!map.getLayer("show-overlay-road-labels")) {
+        map.addLayer({
+          id: "show-overlay-road-labels",
+          type: "symbol",
+          source: "show-overlays",
+          filter: ["all", ["==", ["get", "kind"], "road"], ["has", "name"]],
+          minzoom: 12.5,
+          layout: {
+            "symbol-placement": "line",
+            "text-field": ["get", "name"],
+            "text-size": 9,
+            "symbol-spacing": 240,
+            "text-font": ["Noto Sans Medium", "Arial Unicode MS Regular"]
+          },
+          paint: {
+            "text-color": "#126B80",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.2
+          }
+        });
+      }
     };
 
     const updateLayerVisibility = () => {
@@ -648,9 +766,9 @@ export function MapView({
         const level = AREA_LEVELS[index];
         const layer = AREA_LAYERS[level];
         const isActive = level === activeLevel;
-        // Keep one parent level's outline for geographic context; show only the
-        // active level's fill and labels to avoid stacking opaque polygons.
-        const showOutline = index >= Math.max(0, activeIndex - 1) && index <= activeIndex;
+        // Hide parent outlines when child geography is active so adjacent sectors
+        // and cells have their own legible boundaries instead of a stacked grid.
+        const showOutline = index === activeIndex;
 
         if (map.getLayer(layer.fill)) {
           map.setLayoutProperty(layer.fill, "visibility", isActive ? "visible" : "none");
@@ -808,10 +926,69 @@ export function MapView({
       }
     };
 
+    let showOverlayController: AbortController | null = null;
+    let showOverlaySequence = 0;
+    const overlayScopeBounds: Record<OverlayScope, [number, number, number, number]> = {
+      kigali: [29.58, -2.12, 30.32, -1.47],
+      bugesera: [29.82, -2.62, 30.56, -1.92],
+      combined: [29.58, -2.62, 30.56, -1.47]
+    };
+
+    const refreshShowOverlay = () => {
+      const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
+      const category = showLayerRef.current;
+      if (!source) return;
+      if (category === "none" || !map.isStyleLoaded()) {
+        source.setData(emptyFeatureCollection());
+        return;
+      }
+
+      const scope = overlayScopeBounds[overlayScopeRef.current];
+      const bounds = map.getBounds();
+      const west = Math.max(bounds.getWest(), scope[0]);
+      const south = Math.max(bounds.getSouth(), scope[1]);
+      const east = Math.min(bounds.getEast(), scope[2]);
+      const north = Math.min(bounds.getNorth(), scope[3]);
+      if (west >= east || south >= north) {
+        source.setData(emptyFeatureCollection());
+        return;
+      }
+
+      showOverlayController?.abort();
+      const controller = new AbortController();
+      showOverlayController = controller;
+      const sequence = ++showOverlaySequence;
+      const params = new URLSearchParams({
+        category,
+        scope: overlayScopeRef.current,
+        bbox: [west, south, east, north].map((value) => value.toFixed(6)).join(","),
+        zoom: map.getZoom().toFixed(2)
+      });
+
+      void fetch(`/api/map-overlays?${params.toString()}`, { signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Overlay request failed (${response.status})`);
+          return response.json() as Promise<MapFeatureCollection>;
+        })
+        .then((data) => {
+          if (sequence !== showOverlaySequence || controller.signal.aborted) return;
+          (map.getSource("show-overlays") as GeoJSONSource | undefined)?.setData(data);
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          console.warn("Map overlay source unavailable.", error);
+          if (sequence === showOverlaySequence) {
+            (map.getSource("show-overlays") as GeoJSONSource | undefined)?.setData(emptyFeatureCollection());
+          }
+        });
+    };
+    refreshShowOverlayRef.current = refreshShowOverlay;
+
     const scheduleRefresh = () => {
       updateLayerVisibility();
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => void refreshAreas(), 220);
+      refreshShowOverlay();
     };
 
     const setHover = (
@@ -885,6 +1062,7 @@ export function MapView({
       updateLayerVisibility();
       onStatusChange("ready");
       void refreshAreas();
+      refreshShowOverlay();
       attachInteractionHandlers();
 
       if (!viewportListenersAttached) {
@@ -937,6 +1115,10 @@ export function MapView({
       if (refreshTimer) clearTimeout(refreshTimer);
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
+      showOverlayController?.abort();
+      if (refreshShowOverlayRef.current === refreshShowOverlay) {
+        refreshShowOverlayRef.current = null;
+      }
       resizeObserver?.disconnect();
       map.remove();
       mapRef.current = null;
