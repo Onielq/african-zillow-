@@ -357,6 +357,9 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}/4` : ""}
           </button>
+          <Link className="compare-control" href="/data-sources">
+            Data sources
+          </Link>
         </nav>
 
         <div aria-label="Application modes" className="topbar-actions">
