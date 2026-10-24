@@ -748,6 +748,37 @@ export function MapExperience() {
                   <strong>{selectedArea.parcelNumber ?? "Not published"}</strong>
                 </div>
                 <div>
+                  <span>District / ID</span>
+                  <strong>
+                    {selectedArea.district}
+                    {selectedArea.districtId ? ` · ID ${selectedArea.districtId}` : ""}
+                  </strong>
+                </div>
+                <div>
+                  <span>Sector / ID</span>
+                  <strong>
+                    {selectedArea.sector
+                      ? `${selectedArea.sector}${selectedArea.sectorId ? ` · ID ${selectedArea.sectorId}` : ""}`
+                      : "Not published"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Cell / ID</span>
+                  <strong>
+                    {selectedArea.cell
+                      ? `${selectedArea.cell}${selectedArea.cellId ? ` · ID ${selectedArea.cellId}` : ""}`
+                      : "Not published"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Village / ID</span>
+                  <strong>
+                    {selectedArea.village
+                      ? `${selectedArea.village}${selectedArea.villageId ? ` · ID ${selectedArea.villageId}` : ""}`
+                      : "Not published"}
+                  </strong>
+                </div>
+                <div>
                   <span>Parcel area</span>
                   <strong>
                     {typeof selectedArea.parcelSizeM2 === "number"
@@ -936,7 +967,7 @@ export function MapExperience() {
               <span className="source-register-status source-register-connected" />
               <div>
                 <strong>Individual land parcels</strong>
-                <p>Polygon + UPI connected for Kigali and Bugesera. Kigali additionally exposes parcel number, area, wetland overlap and update date. Bugesera reuse terms, completeness and survey accuracy still need confirmation.</p>
+                <p>Parcel geometry, UPI, parcel number, area and sector/cell/village names are connected for both. Bugesera district/sector/cell IDs come from UPI codes; village IDs are joined only on an unambiguous cell + exact-name match. Reuse permission, completeness and survey accuracy still need confirmation.</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -1009,7 +1040,7 @@ export function MapExperience() {
             </a>
             <p className="data-source-note">
               Public land-summary datasets describe aggregated records, not
-              individual title documents. The Bugesera cadastral endpoint exposes polygon + UPI in the checked sample; permission to reuse/redistribute, data completeness and current survey accuracy must be confirmed before commercial reliance.
+              individual title documents. The Bugesera layer exposes parcel IDs, area and administrative names, but its ArcGIS licence-information field is blank. Written permission to reuse/redistribute, data completeness and current survey accuracy must be confirmed before commercial reliance.
             </p>
           </aside>
         ) : null}

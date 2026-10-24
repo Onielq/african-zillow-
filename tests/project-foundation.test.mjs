@@ -152,17 +152,22 @@ test("the basemap has a documented fallback style", async () => {
   assert.match(mapView, /map\.setStyle\(FALLBACK_STYLE_URL\)/);
 });
 
-test("parcel coverage includes the NLA-hosted Bugesera polygon layer without requesting ownership fields", async () => {
+test("Bugesera parcel attributes and UPI-derived location codes are mapped from published fields", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
 
   assert.match(route, /BUGESERA_PARCEL_FEATURE_LAYER/);
-  assert.match(route, /provider\.id === "bugesera"/);
-  assert.match(route, /"upi"/);
-  assert.match(route, /const geometry = arcGisPolygonToGeoJson\(feature\.geometry\)/);
-  assert.match(route, /reuse terms, completeness, and current survey accuracy still need confirmation/i);
-  assert.match(experience, /Bugesera parcel polygons are connected/i);
-  assert.match(experience, /reuse terms, completeness and survey accuracy still need confirmation/i);
+  assert.match(route, /upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on/);
+  assert.match(route, /bugeseraLocationIdsFromUpi/);
+  assert.match(route, /parcel_size_m2: numberValue/);
+  assert.match(route, /sector_id: locationIds\.sectorId/);
+  assert.match(route, /cell_id: locationIds\.cellId/);
+  assert.match(route, /reuse permission pending/i);
+  assert.match(mapView, /villageIdByCellAndName/);
+  assert.match(mapView, /ambiguousVillageKeys/);
+  assert.match(experience, /Sector \/ ID/);
+  assert.match(experience, /Village \/ ID/);
 });
 
 test("the UI identifies Kigali parcels without presenting them as proof of ownership", async () => {
