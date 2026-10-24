@@ -127,7 +127,10 @@ async function checkSource(source: SourceProbe, checkedAt: string) {
       category: source.category,
       status: "reachable" as const,
       httpStatus: response.status,
-      serviceTitle: metadata.name ?? metadata.layerName ?? metadata.serviceDescription ?? metadata.description ?? source.name,
+      serviceTitle:
+        [metadata.name, metadata.layerName, metadata.serviceDescription, metadata.description]
+          .find((value) => typeof value === "string" && value.trim().length > 0)
+          ?.trim() ?? source.name,
       layerCount: Array.isArray(metadata.layers) ? metadata.layers.length : null,
       // Field names come from the service schema, not from parcel records.
       fields: Array.isArray(metadata.fields)
