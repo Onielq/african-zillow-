@@ -185,10 +185,12 @@ const SATELLITE_STYLE: StyleSpecification = {
 
 // Administrative boundaries are real geographic polygons, not routes.
 // The thresholds reveal one progressively finer level at a time.
-const SECTOR_ZOOM = 9.55;
-const CELL_ZOOM = 12.15;
-const VILLAGE_ZOOM = 14.75;
-const PARCEL_ZOOM = 16.15;
+const SECTOR_ZOOM = 10.4;
+const CELL_ZOOM = 13.05;
+// Keep village IDs available for parcel joins, but move visually from cells to
+// cadastral plots so a visible village outline does not obscure the cell view.
+const VILLAGE_ZOOM = 21;
+const PARCEL_ZOOM = 15.25;
 
 const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village", "parcel"];
 
@@ -964,16 +966,17 @@ export function MapView({
     const refreshShowOverlays = async () => {
       const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
       if (!map.isStyleLoaded() || !source) return;
+      showOverlayController?.abort();
+      showOverlayController = null;
+      const sequence = ++showOverlaySequence;
       const categories = showLayersRef.current;
       if (categories.length === 0) {
         source.setData(emptyFeatureCollection());
         return;
       }
 
-      showOverlayController?.abort();
       const controller = new AbortController();
       showOverlayController = controller;
-      const sequence = ++showOverlaySequence;
       const bounds = map.getBounds();
       const bbox = [
         bounds.getWest(),
