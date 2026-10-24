@@ -100,6 +100,9 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
       selections.push(
         element + '["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");"
       );
+      selections.push(
+        element + '["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");"
+      );
     }
   }
 
@@ -115,6 +118,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
       selections.push(element + '["leisure"~"park|nature_reserve"](' + box + ");");
       selections.push(element + '["natural"~"water|waterfall"](' + box + ");");
       selections.push(element + '["water"="lake"](' + box + ");");
+      selections.push(element + '["waterway"="waterfall"](' + box + ");");
       selections.push(element + '["boundary"="protected_area"](' + box + ");");
     }
   }
@@ -187,6 +191,8 @@ function featureForElement(element: OsmElement, category: OverlayCategory): Over
     tags.leisure,
     tags.natural,
     tags.water,
+    tags.waterway,
+    tags.healthcare,
     tags.highway
   ].filter(Boolean).join(" · ");
 
@@ -382,7 +388,8 @@ export async function GET(request: NextRequest) {
           ) actualCategory = "transportation";
           else if (
             categories.includes("healthEducation") &&
-            ["school", "university", "college", "hospital", "clinic", "doctors", "pharmacy"].includes(tags.amenity ?? "")
+            ["school", "university", "college", "hospital", "clinic", "doctors", "pharmacy"].includes(tags.amenity ?? "") ||
+            ["hospital", "clinic", "doctor", "pharmacy"].includes(tags.healthcare ?? "")
           ) actualCategory = "healthEducation";
           else if (
             categories.includes("landmarks") &&
@@ -392,7 +399,7 @@ export async function GET(request: NextRequest) {
             categories.includes("nature") &&
             (["park", "nature_reserve"].includes(tags.leisure ?? "") ||
               ["water", "waterfall"].includes(tags.natural ?? "") ||
-              tags.water === "lake" || tags.boundary === "protected_area")
+              tags.water === "lake" || tags.waterway === "waterfall" || tags.boundary === "protected_area")
           ) actualCategory = "nature";
           if (!actualCategory) return [];
           const feature = featureForElement(element, actualCategory);
