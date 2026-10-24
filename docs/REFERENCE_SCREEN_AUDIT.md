@@ -69,6 +69,10 @@ This comparison is based on the live application code on `main`, not assumptions
 | Developers | No connected developer directory or validated development-pipeline source. | Keep developer records out until a legitimate, current source/partner feed exists. |
 | Data governance | Dedicated `/data-sources` page and `docs/DATA_SOURCE_REGISTER.md` added; cadastral reuse issues are visible. | Record the permission decision and audit trail at each source integration. |
 
+### Baseline note and current review-branch work
+
+The “Current Rwanda application” column below records `main` before the changes proposed in PR #11. The review branch builds on that baseline with a centred comparison modal/search for the four pilot districts, selected-area chips and clear/remove actions, six evidence-aware market cards in the area inspector, an explicit Projects empty state, a metric-definition popover, and an on-demand metadata-only health check for the four GIS services. These changes remain subject to CI and review before production.
+
 ## 4. Rwanda data source readiness
 
 This table separates **geographic reference layers** from **market indicators** and **listing/project inventory**. Those data classes answer different questions and must not be substituted for one another.
