@@ -628,23 +628,20 @@ export function MapExperience() {
       : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
-  const comparisonSearchResults = normalizedComparisonSearch
-    ? PILOT_DISTRICT_SEARCH_AREAS.filter((area) =>
-        area.name.toLocaleLowerCase().includes(normalizedComparisonSearch)
-      )
-    : [];
-  const canCompareDistrictPrices =
-    comparedAreas.length > 1 &&
-    comparedAreas.every(
-      (area) =>
-        area.level === "district" &&
-        typeof area.averageLandPricePerM2 === "number"
-    );
-  const highestDistrictPrice = canCompareDistrictPrices
-    ? Math.max(
-        ...comparedAreas.map((area) => area.averageLandPricePerM2 ?? Number.NEGATIVE_INFINITY)
-      )
+  const activeTransactionEstimateKey = selectedArea ? transactionEstimateKeyForArea(selectedArea) : null;
+  const transactionEstimateForSelected = activeTransactionEstimateKey === selectedTransactionEstimateKey
+    ? selectedTransactionEstimate
     : null;
+  const comparisonUnitPrices = comparedAreas.map((area) => ({
+    area,
+    estimate: area.comparisonKind === "project"
+      ? { pricePerM2: null, kind: "unavailable" as const, explanation: "Project price data is not connected." }
+      : getUnitPriceEstimate(landPriceRows, area)
+  }));
+  const comparisonPrices = comparisonUnitPrices
+    .filter(({ estimate }) => estimate.pricePerM2 !== null)
+    .map(({ estimate }) => estimate.pricePerM2 as number);
+  const highestComparisonPrice = comparisonPrices.length > 1 ? Math.max(...comparisonPrices) : null;
 
   useEffect(() => {
     let active = true;
