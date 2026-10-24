@@ -180,8 +180,8 @@ const MARKET_METRICS: Array<{
     id: "averageLandPricePerM2",
     label: "Average land price / m²",
     shortLabel: "Land price / m²",
-    description: "Published average land price by district, in Rwandan francs per square metre.",
-    dataStatus: "A sourced district snapshot is mapped for the four pilot districts. The source page does not expose the observation date, and this is not a house-sale price series."
+    description: "Dashboard-reported average land price by district, in Rwandan francs per square metre. This is distinct from the separate land-reference-price table and from asking prices for individual plots.",
+    dataStatus: "The /prices page snapshot lists Kicukiro 61,499, Nyarugenge 50,771, Gasabo 36,103 and Bugesera 4,038 RWF/m². The effective date and calculation method are not shown in the visible page text. The /reference page separately labels transaction prices and reference prices and reports 50,865 for Nyarugenge transaction price, so cross-page reconciliation remains open. Repeated geographic keys also appear in the indexed /prices table; the detailed supplied cell file is provisional, not production-grade."
   },
   {
     id: "transactionVolume",
@@ -272,8 +272,8 @@ const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
     cellId: null,
     village: null,
     villageId: null,
-    averageLandPricePerM2: 36013,
-    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    averageLandPricePerM2: 36103,
+    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
     sourceType: "administrative-boundary"
   },
   {
@@ -288,8 +288,8 @@ const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
     cellId: null,
     village: null,
     villageId: null,
-    averageLandPricePerM2: 61491,
-    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    averageLandPricePerM2: 61499,
+    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
     sourceType: "administrative-boundary"
   },
   {
@@ -304,8 +304,8 @@ const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
     cellId: null,
     village: null,
     villageId: null,
-    averageLandPricePerM2: 50735,
-    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    averageLandPricePerM2: 50771,
+    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
     sourceType: "administrative-boundary"
   },
   {
@@ -320,8 +320,8 @@ const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
     cellId: null,
     village: null,
     villageId: null,
-    averageLandPricePerM2: 4033,
-    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    averageLandPricePerM2: 4038,
+    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
     sourceType: "administrative-boundary"
   }
 ];
@@ -888,12 +888,13 @@ export function MapExperience() {
                       </small>
                     </span>
                     <span className={metric.id === "averageLandPricePerM2" ? "metric-data-pill metric-data-pill-available" : "metric-data-pill"}>
-                      {metric.id === "averageLandPricePerM2" ? "Source data" : "Pending"}
+                      {metric.id === "averageLandPricePerM2" ? "Snapshot only" : "Pending"}
                     </span>
                   </button>
                 ))}
               </div>
               <p className="metrics-menu-supply-note"><strong>Supply definitions:</strong> Market supply means plots currently available for sale and ready to transact. Upcoming supply covers a future pipeline that is not yet ready, potentially because subdivision, planning, negotiation or legal/administrative steps remain. No such constraints are inferred or published by this pilot.</p>
+              <p className="metrics-menu-quality"><strong>Price-source status:</strong> district values are a provisional dashboard snapshot; effective date and calculation method are not exposed. Cell prices remain provisional until the duplicate keys are reconciled against the full /reference geography and source schema.</p>
               <p className="metrics-menu-quality">
                 {landPriceLoadStatus === "loaded"
                   ? `Supplied file diagnostics: ${landPriceDiagnostics.usableRows} usable rows · ${landPriceDiagnostics.malformedRows} malformed rows · ${landPriceDiagnostics.conflictingLocations} conflicting locations. Observation date not supplied.`
@@ -1254,9 +1255,9 @@ export function MapExperience() {
                             : selectedArea.level === "sector"
                               ? `The file reports values by cell, not a sector-level weighted average. ${selectedLandPrice?.pricedCells ?? 0} cells have one unambiguous value.`
                               : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
-                                ? `Supplied cell-price snapshot · date not supplied. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
+                                ? `Supplied cell-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
-                                  ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}; no price shown until reconciled.`
+                                  ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}. The dashboard /prices table also repeats some location keys; no value is selected until the publisher clarifies row identity.`
                                   : selectedArea.level === "cell"
                                     ? "No exact district + sector + cell match in the supplied file. District-level land prices are not a valid substitute; No district average is substituted and no price is inferred."
                                     : "This source is at cell level; no village or individual-parcel price is inferred."}
@@ -1378,7 +1379,7 @@ export function MapExperience() {
               <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Average district land prices</strong>
-                <p>District snapshot is mapped; the supplied cell-price table is loaded separately. Its observation date is unknown, 2 rows are malformed, and 10 location keys have conflicting values.</p>
+                <p>Provisional /prices snapshot: Gasabo 36,103, Kicukiro 61,499, Nyarugenge 50,771, Bugesera 4,038 RWF/m². Effective date/method are not shown. The separate /reference comparison lists Nyarugenge transaction price 50,865. Supplied cell file: 2 malformed rows and 10 conflicting keys; public /prices output repeats some of those keys. See the reconciliation audit.</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -1426,6 +1427,29 @@ export function MapExperience() {
               target="_blank"
             >
               Open National Land Dashboard prices ↗
+            </a>
+            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/reference" rel="noreferrer" target="_blank">
+              Open National Land Dashboard reference prices ↗
+            </a>
+            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/transactions" rel="noreferrer" target="_blank">
+              Open National Land Dashboard transactions ↗
+            </a>
+            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/ownership" rel="noreferrer" target="_blank">
+              Open National Land Dashboard ownership ↗
+            </a>
+            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/land-use" rel="noreferrer" target="_blank">
+              Open National Land Dashboard land use ↗
+            </a>
+            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/" rel="noreferrer" target="_blank">
+              Open National Land Dashboard overview ↗
+            </a>
+            <a
+              className="source-register-link"
+              href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open transaction-volume dataset metadata ↗
             </a>
             <a
               className="source-register-link"
