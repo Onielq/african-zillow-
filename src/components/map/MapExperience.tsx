@@ -688,21 +688,61 @@ export function MapExperience() {
                   </strong>
                 </div>
               </div>
-            ) : selectedMetric === "averageLandPricePerM2" ? (
-              selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null ? (
-                <div className="area-price-metric">
-                  <span>Average land price / m²</span>
-                  <strong>
-                    {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF
-                  </strong>
-                  <small>Rwanda Land Dashboard · source observation date not exposed</small>
+            ) : (
+              <>
+                <div aria-label="Selected area market metrics" className="area-market-grid">
+                  <article className="area-market-card area-market-card-featured">
+                    <span>Average land price / m²</span>
+                    <strong>
+                      {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
+                        ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
+                        : "Not available"}
+                    </strong>
+                    <small>
+                      {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
+                        ? "Rwanda Land Dashboard · observation date not exposed"
+                        : "No finer-level value is mapped; district averages are not reused for smaller areas."}
+                    </small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Transaction volume</span>
+                    <strong>Not connected</strong>
+                    <small>Approved transaction aggregates are not yet joined to this area.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Rental yield</span>
+                    <strong>Not connected</strong>
+                    <small>Verified rental and comparable value records are required.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>New projects</span>
+                    <strong>Not connected</strong>
+                    <small>No verified developer/project inventory is connected yet.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Capital appreciation</span>
+                    <strong>Not connected</strong>
+                    <small>A validated comparable land-price time series is not connected.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Upcoming supply</span>
+                    <strong>Not connected</strong>
+                    <small>Verified project stages and future unit counts are not available.</small>
+                  </article>
                 </div>
-              ) : (
-                <p className="metric-status-copy area-price-unavailable">
-                  District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped here yet.
-                </p>
-              )
-            ) : null}
+                <section aria-label="Projects in selected area" className="area-projects-empty">
+                  <div className="area-projects-empty-heading">
+                    <h3>Projects</h3>
+                    <span>Not connected</span>
+                  </div>
+                  <p>
+                    No verified developer or project inventory is connected yet. Project names,
+                    prices, availability, sales progress and completion figures will appear only
+                    when a permitted, current source is connected.
+                  </p>
+                </section>
+              </>
+            )}
             {getAreaParent(selectedArea) ? (
               <p className="panel-parent">Within {getAreaParent(selectedArea)}</p>
             ) : null}
