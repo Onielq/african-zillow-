@@ -446,6 +446,15 @@ export function MapView({
   }, [showLandPriceHeatmap]);
 
   useEffect(() => {
+    showLayersRef.current = showLayers;
+    showScopeRef.current = showScope;
+    const map = mapRef.current;
+    if (!map) return;
+    applyShowOverlayFilters(map, showLayers);
+    refreshShowOverlaysRef.current?.();
+  }, [showLayers, showScope]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -942,8 +951,61 @@ export function MapView({
       }
     };
 
+    let showOverlayController: AbortController | null = null;
+    let showOverlaySequence = 0;
+    let showOverlayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshShowOverlays = async () => {
+      const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
+      if (!map.isStyleLoaded() || !source) return;
+      const categories = showLayersRef.current;
+      if (categories.length === 0) {
+        source.setData(emptyFeatureCollection());
+        return;
+      }
+
+      showOverlayController?.abort();
+      const controller = new AbortController();
+      showOverlayController = controller;
+      const sequence = ++showOverlaySequence;
+      const bounds = map.getBounds();
+      const bbox = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ].map((value) => value.toFixed(6)).join(",");
+      const params = new URLSearchParams({
+        categories: categories.join(","),
+        bbox,
+        scope: showScopeRef.current
+      });
+
+      try {
+        const response = await fetch("/api/geography/places?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Place overlay request failed (" + response.status + ")");
+        const data = await response.json() as MapFeatureCollection;
+        if (sequence !== showOverlaySequence || controller.signal.aborted) return;
+        source.setData(data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Map place overlay loading failed.", error);
+        source.setData(emptyFeatureCollection());
+      }
+    };
+
+    const scheduleShowOverlayRefresh = () => {
+      applyShowOverlayFilters(map, showLayersRef.current);
+      if (showOverlayTimer) clearTimeout(showOverlayTimer);
+      showOverlayTimer = setTimeout(() => void refreshShowOverlays(), 260);
+    };
+    refreshShowOverlaysRef.current = scheduleShowOverlayRefresh;
+
     const scheduleRefresh = () => {
       updateLayerVisibility();
+      scheduleShowOverlayRefresh();
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => void refreshAreas(), 220);
     };
@@ -1016,7 +1078,10 @@ export function MapView({
       styleLoaded = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       addAdministrativeLayers();
+      addShowOverlayLayers();
       updateLayerVisibility();
+      applyShowOverlayFilters(map, showLayersRef.current);
+      void refreshShowOverlays();
       onStatusChange("ready");
       void refreshAreas();
       attachInteractionHandlers();
@@ -1069,6 +1134,9 @@ export function MapView({
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
+      if (showOverlayTimer) clearTimeout(showOverlayTimer);
+      showOverlayController?.abort();
+      refreshShowOverlaysRef.current = null;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();
