@@ -60,7 +60,7 @@ export const RWANDA_REAL_ESTATE_AGENCIES: AgencyCandidate[] = [
     id: "abahuza",
     name: "Abahuza.com",
     segment: "Real estate agent platform",
-    website: "https://www.abahuza.com/",
+    website: "http://www.abahuza.com/",
     sourceLabel: "Public company profile lists this website",
     status: "Source found · review pending"
   }
