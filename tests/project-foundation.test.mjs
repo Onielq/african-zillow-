@@ -27,6 +27,22 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /f: "json"/);
 });
 
+test("administrative boundaries render per GIS source and reuse cached viewport geometry", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(route, /source must be kigali or bugesera/);
+  assert.match(route, /sourceFilter\?\: "kigali" \| "bugesera"/);
+  assert.match(route, /revalidateSeconds = 300/);
+  assert.match(route, /86_400/);
+  assert.match(route, /s-maxage=3600, stale-while-revalidate=86400/);
+  assert.match(mapView, /AREA_QUERY_GRIDS/);
+  assert.match(mapView, /const areaCache = new Map/);
+  assert.match(mapView, /source=\$\{adminSource\}/);
+  assert.match(mapView, /publishLevel\(level\)/);
+  assert.match(mapView, /reportActiveReady\(\)/);
+});
+
 test("the map view progressively switches administrative levels and increases boundary opacity", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /SECTOR_ZOOM/);
