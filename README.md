@@ -75,6 +75,16 @@ Before public or commercial production, confirm that this access method and the 
 
 Satellite imagery helps people visually understand the ground. It does not prove legal ownership and must not be used to infer cadastral plot boundaries.
 
+## Show menu, price heatmap, and cell parcel inventory
+
+The **Show** menu adds viewport-scoped OpenStreetMap discovery layers for landmarks, medical facilities, schools, roads and bus stops, and parks/nature/lakes/waterfalls. Overlay queries follow the active pilot scope (Kigali's Gasabo, Kicukiro and Nyarugenge districts; Bugesera; or both). OpenStreetMap coverage may be incomplete or out of date; these are discovery layers, not official registers.
+
+Hovering highlights the active administrative polygon. As the map moves from district to sector and cell detail, only the active hierarchy level's outline remains, preventing the parent district border from obscuring sector boundaries. When land-price shading is selected, lower prices trend cyan/green and higher prices trend amber/orange/red. Cell prices with conflicting source values remain unpriced. Sector shading is an **indicative unweighted mean of unambiguous cell values**, not an official sector-weighted average; its effective date and method remain unconfirmed.
+
+Selecting a cell populates a list from the connected Kigali/Bugesera cadastral services. Selecting a listed record centers the map on its parcel geometry. The list is scoped to exact district, sector and cell labels and has a 10,000-record safety cap. Parcel coverage, currency, title, legal accuracy and redistribution permission are not guaranteed by this exploratory view.
+
+**Transaction volume is an activity signal, not appreciation.** The repository records the Bugesera count of 4,350 as a user-provided dashboard observation dated 24 October 2026, not a live feed. A publicly indexed snapshot differed, so the observation should be rechecked before analytical use. The dashboard includes multiple transaction types—not just voluntary sales—and monthly district counts are not inferred at sector/cell level.
+
 ## Geographic hierarchy and source plan
 
 The visible navigation hierarchy is:
