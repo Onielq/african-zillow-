@@ -42,7 +42,7 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
   assert.match(mapView, /0\.2/);
-  assert.match(mapView, /0\.35/);
+  assert.match(mapView, /0\.42/);
   assert.match(mapView, /0\.5/);
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
 });
@@ -74,8 +74,11 @@ test("the average land price metric uses sourced district values and marks snaps
   assert.match(route, /rwandalanddashboard\.lands\.rw\/prices/);
   assert.match(mapView, /showLandPriceHeatmap/);
   assert.match(mapView, /average_land_price_per_m2/);
-  assert.match(mapView, /4038, "#E2F0E5"/);
-  assert.match(mapView, /61499, "#B94943"/);
+  assert.match(mapView, /LAND_PRICE_RAMP/);
+  assert.match(mapView, /#36B8B2/);
+  assert.match(mapView, /#B7444B/);
+  assert.match(mapView, /13\.05/);
+  assert.match(mapView, /15\.25/);
   assert.match(experience, /effective date and calculation method are not disclosed/i);
   assert.match(experience, /district-level land prices are not a valid substitute/i);
 });
@@ -385,4 +388,57 @@ test("official dashboard price snapshots are provisional and separated from refe
   assert.match(sourceAudit, /Nyarugenge figure differs by \*\*94 RWF\/m²\*\*/);
   assert.match(sourceAudit, /observation date of these values is \*\*not confirmed\*\*/);
   assert.match(sourceAudit, /Do not choose the higher value, lower value, mean/);
+});
+
+
+test("Show menu exposes sourced overlays and scopes queries to the active pilot area", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const places = await readProjectFile("src/app/api/geography/places/route.ts");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(experience, /aria-label="Show map overlays"/);
+  assert.match(experience, /title: "Landmarks"/);
+  assert.match(experience, /title: "Medical & schools"/);
+  assert.match(experience, /title: "Transportation"/);
+  assert.match(experience, /title: "Nature"/);
+  assert.match(experience, /activeFocus === "kigali" \? "kigali"/);
+  assert.match(mapView, /show-road-lines/);
+  assert.match(mapView, /show-poi-circles/);
+  assert.match(mapView, /showLayersRef/);
+  assert.match(places, /OVERPASS_ENDPOINTS/);
+  assert.match(places, /KIGALI_EXTENT/);
+  assert.match(places, /BUGESERA_EXTENT/);
+  assert.match(places, /© OpenStreetMap contributors, ODbL/);
+  assert.match(css, /\.show-menu/);
+});
+
+test("cell selection offers UPI parcel inventory and zoom-to-parcel navigation", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const parcelRoute = await readProjectFile("src/app/api/geography/cell-parcels/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(experience, /Land parcels in/);
+  assert.match(experience, /cell-parcels/);
+  assert.match(experience, /mapInstance\.fitBounds/);
+  assert.match(experience, /parcel\.upi/);
+  assert.match(parcelRoute, /returnIdsOnly: "true"/);
+  assert.match(parcelRoute, /upi IS NOT NULL/);
+  assert.match(parcelRoute, /MAX_PARCELS_PER_CELL/);
+  assert.match(parcelRoute, /returnGeometry: "true"/);
+  assert.match(mapView, /const showOutline = index === activeIndex/);
+  assert.match(css, /\.cell-parcel-row/);
+});
+
+test("transaction volume explains district priorities, transaction types, and non-appreciation caveats", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(experience, /Bugesera, Kicukiro, Gasabo and Nyarugenge/);
+  assert.match(experience, /Transaction types to track/);
+  assert.match(experience, /Voluntary sale, succession, expropriation/);
+  assert.match(experience, /not proof of price appreciation/);
+  assert.match(experience, /rwandalanddashboard\.lands\.rw\/transactions/);
+  assert.match(experience, /4,350 Bugesera monthly count/);
+  assert.match(experience, /4,031/);
 });
