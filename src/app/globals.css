@@ -1834,3 +1834,135 @@ button:disabled {
     font-size: 8px;
   }
 }
+
+
+/* Metric definition popover, based on the reference info control */
+.metric-info-trigger {
+  min-width: 34px;
+  width: 34px;
+  padding: 0;
+  border-color: #dce4de;
+  border-radius: 50%;
+  background: #fff;
+  color: #176b50;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.metric-info-trigger > span {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1;
+}
+
+.metric-info-panel {
+  position: absolute;
+  z-index: 6;
+  top: 118px;
+  left: 18px;
+  width: min(360px, calc(100% - 36px));
+  max-height: calc(100% - 145px);
+  overflow-y: auto;
+  padding: 20px 18px 17px;
+  border: 1px solid rgb(220 228 222 / 96%);
+  border-radius: 17px;
+  background: rgb(255 255 255 / 98%);
+  color: var(--ink);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: blur(16px);
+}
+
+.metric-info-panel h2 {
+  max-width: calc(100% - 18px);
+  margin: 0;
+  color: #17231f;
+  font-size: 19px;
+  font-weight: 760;
+  letter-spacing: -.04em;
+  line-height: 1.2;
+}
+
+.metric-info-description {
+  margin: 10px 0 0;
+  color: #596861;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.metric-info-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 15px;
+  padding: 11px 12px;
+  border: 1px solid #e3e9e4;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+
+.metric-info-unit > span,
+.metric-info-status > strong {
+  color: #78867d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.metric-info-unit > strong {
+  color: #243b30;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.metric-info-status {
+  margin-top: 15px;
+}
+
+.metric-info-status > strong {
+  color: #273f32;
+}
+
+.metric-info-status > p,
+.metric-info-no-source {
+  margin: 7px 0 0;
+  color: #596861;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.metric-info-source {
+  display: inline-flex;
+  margin-top: 14px;
+  color: #176b50;
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.metric-info-source:hover {
+  text-decoration: underline;
+}
+
+.metric-info-no-source {
+  padding-top: 11px;
+  border-top: 1px solid #e9eeea;
+}
+
+@media (max-width: 700px) {
+  .metric-info-panel {
+    top: 112px;
+    left: 11px;
+    width: calc(100% - 22px);
+    max-height: calc(100% - 130px);
+    padding: 18px 15px 15px;
+  }
+}
