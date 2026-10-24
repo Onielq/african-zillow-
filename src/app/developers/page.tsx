@@ -2,44 +2,63 @@ import type { Metadata } from "next";
 import { DirectoryLandingPage } from "@/components/directories/DirectoryLandingPage";
 
 export const metadata: Metadata = {
-  title: "Developers",
+  title: "Developers & Agents",
   description:
-    "A source-aware Rwanda developer directory. Developer and project claims are published only when identity and permission are verified."
+    "A source-aware Rwanda property directory that separates developers, estate agencies and independent agents, with verification for each role."
 };
 
 export default function DevelopersPage() {
   return (
     <DirectoryLandingPage
       kind="developers"
-      eyebrow="DEVELOPER INTELLIGENCE / RWANDA"
-      title="Know who stands behind a development."
-      description="Developer discovery is useful only when company identity, project relationships and publication rights can be checked. This directory will not turn a name found online into an endorsed developer profile."
-      status="Developer directory not connected"
-      recordLabel="verified developer records published"
-      emptyTitle="No verified developer directory is connected yet."
-      emptyDescription="There is no authorised, maintained developer feed connected to this prototype. We are not inventing developer profiles, contact details, portfolios, delivery records or project relationships to fill the page."
-      evidenceHeading="What a developer profile must prove"
-      evidenceIntro="A developer profile is a claim about a real organisation and its role in a project. Each claim needs its own source and a clear date."
+      eyebrow="DEVELOPER & AGENT INTELLIGENCE / RWANDA"
+      title="Know who builds, who sells, and who represents."
+      description="Rwanda's property market includes developers, agencies and individual agents. This directory can include all three without confusing their roles. Profiles, project relationships and public contact details appear only when identity, authority and publication permission are checked."
+      status="Directory ready for verified records"
+      recordLabel="verified profiles published"
+      emptyTitle="No verified profiles published yet."
+      emptyDescription="The directory is prepared for the developer list you will provide and for major estate agencies and independent agents. There is no connected, authorised feed today, so we are not inventing company details, contacts, portfolios or project relationships."
+      profileTypes={[
+        {
+          title: "Property developers",
+          description: "Companies or organisations responsible for developing land or delivering a project. Their verified projects and delivery track record can be linked to the profile.",
+          publicationRule: "Developer status requires evidence of the organisation's actual role in a project."
+        },
+        {
+          title: "Estate agencies",
+          description: "Businesses that market, broker or manage property transactions. Their agency profile can include permitted office contacts, service areas and verified listings.",
+          publicationRule: "Agency status is separate from ownership or development responsibility."
+        },
+        {
+          title: "Independent agents",
+          description: "Individual property intermediaries connected to an agency or working independently. Their professional role and any project representation are shown separately.",
+          publicationRule: "An agent is never presented as a developer without independent evidence."
+        }
+      ]}
+      templateHref="/developer-directory-template.csv"
+      templateLabel="Download directory CSV template"
+      evidenceHeading="What each profile must prove"
+      evidenceIntro="A name is only a lead. Every published claim needs a source, a responsible party and a clear verification status."
       evidence={[
         {
           number: "01",
           title: "Official identity",
-          description: "Use the organisation's recognised legal or trading name and a reliable registration or official-company reference where available."
+          description: "Use the recognised legal or trading name and a reliable registration or official-company reference where available."
         },
         {
           number: "02",
-          title: "Authority to represent",
-          description: "Confirm that the organisation is the developer or an authorised representative for the projects shown. A public web page alone is not enough."
+          title: "Verified market role",
+          description: "Confirm whether the record is a developer, estate agency or independent agent. Do not infer developer status from advertising or selling a project."
         },
         {
           number: "03",
           title: "Project links and track record",
-          description: "Connect only projects whose identity, location and status have been independently checked; mark unverified claims as unavailable."
+          description: "Connect only projects whose identity, location and status have been checked. Keep unverified claims labelled as unverified."
         },
         {
           number: "04",
           title: "Contact permission and freshness",
-          description: "Publish contact information only with an appropriate source and permission, and retain the last-verified date for profile details."
+          description: "Publish contact details only when they are suitable for public display and permission is recorded. Keep a last-verified date for profile details."
         }
       ]}
     />

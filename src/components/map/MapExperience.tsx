@@ -639,7 +639,7 @@ export function MapExperience() {
               Sources
             </button>
             <button
-              aria-label={`Definition for ${activeMetric.label}`}
+              aria-label={workspaceMode === "projects" ? "Project mode information" : "Metric description for " + activeMetric.label}
               aria-expanded={metricInfoOpen}
               className={metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
               onClick={() => {
@@ -655,47 +655,99 @@ export function MapExperience() {
         </div>
 
         {metricInfoOpen ? (
-          <aside aria-label={`Definition for ${activeMetric.label}`} className="metric-info-panel">
+          <aside
+            aria-label={workspaceMode === "projects" ? "Project mode information" : "Metric description for " + activeMetric.label}
+            className="metric-info-panel"
+          >
             <button
-              aria-label="Close metric definition"
+              aria-label="Close metric description"
               className="panel-close"
               onClick={() => setMetricInfoOpen(false)}
               type="button"
             >
               ×
             </button>
-            <p className="panel-eyebrow">METRIC DEFINITION</p>
-            <h2>{activeMetric.label}</h2>
-            <p className="metric-info-description">{activeMetric.description}</p>
-            <div className="metric-info-unit">
-              <span>Expected unit</span>
-              <strong>
-                {selectedMetric === "averageLandPricePerM2"
-                  ? "RWF per m²"
-                  : selectedMetric === "transactionVolume"
-                    ? "Count of registered land transactions"
-                    : selectedMetric === "capitalAppreciation" || selectedMetric === "rentalYield"
-                      ? "Percent (%)"
-                      : selectedMetric === "marketSupply"
-                        ? "Count of active sale/rent listings"
-                        : "Count of expected units from verified projects"}
-              </strong>
-            </div>
-            <div className="metric-info-status">
-              <strong>Data status</strong>
-              <p>{activeMetric.dataStatus}</p>
-            </div>
-            {selectedMetric === "averageLandPricePerM2" ? (
-              <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
-                Open Rwanda Land Dashboard ↗
-              </a>
-            ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
-              <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
-                Review transaction dataset and access terms ↗
-              </a>
+            <p className="panel-eyebrow">
+              {workspaceMode === "projects" ? "PROJECT MODE" : "METRIC DESCRIPTION"}
+            </p>
+            <h2>{workspaceMode === "projects" ? "Projects mode" : activeMetric.label}</h2>
+            <p className="metric-info-description">
+              {workspaceMode === "projects"
+                ? "Project mode is ready for a verified project feed. This panel brings the map status and publication limits together in one place."
+                : activeMetric.description}
+            </p>
+            {workspaceMode === "projects" ? (
+              <div className="metric-info-status">
+                <strong>Project data status</strong>
+                <p>
+                  Developer launches, starting prices, payment plans, construction progress and
+                  unit availability are not connected yet. No project markers or prices are fabricated.
+                </p>
+                <div className="directory-route-links">
+                  <Link href="/projects">Open project directory ↗</Link>
+                  <Link href="/developers">Developers &amp; agents directory ↗</Link>
+                </div>
+              </div>
             ) : (
-              <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
+              <>
+                <div className="metric-info-unit">
+                  <span>Expected unit</span>
+                  <strong>
+                    {selectedMetric === "averageLandPricePerM2"
+                      ? "RWF per m²"
+                      : selectedMetric === "transactionVolume"
+                        ? "Count of registered land transactions"
+                        : selectedMetric === "capitalAppreciation" || selectedMetric === "rentalYield"
+                          ? "Percent (%)"
+                          : selectedMetric === "marketSupply"
+                            ? "Count of active sale/rent listings"
+                            : "Count of expected units from verified projects"}
+                  </strong>
+                </div>
+                <div className="metric-info-status">
+                  <strong>Data status</strong>
+                  <p>{activeMetric.dataStatus}</p>
+                </div>
+                <div className="metric-info-status">
+                  <strong>Map interpretation</strong>
+                  <p>
+                    Current filters: {selectedMetric === "averageLandPricePerM2" ? "Land · static district snapshot" : (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "All property") + " · " + (ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label ?? "12 months")}.
+                    {selectedMetric === "averageLandPricePerM2"
+                      ? " District polygons are shaded by the sourced land-price snapshot. Period filtering is not applied because the source observation date is not exposed; prices for sectors, cells, villages or individual plots are not inferred."
+                      : " The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
+                  </p>
+                </div>
+                {selectedMetric === "averageLandPricePerM2" ? (
+                  <div className="land-price-legend" aria-label="Land price heatmap legend">
+                    <span>RWF/m²</span>
+                    <div className="land-price-legend-scale" />
+                    <div className="land-price-legend-labels"><span>Lower</span><span>Higher</span></div>
+                  </div>
+                ) : null}
+                {selectedMetric === "averageLandPricePerM2" ? (
+                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
+                    Open Rwanda Land Dashboard ↗
+                  </a>
+                ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
+                  <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
+                    Review transaction dataset and access terms ↗
+                  </a>
+                ) : (
+                  <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
+                )}
+                <p className="data-source-note">
+                  Administrative boundaries: Kigali City Master Plan and Geodata Rwanda Bugesera Masterplan.
+                  Individual parcel polygons: City of Kigali parcel layer for Kigali and an NLA-hosted
+                  LAIS Bugesera_Parcels service for Bugesera. Bugesera reuse terms, completeness and
+                  current survey accuracy still need confirmation; zoning layers remain separate.
+                </p>
+              </>
             )}
+            {boundaryStatus === "error" ? (
+              <p className="metric-info-no-source" role="status">
+                Boundary service unavailable. Administrative boundaries may not refresh until the service is restored.
+              </p>
+            ) : null}
           </aside>
         ) : null}
 
@@ -855,7 +907,7 @@ export function MapExperience() {
                   </p>
                   <div className="directory-route-links">
                     <Link href="/projects">Open project directory ↗</Link>
-                    <Link href="/developers">Open developer directory ↗</Link>
+                    <Link href="/developers">Developers &amp; agents directory ↗</Link>
                   </div>
                 </section>
               </>
@@ -894,55 +946,7 @@ export function MapExperience() {
               </p>
             </div>
           </aside>
-        ) : (
-          <aside aria-label={workspaceMode === "projects" ? "Project data status" : "Market metric data status"} className="data-note">
-            <div className="data-note-heading">
-              <span aria-hidden="true" className="data-note-icon">i</span>
-              <strong>
-                {boundaryStatus === "error"
-                  ? "Boundary service unavailable"
-                  : workspaceMode === "projects"
-                    ? "Projects mode"
-                    : activeMetric.label}
-              </strong>
-            </div>
-            {workspaceMode === "projects" ? (
-              <>
-                <p>
-                  Project mode is ready for a verified project feed, but developer
-                  launches, starting prices, payment plans, construction progress
-                  and unit availability are not connected yet. No project markers
-                  or prices are fabricated.
-                </p>
-                <div className="directory-route-links">
-                  <Link href="/projects">Open project directory ↗</Link>
-                  <Link href="/developers">Developer directory ↗</Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <p>{activeMetric.description}</p>
-                <p className="metric-status-copy">{activeMetric.dataStatus}</p>
-                {selectedMetric === "averageLandPricePerM2" ? (
-                  <div className="land-price-legend" aria-label="Land price heatmap legend">
-                    <span>RWF/m²</span>
-                    <div className="land-price-legend-scale" />
-                    <div className="land-price-legend-labels"><span>Lower</span><span>Higher</span></div>
-                  </div>
-                ) : null}
-                <p>
-                  Current filters: {selectedMetric === "averageLandPricePerM2" ? "Land · static district snapshot" : `${PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label} · ${ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label}`}.
-                  {selectedMetric === "averageLandPricePerM2"
-                    ? "District polygons are shaded by the sourced land-price snapshot. Period filtering is not applied because the source observation date is not exposed; finer-level prices are not inferred."
-                    : "The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
-                </p>
-              </>
-            )}
-            <p className="data-source-note">
-              Administrative boundaries: Kigali City Master Plan and Geodata Rwanda Bugesera Masterplan. Individual parcel polygons: City of Kigali parcel layer for Kigali and an NLA-hosted LAIS Bugesera_Parcels service for Bugesera. Bugesera reuse terms, completeness and current survey accuracy still need confirmation; zoning layers remain separate.
-            </p>
-          </aside>
-        )}
+        ) : null}
 
         {sourcesOpen ? (
           <aside aria-label="Market data sources" className="sources-panel">

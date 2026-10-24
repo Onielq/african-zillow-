@@ -17,14 +17,23 @@ test("project and developer directories remain evidence-gated until a feed is ve
   assert.match(projects, /No verified project feed is connected yet/i);
   assert.match(projects, /Source and display permission/i);
   assert.match(developers, /kind="developers"/);
-  assert.match(developers, /No verified developer directory is connected yet/i);
-  assert.match(developers, /Authority to represent/i);
+  assert.match(developers, /No verified profiles published yet/i);
+  assert.match(developers, /Property developers/i);
+  assert.match(developers, /Estate agencies/i);
+  assert.match(developers, /Independent agents/i);
+  assert.match(developers, /developer-directory-template\.csv/);
+  assert.match(directory, /An agent is not labelled a developer/i);
+  assert.match(developers, /Verified market role/i);
   assert.match(directory, /This means no records are verified and published in this directory/i);
   assert.ok(directory.includes('href: "/projects"'));
   assert.ok(directory.includes('href: "/developers"'));
+  assert.ok(directory.includes("Developers & agents"));
   assert.ok(directory.includes('href: "/data-sources"'));
   assert.ok(mapExperience.includes('href="/projects">Open project directory'));
-  assert.ok(mapExperience.includes('href="/developers">Open developer directory'));
+  assert.ok(mapExperience.includes('href="/developers">Developers &amp; agents directory'));
+  assert.match(mapExperience, /METRIC DESCRIPTION/);
+  assert.match(mapExperience, /Land price heatmap legend/);
+  assert.doesNotMatch(mapExperience, /className="data-note"/);
 });
 
 test("official market-source checks test page availability without importing data rows", async () => {
