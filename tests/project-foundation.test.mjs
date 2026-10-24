@@ -462,3 +462,75 @@ test("transaction volume explains district priorities, transaction types, and no
   assert.match(experience, /4,031/);
   assert.match(experience, /4,350\*/);
 });
+
+
+test("parcel selection calculates an indicative value from parcel area and unit price", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
+  assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
+  assert.match(experience, /Indicative estimated parcel value/);
+  assert.match(experience, /rough area-based estimate, not an official valuation/);
+});
+
+test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const places = await readProjectFile("src/app/api/geography/places/route.ts");
+  const zoning = await readProjectFile("src/app/api/geography/zoning/route.ts");
+
+  for (const label of ["Landmarks", "Medical & schools", "Transportation", "Nature", "Zoning"]) {
+    assert.match(experience, new RegExp(label.replace(/[.*+?^{}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(experience, /showScope="pilot"/);
+  assert.match(experience, /show-toggle-track/);
+  assert.match(mapView, /showZoning/);
+  assert.match(mapView, /\/api\/geography\/zoning\?bbox=/);
+  assert.match(places, /categories\.includes\("healthEducation"\) &&\s*\(/);
+  assert.match(places, /overpassCache/);
+  assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
+  assert.match(zoning, /Bugesera_DLUP/);
+});
+
+test("comparison searches every pilot administrative level and accepts any mixed comparison set", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const search = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+
+  assert.match(search, /district: \{ district: 4, sector: 5, cell: 6, village: 7 \}/);
+  assert.match(search, /district: 2, sector: 4, cell: 3, village: 5/);
+  assert.match(search, /returnGeometry: "false"/);
+  assert.match(experience, /setComparedAreas\(\(areas\) => \[\.\.\.areas, item\]\)/);
+  assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
+  assert.match(experience, /comparisonKind: "project"/);
+  assert.match(experience, /No verified project data/);
+  assert.match(experience, /Search district, sector, cell or village/);
+});
+
+test("transaction indicators distinguish NISR 2023 baselines from the unverified Bugesera month-to-date observation", async () => {
+  const data = await readProjectFile("src/data/transaction-benchmarks.ts");
+  const route = await readProjectFile("src/app/api/geography/transaction-estimate/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  for (const sourceValue of [
+    "annualTransactions2023: 50698",
+    "annualTransactions2023: 73377",
+    "annualTransactions2023: 40102",
+    "annualTransactions2023: 23527",
+    "count: 4350",
+    "user-reported-unverified"
+  ]) assert.ok(data.includes(sourceValue), "missing benchmark datum: " + sourceValue);
+  assert.match(route, /returnCountOnly: "true"/);
+  assert.match(route, /districtBaseline/);
+  assert.match(route, /estimatedShare: share/);
+  assert.match(route, /Modelled estimate only, not an official monthly transaction count/);
+  assert.match(experience, /Historical baseline: official 2023 annual district transactions ÷ 12/);
+  assert.match(experience, /An indexed overview separately showed 4,031/);
+});
+
+test("selected-area KPIs have more width and responsive two-column spacing", async () => {
+  const css = await readProjectFile("src/app/globals.css");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(css, /width: min\(400px, calc\(100% - 36px\)\)/);
+  assert.match(css, /\.area-market-grid\s*\{[^}]*align-items: stretch/s);
+  assert.match(css, /\.parcel-estimate-card\s*\{/);
+  assert.match(experience, /Transaction volume · monthly indicator/);
+});
