@@ -720,14 +720,29 @@ async function getParcels(bounds: Bounds, cellFilter?: ParcelCellFilter): Promis
       const exactWhere = cellFilter
         ? `${baseWhere} AND UPPER(district) = UPPER('${escaped(cellFilter.district)}') AND UPPER(sector) = UPPER('${escaped(cellFilter.sector)}') AND UPPER(cell) = UPPER('${escaped(cellFilter.cell)}')`
         : baseWhere;
-      const upstreamFeatures = await queryArcGisLayer(
-        provider.layerUrl,
-        bounds,
-        2000,
-        exactWhere,
-        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
-        cellFilter ? 10_000 : 2000
-      );
+      let upstreamFeatures: UpstreamFeature[];
+      try {
+        upstreamFeatures = await queryArcGisLayer(
+          provider.layerUrl,
+          bounds,
+          2000,
+          exactWhere,
+          "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+          cellFilter ? 10_000 : 2000
+        );
+      } catch (error) {
+        if (!cellFilter) throw error;
+        // Some FeatureServer SQL dialects reject UPPER(). Retry in the same
+        // cell-sized viewport, then apply exact normalized location filters locally.
+        upstreamFeatures = await queryArcGisLayer(
+          provider.layerUrl,
+          bounds,
+          2000,
+          baseWhere,
+          "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+          10_000
+        );
+      }
       return { provider, upstreamFeatures, failed: false };
     } catch (error) {
       console.error(`Cadastral parcel GIS request failed for ${provider.id}.`, error);
