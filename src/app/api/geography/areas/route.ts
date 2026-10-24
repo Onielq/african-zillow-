@@ -17,11 +17,14 @@ const KIGALI_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE"] as const;
 // The public Kigali parcels layer includes UPI, parcel number, size, wetland
 // overlap and last-updated date. It is an identification layer, not proof of
 // current ownership or encumbrances.
+// Provisional values transcribed from the publicly indexed /prices table during
+// the 2026-10-24 source review. The page does not expose the effective date or
+// calculation method; do not treat this as a live or production-grade feed.
 const DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2: Record<string, number> = {
-  GASABO: 36013,
-  KICUKIRO: 61491,
-  NYARUGENGE: 50735,
-  BUGESERA: 4033
+  GASABO: 36103,
+  KICUKIRO: 61499,
+  NYARUGENGE: 50771,
+  BUGESERA: 4038
 };
 const DISTRICT_LAND_PRICE_SOURCE =
   "https://rwandalanddashboard.lands.rw/prices";
@@ -455,7 +458,7 @@ function normaliseAdministrativeFeature(
             average_land_price_per_m2:
               DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict],
             average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
-            average_land_price_date_status: "source observation date not exposed"
+            average_land_price_date_status: "Effective date and calculation method not disclosed; provisional /prices page snapshot reviewed 2026-10-24"
           }
         : {})
     }

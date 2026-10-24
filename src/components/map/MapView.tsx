@@ -367,11 +367,11 @@ export function MapView({
               "interpolate",
               ["linear"],
               ["get", "average_land_price_per_m2"],
-              4033, "#E2F0E5",
+              4038, "#E2F0E5",
               10000, "#C7DFAE",
               25000, "#F0D16B",
               40000, "#E98B59",
-              61491, "#B94943"
+              61499, "#B94943"
             ],
             "#DCE5DD"
           ]
@@ -516,11 +516,11 @@ export function MapView({
                       "interpolate",
                       ["linear"],
                       ["get", "average_land_price_per_m2"],
-                      4033, "#E2F0E5",
+                      4038, "#E2F0E5",
                       10000, "#C7DFAE",
                       25000, "#F0D16B",
                       40000, "#E98B59",
-                      61491, "#B94943"
+                      61499, "#B94943"
                     ],
                     "#DCE5DD"
                   ]
