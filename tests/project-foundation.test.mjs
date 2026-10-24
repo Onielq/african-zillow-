@@ -210,3 +210,23 @@ test("MapLibre worker and shared modules are copied to a versioned public path",
   assert.match(copyScript, /maplibre-gl-worker\.mjs/);
   assert.match(copyScript, /maplibre-gl-shared\.mjs/);
 });
+
+
+test("the standalone data source register exposes provenance, limitations, and source links", async () => {
+  const page = await readProjectFile("src/app/data-sources/page.tsx");
+  const css = await readProjectFile("src/app/data-sources/data-sources.module.css");
+  const docs = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(page, /Kigali administrative boundaries/);
+  assert.match(page, /Bugesera cadastral parcels/);
+  assert.match(page, /Rwanda Data Sharing Platform/);
+  assert.match(page, /Population and housing statistics/);
+  assert.match(page, /reuse permission/i);
+  assert.match(page, /not proof of ownership/i);
+  assert.match(page, /data-status/);
+  assert.match(css, /@media \(max-width: 760px\)/);
+  assert.match(docs, /DATA_SOURCE_REGISTER|Data source register/);
+  assert.match(docs, /approved sharing/);
+  assert.match(experience, /href="\/data-sources"/);
+});
