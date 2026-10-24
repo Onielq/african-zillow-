@@ -29,6 +29,12 @@ This register deliberately distinguishes data connectivity from data-quality val
 - NISR Population and Housing Census: https://gis.statistics.gov.rw/data-sources/censuses/Population-and-Housing-Census
 - NLA land use and mapping information: https://www.lands.rw/land-use-and-mapping
 
+## Operational source-health checks
+
+The application source register includes an on-demand health check at `/api/data-sources/health` for the four GIS endpoints already used by the map. It reads service metadata only and reports HTTP reachability, exposed layer/schema metadata, a last-edit timestamp when supplied, and whether the endpoint declares a licence statement.
+
+The check does **not** download parcel features or ownership attributes. A reachable service, an exposed field list, and a published last-edit date are not proof of data completeness, survey accuracy, legal status, freshness of every feature, or permission to cache and redistribute. The UI must keep those checks separate.
+
 ## Non-negotiable data rules
 
 1. Do not infer cadastral parcel edges from roads, satellite imagery, administrative polygons, or zoning overlays.
