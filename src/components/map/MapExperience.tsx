@@ -17,6 +17,10 @@ import {
   RWANDA_PUBLIC_AGENT_CANDIDATES,
   RWANDA_REAL_ESTATE_AGENCIES
 } from "@/data/real-estate-directory";
+import {
+  TRANSACTION_BENCHMARK_SOURCE,
+  TRANSACTION_DASHBOARD_SOURCE
+} from "@/data/transaction-benchmarks";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
 type WorkspaceMode = "areas" | "projects";
@@ -61,6 +65,113 @@ type CellParcelResponse = {
   capped: boolean;
   parcels: CellParcelRecord[];
 };
+
+type ComparisonItem = SelectedArea & {
+  comparisonKind?: "area" | "project";
+  projectSourceUrl?: string | null;
+  transactionEstimate?: TransactionEstimateResponse | null;
+};
+
+type AreaSearchResult = SelectedArea & { id: string };
+type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string };
+type TransactionEstimateResponse = {
+  estimate: number | null;
+  status: "reported-current-month-unverified" | "historical-monthly-baseline" | "parcel-share-model" | "unavailable";
+  method: string;
+  unit?: string;
+  annualTransactions2023?: number;
+  currentMonthReported?: { count: number; observedOn: string; status: string; note: string } | null;
+  allocation?: { districtParcelCount: number; areaParcelCount: number; estimatedShare: number; method: string };
+};
+
+type UnitPriceEstimate = {
+  pricePerM2: number | null;
+  kind: "cell-reference-snapshot" | "derived-sector-mean" | "district-dashboard-snapshot" | "unavailable" | "conflicting";
+  explanation: string;
+};
+
+const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
+  gasabo: 36103,
+  kicukiro: 61499,
+  nyarugenge: 50771,
+  bugesera: 4038
+};
+
+function getUnitPriceEstimate(
+  rows: LandPriceRow[],
+  area: SelectedArea,
+  allowDistrictFallback = false
+): UnitPriceEstimate {
+  const districtKey = normalizeAreaName(area.district);
+  if (area.level === "district" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "district-dashboard-snapshot",
+      explanation: "Dashboard district price snapshot; effective date and calculation method are not disclosed."
+    };
+  }
+  if (area.level === "sector" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "derived-sector-mean",
+      explanation: "Indicative sector figure derived from available cell-level snapshots; not an official sector-weighted sale price."
+    };
+  }
+
+  const targetCell = area.level === "cell"
+    ? area.name
+    : area.level === "village" || area.level === "parcel"
+      ? area.cell
+      : null;
+  if (targetCell && area.sector) {
+    const matches = rows.filter((row) =>
+      row.valid &&
+      normalizeAreaName(row.district) === districtKey &&
+      normalizeAreaName(row.sector) === normalizeAreaName(area.sector) &&
+      normalizeAreaName(row.cell) === normalizeAreaName(targetCell)
+    );
+    const uniquePrices = new Set(matches.map((row) => row.price).filter((price): price is number => price !== null));
+    if (uniquePrices.size === 1) {
+      return {
+        pricePerM2: uniquePrices.values().next().value ?? null,
+        kind: "cell-reference-snapshot",
+        explanation: "Exact cell-level price reference; source date and calculation method have not been confirmed."
+      };
+    }
+    if (uniquePrices.size > 1) {
+      if (!allowDistrictFallback) {
+        return { pricePerM2: null, kind: "conflicting", explanation: "The cell reference contains conflicting values." };
+      }
+    }
+  }
+
+  const districtPrice = DISTRICT_PRICE_SNAPSHOTS[districtKey] ?? null;
+  if (allowDistrictFallback && districtPrice !== null) {
+    return {
+      pricePerM2: districtPrice,
+      kind: "district-dashboard-snapshot",
+      explanation: "No unique cell reference was available, so the district dashboard snapshot is used as a clearly labelled rough fallback."
+    };
+  }
+  return { pricePerM2: null, kind: "unavailable", explanation: "No defensible unit price is available at this geographic level." };
+}
+
+function comparisonItemKey(area: ComparisonItem): string {
+  return [
+    area.comparisonKind ?? "area",
+    area.level,
+    normalizeAreaName(area.district),
+    normalizeAreaName(area.sector),
+    normalizeAreaName(area.cell),
+    normalizeAreaName(area.village),
+    normalizeAreaName(area.name),
+    normalizeAreaName(area.projectSourceUrl)
+  ].join("|");
+}
+
+function areaLevelLabel(level: SelectedArea["level"]): string {
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
 
 function normalizeAreaName(value: string | null | undefined): string {
   return (value ?? "")
@@ -278,73 +389,6 @@ const FOCUS_OPTIONS: Array<{
     label: "Bugesera",
     center: [30.18, -2.28],
     zoom: 9.35
-  }
-];
-
-const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
-  {
-    level: "district",
-    name: "Gasabo",
-    province: "Kigali City",
-    district: "Gasabo",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 36103,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Kicukiro",
-    province: "Kigali City",
-    district: "Kicukiro",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 61499,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Nyarugenge",
-    province: "Kigali City",
-    district: "Nyarugenge",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 50771,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Bugesera",
-    province: "Eastern Province",
-    district: "Bugesera",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 4038,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
   }
 ];
 
