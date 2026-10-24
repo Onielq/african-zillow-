@@ -910,7 +910,8 @@ export function MapExperience() {
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
           showLayers={showLayers}
-          showScope={activeFocus === "kigali" ? "kigali" : activeFocus === "bugesera" ? "bugesera" : "pilot"}
+          showZoning={showZoning}
+          showScope="pilot"
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -1066,28 +1067,24 @@ export function MapExperience() {
 
 
         {showOpen ? (
-          <aside aria-label="Show map overlays" className="show-menu">
-            <div className="metrics-menu-header">
-              <div>
-                <p className="panel-eyebrow">MAP LAYERS / RWANDA</p>
-                <h2>Show on map</h2>
-              </div>
-              <button aria-label="Close map overlays" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+          <aside aria-label="Show map layers" className="show-menu">
+            <div className="show-menu-header">
+              <h2>Show</h2>
+              <button aria-label="Close map layers" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
             </div>
-            <p className="show-menu-description">
-              Turn contextual places on and off. Results are taken from OpenStreetMap and may be incomplete; they are not legal or official land records.
-            </p>
             <div className="show-option-list">
               {([
-                { id: "landmarks" as const, title: "Landmarks", detail: "Points of interest, historic places and attractions", marker: "◆" },
-                { id: "healthEducation" as const, title: "Medical & schools", detail: "Hospitals, clinics, pharmacies, schools and universities", marker: "+" },
-                { id: "transportation" as const, title: "Transportation", detail: "Main roads, bus stops and bus stations", marker: "↗" },
-                { id: "nature" as const, title: "Nature", detail: "Eco parks, nature reserves, lakes and waterfalls", marker: "⌁" }
+                { id: "landmarks" as const, title: "Landmarks" },
+                { id: "healthEducation" as const, title: "Medical & schools" },
+                { id: "transportation" as const, title: "Transportation" },
+                { id: "nature" as const, title: "Nature" }
               ]).map((layer) => {
                 const checked = showLayers.includes(layer.id);
                 return (
-                  <label className={checked ? "show-option show-option-active" : "show-option"} key={layer.id}>
+                  <label className={checked ? "show-toggle show-toggle-active" : "show-toggle"} key={layer.id}>
+                    <span>{layer.title}</span>
                     <input
+                      aria-label={layer.title}
                       checked={checked}
                       onChange={() => {
                         setShowLayers((current) =>
@@ -1098,21 +1095,21 @@ export function MapExperience() {
                       }}
                       type="checkbox"
                     />
-                    <span className={"show-option-marker show-option-marker-" + layer.id} aria-hidden="true">{layer.marker}</span>
-                    <span className="show-option-copy">
-                      <strong>{layer.title}</strong>
-                      <small>{layer.detail}</small>
-                    </span>
-                    <span className="show-option-state">{checked ? "On" : "Off"}</span>
+                    <span className="show-toggle-track" aria-hidden="true"><span /></span>
                   </label>
                 );
               })}
+              <label className={showZoning ? "show-toggle show-toggle-active" : "show-toggle"}>
+                <span>Zoning</span>
+                <input
+                  aria-label="Zoning"
+                  checked={showZoning}
+                  onChange={() => setShowZoning((value) => !value)}
+                  type="checkbox"
+                />
+                <span className="show-toggle-track" aria-hidden="true"><span /></span>
+              </label>
             </div>
-            <div className="show-menu-footer">
-              <span>Coverage</span>
-              <strong>{activeFocus === "kigali" ? "Kigali City" : activeFocus === "bugesera" ? "Bugesera District" : "Kigali City + Bugesera"}</strong>
-            </div>
-            <p className="show-menu-source">Source: © OpenStreetMap contributors · ODbL</p>
           </aside>
         ) : null}
 
