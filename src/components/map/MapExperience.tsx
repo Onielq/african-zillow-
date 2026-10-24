@@ -9,6 +9,8 @@ import {
   type BasemapStatus,
   type BoundaryStatus,
   type BasemapMode,
+  type MapOverlayCategory,
+  type ShowScope,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -406,6 +408,8 @@ export function MapExperience() {
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
@@ -562,7 +566,7 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setCompareOpen(false);
@@ -571,11 +575,12 @@ export function MapExperience() {
         setDevelopersOpen(false);
         setProjectsOpen(false);
         setSourcesOpen(false);
+        setShowOpen(false);
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -679,6 +684,8 @@ export function MapExperience() {
         <MapView
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
+          showLayers={showLayers}
+          showScope={activeFocus === "kigali" ? "kigali" : activeFocus === "bugesera" ? "bugesera" : "pilot"}
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -740,6 +747,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setDirectoryTab("developers");
                 setDevelopersOpen((open) => !open);
@@ -757,6 +765,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setDevelopersOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setProjectsOpen((open) => !open);
               }}
@@ -772,12 +781,29 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setMetricsOpen((open) => !open);
               }}
               type="button"
             >
               Metrics <span className="metrics-trigger-value">{activeMetric.shortLabel}</span><span aria-hidden="true">⌄</span>
+            </button>
+            <button
+              aria-label="Show map overlays"
+              aria-expanded={showOpen}
+              className={showOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => {
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setShowOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Show <span aria-hidden="true">⌄</span>
             </button>
             <button
               aria-expanded={sourcesOpen}
@@ -787,6 +813,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setMetricInfoOpen(false);
+                setShowOpen(false);
                 setSourcesOpen((open) => !open);
               }}
               type="button"
@@ -802,6 +829,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen((open) => !open);
               }}
               type="button"
@@ -810,6 +838,58 @@ export function MapExperience() {
             </button>
           </div>
         </div>
+
+
+        {showOpen ? (
+          <aside aria-label="Show map overlays" className="show-menu">
+            <div className="metrics-menu-header">
+              <div>
+                <p className="panel-eyebrow">MAP LAYERS / RWANDA</p>
+                <h2>Show on map</h2>
+              </div>
+              <button aria-label="Close map overlays" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+            </div>
+            <p className="show-menu-description">
+              Turn contextual places on and off. Results are taken from OpenStreetMap and may be incomplete; they are not legal or official land records.
+            </p>
+            <div className="show-option-list">
+              {([
+                { id: "landmarks" as const, title: "Landmarks", detail: "Points of interest, historic places and attractions", marker: "◆" },
+                { id: "healthEducation" as const, title: "Medical & schools", detail: "Hospitals, clinics, pharmacies, schools and universities", marker: "+" },
+                { id: "transportation" as const, title: "Transportation", detail: "Main roads, bus stops and bus stations", marker: "↗" },
+                { id: "nature" as const, title: "Nature", detail: "Eco parks, nature reserves, lakes and waterfalls", marker: "⌁" }
+              ]).map((layer) => {
+                const checked = showLayers.includes(layer.id);
+                return (
+                  <label className={checked ? "show-option show-option-active" : "show-option"} key={layer.id}>
+                    <input
+                      checked={checked}
+                      onChange={() => {
+                        setShowLayers((current) =>
+                          current.includes(layer.id)
+                            ? current.filter((item) => item !== layer.id)
+                            : [...current, layer.id]
+                        );
+                      }}
+                      type="checkbox"
+                    />
+                    <span className={"show-option-marker show-option-marker-" + layer.id} aria-hidden="true">{layer.marker}</span>
+                    <span className="show-option-copy">
+                      <strong>{layer.title}</strong>
+                      <small>{layer.detail}</small>
+                    </span>
+                    <span className="show-option-state">{checked ? "On" : "Off"}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="show-menu-footer">
+              <span>Coverage</span>
+              <strong>{activeFocus === "kigali" ? "Kigali City" : activeFocus === "bugesera" ? "Bugesera District" : "Kigali City + Bugesera"}</strong>
+            </div>
+            <p className="show-menu-source">Source: © OpenStreetMap contributors · ODbL</p>
+          </aside>
+        ) : null}
 
         {metricsOpen ? (
           <aside aria-label="Market metrics menu" className="metrics-menu">
