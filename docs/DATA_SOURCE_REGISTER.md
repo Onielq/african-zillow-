@@ -83,3 +83,30 @@ The drawer separately lists estate-agency candidates found through public websit
 The official source review on 24 October 2026 is documented in `docs/LAND_PRICE_SOURCE_RECONCILIATION.md`. The district values are stored in `public/land-price-district-snapshot.tsv` with separate review and observation-date fields. The row-level problem list is in `public/land-price-reconciliation.tsv`.
 
 The review timestamp must not be mistaken for the underlying price observation date. District values are marked provisional until the publisher confirms the effective date and method. The raw 244-row user-supplied TSV remains unchanged so that source corrections can be audited rather than silently rewritten.
+
+## Contextual place overlays (Show menu)
+
+- **Source:** OpenStreetMap contributors, queried through the public Overpass API. Attribution: © OpenStreetMap contributors, ODbL.
+- **Categories:** Landmarks and historic/attraction points; medical facilities and schools; main road corridors, bus stops and stations; nature reserves, parks, lakes and waterfalls where mapped and tagged.
+- **Geographic scope:** Search boxes are an optimization only. Returned points and road segments are clipped to the official pilot district polygons supplied through the administrative geography API. “Kigali City” is restricted to Gasabo, Kicukiro and Nyarugenge; “Bugesera” is restricted to Bugesera; combined focus includes those four districts.
+- **Limitations:** OpenStreetMap feature coverage and tagging vary. Missing hospitals, schools, routes, stops or natural features should not be interpreted as absence on the ground. These overlays are contextual reference layers, not cadastral records, official infrastructure inventories, or legal evidence. Live queries may be rate-limited; failed overlays leave the base map and land boundaries available.
+
+## Selected-cell parcel inventory
+
+- **Source:** City of Kigali parcel FeatureServer for Gasabo, Kicukiro and Nyarugenge; NLA-hosted LAIS Bugesera_Parcels FeatureServer for Bugesera.
+- **Selection:** Filtered by district + sector + cell names, then rechecked against those exact administrative attributes. Returned parcel rows include UPI, parcel number where available, village, area where available, source update date where available, and a map extent used for zoom-to-parcel.
+- **Limitations:** The route currently caps the parcel inventory at 10,000 records per cell. Parcel source permissions, coverage, current survey accuracy and the stability of name-based joins still need confirmation. A UPI/parcel outline identifies a cadastral record; it does not establish current legal ownership, restrictions, or a clear title.
+
+## Land-price heatmap beyond district scale
+
+- **Cell shading:** Uses only a unique numeric value for an exact district + sector + cell key in public/land-price-reference.tsv. Conflicting keys do not receive a numeric price; they remain unpriced/neutral.
+- **Sector shading:** Where at least one cell has a unique source value, the app calculates the simple arithmetic mean of the available cell-level weighted-average values, excluding conflicting cells. This is an **indicative derived mean**, not a published sector-level weighted average. The number of included cells and conflicting cells is exposed in selected-sector details. The source observation date and methodology are still unknown. Do not compare this derived sector estimate directly with the district average as if both used the same weighting and population.
+- **Raw-source integrity:** The user-supplied TSV remains unchanged. The derived mean is generated at request time and does not modify the source file.
+
+## Transaction activity display
+
+- **Dashboard:** https://rwandalanddashboard.lands.rw/transactions
+- **Priority districts:** Bugesera, Kicukiro, Gasabo and Nyarugenge.
+- **Current implementation status:** The map links to the official dashboard and describes transaction categories and limitations, but a normalized, date-stamped monthly transaction feed is **not yet connected**. A Bugesera count of 4,350 was reported during the 24 Oct 2026 product review; a cached overview indexed earlier showed 4,031. Those observations have not been reconciled to an effective month or snapshot date and neither is embedded as a validated live KPI.
+- **Interpretation:** High transaction count indicates recorded administrative activity, not by itself price appreciation, verified demand for a specific sector/cell, or sale/listing inventory. Do not allocate district totals down to cells or sectors without a geographic transaction dataset.
+

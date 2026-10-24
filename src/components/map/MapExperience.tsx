@@ -9,6 +9,7 @@ import {
   type BasemapStatus,
   type BoundaryStatus,
   type BasemapMode,
+  type MapOverlayCategory,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -38,6 +39,27 @@ type LandPriceLookup = {
   price: number | null;
   sourceLines: number[];
   pricedCells: number;
+};
+
+type CellParcelRecord = {
+  id: string;
+  upi: string;
+  parcelNumber: string | null;
+  district: string;
+  sector: string;
+  cell: string;
+  village: string | null;
+  areaM2: number | null;
+  wetlandAreaM2: number | null;
+  lastUpdatedOn: number | null;
+  bounds: [number, number, number, number];
+};
+
+type CellParcelResponse = {
+  totalSourceRecords: number;
+  returnedRecords: number;
+  capped: boolean;
+  parcels: CellParcelRecord[];
 };
 
 function normalizeAreaName(value: string | null | undefined): string {
@@ -188,7 +210,7 @@ const MARKET_METRICS: Array<{
     label: "Transaction volume",
     shortLabel: "Transactions",
     description: "How many registered land transactions take place in an area.",
-    dataStatus: "The Rwanda Land Dashboard publishes aggregate transaction summaries. The data feed and geographic join are not connected yet."
+    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized feed is not connected. A Bugesera month-to-date total of 4,350 was reported from /transactions on 24 Oct 2026. An earlier cached overview showed 4,031, plausibly an earlier cumulative snapshot; its observation date is not exposed. The 4,350 figure may be shown only as a dated provisional reference until a refreshable feed is connected. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
   },
   {
     id: "capitalAppreciation",
@@ -406,9 +428,16 @@ export function MapExperience() {
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
+  const [cellParcelsLookupKey, setCellParcelsLookupKey] = useState<string | null>(null);
+  const [cellParcelsStatus, setCellParcelsStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [cellParcelsTotal, setCellParcelsTotal] = useState(0);
+  const [cellParcelsCapped, setCellParcelsCapped] = useState(false);
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
@@ -500,6 +529,14 @@ export function MapExperience() {
   const selectedLandPrice = selectedArea
     ? lookupLandPriceForArea(landPriceRows, selectedArea)
     : null;
+  const activeCellParcelKey = selectedArea?.level === "cell" && selectedArea.sector
+    ? [selectedArea.district, selectedArea.sector, selectedArea.name].join("|")
+    : null;
+  const activeCellParcelsStatus = activeCellParcelKey && cellParcelsLookupKey === activeCellParcelKey
+    ? cellParcelsStatus
+    : activeCellParcelKey
+      ? "loading"
+      : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
   const comparisonSearchResults = normalizedComparisonSearch
@@ -541,6 +578,38 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
+    const level = selectedArea?.level;
+    const district = selectedArea?.district;
+    const sector = selectedArea?.sector;
+    const cell = selectedArea?.level === "cell" ? selectedArea.name : null;
+    if (level !== "cell" || !district || !sector || !cell) return;
+
+    const controller = new AbortController();
+    const lookupKey = [district, sector, cell].join("|");
+    const loadCellParcels = async () => {
+      try {
+        const params = new URLSearchParams({ district, sector, cell });
+        const response = await fetch("/api/geography/cell-parcels?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Cell parcel list request failed.");
+        const payload = await response.json() as CellParcelResponse;
+        if (controller.signal.aborted) return;
+        setCellParcelsLookupKey(lookupKey);
+        setCellParcels(payload.parcels ?? []);
+        setCellParcelsTotal(payload.totalSourceRecords ?? payload.returnedRecords ?? 0);
+        setCellParcelsCapped(payload.capped ?? false);
+        setCellParcelsStatus("loaded");
+      } catch {
+        if (controller.signal.aborted) return;
+        setCellParcelsLookupKey(lookupKey);
+        setCellParcelsStatus("error");
+      }
+    };
+    void loadCellParcels();
+    return () => controller.abort();
+  }, [selectedArea?.level, selectedArea?.district, selectedArea?.sector, selectedArea?.name]);
+  useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const context = gsap.context(() => {
@@ -562,7 +631,7 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setCompareOpen(false);
@@ -571,11 +640,12 @@ export function MapExperience() {
         setDevelopersOpen(false);
         setProjectsOpen(false);
         setSourcesOpen(false);
+        setShowOpen(false);
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -679,6 +749,8 @@ export function MapExperience() {
         <MapView
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
+          showLayers={showLayers}
+          showScope={activeFocus === "kigali" ? "kigali" : activeFocus === "bugesera" ? "bugesera" : "pilot"}
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -740,6 +812,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setDirectoryTab("developers");
                 setDevelopersOpen((open) => !open);
@@ -757,6 +830,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setDevelopersOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setProjectsOpen((open) => !open);
               }}
@@ -772,12 +846,29 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setMetricsOpen((open) => !open);
               }}
               type="button"
             >
               Metrics <span className="metrics-trigger-value">{activeMetric.shortLabel}</span><span aria-hidden="true">⌄</span>
+            </button>
+            <button
+              aria-label="Show map overlays"
+              aria-expanded={showOpen}
+              className={showOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => {
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setShowOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Show <span aria-hidden="true">⌄</span>
             </button>
             <button
               aria-expanded={sourcesOpen}
@@ -787,6 +878,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setMetricInfoOpen(false);
+                setShowOpen(false);
                 setSourcesOpen((open) => !open);
               }}
               type="button"
@@ -802,6 +894,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen((open) => !open);
               }}
               type="button"
@@ -810,6 +903,58 @@ export function MapExperience() {
             </button>
           </div>
         </div>
+
+
+        {showOpen ? (
+          <aside aria-label="Show map overlays" className="show-menu">
+            <div className="metrics-menu-header">
+              <div>
+                <p className="panel-eyebrow">MAP LAYERS / RWANDA</p>
+                <h2>Show on map</h2>
+              </div>
+              <button aria-label="Close map overlays" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+            </div>
+            <p className="show-menu-description">
+              Turn contextual places on and off. Results are taken from OpenStreetMap and may be incomplete; they are not legal or official land records.
+            </p>
+            <div className="show-option-list">
+              {([
+                { id: "landmarks" as const, title: "Landmarks", detail: "Points of interest, historic places and attractions", marker: "◆" },
+                { id: "healthEducation" as const, title: "Medical & schools", detail: "Hospitals, clinics, pharmacies, schools and universities", marker: "+" },
+                { id: "transportation" as const, title: "Transportation", detail: "Main roads, bus stops and bus stations", marker: "↗" },
+                { id: "nature" as const, title: "Nature", detail: "Eco parks, nature reserves, lakes and waterfalls", marker: "⌁" }
+              ]).map((layer) => {
+                const checked = showLayers.includes(layer.id);
+                return (
+                  <label className={checked ? "show-option show-option-active" : "show-option"} key={layer.id}>
+                    <input
+                      checked={checked}
+                      onChange={() => {
+                        setShowLayers((current) =>
+                          current.includes(layer.id)
+                            ? current.filter((item) => item !== layer.id)
+                            : [...current, layer.id]
+                        );
+                      }}
+                      type="checkbox"
+                    />
+                    <span className={"show-option-marker show-option-marker-" + layer.id} aria-hidden="true">{layer.marker}</span>
+                    <span className="show-option-copy">
+                      <strong>{layer.title}</strong>
+                      <small>{layer.detail}</small>
+                    </span>
+                    <span className="show-option-state">{checked ? "On" : "Off"}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="show-menu-footer">
+              <span>Coverage</span>
+              <strong>{activeFocus === "kigali" ? "Kigali City" : activeFocus === "bugesera" ? "Bugesera District" : "Kigali City + Bugesera"}</strong>
+            </div>
+            <p className="show-menu-source">Source: © OpenStreetMap contributors · ODbL</p>
+          </aside>
+        ) : null}
 
         {metricsOpen ? (
           <aside aria-label="Market metrics menu" className="metrics-menu">
@@ -888,7 +1033,11 @@ export function MapExperience() {
                       </small>
                     </span>
                     <span className={metric.id === "averageLandPricePerM2" ? "metric-data-pill metric-data-pill-available" : "metric-data-pill"}>
-                      {metric.id === "averageLandPricePerM2" ? "Snapshot only" : "Pending"}
+                      {metric.id === "averageLandPricePerM2"
+                        ? "Snapshot only"
+                        : metric.id === "transactionVolume"
+                          ? "Dashboard only"
+                          : "Pending"}
                     </span>
                   </button>
                 ))}
@@ -1084,6 +1233,20 @@ export function MapExperience() {
                   <strong>Data status</strong>
                   <p>{activeMetric.dataStatus}</p>
                 </div>
+                {selectedMetric === "transactionVolume" ? (
+                  <div className="transaction-types-note">
+                    <strong>Transaction types to track</strong>
+                    <p>
+                      Voluntary sale, succession, expropriation, exchange, donation, court decisions and auctions, subdivision, public-land title, parcel merge, and change of land use. Keep counts by type and month so different legal events are not treated as identical market demand.
+                    </p>
+                    <p>
+                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Do not infer sector/cell transaction counts from district totals without transaction-level geography.
+                    </p>
+                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                      Open district transaction and type tables ↗
+                    </a>
+                  </div>
+                ) : null}
                 <div className="metric-info-status">
                   <strong>Map interpretation</strong>
                   <p>
@@ -1104,9 +1267,13 @@ export function MapExperience() {
                   <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
                     Open Rwanda Land Dashboard ↗
                   </a>
-                ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
+                ) : selectedMetric === "transactionVolume" ? (
+                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                    Open official transaction dashboard ↗
+                  </a>
+                ) : selectedMetric === "capitalAppreciation" ? (
                   <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
-                    Review transaction dataset and access terms ↗
+                    Review annual transaction dataset and access terms ↗
                   </a>
                 ) : (
                   <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
@@ -1233,13 +1400,15 @@ export function MapExperience() {
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
                   <article className="area-market-card area-market-card-featured">
-                    <span>Weighted average land price / m²</span>
+                    <span>{selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean" ? "Indicative sector mean / m²" : "Weighted average land price / m²"}</span>
                     <strong>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
-                        : selectedArea.level === "cell" && selectedLandPrice?.status === "found" && selectedLandPrice.price !== null
-                          ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
-                          : selectedLandPrice?.status === "ambiguous"
+                        : selectedArea.level === "sector" && selectedArea.averageLandPricePerM2 !== null
+                          ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
+                          : selectedArea.level === "cell" && selectedLandPrice?.status === "found" && selectedLandPrice.price !== null
+                            ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
+                            : selectedLandPrice?.status === "ambiguous"
                             ? "Conflicting source values"
                             : selectedArea.level === "sector"
                               ? "Sector average not supplied"
@@ -1248,13 +1417,15 @@ export function MapExperience() {
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? "Rwanda Land Dashboard /prices · provisional indexed snapshot reviewed 24 Oct 2026; effective date and calculation method are not disclosed."
-                        : landPriceLoadStatus === "loading"
-                          ? "Loading the supplied sector/cell reference table…"
-                          : landPriceLoadStatus === "error"
-                            ? "The supplied reference table could not be loaded; no value is inferred."
-                            : selectedArea.level === "sector"
-                              ? `The file reports values by cell, not a sector-level weighted average. ${selectedLandPrice?.pricedCells ?? 0} cells have one unambiguous value.`
-                              : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
+                        : selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean"
+                          ? `Indicative arithmetic mean of ${selectedArea.averageLandPriceSampleSize ?? 0} unambiguous cell-level weighted-average snapshots, rounded to RWF. This is not an official sector weighted average. ${selectedArea.averageLandPriceConflictingCells ?? 0} conflicting cell values were excluded; source dates and methodology remain unverified.`
+                          : landPriceLoadStatus === "loading"
+                            ? "Loading the supplied sector/cell reference table…"
+                            : landPriceLoadStatus === "error"
+                              ? "The supplied reference table could not be loaded; no value is inferred."
+                              : selectedArea.level === "sector"
+                                ? `No defensible sector estimate is available. The source file contains cell-level values, not an official sector weighted average.`
+                                : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
                                 ? `Supplied cell-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
                                   ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}. The dashboard /prices table also repeats some location keys; no value is selected until the publisher clarifies row identity.`
@@ -1264,9 +1435,24 @@ export function MapExperience() {
                     </small>
                   </article>
                   <article className="area-market-card">
-                    <span>Transaction volume</span>
-                    <strong>Not connected</strong>
-                    <small>Approved transaction aggregates are not yet joined to this area.</small>
+                    <span>Transaction volume · month to date</span>
+                    <strong>
+                      {selectedMetric === "transactionVolume" &&
+                        selectedArea.level === "district" &&
+                        selectedArea.district.toLowerCase() === "bugesera"
+                        ? "4,350*"
+                        : "Not connected"}
+                    </strong>
+                    <small>
+                      {selectedMetric === "transactionVolume" &&
+                        selectedArea.level === "district" &&
+                        selectedArea.district.toLowerCase() === "bugesera"
+                        ? "Dated provisional reference reported from the official /transactions page on 24 Oct 2026; not a live value in this app. Refresh the source before treating it as current."
+                        : "Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation."}
+                    </small>
+                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                      Open transaction dashboard ↗
+                    </a>
                   </article>
                   <article className="area-market-card">
                     <span>Rental yield</span>
@@ -1289,6 +1475,103 @@ export function MapExperience() {
                     <small>Verified project stages and future unit counts are not available.</small>
                   </article>
                 </div>
+                {selectedArea.level === "cell" ? (
+                  <section aria-label="Land parcels inside selected cell" className="cell-parcel-list">
+                    <div className="cell-parcel-list-heading">
+                      <div>
+                        <h3>Land parcels in {selectedArea.name}</h3>
+                        <p>Parcel records for this cell. Select a row to zoom to the plot.</p>
+                      </div>
+                      <span>
+                        {activeCellParcelsStatus === "loaded"
+                          ? cellParcels.length.toLocaleString("en-RW")
+                          : activeCellParcelsStatus === "loading"
+                            ? "Loading…"
+                            : "UPI"}
+                      </span>
+                    </div>
+                    {activeCellParcelsStatus === "loading" ? (
+                      <p className="cell-parcel-message" role="status">Loading parcel identifiers and areas from the connected cadastral source…</p>
+                    ) : activeCellParcelsStatus === "error" ? (
+                      <p className="cell-parcel-message" role="status">The parcel list could not be loaded. The administrative cell and its market indicators remain available.</p>
+                    ) : activeCellParcelsStatus === "loaded" && cellParcels.length === 0 ? (
+                      <p className="cell-parcel-message" role="status">No matching parcel records were returned for this exact cell name. Try the map at parcel zoom, and verify the source&#39;s administrative names.</p>
+                    ) : activeCellParcelsStatus === "loaded" ? (
+                      <>
+                        <div className="cell-parcel-table-head">
+                          <span>Parcel / UPI</span>
+                          <span>Area</span>
+                        </div>
+                        <div className="cell-parcel-rows">
+                          {cellParcels.map((parcel) => (
+                            <button
+                              className="cell-parcel-row"
+                              onClick={() => {
+                                const [west, south, east, north] = parcel.bounds;
+                                const mobile = window.matchMedia("(max-width: 720px)").matches;
+                                if (mapInstance) {
+                                  mapInstance.fitBounds(
+                                    [[west, south], [east, north]],
+                                    {
+                                      padding: mobile
+                                        ? { top: 150, bottom: 150, left: 18, right: 18 }
+                                        : { top: 120, bottom: 70, left: 336, right: 72 },
+                                      maxZoom: 19.4,
+                                      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 620
+                                    }
+                                  );
+                                }
+                                setSelectedArea({
+                                  level: "parcel",
+                                  name: parcel.parcelNumber ? "Parcel " + parcel.parcelNumber : "Parcel " + parcel.upi,
+                                  province: selectedArea.province,
+                                  district: parcel.district,
+                                  districtId: selectedArea.districtId,
+                                  sector: parcel.sector,
+                                  sectorId: selectedArea.sectorId,
+                                  cell: parcel.cell,
+                                  cellId: selectedArea.cellId,
+                                  village: parcel.village,
+                                  villageId: null,
+                                  averageLandPricePerM2: null,
+                                  sourceLabel: parcel.district.toLowerCase() === "bugesera"
+                                    ? "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse permission pending)"
+                                    : "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)",
+                                  sourceType: "cadastral-parcel",
+                                  upi: parcel.upi,
+                                  parcelNumber: parcel.parcelNumber,
+                                  parcelSizeM2: parcel.areaM2,
+                                  wetlandAreaM2: parcel.wetlandAreaM2,
+                                  lastUpdatedOn: parcel.lastUpdatedOn,
+                                  bounds: parcel.bounds
+                                });
+                              }}
+                              key={parcel.id}
+                              type="button"
+                              title={"Zoom to UPI " + parcel.upi}
+                            >
+                              <span className="cell-parcel-row-main">
+                                <strong>{parcel.parcelNumber ? "Parcel " + parcel.parcelNumber : "Parcel record"}</strong>
+                                <small>{parcel.upi}</small>
+                                {parcel.village ? <small>{parcel.village} Village</small> : null}
+                              </span>
+                              <span className="cell-parcel-area">
+                                {typeof parcel.areaM2 === "number"
+                                  ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcel.areaM2) + " m²"
+                                  : "Area unavailable"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="cell-parcel-message">
+                          {cellParcelsTotal.toLocaleString("en-RW")} source records matched this cell.
+                          {cellParcelsCapped ? " The API response limit was reached; this list may not be complete." : ""}
+                          Parcel shapes identify land records but do not prove legal title or current ownership.
+                        </p>
+                      </>
+                    ) : null}
+                  </section>
+                ) : null}
                 <section aria-label="Projects in selected area" className="area-projects-empty">
                   <div className="area-projects-empty-heading">
                     <h3>Projects</h3>
@@ -1373,6 +1656,14 @@ export function MapExperience() {
               <div>
                 <strong>Land transaction summaries</strong>
                 <p>Source identified · normalized feed not connected; approved-use terms still apply</p>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-pending" />
+              <div>
+                <strong>Show contextual place overlays</strong>
+                <p>OpenStreetMap / Overpass · landmarks, health and education, primary roads and bus stops, parks, nature reserves, lakes and waterfalls. Coverage depends on mapping completeness; results are clipped to the pilot district boundaries.</p>
+                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution and licence ↗</a>
               </div>
             </div>
             <div className="source-register-item">
