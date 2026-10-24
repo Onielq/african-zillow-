@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DirectoryLandingPage } from "@/components/directories/DirectoryLandingPage";
+import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
 
 export const metadata: Metadata = {
   title: "Developers & Agents",
@@ -14,10 +15,10 @@ export default function DevelopersPage() {
       eyebrow="DEVELOPER & AGENT INTELLIGENCE / RWANDA"
       title="Know who builds, who sells, and who represents."
       description="Rwanda's property market includes developers, agencies and individual agents. This directory can include all three without confusing their roles. Profiles, project relationships and public contact details appear only when identity, authority and publication permission are checked."
-      status="Directory ready for verified records"
+      status="20 candidate organizations supplied · 0 verified"
       recordLabel="verified profiles published"
-      emptyTitle="No verified profiles published yet."
-      emptyDescription="The directory is prepared for the developer list you will provide and for major estate agencies and independent agents. There is no connected, authorised feed today, so we are not inventing company details, contacts, portfolios or project relationships."
+      emptyTitle="Supplied candidates are ready for review."
+      emptyDescription="The first 20 organizations have been added from your table. Their names, supplied focus areas and six numeric fields are preserved below. No record is presented as verified, and the six numeric fields are not interpreted because the original column headings were missing."
       profileTypes={[
         {
           title: "Property developers",
@@ -37,6 +38,7 @@ export default function DevelopersPage() {
       ]}
       templateHref="/developer-directory-template.csv"
       templateLabel="Download directory CSV template"
+      candidateRecords={RWANDA_DEVELOPER_CANDIDATES}
       evidenceHeading="What each profile must prove"
       evidenceIntro="A name is only a lead. Every published claim needs a source, a responsible party and a clear verification status."
       evidence={[
