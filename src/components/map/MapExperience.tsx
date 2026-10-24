@@ -765,6 +765,7 @@ export function MapExperience() {
               Projects
             </button>
             <button
+              aria-label="Market metric"
               aria-expanded={metricsOpen}
               className={metricsOpen ? "toolbar-action toolbar-action-active metrics-trigger" : "toolbar-action metrics-trigger"}
               onClick={() => {
