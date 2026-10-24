@@ -14,6 +14,7 @@ This register deliberately distinguishes data connectivity from data-quality val
 | Geodata Rwanda Bugesera Masterplan MapServer | Administrative polygons and planning overlays | Connected in prototype | Cell metadata reports NISR source/capture year 2012. Check whether a newer authoritative layer exists. |
 | City of Kigali Kigali Parcels FeatureServer | Individual parcel polygons and public parcel fields | Connected in prototype | Source layer described as 1 June 2026. Confirm terms for commercial display, caching and redistribution. |
 | NLA LAIS Bugesera_Parcels FeatureServer | Individual parcel polygons and UPI | Connected in prototype | Public layer metadata does not state a reuse licence. Obtain written permission; verify coverage, survey currency and caching/redistribution terms. Do not treat it as proof of title. |
+| User-supplied `public/land-price-reference.tsv` | Cell-level weighted-average land price reference for exact sector/cell matches | Imported into the pilot; 244 source data rows retained | The observation date is not supplied. Two rows have missing separators and ten location keys have conflicting prices. The UI shows only exact, unambiguous cell matches; it does not average conflicting rows, substitute district prices for cells, or infer a village/parcel price. The source figures are not represented as live prices. |
 | Rwanda Land Dashboard prices page | District land price per m² snapshot | Snapshot mapped | Observation date is not exposed in the visible table. It is not a house-price index or a live/time-series feed. |
 | Rwanda Data Sharing Platform: transaction volumes and land-use volumes | Candidate source for land-market activity summaries | Not connected | Dataset pages say summaries are for approved sharing. Confirm access and product redistribution terms before importing. Not parcel-level/title data. |
 | NISR 2022 Population and Housing Census | Candidate demographic context for market analysis | Not connected | Preserve census year and geographic granularity; census values are not active listings, rent observations or transaction prices. |
@@ -50,3 +51,18 @@ The check does **not** download parcel features, ownership attributes, or market
 ## Directory publication gates
 
 The `/projects` and `/developers` routes are available, but the directory feeds are not connected and the number of verified, published records is currently zero. This is not a claim that Rwanda has no projects or developers. The page requires record-level identity, source, location, last-verified date, and appropriate display permission before showing any result.
+
+
+## User-supplied cell-price snapshot
+
+The file `public/land-price-reference.tsv` preserves the table supplied for this implementation. It has 244 data rows and a header identifying province, district, sector, cell and weighted average price in RWF/m². Its observation date and the method used to calculate each weighted average were not included.
+
+The application checks the shape of each row and groups repeated locations using normalized district + sector + cell names. A cell price is displayed only when the exact location key has one distinct valid value. Duplicate keys with conflicting values remain unresolved with their source row numbers visible. Rows with missing or extra fields remain in the raw file for audit but are not used as a price. Sector prices are not calculated by averaging the supplied cells, because the file does not provide a sector-level weighted average or the underlying weights.
+
+Initial diagnostics: 242 valid-shaped rows, 2 malformed rows and 10 location keys with more than one price. These are data-quality findings, not a correction of the source values. Review the original source and observation date before production use.
+
+## Public real-estate directory discovery
+
+The Developers drawer contains the 20 organization candidates supplied by the project owner. Where a plausible organization website was found, it is linked as a discovery lead only. Its presence does not verify current legal identity, development role, project ownership, contact information or the right to reproduce a company logo.
+
+The drawer separately lists estate-agency candidates found through public websites and one agent name listed on an agency's public profile. These are labelled as review-pending candidates, not endorsements. No "top agent" ranking is shown because no comparable, current performance source was verified. Confirm present activity, affiliation, registration and display/contact permission before changing any candidate to verified.
