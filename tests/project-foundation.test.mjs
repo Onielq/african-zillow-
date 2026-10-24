@@ -217,6 +217,7 @@ test("the standalone data source register exposes provenance, limitations, and s
   const css = await readProjectFile("src/app/data-sources/data-sources.module.css");
   const docs = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const healthRoute = await readProjectFile("src/app/api/data-sources/health/route.ts");
 
   assert.match(page, /Kigali administrative boundaries/);
   assert.match(page, /Bugesera cadastral parcels/);
@@ -225,6 +226,14 @@ test("the standalone data source register exposes provenance, limitations, and s
   assert.match(page, /reuse permission/i);
   assert.match(page, /not proof of ownership/i);
   assert.match(page, /data-status/);
+  assert.match(page, /Check live connections/);
+  assert.match(page, /Reachable/);
+  assert.match(healthRoute, /KIGALI_MASTERPLAN|kigali-administrative/);
+  assert.match(healthRoute, /bugesera-cadastral/);
+  assert.match(healthRoute, /No licence statement declared in service metadata/);
+  assert.match(healthRoute, /X-Data-Check/);
+  assert.match(healthRoute, /does not validate coverage/);
+  assert.match(css, /\.healthGrid/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(docs, /DATA_SOURCE_REGISTER|Data source register/);
   assert.match(docs, /approved sharing/);
