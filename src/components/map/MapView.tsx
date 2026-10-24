@@ -24,6 +24,8 @@ export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
+export type MapOverlayCategory = "landmarks" | "healthEducation" | "transportation" | "nature";
+export type ShowScope = "kigali" | "bugesera" | "pilot";
 
 export type SelectedArea = {
   level: AreaLevel;
@@ -45,6 +47,7 @@ export type SelectedArea = {
   parcelSizeM2?: number | null;
   wetlandAreaM2?: number | null;
   lastUpdatedOn?: number | null;
+  bounds?: [number, number, number, number] | null;
 };
 
 type AreaProperties = {
@@ -68,6 +71,13 @@ type AreaProperties = {
   parcel_size_m2?: number | null;
   wetland_area_m2?: number | null;
   last_updated_on?: number | null;
+  average_land_price_kind?: string | null;
+  average_land_price_sample_size?: number | null;
+  average_land_price_conflicting_cells?: number | null;
+  overlay_category?: MapOverlayCategory | null;
+  name?: string | null;
+  detail?: string | null;
+  source_id?: string | number | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -75,6 +85,8 @@ type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 type MapViewProps = {
   basemapMode: BasemapMode;
   showLandPriceHeatmap: boolean;
+  showLayers: MapOverlayCategory[];
+  showScope: ShowScope;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -82,6 +94,53 @@ type MapViewProps = {
 };
 
 const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+const LAND_PRICE_RAMP = [
+  0, "#36B8B2",
+  10000, "#79CDA8",
+  25000, "#D9D76B",
+  40000, "#EF9754",
+  65000, "#B7444B"
+] as const;
+
+function areaFillColorExpression(showPrice: boolean, baseColor: string) {
+  return [
+    "case",
+    ["boolean", ["feature-state", "hover"], false], "#B9EBD4",
+    ["boolean", ["feature-state", "selected"], false], "#FFE3A1",
+    showPrice
+      ? [
+          "case",
+          ["has", "average_land_price_per_m2"],
+          ["interpolate", ["linear"], ["get", "average_land_price_per_m2"], ...LAND_PRICE_RAMP],
+          "#DCE5DD"
+        ]
+      : baseColor
+  ] as never;
+}
+
+const AREA_FILL_OPACITY_EXPRESSION = [
+  "case",
+  ["boolean", ["feature-state", "hover"], false], 0.58,
+  ["boolean", ["feature-state", "selected"], false], 0.42,
+  0.23
+] as never;
+
+function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverlayCategory[]) {
+  const categoryFilter = categories.length
+    ? ["in", ["get", "overlay_category"], ["literal", categories]]
+    : ["==", ["get", "overlay_category"], "__hidden__"];
+  const filters: Array<[string, unknown[]]> = [
+    ["show-road-lines", ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
+    ["show-poi-fill", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
+    ["show-poi-outline", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
+    ["show-poi-circles", ["all", ["==", ["geometry-type"], "Point"], categoryFilter]],
+    ["show-poi-labels", ["all", ["==", ["geometry-type"], "Point"], ["has", "name"], categoryFilter]]
+  ];
+  for (const [id, filter] of filters) {
+    if (map.getLayer(id)) map.setFilter(id, filter as never);
+  }
+}
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
 
@@ -330,12 +389,17 @@ export function MapView({
   onMapReady,
   onStatusChange,
   onBoundaryStatusChange,
-  onAreaSelected
+  onAreaSelected,
+  showLayers,
+  showScope
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
+  const showLayersRef = useRef(showLayers);
+  const showScopeRef = useRef(showScope);
+  const refreshShowOverlaysRef = useRef<(() => void) | null>(null);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
