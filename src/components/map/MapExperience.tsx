@@ -1660,6 +1660,14 @@ export function MapExperience() {
             <div className="source-register-item">
               <span className="source-register-status source-register-pending" />
               <div>
+                <strong>Show contextual place overlays</strong>
+                <p>OpenStreetMap / Overpass · landmarks, health and education, primary roads and bus stops, parks, nature reserves, lakes and waterfalls. Coverage depends on mapping completeness; results are clipped to the pilot district boundaries.</p>
+                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution and licence ↗</a>
+              </div>
+            </div>
+            <div className="source-register-item">
+              <span className="source-register-status source-register-pending" />
+              <div>
                 <strong>Average district land prices</strong>
                 <p>Provisional /prices snapshot: Gasabo 36,103, Kicukiro 61,499, Nyarugenge 50,771, Bugesera 4,038 RWF/m². Effective date/method are not shown. The separate /reference comparison lists Nyarugenge transaction price 50,865. Supplied cell file: 2 malformed rows and 10 conflicting keys; public /prices output repeats some of those keys. See the reconciliation audit.</p>
               </div>
