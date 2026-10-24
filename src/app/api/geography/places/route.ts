@@ -16,9 +16,34 @@ type OsmElement = {
   tags?: OsmTags;
 };
 type OsmResponse = { elements?: OsmElement[]; remark?: string };
+type AreaGeometry = { type: string; coordinates: unknown };
+type DistrictAreaFeature = {
+  type: "Feature";
+  geometry: AreaGeometry | null;
+  properties: Record<string, unknown>;
+};
+type OverlayFeature = {
+  type: "Feature";
+  id: string;
+  geometry:
+    | { type: "Point"; coordinates: [number, number] }
+    | { type: "LineString"; coordinates: [number, number][] }
+    | { type: "MultiLineString"; coordinates: [number, number][][] };
+  properties: {
+    overlay_category: OverlayCategory;
+    name: string;
+    detail: string;
+    source_id: string;
+    source_label: string;
+  };
+};
 
 const KIGALI_EXTENT: Bounds = [29.58, -2.12, 30.32, -1.47];
 const BUGESERA_EXTENT: Bounds = [29.82, -2.62, 30.56, -1.92];
+const PILOT_DISTRICT_BOUNDS: Bounds = [29.4, -2.75, 30.7, -1.4];
+const KIGALI_DISTRICT_NAMES = new Set(["gasabo", "kicukiro", "nyarugenge"]);
+const PILOT_DISTRICT_NAMES = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
+let pilotDistrictFeaturesPromise: Promise<DistrictAreaFeature[]> | null = null;
 const VALID_CATEGORIES: OverlayCategory[] = [
   "landmarks",
   "healthEducation",
@@ -123,17 +148,14 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
   throw lastError instanceof Error ? lastError : new Error("OpenStreetMap query failed");
 }
 
-function featureForElement(element: OsmElement, category: OverlayCategory) {
+function featureForElement(element: OsmElement, category: OverlayCategory): OverlayFeature | null {
   const tags = element.tags ?? {};
   const isRoad =
     category === "transportation" &&
     typeof tags.highway === "string" &&
     Array.isArray(element.geometry) &&
     element.geometry.length >= 2;
-  let geometry: { type: "Point"; coordinates: [number, number] } | {
-    type: "LineString";
-    coordinates: [number, number][];
-  } | null = null;
+  let geometry: OverlayFeature["geometry"] | null = null;
 
   if (isRoad) {
     const coordinates = (element.geometry ?? [])
@@ -182,6 +204,114 @@ function featureForElement(element: OsmElement, category: OverlayCategory) {
   };
 }
 
+function pointInRing(point: [number, number], rawRing: unknown): boolean {
+  if (!Array.isArray(rawRing) || rawRing.length < 4) return false;
+  const ring = rawRing.filter((value): value is [number, number] =>
+    Array.isArray(value) && typeof value[0] === "number" && typeof value[1] === "number"
+  );
+  if (ring.length < 4) return false;
+  const [x, y] = point;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = (yi > y) !== (yj > y) &&
+      x < ((xj - xi) * (y - yi)) / ((yj - yi) || Number.EPSILON) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInPolygon(point: [number, number], rawPolygon: unknown): boolean {
+  if (!Array.isArray(rawPolygon) || !rawPolygon.length) return false;
+  if (!pointInRing(point, rawPolygon[0])) return false;
+  return !rawPolygon.slice(1).some((hole) => pointInRing(point, hole));
+}
+
+function pointInDistrictAreas(point: [number, number], areas: DistrictAreaFeature[]): boolean {
+  return areas.some((feature) => {
+    const geometry = feature.geometry;
+    if (!geometry) return false;
+    if (geometry.type === "Polygon") return pointInPolygon(point, geometry.coordinates);
+    if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates)) {
+      return geometry.coordinates.some((polygon) => pointInPolygon(point, polygon));
+    }
+    return false;
+  });
+}
+
+async function getPilotDistrictFeatures(request: NextRequest): Promise<DistrictAreaFeature[]> {
+  if (!pilotDistrictFeaturesPromise) {
+    pilotDistrictFeaturesPromise = (async () => {
+      const url = new URL("/api/geography/areas", request.url);
+      url.searchParams.set("level", "district");
+      url.searchParams.set("bbox", PILOT_DISTRICT_BOUNDS.join(","));
+      const response = await fetch(url, {
+        headers: { Accept: "application/geo+json, application/json" },
+        next: { revalidate: 300 },
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!response.ok) throw new Error("Pilot district boundary query returned HTTP " + response.status);
+      const payload = await response.json() as { features?: DistrictAreaFeature[] };
+      const features = (payload.features ?? []).filter((feature) => {
+        const district = String(feature.properties?.district ?? "").trim().toLowerCase();
+        return PILOT_DISTRICT_NAMES.has(district) && feature.geometry !== null;
+      });
+      if (![...KIGALI_DISTRICT_NAMES, "bugesera"].every((district) =>
+        features.some((feature) => String(feature.properties?.district ?? "").trim().toLowerCase() === district)
+      )) {
+        throw new Error("One or more pilot district boundaries are missing; map overlays will fail closed.");
+      }
+      return features;
+    })().catch((error) => {
+      pilotDistrictFeaturesPromise = null;
+      throw error;
+    });
+  }
+  return pilotDistrictFeaturesPromise;
+}
+
+function clipLineToDistricts(
+  coordinates: [number, number][],
+  areas: DistrictAreaFeature[]
+): [number, number][][] {
+  const segments: [number, number][][] = [];
+  let current: [number, number][] = [];
+  const flush = () => {
+    if (current.length >= 2) segments.push(current);
+    current = [];
+  };
+  for (const coordinate of coordinates) {
+    if (pointInDistrictAreas(coordinate, areas)) {
+      current.push(coordinate);
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return segments;
+}
+
+function clipFeatureToDistricts(
+  feature: OverlayFeature,
+  areas: DistrictAreaFeature[]
+): OverlayFeature[] {
+  if (feature.geometry.type === "Point") {
+    return pointInDistrictAreas(feature.geometry.coordinates, areas) ? [feature] : [];
+  }
+  const lines = feature.geometry.type === "LineString"
+    ? [feature.geometry.coordinates]
+    : feature.geometry.coordinates;
+  const clipped = lines.flatMap((line) => clipLineToDistricts(line, areas));
+  if (!clipped.length) return [];
+  return [{
+    ...feature,
+    geometry: clipped.length === 1
+      ? { type: "LineString", coordinates: clipped[0] }
+      : { type: "MultiLineString", coordinates: clipped }
+  }];
+}
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const bounds = parseBounds(params.get("bbox"));
@@ -221,6 +351,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Always clip context layers against the official pilot district polygons.
+    // Bounding boxes are only query optimizations; they do not define the city limits.
+    const allPilotDistricts = await getPilotDistrictFeatures(request);
+    const allowedDistricts = scope === "kigali"
+      ? allPilotDistricts.filter((feature) =>
+          KIGALI_DISTRICT_NAMES.has(String(feature.properties?.district ?? "").trim().toLowerCase())
+        )
+      : scope === "bugesera"
+        ? allPilotDistricts.filter((feature) =>
+            String(feature.properties?.district ?? "").trim().toLowerCase() === "bugesera"
+          )
+        : allPilotDistricts;
+
     const collections = await Promise.all(targetBounds.map(async (target) => {
       const jobs: Array<Promise<OsmElement[]>> = [
         queryOverpass(queryFor(categories, target, false))
@@ -258,12 +401,14 @@ export async function GET(request: NextRequest) {
       );
     }));
 
-    const deduplicated = new Map<string, ReturnType<typeof featureForElement>>();
+    const deduplicated = new Map<string, OverlayFeature>();
     for (const feature of collections.flat()) {
       if (!feature) continue;
       deduplicated.set(String(feature.id), feature);
     }
-    const features = Array.from(deduplicated.values()).filter(Boolean).slice(0, 6000);
+    const features = Array.from(deduplicated.values())
+      .flatMap((feature) => clipFeatureToDistricts(feature, allowedDistricts))
+      .slice(0, 6000);
 
     return NextResponse.json(
       { type: "FeatureCollection", features },
@@ -272,7 +417,7 @@ export async function GET(request: NextRequest) {
           "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=900",
           "X-Data-Source": "OpenStreetMap / Overpass API",
           "X-Map-Coverage": scope === "kigali"
-            ? "Kigali City pilot extent; source objects may be mapped incompletely"
+            ? "Clipped to official Gasabo, Kicukiro and Nyarugenge district polygons; OSM completeness varies"
             : scope === "bugesera"
               ? "Bugesera pilot extent; source objects may be mapped incompletely"
               : "Kigali and Bugesera pilot extents",
