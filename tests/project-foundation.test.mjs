@@ -318,3 +318,21 @@ test("developer popup separates developer candidates, agencies and public agent 
   assert.match(developerData, /https:\/\/delta-rwanda\.com/);
   assert.match(agencyData, /https:\/\/homeland\.rw/);
 });
+
+
+test("developer drawer renders only sourced logo assets and expands public agent candidates without ranking", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const developerData = await readProjectFile("src/data/developer-directory.ts");
+  const directoryData = await readProjectFile("src/data/real-estate-directory.ts");
+
+  assert.match(experience, /directory-logo-image/);
+  assert.match(experience, /candidate\.logoUrl/);
+  assert.match(developerData, /https:\/\/delta-rwanda\.com\/assets\/delta-developers/);
+  assert.match(developerData, /pbs\.twimg\.com\/profile_images/);
+  assert.match(directoryData, /Arstide Yves Horimbere/);
+  assert.match(directoryData, /Grace Uwacu/);
+  assert.match(directoryData, /Yassin Musabyimana/);
+  assert.match(directoryData, /Gustave Niyonkuru/);
+  assert.match(directoryData, /IZERE IRAKIZA Aime Johnson/);
+  assert.match(experience, /No “top agent” ranking published/);
+});
