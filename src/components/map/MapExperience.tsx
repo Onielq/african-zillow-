@@ -257,6 +257,7 @@ export function MapExperience() {
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
   const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
@@ -367,13 +368,16 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen) return;
+    if (!compareOpen && !metricInfoOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCompareOpen(false);
+      if (event.key === "Escape") {
+        setCompareOpen(false);
+        setMetricInfoOpen(false);
+      }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen]);
+  }, [compareOpen, metricInfoOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -608,14 +612,71 @@ export function MapExperience() {
               className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
               onClick={() => {
                 setCompareOpen(false);
+                setMetricInfoOpen(false);
                 setSourcesOpen((open) => !open);
               }}
               type="button"
             >
               Sources
             </button>
+            <button
+              aria-label={`Definition for ${activeMetric.label}`}
+              aria-expanded={metricInfoOpen}
+              className={metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
+              onClick={() => {
+                setCompareOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen((open) => !open);
+              }}
+              type="button"
+            >
+              <span aria-hidden="true">i</span>
+            </button>
           </div>
         </div>
+
+        {metricInfoOpen ? (
+          <aside aria-label={`Definition for ${activeMetric.label}`} className="metric-info-panel">
+            <button
+              aria-label="Close metric definition"
+              className="panel-close"
+              onClick={() => setMetricInfoOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+            <p className="panel-eyebrow">METRIC DEFINITION</p>
+            <h2>{activeMetric.label}</h2>
+            <p className="metric-info-description">{activeMetric.description}</p>
+            <div className="metric-info-unit">
+              <span>Expected unit</span>
+              <strong>
+                {selectedMetric === "averageLandPricePerM2"
+                  ? "RWF per m²"
+                  : selectedMetric === "transactionVolume"
+                    ? "Registered land transactions"
+                    : selectedMetric === "capitalAppreciation" || selectedMetric === "rentalYield"
+                      ? "Percent (%)"
+                      : "Count of verified records"}
+              </strong>
+            </div>
+            <div className="metric-info-status">
+              <strong>Data status</strong>
+              <p>{activeMetric.dataStatus}</p>
+            </div>
+            {selectedMetric === "averageLandPricePerM2" ? (
+              <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
+                Open Rwanda Land Dashboard ↗
+              </a>
+            ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
+              <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
+                Review transaction dataset and access terms ↗
+              </a>
+            ) : (
+              <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
+            )}
+          </aside>
+        ) : null}
 
         <div className="map-focus-panel" ref={focusRef}>
           <span className="focus-eyebrow">EXPLORE AREA</span>
