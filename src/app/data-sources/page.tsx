@@ -101,7 +101,7 @@ const sources: DataSource[] = [
 type SourceHealthResult = {
   id: string;
   name: string;
-  category: "administrative" | "cadastral";
+  category: "administrative" | "cadastral" | "market-data";
   status: "reachable" | "unavailable";
   httpStatus: number | null;
   serviceTitle: string | null;
@@ -217,7 +217,7 @@ export default function DataSourcesPage() {
             <p className={styles.eyebrow}>LIVE CONNECTIONS</p>
             <h2 id="health-section-title">Check the sources the map depends on.</h2>
             <p className={styles.healthIntro}>
-              The check reads only GIS service metadata. It does not download parcel features or ownership fields, and a reachable endpoint is not permission to reuse its data.
+              The check reads GIS metadata and checks the availability of official market-source pages. It does not import parcel records, owner attributes or market figures, and reachability is not permission to reuse the data.
             </p>
           </div>
           <button
@@ -243,7 +243,7 @@ export default function DataSourcesPage() {
                 <article className={styles.healthCard} key={result.id}>
                   <div className={styles.healthCardHeader}>
                     <div>
-                      <p className={styles.healthCategory}>{result.category === "cadastral" ? "CADASTRAL" : "ADMINISTRATIVE"}</p>
+                      <p className={styles.healthCategory}>{result.category === "cadastral" ? "CADASTRAL" : result.category === "market-data" ? "MARKET DATA" : "ADMINISTRATIVE"}</p>
                       <h3>{result.name}</h3>
                     </div>
                     <span className={styles.healthStatus} data-status={result.status}>
@@ -276,7 +276,7 @@ export default function DataSourcesPage() {
             <p className={styles.healthNotice}>{healthReport.notice}</p>
           </div>
         ) : (
-          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect availability and metadata from the four connected GIS endpoints.</p>
+          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect four GIS services plus two official land-market source pages.</p>
         )}
       </section>
 
