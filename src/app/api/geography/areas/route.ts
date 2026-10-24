@@ -428,7 +428,8 @@ async function queryArcGisLayer(
   bounds: Bounds,
   resultRecordCount?: number,
   where = "1=1",
-  outFields = "*"
+  outFields = "*",
+  revalidateSeconds = 300
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
   // Request the provider's full polygon geometry. Do not set maxAllowableOffset
@@ -456,7 +457,7 @@ async function queryArcGisLayer(
 
   const response = await fetch(upstreamUrl, {
     headers: { Accept: "application/json" },
-    next: { revalidate: 300 },
+    next: { revalidate: revalidateSeconds },
     signal: AbortSignal.timeout(15_000)
   });
 
@@ -601,7 +602,8 @@ function normaliseAdministrativeFeature(
 
 async function getAdministrativeAreas(
   level: AreaLevel,
-  bounds: Bounds
+  bounds: Bounds,
+  sourceFilter?: "kigali" | "bugesera"
 ): Promise<NextResponse> {
   const sources = [
     {
@@ -616,13 +618,20 @@ async function getAdministrativeAreas(
       layerId: { district: 2, sector: 4, cell: 3, village: 5 }[level],
       extent: BUGESERA_GIS_EXTENT
     }
-  ].filter((source) => boundsIntersect(bounds, source.extent));
+  ].filter((source) =>
+    (!sourceFilter || source.id === sourceFilter) &&
+    boundsIntersect(bounds, source.extent)
+  );
 
   const results = await Promise.all(sources.map(async (source) => {
     try {
       const upstreamFeatures = await queryArcGisLayer(
         `${source.baseUrl}/${source.layerId}`,
-        bounds
+        bounds,
+        undefined,
+        "1=1",
+        "*",
+        86_400
       );
       return {
         sourceId: source.id,
@@ -658,7 +667,7 @@ async function getAdministrativeAreas(
     { type: "FeatureCollection", features },
     {
       headers: {
-        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
         "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan",
         "X-Data-Basis": "Kigali admin service dated April 2026; Bugesera cell layer metadata lists NISR capture 2012"
       }
@@ -672,7 +681,10 @@ type ParcelProvider = {
   extent: Bounds;
 };
 
-async function getParcels(bounds: Bounds): Promise<NextResponse> {
+async function getParcels(
+  bounds: Bounds,
+  sourceFilter?: "kigali" | "bugesera"
+): Promise<NextResponse> {
   // These providers publish individual parcel polygons. Do not replace a
   // missing cadastral polygon with a road edge, image trace, or zoning polygon.
   const parcelProviders: ParcelProvider[] = [
@@ -688,6 +700,7 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
     }
   ];
   const providers = parcelProviders.filter((provider) =>
+    (!sourceFilter || provider.id === sourceFilter) &&
     boundsIntersect(bounds, provider.extent)
   );
 
@@ -834,6 +847,14 @@ export async function GET(request: NextRequest) {
   }
 
   const level = rawLevel as (typeof validLevels)[number];
+  const rawSource = request.nextUrl.searchParams.get("source");
+  if (rawSource && rawSource !== "kigali" && rawSource !== "bugesera") {
+    return NextResponse.json(
+      { error: "source must be kigali or bugesera" },
+      { status: 400 }
+    );
+  }
+  const sourceFilter = rawSource as "kigali" | "bugesera" | null;
   const hasBounds = request.nextUrl.searchParams.has("bbox");
   const bounds = parseBounds(request.nextUrl.searchParams.get("bbox"));
   if (!bounds) {
@@ -854,6 +875,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (level === "parcel") return getParcels(bounds);
-  return getAdministrativeAreas(level, bounds);
+  if (level === "parcel") return getParcels(bounds, sourceFilter ?? undefined);
+  return getAdministrativeAreas(level, bounds, sourceFilter ?? undefined);
 }
