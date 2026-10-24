@@ -914,7 +914,7 @@ export function MapExperience() {
                 strokeLinejoin="round"
               />
             </svg>
-            Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}/4` : ""}
+            Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
           <Link className="compare-control" href="/data-sources">
             Data sources
@@ -1441,7 +1441,7 @@ export function MapExperience() {
                     <p>
                       Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Do not infer sector/cell transaction counts from district totals without transaction-level geography.
                     </p>
-                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                    <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                       Open district transaction and type tables ↗
                     </a>
                   </div>
@@ -1467,7 +1467,7 @@ export function MapExperience() {
                     Open Rwanda Land Dashboard ↗
                   </a>
                 ) : selectedMetric === "transactionVolume" ? (
-                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                  <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                     Open official transaction dashboard ↗
                   </a>
                 ) : selectedMetric === "capitalAppreciation" ? (
@@ -1672,7 +1672,7 @@ export function MapExperience() {
                               ? "Calculating a sourced activity indicator…"
                               : "No current verified count is available for this area."}
                     </small>
-                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                    <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                       Official dashboard ↗
                     </a>
                   </article>
@@ -1944,7 +1944,7 @@ export function MapExperience() {
             <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/reference" rel="noreferrer" target="_blank">
               Open National Land Dashboard reference prices ↗
             </a>
-            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/transactions" rel="noreferrer" target="_blank">
+            <a className="source-register-link" href={TRANSACTION_DASHBOARD_SOURCE} rel="noreferrer" target="_blank">
               Open National Land Dashboard transactions ↗
             </a>
             <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/ownership" rel="noreferrer" target="_blank">
@@ -2141,9 +2141,10 @@ export function MapExperience() {
                         {comparedAreas.map((area) => (
                           <th
                             scope="col"
-                            key={`${area.level}-${area.district}-${area.name}`}
+                            key={comparisonItemKey(area)}
                           >
-                            {area.name}
+                            <span>{area.comparisonKind === "project" ? area.name : area.name}</span>
+                            <small>{area.comparisonKind === "project" ? "Project · no verified feed" : areaLevelLabel(area.level) + " · " + area.district}</small>
                           </th>
                         ))}
                       </tr>
