@@ -11,11 +11,156 @@ import {
   type BasemapMode,
   type SelectedArea
 } from "@/components/map/MapView";
+import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
+import {
+  RWANDA_PUBLIC_AGENT_CANDIDATES,
+  RWANDA_REAL_ESTATE_AGENCIES
+} from "@/data/real-estate-directory";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
 type WorkspaceMode = "areas" | "projects";
-type PropertyScope = "all" | "residential" | "land";
+type PropertyScope = "all" | "land" | "apartment" | "villa";
 type AnalysisPeriod = "3m" | "6m" | "12m";
+type DirectoryTab = "developers" | "agencies" | "agents";
+
+type LandPriceRow = {
+  sourceLine: number;
+  province: string | null;
+  district: string | null;
+  sector: string | null;
+  cell: string | null;
+  price: number | null;
+  valid: boolean;
+};
+
+type LandPriceLookup = {
+  status: "found" | "ambiguous" | "unavailable" | "sector-summary-not-provided";
+  price: number | null;
+  sourceLines: number[];
+  pricedCells: number;
+};
+
+function normalizeAreaName(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+function parseLandPriceReference(text: string): LandPriceRow[] {
+  return text
+    .split(/\r?\n/)
+    .slice(1)
+    .filter((line) => line.trim().length > 0)
+    .map((line, index) => {
+      const fields = line.split("\t");
+      const rawPrice = fields.length === 5 ? Number(fields[4].replace(/,/g, "").trim()) : Number.NaN;
+      const valid =
+        fields.length === 5 &&
+        fields.slice(0, 4).every((field) => field.trim().length > 0) &&
+        Number.isFinite(rawPrice) &&
+        rawPrice > 0;
+
+      return {
+        sourceLine: index + 2,
+        province: fields[0]?.trim() || null,
+        district: fields.length === 5 ? fields[1].trim() : null,
+        sector: fields.length === 5 ? fields[2].trim() : null,
+        cell: fields.length === 5 ? fields[3].trim() : null,
+        price: valid ? rawPrice : null,
+        valid
+      };
+    });
+}
+
+function lookupLandPriceForArea(
+  rows: LandPriceRow[],
+  area: SelectedArea
+): LandPriceLookup {
+  if (area.level === "sector") {
+    const sectorRows = rows.filter(
+      (row) =>
+        row.valid &&
+        normalizeAreaName(row.district) === normalizeAreaName(area.district) &&
+        normalizeAreaName(row.sector) === normalizeAreaName(area.name)
+    );
+    const byCell = new Map<string, Set<number>>();
+    for (const row of sectorRows) {
+      const key = normalizeAreaName(row.cell);
+      const prices = byCell.get(key) ?? new Set<number>();
+      if (row.price !== null) prices.add(row.price);
+      byCell.set(key, prices);
+    }
+    const pricedCells = Array.from(byCell.values()).filter((prices) => prices.size === 1).length;
+    return {
+      status: "sector-summary-not-provided",
+      price: null,
+      sourceLines: [],
+      pricedCells
+    };
+  }
+
+  if (area.level !== "cell" || !area.sector) {
+    return { status: "unavailable", price: null, sourceLines: [], pricedCells: 0 };
+  }
+
+  const matches = rows.filter(
+    (row) =>
+      row.valid &&
+      normalizeAreaName(row.district) === normalizeAreaName(area.district) &&
+      normalizeAreaName(row.sector) === normalizeAreaName(area.sector) &&
+      normalizeAreaName(row.cell) === normalizeAreaName(area.name)
+  );
+
+  if (matches.length === 0) {
+    return { status: "unavailable", price: null, sourceLines: [], pricedCells: 0 };
+  }
+
+  const prices = new Set(matches.map((row) => row.price).filter((price): price is number => price !== null));
+  const sourceLines = matches.map((row) => row.sourceLine);
+  if (prices.size !== 1) {
+    return { status: "ambiguous", price: null, sourceLines, pricedCells: 0 };
+  }
+
+  return {
+    status: "found",
+    price: prices.values().next().value ?? null,
+    sourceLines,
+    pricedCells: 1
+  };
+}
+
+function getLandPriceDiagnostics(rows: LandPriceRow[]) {
+  const validRows = rows.filter((row) => row.valid);
+  const pricesByLocation = new Map<string, Set<number>>();
+  for (const row of validRows) {
+    const key = [
+      normalizeAreaName(row.district),
+      normalizeAreaName(row.sector),
+      normalizeAreaName(row.cell)
+    ].join("|");
+    const prices = pricesByLocation.get(key) ?? new Set<number>();
+    if (row.price !== null) prices.add(row.price);
+    pricesByLocation.set(key, prices);
+  }
+  return {
+    usableRows: validRows.length,
+    malformedRows: rows.length - validRows.length,
+    conflictingLocations: Array.from(pricesByLocation.values()).filter((prices) => prices.size > 1).length
+  };
+}
+
+function initialsForName(name: string): string {
+  return name
+    .split(/[\s&\/-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
 type MarketMetric =
   | "averageLandPricePerM2"
   | "transactionVolume"
@@ -76,15 +221,16 @@ const MARKET_METRICS: Array<{
 ];
 
 const PROPERTY_SCOPES: Array<{ value: PropertyScope; label: string }> = [
-  { value: "all", label: "All property" },
-  { value: "residential", label: "Residential" },
-  { value: "land", label: "Land" }
+  { value: "all", label: "All" },
+  { value: "land", label: "Land" },
+  { value: "apartment", label: "Apartment" },
+  { value: "villa", label: "Villa" }
 ];
 
-const ANALYSIS_PERIODS: Array<{ value: AnalysisPeriod; label: string }> = [
-  { value: "3m", label: "3 months" },
-  { value: "6m", label: "6 months" },
-  { value: "12m", label: "12 months" }
+const ANALYSIS_PERIODS: Array<{ value: AnalysisPeriod; label: string; shortLabel: string }> = [
+  { value: "12m", label: "1 year", shortLabel: "1Y" },
+  { value: "6m", label: "6 months", shortLabel: "6M" },
+  { value: "3m", label: "3 months", shortLabel: "3M" }
 ];
 
 const FOCUS_OPTIONS: Array<{
@@ -257,6 +403,12 @@ export function MapExperience() {
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
+  const [developersOpen, setDevelopersOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
+  const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
+  const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
@@ -345,6 +497,10 @@ export function MapExperience() {
   const activeMetric =
     MARKET_METRICS.find((metric) => metric.id === selectedMetric) ??
     MARKET_METRICS[0];
+  const selectedLandPrice = selectedArea
+    ? lookupLandPriceForArea(landPriceRows, selectedArea)
+    : null;
+  const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
   const comparisonSearchResults = normalizedComparisonSearch
     ? PILOT_DISTRICT_SEARCH_AREAS.filter((area) =>
@@ -363,6 +519,26 @@ export function MapExperience() {
         ...comparedAreas.map((area) => area.averageLandPricePerM2 ?? Number.NEGATIVE_INFINITY)
       )
     : null;
+
+  useEffect(() => {
+    let active = true;
+    const loadLandPriceReference = async () => {
+      try {
+        const response = await fetch("/land-price-reference.tsv");
+        if (!response.ok) throw new Error("Land-price reference could not be loaded.");
+        const text = await response.text();
+        if (!active) return;
+        setLandPriceRows(parseLandPriceReference(text));
+        setLandPriceLoadStatus("loaded");
+      } catch {
+        if (active) setLandPriceLoadStatus("error");
+      }
+    };
+    void loadLandPriceReference();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -386,16 +562,20 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setCompareOpen(false);
         setMetricInfoOpen(false);
+        setMetricsOpen(false);
+        setDevelopersOpen(false);
+        setProjectsOpen(false);
+        setSourcesOpen(false);
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -552,85 +732,60 @@ export function MapExperience() {
         </div>
 
         <div className="map-floating-toolbar" ref={toolbarRef}>
-          <div aria-label="Investment map filters" className="map-toolbar investment-toolbar">
-            <label className="investment-field investment-field-metric">
-              <span>Metric</span>
-              <select
-                aria-label="Market metric"
-                className="toolbar-select"
-                value={selectedMetric}
-                onChange={(event) => {
-                  const metric = event.target.value as MarketMetric;
-                  setSelectedMetric(metric);
-                  if (
-                    metric === "averageLandPricePerM2" ||
-                    metric === "transactionVolume" ||
-                    metric === "capitalAppreciation"
-                  ) {
-                    setPropertyScope("land");
-                  } else {
-                    setPropertyScope("all");
-                  }
-                }}
-              >
-                {MARKET_METRICS.map((metric) => (
-                  <option key={metric.id} value={metric.id}>{metric.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="investment-field">
-              <span>Type</span>
-              <select
-                aria-label="Property type"
-                className="toolbar-select"
-                disabled={
-                  selectedMetric === "averageLandPricePerM2" ||
-                  selectedMetric === "transactionVolume" ||
-                  selectedMetric === "capitalAppreciation"
-                }
-                value={
-                  selectedMetric === "averageLandPricePerM2" ||
-                  selectedMetric === "transactionVolume" ||
-                  selectedMetric === "capitalAppreciation"
-                    ? "land"
-                    : propertyScope
-                }
-                onChange={(event) => setPropertyScope(event.target.value as PropertyScope)}
-              >
-                {(selectedMetric === "averageLandPricePerM2" ||
-                selectedMetric === "transactionVolume" ||
-                selectedMetric === "capitalAppreciation"
-                  ? PROPERTY_SCOPES.filter((scope) => scope.value === "land")
-                  : PROPERTY_SCOPES
-                ).map((scope) => (
-                  <option key={scope.value} value={scope.value}>{scope.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="investment-field investment-field-period">
-              <span>Period</span>
-              <select
-                aria-label="Analysis period"
-                className="toolbar-select"
-                disabled={selectedMetric === "averageLandPricePerM2"}
-                title={
-                  selectedMetric === "averageLandPricePerM2"
-                    ? "The available district price snapshot has no observation date; period filtering is not applied."
-                    : undefined
-                }
-                value={analysisPeriod}
-                onChange={(event) => setAnalysisPeriod(event.target.value as AnalysisPeriod)}
-              >
-                {ANALYSIS_PERIODS.map((period) => (
-                  <option key={period.value} value={period.value}>{period.label}</option>
-                ))}
-              </select>
-            </label>
+          <div aria-label="Investment map actions" className="map-toolbar investment-toolbar">
+            <button
+              aria-expanded={developersOpen}
+              className={developersOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => {
+                setMetricsOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setDirectoryTab("developers");
+                setDevelopersOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Developers <span className="toolbar-count">20</span>
+            </button>
+            <button
+              aria-expanded={projectsOpen}
+              className={projectsOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => {
+                setWorkspaceMode("projects");
+                setSelectedArea(null);
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setProjectsOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Projects
+            </button>
+            <button
+              aria-label="Market metric"
+              aria-expanded={metricsOpen}
+              className={metricsOpen ? "toolbar-action toolbar-action-active metrics-trigger" : "toolbar-action metrics-trigger"}
+              onClick={() => {
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setMetricsOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Metrics <span className="metrics-trigger-value">{activeMetric.shortLabel}</span><span aria-hidden="true">⌄</span>
+            </button>
             <button
               aria-expanded={sourcesOpen}
               className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
               onClick={() => {
-                setCompareOpen(false);
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
                 setMetricInfoOpen(false);
                 setSourcesOpen((open) => !open);
               }}
@@ -643,7 +798,9 @@ export function MapExperience() {
               aria-expanded={metricInfoOpen}
               className={metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
               onClick={() => {
-                setCompareOpen(false);
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
                 setSourcesOpen(false);
                 setMetricInfoOpen((open) => !open);
               }}
@@ -653,6 +810,213 @@ export function MapExperience() {
             </button>
           </div>
         </div>
+
+        {metricsOpen ? (
+          <aside aria-label="Market metrics menu" className="metrics-menu">
+            <div className="metrics-menu-header">
+              <div>
+                <p className="panel-eyebrow">LAND MARKET / RWANDA</p>
+                <h2>Metrics</h2>
+              </div>
+              <button aria-label="Close metrics menu" className="panel-close" onClick={() => setMetricsOpen(false)} type="button">×</button>
+            </div>
+            <div className="metrics-menu-section">
+              <span className="metrics-section-label">Property type</span>
+              <div aria-label="Property type" className="metric-scope-switch" role="group">
+                {PROPERTY_SCOPES.map((scope) => {
+                  const futureOnly = scope.value === "apartment" || scope.value === "villa";
+                  return (
+                    <button
+                      aria-pressed={propertyScope === scope.value}
+                      className={propertyScope === scope.value ? "metric-scope-option metric-scope-option-active" : "metric-scope-option"}
+                      disabled={futureOnly}
+                      key={scope.value}
+                      onClick={() => setPropertyScope(scope.value)}
+                      title={futureOnly ? "Building-level datasets are not connected yet." : undefined}
+                      type="button"
+                    >
+                      {scope.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="metrics-menu-note">This pilot is land-first. Apartment and villa metrics will become available when verified building data is connected; “All” currently shows the available land data.</p>
+            </div>
+            <div className="metrics-menu-section metrics-menu-period-section">
+              <span className="metrics-section-label">Period</span>
+              <div aria-label="Analysis period" className="metric-period-switch" role="group">
+                {ANALYSIS_PERIODS.map((period) => (
+                  <button
+                    aria-pressed={analysisPeriod === period.value}
+                    className={analysisPeriod === period.value ? "metric-period-option metric-period-option-active" : "metric-period-option"}
+                    disabled
+                    key={period.value}
+                    title="A validated dated series is not connected, so this period cannot filter values yet."
+                    type="button"
+                  >
+                    {period.shortLabel}
+                  </button>
+                ))}
+              </div>
+              <p className="metrics-menu-note">Time windows are shown for the reference layout, but are disabled until a dated land-market series is validated.</p>
+            </div>
+            <div className="metrics-menu-section metrics-options-section">
+              <span className="metrics-section-label">Market indicators</span>
+              <div className="metrics-option-list">
+                {MARKET_METRICS.map((metric) => (
+                  <button
+                    aria-pressed={selectedMetric === metric.id}
+                    className={selectedMetric === metric.id ? "metrics-option metrics-option-active" : "metrics-option"}
+                    key={metric.id}
+                    onClick={() => {
+                      setSelectedMetric(metric.id);
+                      setPropertyScope("land");
+                      setMetricsOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <span className="metrics-option-copy">
+                      <strong>{metric.label}</strong>
+                      <small>
+                        {metric.id === "averageLandPricePerM2"
+                          ? "Weighted average land price per square metre"
+                          : metric.id === "marketSupply"
+                            ? "Plots currently listed and ready for sale"
+                            : metric.id === "upcomingSupply"
+                              ? "Potential future plots not yet ready to enter the market"
+                              : metric.description}
+                      </small>
+                    </span>
+                    <span className={metric.id === "averageLandPricePerM2" ? "metric-data-pill metric-data-pill-available" : "metric-data-pill"}>
+                      {metric.id === "averageLandPricePerM2" ? "Source data" : "Pending"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="metrics-menu-supply-note"><strong>Supply definitions:</strong> Market supply means plots currently available for sale and ready to transact. Upcoming supply covers a future pipeline that is not yet ready, potentially because subdivision, planning, negotiation or legal/administrative steps remain. No such constraints are inferred or published by this pilot.</p>
+              <p className="metrics-menu-quality">
+                {landPriceLoadStatus === "loaded"
+                  ? `Supplied file diagnostics: ${landPriceDiagnostics.usableRows} usable rows · ${landPriceDiagnostics.malformedRows} malformed rows · ${landPriceDiagnostics.conflictingLocations} conflicting locations. Observation date not supplied.`
+                  : landPriceLoadStatus === "error"
+                    ? "Supplied file diagnostics unavailable because the file could not be loaded."
+                    : "Loading supplied cell-price data and checking source-row quality…"}
+              </p>
+            </div>
+          </aside>
+        ) : null}
+
+        {developersOpen ? (
+          <aside aria-label="Developer and agent directory" className="directory-drawer">
+            <div className="directory-drawer-header">
+              <div>
+                <p className="panel-eyebrow">RWANDA REAL ESTATE DIRECTORY</p>
+                <h2>Developers &amp; agents</h2>
+                <p className="directory-drawer-subtitle">Public-source candidates to review — not a ranking or endorsement.</p>
+              </div>
+              <button aria-label="Close developer directory" className="panel-close" onClick={() => setDevelopersOpen(false)} type="button">×</button>
+            </div>
+            <div aria-label="Directory category" className="directory-tabs" role="tablist">
+              <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("developers")} role="tab" type="button">Developers <span>20</span></button>
+              <button aria-selected={directoryTab === "agencies"} className={directoryTab === "agencies" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agencies")} role="tab" type="button">Agencies <span>{RWANDA_REAL_ESTATE_AGENCIES.length}</span></button>
+              <button aria-selected={directoryTab === "agents"} className={directoryTab === "agents" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agents")} role="tab" type="button">Agents <span>{RWANDA_PUBLIC_AGENT_CANDIDATES.length}</span></button>
+            </div>
+            {directoryTab === "developers" ? (
+              <>
+                <div className="directory-summary">
+                  <strong>{RWANDA_DEVELOPER_CANDIDATES.length} organizations supplied</strong>
+                  <span>0 verified developer profiles</span>
+                </div>
+                <div className="directory-record-list" role="tabpanel">
+                  {RWANDA_DEVELOPER_CANDIDATES.map((candidate) => {
+                    const institutional = /Rwanda Housing Authority|Rwanda Social Security Board/.test(candidate.name);
+                    return (
+                      <article className="directory-record" key={candidate.id}>
+                        <div aria-label={candidate.website ? "Organization initials; official logo not yet checked" : "Organization initials"} className="directory-monogram">{initialsForName(candidate.name)}</div>
+                        <div className="directory-record-copy">
+                          <div className="directory-record-title">
+                            <strong>{candidate.name}</strong>
+                            <span className="directory-status">{institutional ? "Public / institutional" : "Needs verification"}</span>
+                          </div>
+                          <p>{candidate.segment}</p>
+                          {candidate.website ? (
+                            <a href={candidate.website} rel="noreferrer" target="_blank">{candidate.website.replace(/^https?:\/\//, "").replace(/\/$/, "")} ↗</a>
+                          ) : (
+                            <span className="directory-no-source">Official website not yet sourced</span>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                <p className="directory-disclaimer">Names and segments are retained from the supplied list. Public websites are discovery leads; affiliation, developer role, projects, logo rights and current contacts still need record-level verification.</p>
+                <Link className="directory-full-link" href="/developers">Open full developer directory ↗</Link>
+              </>
+            ) : null}
+            {directoryTab === "agencies" ? (
+              <>
+                <div className="directory-summary">
+                  <strong>{RWANDA_REAL_ESTATE_AGENCIES.length} agency candidates found online</strong>
+                  <span>Source found · review pending</span>
+                </div>
+                <div className="directory-record-list" role="tabpanel">
+                  {RWANDA_REAL_ESTATE_AGENCIES.map((agency) => (
+                    <article className="directory-record" key={agency.id}>
+                      <div aria-label="Agency initials; official logo not yet checked" className="directory-monogram">{initialsForName(agency.name)}</div>
+                      <div className="directory-record-copy">
+                        <div className="directory-record-title"><strong>{agency.name}</strong><span className="directory-status">{agency.status}</span></div>
+                        <p>{agency.segment}</p>
+                        <a href={agency.website} rel="noreferrer" target="_blank">{agency.website.replace(/^https?:\/\//, "").replace(/\/$/, "")} ↗</a>
+                        <small>{agency.sourceLabel}</small>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <p className="directory-disclaimer">This is a sourced discovery list, not a quality ranking. Review current activity, registration, permissions and contact details before promoting an agency as verified.</p>
+              </>
+            ) : null}
+            {directoryTab === "agents" ? (
+              <>
+                <div className="directory-summary">
+                  <strong>{RWANDA_PUBLIC_AGENT_CANDIDATES.length} publicly listed agent candidate</strong>
+                  <span>No “top agent” ranking published</span>
+                </div>
+                <div className="directory-record-list" role="tabpanel">
+                  {RWANDA_PUBLIC_AGENT_CANDIDATES.map((agent) => (
+                    <article className="directory-record" key={agent.id}>
+                      <div aria-label="Agent initials" className="directory-monogram">{initialsForName(agent.name)}</div>
+                      <div className="directory-record-copy">
+                        <div className="directory-record-title"><strong>{agent.name}</strong><span className="directory-status">{agent.status}</span></div>
+                        <p>{agent.segment}</p>
+                        <a href={agent.sourceUrl} rel="noreferrer" target="_blank">Open publishing agency profile ↗</a>
+                        <small>{agent.sourceLabel}</small>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <p className="directory-disclaimer">An agency page lists this person, but the current affiliation must be reconfirmed. The source does not provide a comparable performance ranking, so this directory does not call anyone “top.”</p>
+              </>
+            ) : null}
+          </aside>
+        ) : null}
+
+        {projectsOpen ? (
+          <aside aria-label="Projects directory panel" className="directory-drawer projects-drawer">
+            <div className="directory-drawer-header">
+              <div>
+                <p className="panel-eyebrow">PROJECT INTELLIGENCE / RWANDA</p>
+                <h2>Buildings &amp; off-plan projects</h2>
+                <p className="directory-drawer-subtitle">Named developments, apartments, villas, construction stages and future handovers.</p>
+              </div>
+              <button aria-label="Close projects panel" className="panel-close" onClick={() => setProjectsOpen(false)} type="button">×</button>
+            </div>
+            <div className="projects-panel-empty">
+              <div className="projects-panel-icon" aria-hidden="true">⌂</div>
+              <strong>Verified project feed not connected</strong>
+              <p>Projects such as residential estates and off-plan buildings will appear here only after their identity, developer, location, stage, current unit availability and publication permission have been checked.</p>
+              <Link className="directory-full-link" href="/projects">Open projects workspace ↗</Link>
+            </div>
+          </aside>
+        ) : null}
 
         {metricInfoOpen ? (
           <aside
@@ -711,7 +1075,7 @@ export function MapExperience() {
                 <div className="metric-info-status">
                   <strong>Map interpretation</strong>
                   <p>
-                    Current filters: {selectedMetric === "averageLandPricePerM2" ? "Land · static district snapshot" : (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "All property") + " · " + (ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label ?? "12 months")}.
+                    Current filters: {selectedMetric === "averageLandPricePerM2" ? (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "Land") + " · static district/cell snapshot" : (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "All") + " · " + (ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label ?? "1 year")}.
                     {selectedMetric === "averageLandPricePerM2"
                       ? " District polygons are shaded by the sourced land-price snapshot. Period filtering is not applied because the source observation date is not exposed; prices for sectors, cells, villages or individual plots are not inferred."
                       : " The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
@@ -857,16 +1221,34 @@ export function MapExperience() {
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
                   <article className="area-market-card area-market-card-featured">
-                    <span>Average land price / m²</span>
+                    <span>Weighted average land price / m²</span>
                     <strong>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
-                        : "Not available"}
+                        : selectedArea.level === "cell" && selectedLandPrice?.status === "found" && selectedLandPrice.price !== null
+                          ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
+                          : selectedLandPrice?.status === "ambiguous"
+                            ? "Conflicting source values"
+                            : selectedArea.level === "sector"
+                              ? "Sector average not supplied"
+                              : "Not available"}
                     </strong>
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? "Rwanda Land Dashboard · source observation date not exposed"
-                        : "District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped yet."}
+                        : landPriceLoadStatus === "loading"
+                          ? "Loading the supplied sector/cell reference table…"
+                          : landPriceLoadStatus === "error"
+                            ? "The supplied reference table could not be loaded; no value is inferred."
+                            : selectedArea.level === "sector"
+                              ? `The file reports values by cell, not a sector-level weighted average. ${selectedLandPrice?.pricedCells ?? 0} cells have one unambiguous value.`
+                              : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
+                                ? `Supplied cell-price snapshot · date not supplied. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
+                                : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
+                                  ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}; no price shown until reconciled.`
+                                  : selectedArea.level === "cell"
+                                    ? "No exact district + sector + cell match in the supplied file. District-level land prices are not a valid substitute; No district average is substituted and no price is inferred."
+                                    : "This source is at cell level; no village or individual-parcel price is inferred."}
                     </small>
                   </article>
                   <article className="area-market-card">
@@ -978,14 +1360,14 @@ export function MapExperience() {
               <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Land transaction summaries</strong>
-                <p>Source identified · normalized feed not connected</p>
+                <p>Source identified · normalized feed not connected; approved-use terms still apply</p>
               </div>
             </div>
             <div className="source-register-item">
               <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Average district land prices</strong>
-                <p>Initial RWF/m² snapshot mapped for four pilot districts; live feed and source observation date need validation</p>
+                <p>District snapshot is mapped; the supplied cell-price table is loaded separately. Its observation date is unknown, 2 rows are malformed, and 10 location keys have conflicting values.</p>
               </div>
             </div>
             <div className="source-register-item">

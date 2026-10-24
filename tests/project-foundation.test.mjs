@@ -272,3 +272,49 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.match(css, /area-market-card/);
   assert.match(css, /metric definition popover/i);
 });
+
+
+test("the market metrics dropdown presents land-first scope, periods and supply definitions", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(experience, /aria-label="Market metrics menu"/);
+  assert.match(experience, /aria-label="Property type"/);
+  assert.match(experience, /aria-label="Analysis period"/);
+  assert.match(experience, /"apartment"/);
+  assert.match(experience, /"villa"/);
+  assert.match(experience, /Market supply means plots currently available for sale and ready to transact/);
+  assert.match(experience, /Upcoming supply covers a future pipeline that is not yet ready/);
+  assert.match(experience, /Apartment and villa metrics will become available/);
+  assert.match(css, /\.metrics-menu/);
+});
+
+test("the uploaded land-price snapshot is preserved and ambiguous rows are not silently averaged", async () => {
+  const source = await readProjectFile("public/land-price-reference.tsv");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const rows = source.trim().split(/\r?\n/);
+
+  assert.equal(rows.length, 245);
+  assert.equal(rows[0], "PROVINCE\tDISTRICT\tSECTOR\tCELL\tWEIGHTED AVERAGE (RWF/M²)");
+  assert.match(source, /Eastern\tBugesera\tMayange\tKibenga\t6,566/);
+  assert.match(source, /Kigali City\tGasabo\tRemera\tNyarutarama\t218,375/);
+  assert.match(experience, /parseLandPriceReference/);
+  assert.match(experience, /conflictingLocations/);
+  assert.match(experience, /Conflicting values on source rows/);
+  assert.match(experience, /No district average is substituted/);
+});
+
+test("developer popup separates developer candidates, agencies and public agent sources", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const developerData = await readProjectFile("src/data/developer-directory.ts");
+  const agencyData = await readProjectFile("src/data/real-estate-directory.ts");
+
+  assert.match(experience, /aria-label="Developer and agent directory"/);
+  assert.match(experience, /Developers &amp; agents/);
+  assert.match(experience, /RWANDA_REAL_ESTATE_AGENCIES/);
+  assert.match(experience, /RWANDA_PUBLIC_AGENT_CANDIDATES/);
+  assert.match(experience, /Public websites are discovery leads/);
+  assert.match(experience, /No “top agent” ranking published/);
+  assert.match(developerData, /https:\/\/delta-rwanda\.com/);
+  assert.match(agencyData, /https:\/\/homeland\.rw/);
+});
