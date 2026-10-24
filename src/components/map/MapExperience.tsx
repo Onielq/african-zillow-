@@ -1478,7 +1478,6 @@ export function MapExperience() {
                           {cellParcels.map((parcel) => (
                             <button
                               className="cell-parcel-row"
-                              key={parcel.id}
                               onClick={() => {
                                 const [west, south, east, north] = parcel.bounds;
                                 const mobile = window.matchMedia("(max-width: 720px)").matches;
@@ -1532,7 +1531,6 @@ export function MapExperience() {
                                 {typeof parcel.areaM2 === "number"
                                   ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcel.areaM2) + " m²"
                                   : "Area unavailable"}
-                                <icon-placeholder />
                               </span>
                             </button>
                           ))}
