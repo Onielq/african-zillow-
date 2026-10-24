@@ -931,7 +931,18 @@ export function MapExperience() {
                     const institutional = /Rwanda Housing Authority|Rwanda Social Security Board/.test(candidate.name);
                     return (
                       <article className="directory-record" key={candidate.id}>
-                        <div aria-label={candidate.website ? "Organization initials; official logo not yet checked" : "Organization initials"} className="directory-monogram">{initialsForName(candidate.name)}</div>
+                        <div aria-label={candidate.logoUrl ? candidate.name + " logo" : "Organization initials; official logo not yet sourced"} className="directory-monogram">
+                          <span className="directory-logo-fallback">{initialsForName(candidate.name)}</span>
+                          {candidate.logoUrl ? (
+                            <img
+                              alt={candidate.name + " logo"}
+                              className="directory-logo-image"
+                              loading="lazy"
+                              onError={(event) => { event.currentTarget.style.display = "none"; }}
+                              src={candidate.logoUrl}
+                            />
+                          ) : null}
+                        </div>
                         <div className="directory-record-copy">
                           <div className="directory-record-title">
                             <strong>{candidate.name}</strong>
@@ -977,7 +988,7 @@ export function MapExperience() {
             {directoryTab === "agents" ? (
               <>
                 <div className="directory-summary">
-                  <strong>{RWANDA_PUBLIC_AGENT_CANDIDATES.length} publicly listed agent candidate</strong>
+                  <strong>{RWANDA_PUBLIC_AGENT_CANDIDATES.length} publicly listed agent candidates</strong>
                   <span>No “top agent” ranking published</span>
                 </div>
                 <div className="directory-record-list" role="tabpanel">
@@ -986,7 +997,7 @@ export function MapExperience() {
                       <div aria-label="Agent initials" className="directory-monogram">{initialsForName(agent.name)}</div>
                       <div className="directory-record-copy">
                         <div className="directory-record-title"><strong>{agent.name}</strong><span className="directory-status">{agent.status}</span></div>
-                        <p>{agent.segment}</p>
+                        <p>{agent.segment} · {agent.agency}</p>
                         <a href={agent.sourceUrl} rel="noreferrer" target="_blank">Open publishing agency profile ↗</a>
                         <small>{agent.sourceLabel}</small>
                       </div>
