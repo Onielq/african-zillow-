@@ -7,6 +7,12 @@ type EvidenceItem = {
   description: string;
 };
 
+type ProfileTypeItem = {
+  title: string;
+  description: string;
+  publicationRule: string;
+};
+
 type DirectoryKind = "projects" | "developers";
 
 type DirectoryLandingPageProps = {
@@ -21,12 +27,15 @@ type DirectoryLandingPageProps = {
   evidenceHeading: string;
   evidenceIntro: string;
   evidence: EvidenceItem[];
+  profileTypes?: ProfileTypeItem[];
+  templateHref?: string;
+  templateLabel?: string;
 };
 
 const NAV_ITEMS = [
   { href: "/", label: "Map workspace", key: "map" },
   { href: "/projects", label: "Projects", key: "projects" },
-  { href: "/developers", label: "Developers", key: "developers" },
+  { href: "/developers", label: "Developers & agents", key: "developers" },
   { href: "/data-sources", label: "Data sources", key: "sources" }
 ] as const;
 
@@ -41,7 +50,10 @@ export function DirectoryLandingPage({
   emptyDescription,
   evidenceHeading,
   evidenceIntro,
-  evidence
+  evidence,
+  profileTypes,
+  templateHref,
+  templateLabel
 }: DirectoryLandingPageProps) {
   return (
     <main className={styles.page} data-directory={kind}>
@@ -109,6 +121,48 @@ export function DirectoryLandingPage({
             <small>This means no records are verified and published in this directory; it does not mean none exist in Rwanda.</small>
           </aside>
         </section>
+
+        {profileTypes?.length ? (
+          <section className={styles.profileTypes} aria-labelledby="profile-types-title">
+            <div className={styles.profileTypesHeading}>
+              <div>
+                <p className={styles.eyebrow}>DIRECTORY CATEGORIES</p>
+                <h2 id="profile-types-title">Separate roles. Verified claims.</h2>
+              </div>
+              <p>
+                Developers, estate agencies and independent agents can appear in one directory,
+                but each profile keeps its actual role. An agent is not labelled a developer just
+                because they market a project.
+              </p>
+            </div>
+            <div className={styles.profileTypeGrid}>
+              {profileTypes.map((item, index) => (
+                <article className={styles.profileTypeCard} key={item.title}>
+                  <span className={styles.profileTypeNumber}>ROLE {String(index + 1).padStart(2, "0")}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <small>{item.publicationRule}</small>
+                </article>
+              ))}
+            </div>
+            {templateHref ? (
+              <div className={styles.templatePanel}>
+                <div>
+                  <p className={styles.eyebrow}>DATA INTAKE</p>
+                  <h3>Prepare the first batch of profiles</h3>
+                  <p>
+                    Use the CSV template to send names and source details in a consistent format.
+                    Submitted records will still need identity, role and publication-permission checks
+                    before they are shown as verified.
+                  </p>
+                </div>
+                <a className={styles.templateAction} href={templateHref} download>
+                  {templateLabel ?? "Download CSV template"} <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className={styles.evidenceSection} aria-labelledby="evidence-title">
           <div className={styles.sectionHeading}>
