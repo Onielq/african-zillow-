@@ -1247,7 +1247,7 @@ export function MapExperience() {
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
                                   ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}; no price shown until reconciled.`
                                   : selectedArea.level === "cell"
-                                    ? "No exact district + sector + cell match in the supplied file. No district average is substituted."
+                                    ? "No exact district + sector + cell match in the supplied file. District-level land prices are not a valid substitute; no price is inferred."
                                     : "This source is at cell level; no village or individual-parcel price is inferred."}
                     </small>
                   </article>
