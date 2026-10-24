@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -61,8 +63,100 @@ type UpstreamFeature = {
 
 type UpstreamCollection = {
   features?: UpstreamFeature[];
+  exceededTransferLimit?: boolean;
   error?: { code?: number; message?: string; details?: string[] };
 };
+
+type CellPriceValue = {
+  status: "found" | "ambiguous";
+  price: number | null;
+  sourceLines: number[];
+};
+
+type SectorPriceValue = { price: number; pricedCells: number };
+type LandPriceIndex = {
+  cells: Map<string, CellPriceValue>;
+  sectors: Map<string, SectorPriceValue>;
+};
+
+const LAND_PRICE_REFERENCE_PATH = join(process.cwd(), "public", "land-price-reference.tsv");
+let landPriceIndexPromise: Promise<LandPriceIndex> | null = null;
+
+function normalizePriceKey(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .trim()
+    .replace(/\\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+function cellPriceKey(district: string, sector: string, cell: string): string {
+  return [district, sector, cell].map(normalizePriceKey).join("|");
+}
+
+function sectorPriceKey(district: string, sector: string): string {
+  return [district, sector].map(normalizePriceKey).join("|");
+}
+
+async function loadLandPriceIndex(): Promise<LandPriceIndex> {
+  if (!landPriceIndexPromise) {
+    landPriceIndexPromise = readFile(LAND_PRICE_REFERENCE_PATH, "utf8")
+      .then((text) => {
+        const groups = new Map<string, {
+          district: string;
+          sector: string;
+          cell: string;
+          prices: Set<number>;
+          sourceLines: number[];
+        }>();
+        text.split(/\\r?\\n/).slice(1).forEach((line, index) => {
+          if (!line.trim()) return;
+          const fields = line.split("\\t");
+          if (fields.length !== 5 || fields.slice(0, 4).some((field) => !field.trim())) return;
+          const district = fields[1].trim();
+          const sector = fields[2].trim();
+          const cell = fields[3].trim();
+          const price = Number(fields[4].replace(/,/g, "").trim());
+          if (!Number.isFinite(price) || price <= 0) return;
+          const key = cellPriceKey(district, sector, cell);
+          const group = groups.get(key) ?? { district, sector, cell, prices: new Set<number>(), sourceLines: [] };
+          group.prices.add(price);
+          group.sourceLines.push(index + 2);
+          groups.set(key, group);
+        });
+
+        const cells = new Map<string, CellPriceValue>();
+        const sectorTotals = new Map<string, { sum: number; pricedCells: number }>();
+        for (const [key, group] of groups) {
+          if (group.prices.size !== 1) {
+            cells.set(key, { status: "ambiguous", price: null, sourceLines: group.sourceLines });
+            continue;
+          }
+          const price = Array.from(group.prices)[0];
+          cells.set(key, { status: "found", price, sourceLines: group.sourceLines });
+          const skey = sectorPriceKey(group.district, group.sector);
+          const total = sectorTotals.get(skey) ?? { sum: 0, pricedCells: 0 };
+          total.sum += price;
+          total.pricedCells += 1;
+          sectorTotals.set(skey, total);
+        }
+
+        const sectors = new Map<string, SectorPriceValue>();
+        for (const [key, total] of sectorTotals) {
+          if (total.pricedCells > 0) {
+            sectors.set(key, { price: Math.round(total.sum / total.pricedCells), pricedCells: total.pricedCells });
+          }
+        }
+        return { cells, sectors };
+      })
+      .catch((error) => {
+        console.error("Could not load the local land-price reference for map styling.", error);
+        return { cells: new Map<string, CellPriceValue>(), sectors: new Map<string, SectorPriceValue>() };
+      });
+  }
+  return landPriceIndexPromise;
+}
 
 function emptyCollection() {
   return { type: "FeatureCollection" as const, features: [] };
@@ -326,11 +420,11 @@ async function queryArcGisLayer(
   bounds: Bounds,
   resultRecordCount?: number,
   where = "1=1",
-  outFields = "*"
+  outFields = "*",
+  maxFeatures?: number
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
-  // Request the provider's full polygon geometry. Do not set maxAllowableOffset
-  // or geometryPrecision: either can generalize or round parcel boundary vertices.
+  // Preserve full polygon vertices: do not generalize geometry or round coordinates.
   const params = new URLSearchParams({
     where,
     geometry: bounds.join(","),
@@ -342,40 +436,47 @@ async function queryArcGisLayer(
     returnGeometry: "true",
     f: "json"
   });
+  if (typeof resultRecordCount !== "number") {
+    upstreamUrl.search = params.toString();
+    const response = await fetch(upstreamUrl, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(15_000)
+    });
+    if (!response.ok) throw new Error(`ArcGIS layer request failed (${response.status})`);
+    const payload = (await response.json()) as UpstreamCollection;
+    if (payload.error) throw new Error(`ArcGIS error ${payload.error.code ?? "unknown"}: ${payload.error.message ?? "request failed"}`);
+    return payload.features ?? [];
+  }
 
-  // Older MapServer layers reject resultRecordCount because they do not
-  // support pagination. Leave that parameter off for admin boundaries, and
-  // set it only for the newer parcel FeatureServer, which supports pagination.
-  if (typeof resultRecordCount === "number") {
+  const maximum = Math.max(resultRecordCount, Math.min(maxFeatures ?? resultRecordCount, 10_000));
+  const collected: UpstreamFeature[] = [];
+  let offset = 0;
+  while (collected.length < maximum) {
     params.set("resultRecordCount", String(resultRecordCount));
+    params.set("resultOffset", String(offset));
+    upstreamUrl.search = params.toString();
+    const response = await fetch(upstreamUrl, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(15_000)
+    });
+    if (!response.ok) throw new Error(`ArcGIS layer request failed (${response.status})`);
+    const payload = (await response.json()) as UpstreamCollection;
+    if (payload.error) throw new Error(`ArcGIS error ${payload.error.code ?? "unknown"}: ${payload.error.message ?? "request failed"}`);
+    const page = payload.features ?? [];
+    collected.push(...page);
+    if (page.length === 0 || page.length < resultRecordCount) break;
+    offset += page.length;
   }
-
-  upstreamUrl.search = params.toString();
-
-  const response = await fetch(upstreamUrl, {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 300 },
-    signal: AbortSignal.timeout(15_000)
-  });
-
-  if (!response.ok) {
-    throw new Error(`ArcGIS layer request failed (${response.status})`);
-  }
-
-  const payload = (await response.json()) as UpstreamCollection;
-  if (payload.error) {
-    throw new Error(
-      `ArcGIS error ${payload.error.code ?? "unknown"}: ${payload.error.message ?? "request failed"}`
-    );
-  }
-
-  return payload.features ?? [];
+  return collected.slice(0, maximum);
 }
 
 function normaliseAdministrativeFeature(
   feature: UpstreamFeature,
   level: AreaLevel,
-  sourceId: "kigali" | "bugesera"
+  sourceId: "kigali" | "bugesera",
+  priceIndex: LandPriceIndex
 ) {
   const attributes = feature.attributes ?? feature.properties ?? {};
   const activeNameCandidates: Record<AreaLevel, string[]> = {
@@ -433,6 +534,12 @@ function normaliseAdministrativeFeature(
     village: villageId ?? objectId ?? `${district}-${sector ?? "unknown"}-${cell ?? "unknown"}-${village ?? "unknown"}`
   };
   const upperDistrict = district.toUpperCase();
+  const cellPrice = level === "cell" && sector && cell
+    ? priceIndex.cells.get(cellPriceKey(district, sector, cell))
+    : undefined;
+  const sectorPrice = level === "sector" && sector
+    ? priceIndex.sectors.get(sectorPriceKey(district, sector))
+    : undefined;
 
   return {
     type: "Feature" as const,
@@ -458,8 +565,34 @@ function normaliseAdministrativeFeature(
             average_land_price_per_m2:
               DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict],
             average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
+            average_land_price_status: "district-snapshot",
             average_land_price_date_status: "Effective date and calculation method not disclosed; provisional /prices page snapshot reviewed 2026-10-24"
           }
+        : {}),
+      ...(level === "sector" && sectorPrice
+        ? {
+            average_land_price_per_m2: sectorPrice.price,
+            average_land_price_source: "/land-price-reference.tsv",
+            average_land_price_status: "sector-indicative-mean",
+            priced_cell_count: sectorPrice.pricedCells,
+            average_land_price_date_status: `Indicative unweighted mean of ${sectorPrice.pricedCells} unambiguous cell values; not an official sector-weighted average. Source observation date and method unknown.`
+          }
+        : {}),
+      ...(level === "cell" && cellPrice
+        ? cellPrice.status === "found"
+          ? {
+              average_land_price_per_m2: cellPrice.price,
+              average_land_price_source: "/land-price-reference.tsv",
+              average_land_price_status: "unambiguous-cell-snapshot",
+              price_source_lines: cellPrice.sourceLines,
+              average_land_price_date_status: "Supplied cell snapshot; effective date and calculation method not provided."
+            }
+          : {
+              average_land_price_status: "conflict",
+              price_source_lines: cellPrice.sourceLines,
+              average_land_price_source: "/land-price-reference.tsv",
+              average_land_price_date_status: "Conflicting values remain withheld until the publisher confirms row identity."
+            }
         : {})
     }
   };
@@ -508,9 +641,10 @@ async function getAdministrativeAreas(
     );
   }
 
+  const priceIndex = await loadLandPriceIndex();
   const features = results
     .flatMap((result) => result.features.map((feature) =>
-      normaliseAdministrativeFeature(feature, level, result.sourceId)
+      normaliseAdministrativeFeature(feature, level, result.sourceId, priceIndex)
     ))
     .filter((feature): feature is NonNullable<typeof feature> => feature !== null)
     .filter((feature) =>
@@ -537,7 +671,18 @@ type ParcelProvider = {
   extent: Bounds;
 };
 
-async function getParcels(bounds: Bounds): Promise<NextResponse> {
+type ParcelCellFilter = { district: string; sector: string; cell: string };
+
+function normalizeParcelLocation(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .trim()
+    .replace(/\\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+async function getParcels(bounds: Bounds, cellFilter?: ParcelCellFilter): Promise<NextResponse> {
   // These providers publish individual parcel polygons. Do not replace a
   // missing cadastral polygon with a road edge, image trace, or zoning polygon.
   const parcelProviders: ParcelProvider[] = [
@@ -570,12 +715,18 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
     try {
       // Request only public identification fields. In Bugesera, query only
       // UPI; do not fetch owner or other land-management attributes.
+      const baseWhere = "upi IS NOT NULL";
+      const escaped = (value: string) => value.replace(/'/g, "''");
+      const exactWhere = cellFilter
+        ? `${baseWhere} AND UPPER(district) = UPPER('${escaped(cellFilter.district)}') AND UPPER(sector) = UPPER('${escaped(cellFilter.sector)}') AND UPPER(cell) = UPPER('${escaped(cellFilter.cell)}')`
+        : baseWhere;
       const upstreamFeatures = await queryArcGisLayer(
         provider.layerUrl,
         bounds,
         2000,
-        "upi IS NOT NULL",
-        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on"
+        exactWhere,
+        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+        cellFilter ? 10_000 : 2000
       );
       return { provider, upstreamFeatures, failed: false };
     } catch (error) {
@@ -671,9 +822,17 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
     }).filter((feature): feature is NonNullable<typeof feature> => feature !== null)
   );
 
+  const areaFilteredFeatures = cellFilter
+    ? features.filter((feature) =>
+        normalizeParcelLocation(feature.properties.district) === normalizeParcelLocation(cellFilter.district) &&
+        normalizeParcelLocation(feature.properties.sector) === normalizeParcelLocation(cellFilter.sector) &&
+        normalizeParcelLocation(feature.properties.cell) === normalizeParcelLocation(cellFilter.cell)
+      )
+    : features;
+  const listTruncated = Boolean(cellFilter) && results.some((result) => result.upstreamFeatures.length >= 10_000);
   const failedProviders = results.filter((result) => result.failed).map((result) => result.provider.id);
   return NextResponse.json(
-    { type: "FeatureCollection", features },
+    { type: "FeatureCollection", features: areaFilteredFeatures },
     {
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
@@ -682,7 +841,9 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
         "X-Parcel-Provider-Warning": failedProviders.length
           ? `Some parcel source(s) unavailable: ${failedProviders.join(", ")}`
           : "Bugesera source reuse terms, completeness, and current survey accuracy still need confirmation",
-        "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed"
+        "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed",
+        "X-Parcel-List-Mode": cellFilter ? "Exact district + sector + cell filter; source coverage and identifiers still require publisher validation" : "Viewport parcels",
+        "X-Parcel-List-Truncated": String(listTruncated)
       }
     }
   );
@@ -719,6 +880,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (level === "parcel") return getParcels(bounds);
+  if (level === "parcel") {
+    const district = request.nextUrl.searchParams.get("district")?.trim();
+    const sector = request.nextUrl.searchParams.get("sector")?.trim();
+    const cell = request.nextUrl.searchParams.get("cell")?.trim();
+    const cellFilter = district && sector && cell ? { district, sector, cell } : undefined;
+    return getParcels(bounds, cellFilter);
+  }
   return getAdministrativeAreas(level, bounds);
 }
