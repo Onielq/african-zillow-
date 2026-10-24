@@ -113,7 +113,72 @@ const FOCUS_OPTIONS: Array<{
   }
 ];
 
-
+const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
+  {
+    level: "district",
+    name: "Gasabo",
+    province: "Kigali City",
+    district: "Gasabo",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 36013,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Kicukiro",
+    province: "Kigali City",
+    district: "Kicukiro",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 61491,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Nyarugenge",
+    province: "Kigali City",
+    district: "Nyarugenge",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 50735,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Bugesera",
+    province: "Eastern Province",
+    district: "Bugesera",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 4033,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  }
+];
 
 function BrandMark() {
   return (
@@ -192,7 +257,9 @@ export function MapExperience() {
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareSearch, setCompareSearch] = useState("");
   const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
@@ -225,31 +292,40 @@ export function MapExperience() {
     []
   );
 
-  const addSelectedAreaToComparison = () => {
-    if (!selectedArea) return;
-
+  const addAreaToComparison = (areaToAdd: SelectedArea) => {
     const exists = comparedAreas.some(
       (area) =>
-        area.level === selectedArea.level &&
-        area.name === selectedArea.name &&
-        area.district === selectedArea.district
+        area.level === areaToAdd.level &&
+        area.name === areaToAdd.name &&
+        area.district === areaToAdd.district
     );
 
     if (exists) {
-      setComparisonFeedback(`${selectedArea.name} is already on your comparison list.`);
+      setComparisonFeedback(`${areaToAdd.name} is already on your comparison list.`);
+      setSourcesOpen(false);
+      setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
 
     if (comparedAreas.length >= 4) {
       setComparisonFeedback("Compare up to four areas. Remove one to add another.");
+      setSourcesOpen(false);
+      setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
 
-    setComparedAreas((areas) => [...areas, selectedArea]);
-    setComparisonFeedback(`${selectedArea.name} added to comparison.`);
+    setComparedAreas((areas) => [...areas, areaToAdd]);
+    setComparisonFeedback(`${areaToAdd.name} added to comparison.`);
+    setSourcesOpen(false);
+    setMetricInfoOpen(false);
     setCompareOpen(true);
+  };
+
+  const addSelectedAreaToComparison = () => {
+    if (!selectedArea) return;
+    addAreaToComparison(selectedArea);
   };
 
   const removeComparedArea = (areaToRemove: SelectedArea) => {
@@ -269,6 +345,24 @@ export function MapExperience() {
   const activeMetric =
     MARKET_METRICS.find((metric) => metric.id === selectedMetric) ??
     MARKET_METRICS[0];
+  const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
+  const comparisonSearchResults = normalizedComparisonSearch
+    ? PILOT_DISTRICT_SEARCH_AREAS.filter((area) =>
+        area.name.toLocaleLowerCase().includes(normalizedComparisonSearch)
+      )
+    : [];
+  const canCompareDistrictPrices =
+    comparedAreas.length > 1 &&
+    comparedAreas.every(
+      (area) =>
+        area.level === "district" &&
+        typeof area.averageLandPricePerM2 === "number"
+    );
+  const highestDistrictPrice = canCompareDistrictPrices
+    ? Math.max(
+        ...comparedAreas.map((area) => area.averageLandPricePerM2 ?? Number.NEGATIVE_INFINITY)
+      )
+    : null;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -290,6 +384,18 @@ export function MapExperience() {
 
     return () => context.revert();
   }, []);
+
+  useEffect(() => {
+    if (!compareOpen && !metricInfoOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCompareOpen(false);
+        setMetricInfoOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [compareOpen, metricInfoOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -342,6 +448,7 @@ export function MapExperience() {
             className="compare-control"
             onClick={() => {
               setSourcesOpen(false);
+              setMetricInfoOpen(false);
               setCompareOpen((open) => !open);
             }}
             type="button"
@@ -524,14 +631,73 @@ export function MapExperience() {
               className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
               onClick={() => {
                 setCompareOpen(false);
+                setMetricInfoOpen(false);
                 setSourcesOpen((open) => !open);
               }}
               type="button"
             >
               Sources
             </button>
+            <button
+              aria-label={`Definition for ${activeMetric.label}`}
+              aria-expanded={metricInfoOpen}
+              className={metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
+              onClick={() => {
+                setCompareOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen((open) => !open);
+              }}
+              type="button"
+            >
+              <span aria-hidden="true">i</span>
+            </button>
           </div>
         </div>
+
+        {metricInfoOpen ? (
+          <aside aria-label={`Definition for ${activeMetric.label}`} className="metric-info-panel">
+            <button
+              aria-label="Close metric definition"
+              className="panel-close"
+              onClick={() => setMetricInfoOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+            <p className="panel-eyebrow">METRIC DEFINITION</p>
+            <h2>{activeMetric.label}</h2>
+            <p className="metric-info-description">{activeMetric.description}</p>
+            <div className="metric-info-unit">
+              <span>Expected unit</span>
+              <strong>
+                {selectedMetric === "averageLandPricePerM2"
+                  ? "RWF per m²"
+                  : selectedMetric === "transactionVolume"
+                    ? "Count of registered land transactions"
+                    : selectedMetric === "capitalAppreciation" || selectedMetric === "rentalYield"
+                      ? "Percent (%)"
+                      : selectedMetric === "marketSupply"
+                        ? "Count of active sale/rent listings"
+                        : "Count of expected units from verified projects"}
+              </strong>
+            </div>
+            <div className="metric-info-status">
+              <strong>Data status</strong>
+              <p>{activeMetric.dataStatus}</p>
+            </div>
+            {selectedMetric === "averageLandPricePerM2" ? (
+              <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
+                Open Rwanda Land Dashboard ↗
+              </a>
+            ) : selectedMetric === "transactionVolume" || selectedMetric === "capitalAppreciation" ? (
+              <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
+                Review transaction dataset and access terms ↗
+              </a>
+            ) : (
+              <p className="metric-info-no-source">No validated Rwanda source is connected for this metric yet.</p>
+            )}
+          </aside>
+        ) : null}
 
         <div className="map-focus-panel" ref={focusRef}>
           <span className="focus-eyebrow">EXPLORE AREA</span>
@@ -604,21 +770,61 @@ export function MapExperience() {
                   </strong>
                 </div>
               </div>
-            ) : selectedMetric === "averageLandPricePerM2" ? (
-              selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null ? (
-                <div className="area-price-metric">
-                  <span>Average land price / m²</span>
-                  <strong>
-                    {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF
-                  </strong>
-                  <small>Rwanda Land Dashboard · source observation date not exposed</small>
+            ) : (
+              <>
+                <div aria-label="Selected area market metrics" className="area-market-grid">
+                  <article className="area-market-card area-market-card-featured">
+                    <span>Average land price / m²</span>
+                    <strong>
+                      {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
+                        ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
+                        : "Not available"}
+                    </strong>
+                    <small>
+                      {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
+                        ? "Rwanda Land Dashboard · source observation date not exposed"
+                        : "District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped yet."}
+                    </small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Transaction volume</span>
+                    <strong>Not connected</strong>
+                    <small>Approved transaction aggregates are not yet joined to this area.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Rental yield</span>
+                    <strong>Not connected</strong>
+                    <small>Verified rental and comparable value records are required.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>New projects</span>
+                    <strong>Not connected</strong>
+                    <small>No verified developer/project inventory is connected yet.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Capital appreciation</span>
+                    <strong>Not connected</strong>
+                    <small>A validated comparable land-price time series is not connected.</small>
+                  </article>
+                  <article className="area-market-card">
+                    <span>Upcoming supply</span>
+                    <strong>Not connected</strong>
+                    <small>Verified project stages and future unit counts are not available.</small>
+                  </article>
                 </div>
-              ) : (
-                <p className="metric-status-copy area-price-unavailable">
-                  District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped here yet.
-                </p>
-              )
-            ) : null}
+                <section aria-label="Projects in selected area" className="area-projects-empty">
+                  <div className="area-projects-empty-heading">
+                    <h3>Projects</h3>
+                    <span>Not connected</span>
+                  </div>
+                  <p>
+                    No verified developer or project inventory is connected yet. Project names,
+                    prices, availability, sales progress and completion figures will appear only
+                    when a permitted, current source is connected.
+                  </p>
+                </section>
+              </>
+            )}
             {getAreaParent(selectedArea) ? (
               <p className="panel-parent">Within {getAreaParent(selectedArea)}</p>
             ) : null}
@@ -799,7 +1005,22 @@ export function MapExperience() {
         ) : null}
 
         {compareOpen ? (
-          <aside aria-label="Area comparison" className="comparison-panel">
+          <button
+            aria-label="Close comparison dialog"
+            className="comparison-modal-backdrop"
+            onClick={() => setCompareOpen(false)}
+            type="button"
+          />
+        ) : null}
+
+        {compareOpen ? (
+          <aside
+            aria-label="Area comparison dialog"
+            aria-labelledby="comparison-title"
+            aria-modal="true"
+            className="comparison-panel"
+            role="dialog"
+          >
             <button
               aria-label="Close area comparison"
               className="panel-close"
@@ -808,45 +1029,100 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">INVESTMENT SHORTLIST</p>
+            <p className="panel-eyebrow">AREA COMPARISON</p>
             <div className="comparison-title-row">
-              <h2>Compare areas</h2>
-              <span>{comparedAreas.length}/4</span>
+              <div>
+                <h2 id="comparison-title">Compare areas</h2>
+                <p className="comparison-subtitle">Select up to four areas to compare side by side.</p>
+              </div>
+              <span>{comparedAreas.length}/4 selected</span>
             </div>
-            <p className="panel-copy">
-              Click an area on the map, then choose “Add to comparison”.
-              Compare the same metric and period across your shortlist.
-            </p>
+            <label className="comparison-search-label" htmlFor="comparison-area-search">Search by district</label>
+            <input
+              autoComplete="off"
+              className="comparison-search"
+              id="comparison-area-search"
+              onChange={(event) => setCompareSearch(event.target.value)}
+              placeholder="Search by district name"
+              type="search"
+              value={compareSearch}
+            />
+            {normalizedComparisonSearch ? (
+              <div aria-label="Matching pilot districts" className="comparison-search-results" role="listbox">
+                {comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
+                  const isAdded = comparedAreas.some((existing) =>
+                    existing.level === area.level &&
+                    existing.name === area.name &&
+                    existing.district === area.district
+                  );
+                  const atLimit = comparedAreas.length >= 4 && !isAdded;
+                  return (
+                    <button
+                      aria-selected={isAdded}
+                      className="comparison-search-result"
+                      disabled={isAdded || atLimit}
+                      key={area.name}
+                      onClick={() => {
+                        addAreaToComparison(area);
+                        if (!isAdded && !atLimit) setCompareSearch("");
+                      }}
+                      role="option"
+                      type="button"
+                    >
+                      <span className="comparison-search-dot" aria-hidden="true" />
+                      <span className="comparison-search-result-copy">
+                        <strong>{area.name}</strong>
+                        <small>{area.province} · District · pilot geography</small>
+                      </span>
+                      <span className="comparison-search-result-action">{isAdded ? "Added" : atLimit ? "Limit reached" : "Add"}</span>
+                    </button>
+                  );
+                }) : (
+                  <p className="comparison-no-results">No pilot district matched “{compareSearch.trim()}”. Smaller areas can still be added from the map.</p>
+                )}
+              </div>
+            ) : null}
             {comparisonFeedback ? (
               <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
             ) : null}
             {comparedAreas.length === 0 ? (
               <div className="comparison-empty">
-                <strong>Your shortlist is empty</strong>
-                <p>Add up to four districts, sectors, cells or villages from the map.</p>
+                <span aria-hidden="true" className="comparison-empty-pin">⌖</span>
+                <strong>No areas selected</strong>
+                <p>Search a pilot district above or select a smaller area on the map and choose “Add to comparison”.</p>
               </div>
             ) : (
               <>
                 <div className="comparison-area-list">
-                  {comparedAreas.map((area) => (
-                    <div
-                      className="comparison-area-item"
-                      key={`${area.level}-${area.district}-${area.name}`}
-                    >
-                      <div>
-                        <strong>{area.name}</strong>
-                        <span>{area.level} · {area.district} District</span>
-                      </div>
-                      <button
-                        aria-label={`Remove ${area.name} from comparison`}
-                        className="comparison-remove"
-                        onClick={() => removeComparedArea(area)}
-                        type="button"
+                  <div className="comparison-selected-chips">
+                    {comparedAreas.map((area) => (
+                      <span
+                        className="comparison-chip"
+                        key={`${area.level}-${area.district}-${area.name}`}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <span>{area.name}</span>
+                        <button
+                          aria-label={`Remove ${area.name} from comparison`}
+                          className="comparison-chip-remove"
+                          onClick={() => removeComparedArea(area)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    className="comparison-clear-inline"
+                    disabled={comparedAreas.length === 0}
+                    onClick={() => {
+                      setComparedAreas([]);
+                      setComparisonFeedback("");
+                    }}
+                    type="button"
+                  >
+                    Clear all
+                  </button>
                 </div>
                 <div className="comparison-table-scroll">
                   <table className="comparison-table">
@@ -875,11 +1151,20 @@ export function MapExperience() {
                                 : null;
                             return (
                               <td key={`${metric.id}-${area.level}-${area.district}-${area.name}`}>
-                                {landPrice !== null
-                                  ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`
-                                  : metric.id === "averageLandPricePerM2" && area.level !== "district"
-                                    ? "No value at this level"
-                                    : "Pending"}
+                                {landPrice !== null ? (
+                                  <div className="comparison-price-cell">
+                                    <span>{`${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`}</span>
+                                    {canCompareDistrictPrices && landPrice === highestDistrictPrice ? (
+                                      <span className="comparison-row-leader" aria-label="Highest mapped district price">
+                                        <span aria-hidden="true">★</span> Highest mapped
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : metric.id === "averageLandPricePerM2" && area.level !== "district" ? (
+                                  "No value at this level"
+                                ) : (
+                                  "Pending"
+                                )}
                               </td>
                             );
                           })}

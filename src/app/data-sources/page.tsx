@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import styles from "./data-sources.module.css";
 
@@ -97,6 +98,31 @@ const sources: DataSource[] = [
   }
 ];
 
+type SourceHealthResult = {
+  id: string;
+  name: string;
+  category: "administrative" | "cadastral";
+  status: "reachable" | "unavailable";
+  httpStatus: number | null;
+  serviceTitle: string | null;
+  layerCount: number | null;
+  fields: string[];
+  lastEditAt: string | null;
+  licenseDeclared: boolean;
+  licenseStatus: string;
+  attribution: string | null;
+  detail: string;
+  checkedAt: string;
+};
+
+type SourceHealthReport = {
+  checkedAt: string;
+  reachableCount: number;
+  totalCount: number;
+  results: SourceHealthResult[];
+  notice: string;
+};
+
 const statusDescriptions: Record<SourceStatus, string> = {
   connected: "Data is consumed by the prototype; its limits still apply.",
   review: "Data is connected, but source age or accuracy needs review.",
@@ -105,6 +131,27 @@ const statusDescriptions: Record<SourceStatus, string> = {
 };
 
 export default function DataSourcesPage() {
+  const [healthReport, setHealthReport] = useState<SourceHealthReport | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState("");
+
+  const checkLiveSources = async () => {
+    setHealthLoading(true);
+    setHealthError("");
+    try {
+      const response = await fetch("/api/data-sources/health", { cache: "no-store" });
+      const payload = (await response.json()) as SourceHealthReport;
+      if (!response.ok || !Array.isArray(payload.results)) {
+        throw new Error("The source health endpoint returned an unexpected response.");
+      }
+      setHealthReport(payload);
+    } catch {
+      setHealthError("The live check could not complete. The map may still work, but source health could not be verified right now.");
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
   const counts = {
     total: sources.length,
     active: sources.filter((source) => source.status !== "candidate").length,
@@ -162,6 +209,75 @@ export default function DataSourcesPage() {
           <h2>No invented records</h2>
           <p>Unconnected listings, rents, projects, yields and appreciation remain unavailable until evidence is integrated.</p>
         </div>
+      </section>
+
+      <section className={styles.healthSection} aria-labelledby="health-section-title">
+        <div className={styles.healthSectionHeader}>
+          <div>
+            <p className={styles.eyebrow}>LIVE CONNECTIONS</p>
+            <h2 id="health-section-title">Check the sources the map depends on.</h2>
+            <p className={styles.healthIntro}>
+              The check reads only GIS service metadata. It does not download parcel features or ownership fields, and a reachable endpoint is not permission to reuse its data.
+            </p>
+          </div>
+          <button
+            className={styles.healthButton}
+            disabled={healthLoading}
+            onClick={checkLiveSources}
+            type="button"
+          >
+            {healthLoading ? "Checking sources…" : healthReport ? "Check again" : "Check live connections"}
+          </button>
+        </div>
+
+        {healthError ? <p className={styles.healthError} role="alert">{healthError}</p> : null}
+
+        {healthReport ? (
+          <div className={styles.healthResults} aria-live="polite">
+            <div className={styles.healthSummary}>
+              <strong>{healthReport.reachableCount} / {healthReport.totalCount} endpoints reachable</strong>
+              <span>Checked {new Date(healthReport.checkedAt).toLocaleString("en-RW")}</span>
+            </div>
+            <div className={styles.healthGrid}>
+              {healthReport.results.map((result) => (
+                <article className={styles.healthCard} key={result.id}>
+                  <div className={styles.healthCardHeader}>
+                    <div>
+                      <p className={styles.healthCategory}>{result.category === "cadastral" ? "CADASTRAL" : "ADMINISTRATIVE"}</p>
+                      <h3>{result.name}</h3>
+                    </div>
+                    <span className={styles.healthStatus} data-status={result.status}>
+                      {result.status === "reachable" ? "Reachable" : "Unavailable"}
+                    </span>
+                  </div>
+                  <p className={styles.healthServiceTitle}>{result.serviceTitle ?? "Service metadata unavailable"}</p>
+                  <dl className={styles.healthDetails}>
+                    <div>
+                      <dt>HTTP response</dt>
+                      <dd>{result.httpStatus === null ? "No response" : result.httpStatus}</dd>
+                    </div>
+                    <div>
+                      <dt>Last edit timestamp</dt>
+                      <dd>{result.lastEditAt ? new Date(result.lastEditAt).toLocaleString("en-RW") : "Not supplied by metadata"}</dd>
+                    </div>
+                    {result.layerCount !== null ? (
+                      <div><dt>Layers exposed</dt><dd>{result.layerCount}</dd></div>
+                    ) : null}
+                  </dl>
+                  <p className={styles.healthLicence}><strong>Reuse terms:</strong> {result.licenseStatus}</p>
+                  {result.attribution ? <p className={styles.healthAttribution}><strong>Attribution metadata:</strong> {result.attribution}</p> : null}
+                  {result.fields.length > 0 ? (
+                    <p className={styles.healthFields}><strong>Schema fields:</strong> {result.fields.slice(0, 10).join(", ")}{result.fields.length > 10 ? " …" : ""}</p>
+                  ) : null}
+                  <p className={styles.healthDetail}>{result.detail}</p>
+                </article>
+              ))}
+            </div>
+            <p className={styles.healthNotice}>{healthReport.notice}</p>
+          </div>
+        ) : (
+          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect availability and metadata from the four connected GIS endpoints.</p>
+        )}
       </section>
 
       <section className={styles.sourceSection} aria-labelledby="source-register-title">

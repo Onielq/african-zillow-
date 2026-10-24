@@ -84,3 +84,250 @@
   .footer { align-items: start; flex-direction: column; margin: 24px 14px 0; padding: 18px 0 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .page, .page *, .page *::before, .page *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+
+.healthSection {
+  max-width: 1100px;
+  margin: 42px auto 0;
+  padding: 0 24px;
+}
+
+.healthSectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.healthSectionHeader h2 {
+  max-width: 650px;
+  margin: 0;
+  color: #17231f;
+  font-size: clamp(22px, 3vw, 29px);
+  letter-spacing: -.045em;
+  line-height: 1.15;
+}
+
+.healthIntro {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: #596861;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.healthButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  border: 1px solid #176b50;
+  border-radius: 11px;
+  background: #176b50;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.healthButton:hover:not(:disabled) {
+  background: #12563f;
+}
+
+.healthButton:disabled {
+  cursor: progress;
+  opacity: .65;
+}
+
+.healthPrompt,
+.healthError,
+.healthNotice {
+  color: #66756c;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.healthPrompt {
+  margin: 17px 0 0;
+  padding: 15px;
+  border: 1px dashed #cfdad2;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.healthError {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #ecd0d0;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #9f3636;
+}
+
+.healthResults {
+  margin-top: 18px;
+}
+
+.healthSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.healthSummary strong {
+  color: #243b30;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.healthSummary span {
+  color: #77847d;
+  font-size: 10px;
+}
+
+.healthGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.healthCard {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dce4de;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.healthCardHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.healthCategory {
+  margin: 0 0 6px;
+  color: #77847d;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .1em;
+}
+
+.healthCard h3 {
+  margin: 0;
+  color: #17231f;
+  font-size: 14px;
+  letter-spacing: -.025em;
+  line-height: 1.35;
+}
+
+.healthStatus {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid #ead9b5;
+  border-radius: 999px;
+  background: #fffaef;
+  color: #8a5a11;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.healthStatus[data-status="reachable"] {
+  border-color: #c5e1ce;
+  background: #e7f3ec;
+  color: #176b50;
+}
+
+.healthServiceTitle {
+  margin: 10px 0 0;
+  color: #596861;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.healthDetails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 13px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid #edf0ed;
+  border-bottom: 1px solid #edf0ed;
+}
+
+.healthDetails > div {
+  min-width: 0;
+}
+
+.healthDetails dt {
+  color: #77847d;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.healthDetails dd {
+  margin: 4px 0 0;
+  color: #33443a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.healthLicence,
+.healthAttribution,
+.healthFields,
+.healthDetail {
+  margin: 10px 0 0;
+  color: #68766e;
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.healthLicence strong,
+.healthAttribution strong,
+.healthFields strong {
+  color: #3d5045;
+}
+
+.healthDetail {
+  padding-top: 9px;
+  border-top: 1px solid #edf0ed;
+  color: #77847d;
+}
+
+.healthNotice {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 760px) {
+  .healthSection {
+    margin-top: 34px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .healthSectionHeader {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .healthButton {
+    align-self: flex-start;
+  }
+
+  .healthGrid {
+    grid-template-columns: 1fr;
+  }
+}

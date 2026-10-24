@@ -217,6 +217,7 @@ test("the standalone data source register exposes provenance, limitations, and s
   const css = await readProjectFile("src/app/data-sources/data-sources.module.css");
   const docs = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const healthRoute = await readProjectFile("src/app/api/data-sources/health/route.ts");
 
   assert.match(page, /Kigali administrative boundaries/);
   assert.match(page, /Bugesera cadastral parcels/);
@@ -225,8 +226,44 @@ test("the standalone data source register exposes provenance, limitations, and s
   assert.match(page, /reuse permission/i);
   assert.match(page, /not proof of ownership/i);
   assert.match(page, /data-status/);
+  assert.match(page, /Check live connections/);
+  assert.match(page, /Reachable/);
+  assert.match(healthRoute, /KIGALI_MASTERPLAN|kigali-administrative/);
+  assert.match(healthRoute, /bugesera-cadastral/);
+  assert.match(healthRoute, /No licence statement declared in service metadata/);
+  assert.match(healthRoute, /X-Data-Check/);
+  assert.match(healthRoute, /does not validate coverage/);
+  assert.match(css, /\.healthGrid/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(docs, /DATA_SOURCE_REGISTER|Data source register/);
   assert.match(docs, /approved sharing/);
   assert.match(experience, /href="\/data-sources"/);
+});
+
+
+test("the reference screen audit and map comparison patterns are implemented without invented metrics", async () => {
+  const audit = await readProjectFile("docs/REFERENCE_SCREEN_AUDIT.md");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(audit, /Audit of all 18 reference screenshots/);
+  assert.ok(audit.includes("Screenshot 2026-10-19 234441.jpg"));
+  assert.ok(audit.includes("Screenshot 2026-10-19 235932.jpg"));
+  assert.match(audit, /without permission|Do not redistribute/i);
+  assert.match(experience, /PILOT_DISTRICT_SEARCH_AREAS/);
+  assert.match(experience, /comparison-area-search/);
+  assert.match(experience, /comparison-selected-chips/);
+  assert.match(experience, /Clear all/);
+  assert.match(experience, /canCompareDistrictPrices/);
+  assert.match(experience, /Highest mapped district price/);
+  assert.match(experience, /aria-modal="true"/);
+  assert.match(experience, /area-market-grid/);
+  assert.match(experience, /Projects in selected area/);
+  assert.match(experience, /Not connected/);
+  assert.match(experience, /metric-info-panel/);
+  assert.match(experience, /activeMetric\.dataStatus/);
+  assert.match(experience, /Expected unit/);
+  assert.match(css, /comparison-modal-backdrop/);
+  assert.match(css, /area-market-card/);
+  assert.match(css, /metric definition popover/i);
 });

@@ -39,6 +39,10 @@ https://tiles.openfreemap.org/styles/liberty
 - A `devtools://devtools/...` URL is a Chrome debugging URL, not a map-data endpoint. Diagnose the actual error message associated with it before changing app code.
 - If the basemap fails after the worker is available, check the browser Network tab for style and tile requests. A working worker is necessary but does not guarantee that a third-party style or tile service is reachable.
 
+## Reference screen audit
+
+The 18 DXB Interact reference screenshots and the corresponding Rwanda implementation gaps are documented in [the screen-by-screen reference audit](docs/REFERENCE_SCREEN_AUDIT.md). The audit maps each observed screen state to Rwanda-specific behavior, lists data-source and permission gates, and sets acceptance criteria for comparison, metric definitions, area details, project discovery, and contextual map overlays. The Dubai sample metrics are visual examples only and are not reused as Rwanda market data.
+
 ## Investment intelligence workspace
 
 The map workspace includes a six-metric selector, property-type and analysis-period filters, an Areas / Projects mode switch, a data-source register, and a comparison shortlist for up to four areas.
