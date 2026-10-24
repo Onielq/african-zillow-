@@ -1441,7 +1441,7 @@ export function MapExperience() {
                       Voluntary sale, succession, expropriation, exchange, donation, court decisions and auctions, subdivision, public-land title, parcel merge, and change of land use. Keep counts by type and month so different legal events are not treated as identical market demand.
                     </p>
                     <p>
-                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Do not infer sector/cell transaction counts from district totals without transaction-level geography.
+                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Sector, cell and village figures in this app are explicitly labelled parcel-share models, not official transaction counts. The public summary dataset offers finer-level counts but requires approved access before direct integration.
                     </p>
                     <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                       Open district transaction and type tables ↗
