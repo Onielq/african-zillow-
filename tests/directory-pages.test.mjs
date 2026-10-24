@@ -21,9 +21,9 @@ test("project and developer directories remain evidence-gated until a feed is ve
   assert.match(developers, /Property developers/i);
   assert.match(developers, /Estate agencies/i);
   assert.match(developers, /Independent agents/i);
-  assert.match(developers, /developer-directory-template\\.csv/);
+  assert.match(developers, /developer-directory-template\.csv/);
   assert.match(directory, /An agent is not labelled a developer/i);
-  assert.match(developers, /Authority to represent/i);
+  assert.match(developers, /Verified market role/i);
   assert.match(directory, /This means no records are verified and published in this directory/i);
   assert.ok(directory.includes('href: "/projects"'));
   assert.ok(directory.includes('href: "/developers"'));
