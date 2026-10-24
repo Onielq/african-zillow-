@@ -254,6 +254,8 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.match(experience, /comparison-area-search/);
   assert.match(experience, /comparison-selected-chips/);
   assert.match(experience, /Clear all/);
+  assert.match(experience, /canCompareDistrictPrices/);
+  assert.match(experience, /Highest mapped district price/);
   assert.match(experience, /aria-modal="true"/);
   assert.match(experience, /area-market-grid/);
   assert.match(experience, /Projects in selected area/);
