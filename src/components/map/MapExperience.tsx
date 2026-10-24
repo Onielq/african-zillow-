@@ -113,7 +113,72 @@ const FOCUS_OPTIONS: Array<{
   }
 ];
 
-
+const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
+  {
+    level: "district",
+    name: "Gasabo",
+    province: "Kigali City",
+    district: "Gasabo",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 36013,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Kicukiro",
+    province: "Kigali City",
+    district: "Kicukiro",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 61491,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Nyarugenge",
+    province: "Kigali City",
+    district: "Nyarugenge",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 50735,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  },
+  {
+    level: "district",
+    name: "Bugesera",
+    province: "Eastern Province",
+    district: "Bugesera",
+    districtId: null,
+    sector: null,
+    sectorId: null,
+    cell: null,
+    cellId: null,
+    village: null,
+    villageId: null,
+    averageLandPricePerM2: 4033,
+    sourceLabel: "Rwanda Land Dashboard · observation date not exposed",
+    sourceType: "administrative-boundary"
+  }
+];
 
 function BrandMark() {
   return (
@@ -193,6 +258,7 @@ export function MapExperience() {
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareSearch, setCompareSearch] = useState("");
   const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
@@ -225,18 +291,16 @@ export function MapExperience() {
     []
   );
 
-  const addSelectedAreaToComparison = () => {
-    if (!selectedArea) return;
-
+  const addAreaToComparison = (areaToAdd: SelectedArea) => {
     const exists = comparedAreas.some(
       (area) =>
-        area.level === selectedArea.level &&
-        area.name === selectedArea.name &&
-        area.district === selectedArea.district
+        area.level === areaToAdd.level &&
+        area.name === areaToAdd.name &&
+        area.district === areaToAdd.district
     );
 
     if (exists) {
-      setComparisonFeedback(`${selectedArea.name} is already on your comparison list.`);
+      setComparisonFeedback(`${areaToAdd.name} is already on your comparison list.`);
       setCompareOpen(true);
       return;
     }
@@ -247,9 +311,14 @@ export function MapExperience() {
       return;
     }
 
-    setComparedAreas((areas) => [...areas, selectedArea]);
-    setComparisonFeedback(`${selectedArea.name} added to comparison.`);
+    setComparedAreas((areas) => [...areas, areaToAdd]);
+    setComparisonFeedback(`${areaToAdd.name} added to comparison.`);
     setCompareOpen(true);
+  };
+
+  const addSelectedAreaToComparison = () => {
+    if (!selectedArea) return;
+    addAreaToComparison(selectedArea);
   };
 
   const removeComparedArea = (areaToRemove: SelectedArea) => {
@@ -269,6 +338,12 @@ export function MapExperience() {
   const activeMetric =
     MARKET_METRICS.find((metric) => metric.id === selectedMetric) ??
     MARKET_METRICS[0];
+  const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
+  const comparisonSearchResults = normalizedComparisonSearch
+    ? PILOT_DISTRICT_SEARCH_AREAS.filter((area) =>
+        area.name.toLocaleLowerCase().includes(normalizedComparisonSearch)
+      )
+    : [];
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -290,6 +365,15 @@ export function MapExperience() {
 
     return () => context.revert();
   }, []);
+
+  useEffect(() => {
+    if (!compareOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCompareOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [compareOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -799,7 +883,22 @@ export function MapExperience() {
         ) : null}
 
         {compareOpen ? (
-          <aside aria-label="Area comparison" className="comparison-panel">
+          <button
+            aria-label="Close comparison dialog"
+            className="comparison-modal-backdrop"
+            onClick={() => setCompareOpen(false)}
+            type="button"
+          />
+        ) : null}
+
+        {compareOpen ? (
+          <aside
+            aria-label="Area comparison dialog"
+            aria-labelledby="comparison-title"
+            aria-modal="true"
+            className="comparison-panel"
+            role="dialog"
+          >
             <button
               aria-label="Close area comparison"
               className="panel-close"
@@ -808,45 +907,100 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">INVESTMENT SHORTLIST</p>
+            <p className="panel-eyebrow">AREA COMPARISON</p>
             <div className="comparison-title-row">
-              <h2>Compare areas</h2>
-              <span>{comparedAreas.length}/4</span>
+              <div>
+                <h2 id="comparison-title">Compare areas</h2>
+                <p className="comparison-subtitle">Select up to four areas to compare side by side.</p>
+              </div>
+              <span>{comparedAreas.length}/4 selected</span>
             </div>
-            <p className="panel-copy">
-              Click an area on the map, then choose “Add to comparison”.
-              Compare the same metric and period across your shortlist.
-            </p>
+            <label className="comparison-search-label" htmlFor="comparison-area-search">Search by district</label>
+            <input
+              autoComplete="off"
+              className="comparison-search"
+              id="comparison-area-search"
+              onChange={(event) => setCompareSearch(event.target.value)}
+              placeholder="Search by district name"
+              type="search"
+              value={compareSearch}
+            />
+            {normalizedComparisonSearch ? (
+              <div aria-label="Matching pilot districts" className="comparison-search-results" role="listbox">
+                {comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
+                  const isAdded = comparedAreas.some((existing) =>
+                    existing.level === area.level &&
+                    existing.name === area.name &&
+                    existing.district === area.district
+                  );
+                  const atLimit = comparedAreas.length >= 4 && !isAdded;
+                  return (
+                    <button
+                      aria-selected={isAdded}
+                      className="comparison-search-result"
+                      disabled={isAdded || atLimit}
+                      key={area.name}
+                      onClick={() => {
+                        addAreaToComparison(area);
+                        if (!isAdded && !atLimit) setCompareSearch("");
+                      }}
+                      role="option"
+                      type="button"
+                    >
+                      <span className="comparison-search-dot" aria-hidden="true" />
+                      <span className="comparison-search-result-copy">
+                        <strong>{area.name}</strong>
+                        <small>{area.province} · District · pilot geography</small>
+                      </span>
+                      <span className="comparison-search-result-action">{isAdded ? "Added" : atLimit ? "Limit reached" : "Add"}</span>
+                    </button>
+                  );
+                }) : (
+                  <p className="comparison-no-results">No pilot district matched “{compareSearch.trim()}”. Smaller areas can still be added from the map.</p>
+                )}
+              </div>
+            ) : null}
             {comparisonFeedback ? (
               <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
             ) : null}
             {comparedAreas.length === 0 ? (
               <div className="comparison-empty">
-                <strong>Your shortlist is empty</strong>
-                <p>Add up to four districts, sectors, cells or villages from the map.</p>
+                <span aria-hidden="true" className="comparison-empty-pin">⌖</span>
+                <strong>No areas selected</strong>
+                <p>Search a pilot district above or select a smaller area on the map and choose “Add to comparison”.</p>
               </div>
             ) : (
               <>
                 <div className="comparison-area-list">
-                  {comparedAreas.map((area) => (
-                    <div
-                      className="comparison-area-item"
-                      key={`${area.level}-${area.district}-${area.name}`}
-                    >
-                      <div>
-                        <strong>{area.name}</strong>
-                        <span>{area.level} · {area.district} District</span>
-                      </div>
-                      <button
-                        aria-label={`Remove ${area.name} from comparison`}
-                        className="comparison-remove"
-                        onClick={() => removeComparedArea(area)}
-                        type="button"
+                  <div className="comparison-selected-chips">
+                    {comparedAreas.map((area) => (
+                      <span
+                        className="comparison-chip"
+                        key={`${area.level}-${area.district}-${area.name}`}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <span>{area.name}</span>
+                        <button
+                          aria-label={`Remove ${area.name} from comparison`}
+                          className="comparison-chip-remove"
+                          onClick={() => removeComparedArea(area)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    className="comparison-clear-inline"
+                    disabled={comparedAreas.length === 0}
+                    onClick={() => {
+                      setComparedAreas([]);
+                      setComparisonFeedback("");
+                    }}
+                    type="button"
+                  >
+                    Clear all
+                  </button>
                 </div>
                 <div className="comparison-table-scroll">
                   <table className="comparison-table">
