@@ -1992,3 +1992,25 @@ button:disabled {
 .comparison-row-leader > span {
   font-size: 10px;
 }
+
+
+/* Directory links from the map's evidence-gated project states. */
+.directory-route-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 12px;
+}
+
+.directory-route-links a {
+  color: #176B50;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.directory-route-links a:hover {
+  color: #12563F;
+  text-decoration: underline;
+}
