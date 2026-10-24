@@ -10,13 +10,15 @@ export type DeveloperCandidate = {
   status: "Needs verification";
   /** Public website found during initial research; does not mean the profile is verified. */
   website?: string;
+  /** Public logo asset URL found on an official site or public company profile. */
+  logoUrl?: string;
 };
 
 export const RWANDA_DEVELOPER_CANDIDATES: DeveloperCandidate[] = [
   { id: "homart-properties", name: "Homart Properties", segment: "Premium residential / mixed-use", website: "https://homartproperties.com/", sourceMetrics: ["10", "403+", "4", "0", "72", "67"], status: "Needs verification" },
   { id: "ultimate-developers-ltd", name: "Ultimate Developers Ltd (UDL)", segment: "Residential / Commercial / Hospitality", website: "https://udl.rw/", sourceMetrics: ["7", "2,004+", "5", "0", "81", "62"], status: "Needs verification" },
-  { id: "imara-properties", name: "Imara Properties", segment: "Luxury residential", website: "https://www.imara-properties.com/", sourceMetrics: ["7", "86+", "4", "0", "77", "78"], status: "Needs verification" },
-  { id: "delta-fortico-group", name: "Delta Developers / Fortico Group", segment: "Luxury residential / development", website: "https://delta-rwanda.com/", sourceMetrics: ["5", "170", "3", "0", "78", "91"], status: "Needs verification" },
+  { id: "imara-properties", name: "Imara Properties", segment: "Luxury residential", website: "https://www.imara-properties.com/", logoUrl: "https://pbs.twimg.com/profile_images/1377955186182926340/NIk0Qwa0.jpg", sourceMetrics: ["7", "86+", "4", "0", "77", "78"], status: "Needs verification" },
+  { id: "delta-fortico-group", name: "Delta Developers / Fortico Group", segment: "Luxury residential / development", website: "https://delta-rwanda.com/", logoUrl: "https://delta-rwanda.com/assets/delta-developers-B6ukr5Mu.png", sourceMetrics: ["5", "170", "3", "0", "78", "91"], status: "Needs verification" },
   { id: "remote-group-estate", name: "Remote Group / Remote Estate", segment: "Engineering / Construction / Real estate", website: "https://www.remotegroup.com/", sourceMetrics: ["2", "2,978", "0", "1", "30", "70"], status: "Needs verification" },
   { id: "reportage-rwanda", name: "Reportage Rwanda / Reportage Properties", segment: "Luxury residential", website: "https://reportagegroup.com/rw/", sourceMetrics: ["2", "125+", "0", "0", "—", "68"], status: "Needs verification" },
   { id: "belle-ville-groupe", name: "Belle Ville Groupe", segment: "Luxury / serviced apartments", website: "https://bellevillegroupe.com/", sourceMetrics: ["2", "30+", "1", "0", "75", "71"], status: "Needs verification" },
