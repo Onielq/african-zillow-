@@ -1711,3 +1711,126 @@ button:disabled {
     min-width: 145px;
   }
 }
+
+
+/* Reference-audited area inspector cards */
+.area-market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 16px 0 0;
+}
+
+.area-market-card {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 12px 11px;
+  border: 1px solid #e0e7e2;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.area-market-card-featured {
+  border-color: #d4e5da;
+  background: #f5faf6;
+}
+
+.area-market-card > span {
+  color: #52635a;
+  font-size: 9px;
+  font-weight: 780;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+
+.area-market-card > strong {
+  color: #243b30;
+  font-size: clamp(13px, 1.1vw, 17px);
+  font-weight: 780;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  overflow-wrap: anywhere;
+}
+
+.area-market-card-featured > strong {
+  color: #176b50;
+  font-size: clamp(16px, 1.45vw, 22px);
+}
+
+.area-market-card > small {
+  color: #78867d;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.area-projects-empty {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e3e9e4;
+}
+
+.area-projects-empty-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.area-projects-empty-heading h3 {
+  margin: 0;
+  color: #17231f;
+  font-size: 14px;
+  font-weight: 760;
+  letter-spacing: -.025em;
+}
+
+.area-projects-empty-heading span {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 1px solid #e1e7e3;
+  border-radius: 999px;
+  background: #f4f6f4;
+  color: #65736b;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.area-projects-empty > p {
+  margin: 9px 0 0;
+  color: #66756c;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+@media (max-width: 460px) {
+  .area-market-grid {
+    gap: 7px;
+  }
+
+  .area-market-card {
+    min-height: 98px;
+    padding: 10px 9px;
+  }
+
+  .area-market-card > span {
+    font-size: 8px;
+  }
+
+  .area-market-card > strong {
+    font-size: 13px;
+  }
+
+  .area-market-card-featured > strong {
+    font-size: 16px;
+  }
+
+  .area-market-card > small {
+    font-size: 8px;
+  }
+}
