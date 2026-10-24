@@ -106,11 +106,11 @@ async function checkWebPage(source: SourceProbe, checkedAt: string) {
     }
 
     const body = await response.text();
-    const rawTitle = body.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1];
+    const rawTitle = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
     const title = rawTitle
       ?.replace(/<[^>]*>/g, " ")
       .replace(/&amp;/g, "&")
-      .replace(/\\s+/g, " ")
+      .replace(/\s+/g, " ")
       .trim();
 
     return {
