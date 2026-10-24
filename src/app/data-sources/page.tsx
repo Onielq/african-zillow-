@@ -106,8 +106,8 @@ const statusDescriptions: Record<SourceStatus, string> = {
 
 export default function DataSourcesPage() {
   const counts = {
-    connected: sources.filter((source) => source.status === "connected").length,
-    review: sources.filter((source) => source.status === "review").length,
+    total: sources.length,
+    active: sources.filter((source) => source.status !== "candidate").length,
     candidate: sources.filter((source) => source.status === "candidate").length,
     approval: sources.filter((source) => source.status === "approval").length
   };
@@ -140,9 +140,9 @@ export default function DataSourcesPage() {
       </section>
 
       <section className={styles.summary} aria-label="Source status summary">
-        <div><strong>{counts.connected}</strong><span>Connected snapshots / feeds</span></div>
-        <div><strong>{counts.review}</strong><span>Freshness review</span></div>
-        <div><strong>{counts.candidate}</strong><span>Candidate sources</span></div>
+        <div><strong>{counts.total}</strong><span>Sources assessed</span></div>
+        <div><strong>{counts.active}</strong><span>Connected in prototype</span></div>
+        <div><strong>{counts.candidate}</strong><span>Not connected yet</span></div>
         <div><strong>{counts.approval}</strong><span>Reuse approval gates</span></div>
       </section>
 
