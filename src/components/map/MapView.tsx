@@ -731,7 +731,7 @@ export function MapView({
         // names can repeat across cells, so use cell ID + normalized exact name;
         // ambiguous matches are left blank rather than guessing.
         const normalisePlaceName = (value: string) =>
-          value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase().replace(/\\s+/g, " ");
+          value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
         const villageIdByCellAndName = new Map<string, string>();
         const ambiguousVillageKeys = new Set<string>();
         if (villageResult) {
