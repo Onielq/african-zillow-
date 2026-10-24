@@ -1247,7 +1247,7 @@ export function MapExperience() {
                     </strong>
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
-                        ? "Rwanda Land Dashboard · source observation date not exposed"
+                        ? "Rwanda Land Dashboard /prices · provisional indexed snapshot reviewed 24 Oct 2026; effective date and calculation method are not disclosed."
                         : landPriceLoadStatus === "loading"
                           ? "Loading the supplied sector/cell reference table…"
                           : landPriceLoadStatus === "error"
