@@ -1966,3 +1966,29 @@ button:disabled {
     padding: 18px 15px 15px;
   }
 }
+
+
+.comparison-price-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.comparison-row-leader {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: 1px solid #cce4d4;
+  border-radius: 999px;
+  background: #edf7f0;
+  color: #176b50;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.comparison-row-leader > span {
+  font-size: 10px;
+}
