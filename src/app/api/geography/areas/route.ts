@@ -458,7 +458,7 @@ function normaliseAdministrativeFeature(
             average_land_price_per_m2:
               DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict],
             average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
-            average_land_price_date_status: "source observation date not exposed"
+            average_land_price_date_status: "Effective date and calculation method not disclosed; provisional /prices page snapshot reviewed 2026-10-24"
           }
         : {})
     }
