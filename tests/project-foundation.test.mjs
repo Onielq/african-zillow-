@@ -386,3 +386,47 @@ test("official dashboard price snapshots are provisional and separated from refe
   assert.match(sourceAudit, /observation date of these values is \*\*not confirmed\*\*/);
   assert.match(sourceAudit, /Do not choose the higher value, lower value, mean/);
 });
+
+
+test("Show menu provides map overlay categories within the scoped pilot", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const overlayRoute = await readProjectFile("src/app/api/map-overlays/route.ts");
+  const css = await readProjectFile("src/app/globals.css");
+  assert.match(experience, /aria-label="Map overlays menu"/);
+  for (const label of ["Landmarks", "Medical", "Schools", "Transport", "Parks & nature"]) {
+    assert.ok(experience.includes(label), `Missing Show layer: ${label}`);
+  }
+  assert.match(mapView, /show-overlay-road-lines/);
+  assert.match(mapView, /areaFillColorExpression/);
+  assert.match(mapView, /const showOutline = index === activeIndex/);
+  assert.match(overlayRoute, /overpass-api\.de/);
+  assert.match(overlayRoute, /OpenStreetMap/);
+  assert.match(css, /\.show-menu/);
+  assert.match(css, /\.price-map-legend/);
+});
+
+test("sector heatmap is indicative and conflicting cell values remain withheld", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(route, /Indicative unweighted mean/);
+  assert.match(route, /average_land_price_status: "conflict"/);
+  assert.match(route, /Conflicting values remain withheld/);
+  assert.match(experience, /not an official sector-weighted average/);
+  assert.match(experience, /Conflicting values on source rows/);
+});
+
+test("selected cell exposes parcel records and never infers subdistrict transaction volume", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const volume = await readProjectFile("src/data/transaction-volume-snapshot.ts");
+  assert.match(experience, /Land parcels in this cell/);
+  assert.match(experience, /X-Parcel-List-Truncated/);
+  assert.match(experience, /mapInstance\?\.flyTo/);
+  assert.match(experience, /District-level only/);
+  assert.match(experience, /activity does not prove price appreciation/);
+  assert.match(route, /cellFilter/);
+  assert.match(route, /10_000/);
+  assert.match(volume, /transactionCount: 4350/);
+  assert.match(volume, /not a live feed/);
+});
