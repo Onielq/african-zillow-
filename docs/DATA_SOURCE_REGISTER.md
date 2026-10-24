@@ -83,3 +83,10 @@ The drawer separately lists estate-agency candidates found through public websit
 The official source review on 24 October 2026 is documented in `docs/LAND_PRICE_SOURCE_RECONCILIATION.md`. The district values are stored in `public/land-price-district-snapshot.tsv` with separate review and observation-date fields. The row-level problem list is in `public/land-price-reconciliation.tsv`.
 
 The review timestamp must not be mistaken for the underlying price observation date. District values are marked provisional until the publisher confirms the effective date and method. The raw 244-row user-supplied TSV remains unchanged so that source corrections can be audited rather than silently rewritten.
+
+
+## Map discovery overlays and transaction activity
+
+- OpenStreetMap / Overpass API: https://overpass-api.de/api/interpreter (fallback: https://overpass.kumi.systems/api/interpreter). Used for viewport-scoped discovery of landmarks, healthcare, schools, roads, bus stations/stops, parks, lakes and waterfalls. Attribution: © OpenStreetMap contributors. Coverage and tag completeness vary; not an official registry. Queries are limited to current Kigali/Bugesera pilot extents and bounded by viewport/zoom.
+- Rwanda Land Dashboard transactions: https://rwandalanddashboard.lands.rw/transactions. The app records 4,350 transactions for Bugesera as a user-provided observation dated 24 Oct 2026, not a live/verified feed. The publicly indexed snapshot differed. Do not use it as a current official count until rechecked.
+- Sector price shading is the unweighted arithmetic mean of distinct, unambiguous cells in `public/land-price-reference.tsv`. It is labelled indicative, not an official sector-weighted average; conflicting cells and malformed rows are excluded, and the raw file is preserved unchanged. Effective date and methodology remain outstanding.
