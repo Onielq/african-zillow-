@@ -296,14 +296,22 @@ type BugeseraUpiLocationIds = {
  * in UPI and is joined in the map only by unique cell ID + exact village name.
  */
 function bugeseraLocationIdsFromUpi(upi: string): BugeseraUpiLocationIds {
-  const parts = upi.match(/^(\\d+)\\/(\\d+)\\/(\\d+)\\/(\\d+)\\/(\\d+)$/);
-  if (!parts) {
+  const parts = upi.split("/");
+  const isDigits = (part: string) =>
+    part.length > 0 && [...part].every((character) => character >= "0" && character <= "9");
+  if (parts.length !== 5 || !parts.every(isDigits)) {
     return { provinceId: null, districtId: null, sectorId: null, cellId: null };
   }
 
-  const [, provinceCode, districtCode, sectorCode, cellCode] = parts;
-  const compactDistrict = districtCode.replace(/^0+(?=\\d)/, "");
-  const districtId = `${provinceCode}${compactDistrict}`;
+  const provinceCode = parts[0] ?? "";
+  const districtCode = parts[1] ?? "";
+  const sectorCode = parts[2] ?? "";
+  const cellCode = parts[3] ?? "";
+  if (!provinceCode || !districtCode || !sectorCode || !cellCode) {
+    return { provinceId: null, districtId: null, sectorId: null, cellId: null };
+  }
+
+  const districtId = `${provinceCode}${Number(districtCode)}`;
   const sectorId = `${districtId}${sectorCode.padStart(2, "0")}`;
   const cellId = `${sectorId}${cellCode.padStart(2, "0")}`;
 
