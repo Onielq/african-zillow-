@@ -434,6 +434,7 @@ export function MapExperience() {
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
+  const [cellParcelsLookupKey, setCellParcelsLookupKey] = useState<string | null>(null);
   const [cellParcelsStatus, setCellParcelsStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [cellParcelsTotal, setCellParcelsTotal] = useState(0);
   const [cellParcelsCapped, setCellParcelsCapped] = useState(false);
@@ -528,6 +529,14 @@ export function MapExperience() {
   const selectedLandPrice = selectedArea
     ? lookupLandPriceForArea(landPriceRows, selectedArea)
     : null;
+  const activeCellParcelKey = selectedArea?.level === "cell" && selectedArea.sector
+    ? [selectedArea.district, selectedArea.sector, selectedArea.name].join("|")
+    : null;
+  const activeCellParcelsStatus = activeCellParcelKey && cellParcelsLookupKey === activeCellParcelKey
+    ? cellParcelsStatus
+    : activeCellParcelKey
+      ? "loading"
+      : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
   const comparisonSearchResults = normalizedComparisonSearch
@@ -573,20 +582,11 @@ export function MapExperience() {
     const district = selectedArea?.district;
     const sector = selectedArea?.sector;
     const cell = selectedArea?.level === "cell" ? selectedArea.name : null;
-    if (level !== "cell" || !district || !sector || !cell) {
-      setCellParcels([]);
-      setCellParcelsStatus("idle");
-      setCellParcelsTotal(0);
-      setCellParcelsCapped(false);
-      return;
-    }
+    if (level !== "cell" || !district || !sector || !cell) return;
 
     const controller = new AbortController();
+    const lookupKey = [district, sector, cell].join("|");
     const loadCellParcels = async () => {
-      setCellParcelsStatus("loading");
-      setCellParcels([]);
-      setCellParcelsTotal(0);
-      setCellParcelsCapped(false);
       try {
         const params = new URLSearchParams({ district, sector, cell });
         const response = await fetch("/api/geography/cell-parcels?" + params.toString(), {
@@ -595,19 +595,20 @@ export function MapExperience() {
         if (!response.ok) throw new Error("Cell parcel list request failed.");
         const payload = await response.json() as CellParcelResponse;
         if (controller.signal.aborted) return;
+        setCellParcelsLookupKey(lookupKey);
         setCellParcels(payload.parcels ?? []);
         setCellParcelsTotal(payload.totalSourceRecords ?? payload.returnedRecords ?? 0);
         setCellParcelsCapped(payload.capped ?? false);
         setCellParcelsStatus("loaded");
       } catch {
         if (controller.signal.aborted) return;
+        setCellParcelsLookupKey(lookupKey);
         setCellParcelsStatus("error");
       }
     };
     void loadCellParcels();
     return () => controller.abort();
   }, [selectedArea?.level, selectedArea?.district, selectedArea?.sector, selectedArea?.name]);
-
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -1482,20 +1483,20 @@ export function MapExperience() {
                         <p>Parcel records for this cell. Select a row to zoom to the plot.</p>
                       </div>
                       <span>
-                        {cellParcelsStatus === "loaded"
+                        {activeCellParcelsStatus === "loaded"
                           ? cellParcels.length.toLocaleString("en-RW")
-                          : cellParcelsStatus === "loading"
+                          : activeCellParcelsStatus === "loading"
                             ? "Loading…"
                             : "UPI"}
                       </span>
                     </div>
-                    {cellParcelsStatus === "loading" ? (
+                    {activeCellParcelsStatus === "loading" ? (
                       <p className="cell-parcel-message" role="status">Loading parcel identifiers and areas from the connected cadastral source…</p>
-                    ) : cellParcelsStatus === "error" ? (
+                    ) : activeCellParcelsStatus === "error" ? (
                       <p className="cell-parcel-message" role="status">The parcel list could not be loaded. The administrative cell and its market indicators remain available.</p>
-                    ) : cellParcelsStatus === "loaded" && cellParcels.length === 0 ? (
-                      <p className="cell-parcel-message" role="status">No matching parcel records were returned for this exact cell name. Try the map at parcel zoom, and verify the source's administrative names.</p>
-                    ) : cellParcelsStatus === "loaded" ? (
+                    ) : activeCellParcelsStatus === "loaded" && cellParcels.length === 0 ? (
+                      <p className="cell-parcel-message" role="status">No matching parcel records were returned for this exact cell name. Try the map at parcel zoom, and verify the source&#39;s administrative names.</p>
+                    ) : activeCellParcelsStatus === "loaded" ? (
                       <>
                         <div className="cell-parcel-table-head">
                           <span>Parcel / UPI</span>
