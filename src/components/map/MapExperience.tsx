@@ -210,7 +210,7 @@ const MARKET_METRICS: Array<{
     label: "Transaction volume",
     shortLabel: "Transactions",
     description: "How many registered land transactions take place in an area.",
-    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized, date-stamped feed is not connected. A 4,350 Bugesera monthly count was reported during the current product review, while a cached overview snapshot indexed earlier showed 4,031; the period/as-of date must be reconciled before either value is stored as current. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
+    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized feed is not connected. A Bugesera month-to-date total of 4,350 was reported from /transactions on 24 Oct 2026. An earlier cached overview showed 4,031, plausibly an earlier cumulative snapshot; its observation date is not exposed. The 4,350 figure may be shown only as a dated provisional reference until a refreshable feed is connected. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
   },
   {
     id: "capitalAppreciation",
@@ -1032,7 +1032,11 @@ export function MapExperience() {
                       </small>
                     </span>
                     <span className={metric.id === "averageLandPricePerM2" ? "metric-data-pill metric-data-pill-available" : "metric-data-pill"}>
-                      {metric.id === "averageLandPricePerM2" ? "Snapshot only" : "Pending"}
+                      {metric.id === "averageLandPricePerM2"
+                        ? "Snapshot only"
+                        : metric.id === "transactionVolume"
+                          ? "Dashboard only"
+                          : "Pending"}
                     </span>
                   </button>
                 ))}
@@ -1430,10 +1434,20 @@ export function MapExperience() {
                     </small>
                   </article>
                   <article className="area-market-card">
-                    <span>Transaction volume</span>
-                    <strong>Not connected</strong>
+                    <span>Transaction volume · month to date</span>
+                    <strong>
+                      {selectedMetric === "transactionVolume" &&
+                        selectedArea.level === "district" &&
+                        selectedArea.district.toLowerCase() === "bugesera"
+                        ? "4,350*"
+                        : "Not connected"}
+                    </strong>
                     <small>
-                      Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation.
+                      {selectedMetric === "transactionVolume" &&
+                        selectedArea.level === "district" &&
+                        selectedArea.district.toLowerCase() === "bugesera"
+                        ? "Dated provisional reference reported from the official /transactions page on 24 Oct 2026; not a live value in this app. Refresh the source before treating it as current."
+                        : "Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation."}
                     </small>
                     <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
                       Open transaction dashboard ↗
