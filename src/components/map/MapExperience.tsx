@@ -10,7 +10,6 @@ import {
   type BoundaryStatus,
   type BasemapMode,
   type MapOverlayCategory,
-  type ShowScope,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -1229,6 +1228,20 @@ export function MapExperience() {
                   <strong>Data status</strong>
                   <p>{activeMetric.dataStatus}</p>
                 </div>
+                {selectedMetric === "transactionVolume" ? (
+                  <div className="transaction-types-note">
+                    <strong>Transaction types to track</strong>
+                    <p>
+                      Voluntary sale, succession, expropriation, exchange, donation, court decisions and auctions, subdivision, public-land title, parcel merge, and change of land use. Keep counts by type and month so different legal events are not treated as identical market demand.
+                    </p>
+                    <p>
+                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Do not infer sector/cell transaction counts from district totals without transaction-level geography.
+                    </p>
+                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                      Open district transaction and type tables ↗
+                    </a>
+                  </div>
+                ) : null}
                 <div className="metric-info-status">
                   <strong>Map interpretation</strong>
                   <p>
