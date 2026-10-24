@@ -6,7 +6,8 @@ type SourceProbe = {
   id: string;
   name: string;
   url: string;
-  category: "administrative" | "cadastral";
+  category: "administrative" | "cadastral" | "market-data";
+  kind?: "arcgis" | "webpage";
 };
 
 type ArcGisMetadata = {
@@ -49,6 +50,20 @@ const SOURCES: SourceProbe[] = [
     name: "Bugesera cadastral parcels (LAIS)",
     url: "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0",
     category: "cadastral"
+  },
+  {
+    id: "land-dashboard-prices-page",
+    name: "Rwanda Land Dashboard prices page",
+    url: "https://rwandalanddashboard.lands.rw/prices",
+    category: "market-data",
+    kind: "webpage"
+  },
+  {
+    id: "transaction-volume-dataset-page",
+    name: "Rwanda transaction-volume dataset page",
+    url: "https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed",
+    category: "market-data",
+    kind: "webpage"
   }
 ];
 
@@ -62,7 +77,86 @@ function safeDate(value: number | undefined): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+async function checkWebPage(source: SourceProbe, checkedAt: string) {
+  try {
+    const response = await fetch(source.url, {
+      headers: { Accept: "text/html,application/json" },
+      cache: "no-store",
+      redirect: "follow",
+      signal: AbortSignal.timeout(6500)
+    });
+
+    if (!response.ok) {
+      return {
+        id: source.id,
+        name: source.name,
+        category: source.category,
+        status: "unavailable" as const,
+        httpStatus: response.status,
+        serviceTitle: null,
+        layerCount: null,
+        fields: [] as string[],
+        lastEditAt: null,
+        licenseDeclared: false,
+        licenseStatus: "Page availability checked only; underlying data permissions are not validated",
+        attribution: null,
+        detail: `The source page returned HTTP ${response.status}. No market data was ingested.`,
+        checkedAt
+      };
+    }
+
+    const body = await response.text();
+    const rawTitle = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+    const title = rawTitle
+      ?.replace(/<[^>]*>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return {
+      id: source.id,
+      name: source.name,
+      category: source.category,
+      status: "reachable" as const,
+      httpStatus: response.status,
+      serviceTitle: title || source.name,
+      layerCount: null,
+      fields: [] as string[],
+      lastEditAt: null,
+      licenseDeclared: false,
+      licenseStatus: "Page reachability only; reuse, caching and redistribution permission remain unconfirmed",
+      attribution: source.name,
+      detail: "The public source page responds. This check does not read or import market-data rows, verify the figures, or approve use or redistribution.",
+      checkedAt
+    };
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.name === "TimeoutError" || error.name === "AbortError"
+        ? "The source page did not respond within 6.5 seconds."
+        : error.message
+      : "The source page could not be reached.";
+
+    return {
+      id: source.id,
+      name: source.name,
+      category: source.category,
+      status: "unavailable" as const,
+      httpStatus: null,
+      serviceTitle: null,
+      layerCount: null,
+      fields: [] as string[],
+      lastEditAt: null,
+      licenseDeclared: false,
+      licenseStatus: "Page availability checked only; underlying data permissions are not validated",
+      attribution: null,
+      detail: message,
+      checkedAt
+    };
+  }
+}
+
 async function checkSource(source: SourceProbe, checkedAt: string) {
+  if (source.kind === "webpage") return checkWebPage(source, checkedAt);
   try {
     const response = await fetch(`${source.url}?f=json`, {
       headers: { Accept: "application/json" },

@@ -17,6 +17,7 @@ This register deliberately distinguishes data connectivity from data-quality val
 | Rwanda Land Dashboard prices page | District land price per m² snapshot | Snapshot mapped | Observation date is not exposed in the visible table. It is not a house-price index or a live/time-series feed. |
 | Rwanda Data Sharing Platform: transaction volumes and land-use volumes | Candidate source for land-market activity summaries | Not connected | Dataset pages say summaries are for approved sharing. Confirm access and product redistribution terms before importing. Not parcel-level/title data. |
 | NISR 2022 Population and Housing Census | Candidate demographic context for market analysis | Not connected | Preserve census year and geographic granularity; census values are not active listings, rent observations or transaction prices. |
+| Authorised project / developer feed | Project discovery and developer directory | Not connected; dedicated routes show zero published records | No maintained, authorised source is connected. Do not fill the directory with stale advertisements or unverified company/project claims. |
 
 ## Verified source links
 
@@ -31,9 +32,9 @@ This register deliberately distinguishes data connectivity from data-quality val
 
 ## Operational source-health checks
 
-The application source register includes an on-demand health check at `/api/data-sources/health` for the four GIS endpoints already used by the map. It reads service metadata only and reports HTTP reachability, exposed layer/schema metadata, a last-edit timestamp when supplied, and whether the endpoint declares a licence statement.
+The application source register includes an on-demand health check at `/api/data-sources/health` for four GIS services plus two official land-market source pages: the Rwanda Land Dashboard prices page and the Rwanda Data Sharing Platform transaction-volume dataset page. For ArcGIS services it reads metadata such as HTTP reachability, exposed layer/schema information, a last-edit timestamp when supplied, and whether a licence statement is declared. For the two HTML pages it checks page availability and title only.
 
-The check does **not** download parcel features or ownership attributes. A reachable service, an exposed field list, and a published last-edit date are not proof of data completeness, survey accuracy, legal status, freshness of every feature, or permission to cache and redistribute. The UI must keep those checks separate.
+The check does **not** download parcel features, ownership attributes, or market-data rows. A reachable page is not a connected market-data feed. A reachable service, an exposed field list, and a published last-edit date are not proof of data completeness, survey accuracy, legal status, freshness of every feature, or permission to cache and redistribute. The UI must keep those checks separate.
 
 ## Non-negotiable data rules
 
@@ -44,3 +45,8 @@ The check does **not** download parcel features or ownership attributes. A reach
 5. No market appreciation, rental yield, active supply, project status or payment plan should be displayed as a factual live metric until a suitable source, measurement definition and observation date are connected and tested.
 6. Treat data completeness, positional/survey accuracy, legal status and reuse permission as four separate checks.
 7. Before any production cadastral redistribution, retain written confirmation of permission, attribution, permitted caching and limits on display/derivative use.
+
+
+## Directory publication gates
+
+The `/projects` and `/developers` routes are available, but the directory feeds are not connected and the number of verified, published records is currently zero. This is not a claim that Rwanda has no projects or developers. The page requires record-level identity, source, location, last-verified date, and appropriate display permission before showing any result.

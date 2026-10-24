@@ -58,7 +58,7 @@ The map workspace includes a six-metric selector, property-type and analysis-per
 
 Useful public starting points are the [Rwanda Land Dashboard](https://rwandalanddashboard.lands.rw/) and the [Rwanda Data Sharing Platform](https://data.gov.rw/datasets). The platform describes some land datasets as aggregated summaries derived from the Land Administration Information System (LAIS), not individual parcel-title records. Follow each dataset's citation and reuse rules; its published terms may restrict redistribution.
 
-The comparison panel can shortlist area names and levels. It shows the sourced district land-price snapshot where available and marks the other metric rows as pending. Projects mode does not fabricate project markers, prices, payment plans, or construction percentages.
+The comparison panel can shortlist area names and levels. It shows the sourced district land-price snapshot where available and marks the other metric rows as pending. Projects mode does not fabricate project markers, prices, payment plans, or construction percentages. Dedicated `/projects` and `/developers` routes explain the evidence required for those directories; neither publishes records until an authorised, current feed is verified.
 
 ## Rwanda viewport limits and boundary opacity
 
