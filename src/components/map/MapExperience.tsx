@@ -9,8 +9,10 @@ import {
   type BasemapStatus,
   type BoundaryStatus,
   type BasemapMode,
-  type SelectedArea
+  type SelectedArea,
+  type ShowLayer
 } from "@/components/map/MapView";
+import { TRANSACTION_VOLUME_SNAPSHOT } from "@/data/transaction-volume-snapshot";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
 import {
   RWANDA_PUBLIC_AGENT_CANDIDATES,
@@ -34,10 +36,21 @@ type LandPriceRow = {
 };
 
 type LandPriceLookup = {
-  status: "found" | "ambiguous" | "unavailable" | "sector-summary-not-provided";
+  status: "found" | "ambiguous" | "unavailable" | "sector-summary-not-provided" | "sector-estimate";
   price: number | null;
   sourceLines: number[];
   pricedCells: number;
+};
+
+type CellParcelEntry = {
+  id: string | number;
+  upi: string;
+  parcelNumber: string | null;
+  parcelSizeM2: number | null;
+  village: string | null;
+  wetlandAreaM2: number | null;
+  lastUpdatedOn: number | null;
+  center: [number, number];
 };
 
 function normalizeAreaName(value: string | null | undefined): string {
@@ -93,11 +106,17 @@ function lookupLandPriceForArea(
       if (row.price !== null) prices.add(row.price);
       byCell.set(key, prices);
     }
-    const pricedCells = Array.from(byCell.values()).filter((prices) => prices.size === 1).length;
+    const unambiguousCellPrices = Array.from(byCell.values())
+      .filter((prices) => prices.size === 1)
+      .map((prices) => Array.from(prices)[0])
+      .filter((price): price is number => typeof price === "number");
+    const pricedCells = unambiguousCellPrices.length;
     return {
-      status: "sector-summary-not-provided",
-      price: null,
-      sourceLines: [],
+      status: pricedCells > 0 ? "sector-estimate" : "sector-summary-not-provided",
+      price: pricedCells > 0
+        ? Math.round(unambiguousCellPrices.reduce((sum, price) => sum + price, 0) / pricedCells)
+        : null,
+      sourceLines: sectorRows.map((row) => row.sourceLine),
       pricedCells
     };
   }
@@ -150,6 +169,25 @@ function getLandPriceDiagnostics(rows: LandPriceRow[]) {
     malformedRows: rows.length - validRows.length,
     conflictingLocations: Array.from(pricesByLocation.values()).filter((prices) => prices.size > 1).length
   };
+}
+
+function geometryCenter(geometry: unknown): [number, number] | null {
+  if (!geometry || typeof geometry !== "object" || !("coordinates" in geometry)) return null;
+  const positions: Array<[number, number]> = [];
+  const collect = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+      positions.push([value[0], value[1]]);
+      return;
+    }
+    value.forEach(collect);
+  };
+  collect((geometry as { coordinates?: unknown }).coordinates);
+  if (positions.length === 0) return null;
+  return [
+    (Math.min(...positions.map((position) => position[0])) + Math.max(...positions.map((position) => position[0]))) / 2,
+    (Math.min(...positions.map((position) => position[1])) + Math.max(...positions.map((position) => position[1]))) / 2
+  ];
 }
 
 function initialsForName(name: string): string {
@@ -403,6 +441,12 @@ export function MapExperience() {
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const [showLayer, setShowLayer] = useState<ShowLayer>("none");
+  const [cellParcels, setCellParcels] = useState<CellParcelEntry[]>([]);
+  const [cellParcelStatus, setCellParcelStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [cellParcelListTruncated, setCellParcelListTruncated] = useState(false);
+  const [cellParentArea, setCellParentArea] = useState<SelectedArea | null>(null);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -431,10 +475,14 @@ export function MapExperience() {
     (map: MapLibreMapInstance | null) => setMapInstance(map),
     []
   );
-  const handleAreaSelected = useCallback(
-    (area: SelectedArea | null) => setSelectedArea(area),
-    []
-  );
+  const handleAreaSelected = useCallback((area: SelectedArea | null) => {
+    setSelectedArea(area);
+    if (area?.level === "cell") {
+      setCellParentArea(area);
+    } else if (!area || area.level !== "parcel") {
+      setCellParentArea(null);
+    }
+  }, []);
   const handleBasemapStatus = useCallback(
     (status: BasemapStatus) => setBasemapStatus(status),
     []
@@ -562,7 +610,7 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setCompareOpen(false);
@@ -571,11 +619,83 @@ export function MapExperience() {
         setDevelopersOpen(false);
         setProjectsOpen(false);
         setSourcesOpen(false);
+        setShowOpen(false);
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen]);
+
+  useEffect(() => {
+    if (!selectedArea || selectedArea.level !== "cell" || !selectedArea.bounds || !selectedArea.sector) {
+      setCellParcels([]);
+      setCellParcelStatus("idle");
+      setCellParcelListTruncated(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    setCellParcels([]);
+    setCellParcelStatus("loading");
+    setCellParcelListTruncated(false);
+
+    const params = new URLSearchParams({
+      level: "parcel",
+      bbox: selectedArea.bounds.map((value) => value.toFixed(6)).join(","),
+      district: selectedArea.district,
+      sector: selectedArea.sector,
+      cell: selectedArea.name
+    });
+
+    void fetch(`/api/geography/areas?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Cell parcel query failed (${response.status})`);
+        const truncated = response.headers.get("X-Parcel-List-Truncated") === "true";
+        const payload = await response.json() as {
+          features?: Array<{
+            id?: string | number;
+            geometry?: unknown;
+            properties?: Record<string, unknown>;
+          }>;
+        };
+        const entries = (payload.features ?? []).flatMap((feature): CellParcelEntry[] => {
+          const properties = feature.properties ?? {};
+          const upi = typeof properties.upi === "string" ? properties.upi : "";
+          const center = geometryCenter(feature.geometry);
+          if (!upi || !center) return [];
+          const id = typeof feature.id === "string" || typeof feature.id === "number" ? feature.id : upi;
+          const numberValue = (value: unknown): number | null =>
+            typeof value === "number" && Number.isFinite(value) ? value : null;
+          return [{
+            id,
+            upi,
+            parcelNumber: typeof properties.parcel_number === "string" ? properties.parcel_number : null,
+            parcelSizeM2: numberValue(properties.parcel_size_m2),
+            village: typeof properties.village === "string" ? properties.village : null,
+            wetlandAreaM2: numberValue(properties.wetland_area_m2),
+            lastUpdatedOn: numberValue(properties.last_updated_on),
+            center
+          }];
+        });
+        return { entries, truncated };
+      })
+      .then(({ entries, truncated }) => {
+        if (!active) return;
+        setCellParcels(entries);
+        setCellParcelListTruncated(truncated);
+        setCellParcelStatus("loaded");
+      })
+      .catch(() => {
+        if (!active || controller.signal.aborted) return;
+        setCellParcelStatus("error");
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [selectedArea]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -599,6 +719,7 @@ export function MapExperience() {
     if (!option || !mapInstance) return;
 
     setSelectedArea(null);
+    setCellParentArea(null);
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
@@ -679,6 +800,8 @@ export function MapExperience() {
         <MapView
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
+          showLayer={showLayer}
+          overlayScope={activeFocus}
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -686,6 +809,15 @@ export function MapExperience() {
         />
 
         <div className="map-vignette" aria-hidden="true" />
+
+        {selectedMetric === "averageLandPricePerM2" ? (
+          <div aria-label="Land price color scale" className="price-map-legend">
+            <span>Lower</span>
+            <span aria-hidden="true" className="price-map-gradient" />
+            <span>Higher</span>
+            <small>RWF / m² · provisional where shown</small>
+          </div>
+        ) : null}
 
         <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
@@ -765,6 +897,22 @@ export function MapExperience() {
               Projects
             </button>
             <button
+              aria-label="Show map overlays"
+              aria-expanded={showOpen}
+              className={showOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              onClick={() => {
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setShowOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Show <span aria-hidden="true">⌄</span>
+            </button>
+            <button
               aria-label="Market metric"
               aria-expanded={metricsOpen}
               className={metricsOpen ? "toolbar-action toolbar-action-active metrics-trigger" : "toolbar-action metrics-trigger"}
@@ -810,6 +958,50 @@ export function MapExperience() {
             </button>
           </div>
         </div>
+
+        {showOpen ? (
+          <aside aria-label="Map overlays menu" className="show-menu">
+            <div className="show-menu-header">
+              <div>
+                <p className="panel-eyebrow">MAP LAYERS / RWANDA</p>
+                <h2>Show on map</h2>
+              </div>
+              <button aria-label="Close map overlays menu" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+            </div>
+            <p className="show-menu-note">
+              Select a discovery layer for the current pilot area. Locations, roads and facilities come from OpenStreetMap contributors; coverage may be incomplete and is not an official registry.
+            </p>
+            <div aria-label="Map overlay selection" className="show-layer-list" role="group">
+              {([
+                { value: "none", label: "No extra layer", description: "Clear the overlay" },
+                { value: "landmarks", label: "Landmarks", description: "Attractions, museums, monuments and notable places" },
+                { value: "medical", label: "Medical", description: "Hospitals, clinics, pharmacies and doctors" },
+                { value: "schools", label: "Schools", description: "Schools, colleges, universities and kindergartens" },
+                { value: "transport", label: "Transport", description: "Roads, bus stops, bus stations and platforms" },
+                { value: "nature", label: "Parks & nature", description: "Eco parks, nature reserves, lakes and waterfalls" }
+              ] as Array<{ value: ShowLayer; label: string; description: string }>).map((item) => (
+                <button
+                  aria-pressed={showLayer === item.value}
+                  className={showLayer === item.value ? "show-layer-option show-layer-option-active" : "show-layer-option"}
+                  key={item.value}
+                  onClick={() => setShowLayer(item.value)}
+                  type="button"
+                >
+                  <span className="show-layer-option-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                  <span aria-hidden="true" className="show-layer-check">{showLayer === item.value ? "✓" : ""}</span>
+                </button>
+              ))}
+            </div>
+            <div className="show-menu-footnote">
+              <strong>Current boundary:</strong>
+              <span>{activeFocus === "kigali" ? "Kigali City pilot (Gasabo, Kicukiro and Nyarugenge)." : activeFocus === "bugesera" ? "Bugesera District pilot." : "Kigali City + Bugesera pilot."}</span>
+              <span>Roads and amenities are discovery references; map data can be absent or outdated.</span>
+            </div>
+          </aside>
+        ) : null}
 
         {metricsOpen ? (
           <aside aria-label="Market metrics menu" className="metrics-menu">
@@ -1158,7 +1350,10 @@ export function MapExperience() {
             <button
               aria-label="Close selected area panel"
               className="panel-close"
-              onClick={() => setSelectedArea(null)}
+              onClick={() => {
+                setSelectedArea(null);
+                setCellParentArea(null);
+              }}
               type="button"
             >
               ×
@@ -1166,7 +1361,13 @@ export function MapExperience() {
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             <h2>{selectedArea.name}</h2>
             {selectedArea.level === "parcel" ? (
-              <div className="parcel-details">
+              <>
+                {cellParentArea ? (
+                  <button className="cell-back-button" onClick={() => setSelectedArea(cellParentArea)} type="button">
+                    ← Back to {cellParentArea.name} cell parcels
+                  </button>
+                ) : null}
+                <div className="parcel-details">
                 <div>
                   <span>Unique parcel identifier (UPI)</span>
                   <strong>{selectedArea.upi ?? "Not published"}</strong>
@@ -1229,11 +1430,12 @@ export function MapExperience() {
                   </strong>
                 </div>
               </div>
+              </>
             ) : (
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
                   <article className="area-market-card area-market-card-featured">
-                    <span>Weighted average land price / m²</span>
+                    <span>{selectedArea.level === "sector" ? "Indicative sector mean / m²" : selectedArea.level === "cell" ? "Cell reference price / m²" : "District land price / m²"}</span>
                     <strong>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
@@ -1241,8 +1443,8 @@ export function MapExperience() {
                           ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
                           : selectedLandPrice?.status === "ambiguous"
                             ? "Conflicting source values"
-                            : selectedArea.level === "sector"
-                              ? "Sector average not supplied"
+                            : selectedArea.level === "sector" && selectedLandPrice?.status === "sector-estimate" && selectedLandPrice.price !== null
+                              ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedLandPrice.price)} RWF`
                               : "Not available"}
                     </strong>
                     <small>
@@ -1253,7 +1455,9 @@ export function MapExperience() {
                           : landPriceLoadStatus === "error"
                             ? "The supplied reference table could not be loaded; no value is inferred."
                             : selectedArea.level === "sector"
-                              ? `The file reports values by cell, not a sector-level weighted average. ${selectedLandPrice?.pricedCells ?? 0} cells have one unambiguous value.`
+                              ? selectedLandPrice?.status === "sector-estimate"
+                                ? `Indicative unweighted mean of ${selectedLandPrice.pricedCells} unambiguous cell values in the supplied snapshot; this is not an official sector-weighted average. Effective date and method are unknown.`
+                                : "No unambiguous cell prices are available for an indicative sector signal."
                               : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
                                 ? `Supplied cell-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
@@ -1264,9 +1468,33 @@ export function MapExperience() {
                     </small>
                   </article>
                   <article className="area-market-card">
-                    <span>Transaction volume</span>
-                    <strong>Not connected</strong>
-                    <small>Approved transaction aggregates are not yet joined to this area.</small>
+                    <span>Transactions this month</span>
+                    <strong>
+                      {selectedArea.level !== "district"
+                        ? "District-level only"
+                        : (() => {
+                            const observation = TRANSACTION_VOLUME_SNAPSHOT.find(
+                              (item) => normalizeAreaName(item.district) === normalizeAreaName(selectedArea.district)
+                            );
+                            return observation
+                              ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(observation.transactionCount)
+                              : "Not in snapshot";
+                          })()}
+                    </strong>
+                    <small>
+                      {selectedArea.level !== "district"
+                        ? "The monthly aggregate is not available at sector/cell level; no lower-level volume is inferred."
+                        : (() => {
+                            const observation = TRANSACTION_VOLUME_SNAPSHOT.find(
+                              (item) => normalizeAreaName(item.district) === normalizeAreaName(selectedArea.district)
+                            );
+                            return observation
+                              ? `${observation.status} The source includes multiple registration types; activity volume does not prove price appreciation.`
+                              : "A verified count for this district is not recorded in the current local snapshot.";
+                          })()}
+                      {" "}
+                      <a href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">Official source ↗</a>
+                    </small>
                   </article>
                   <article className="area-market-card">
                     <span>Rental yield</span>
@@ -1289,6 +1517,77 @@ export function MapExperience() {
                     <small>Verified project stages and future unit counts are not available.</small>
                   </article>
                 </div>
+                {selectedArea.level === "cell" ? (
+                  <section aria-label="Land parcels in selected cell" className="cell-parcel-list">
+                    <div className="cell-parcel-list-heading">
+                      <h3>Land parcels in this cell</h3>
+                      <span>{cellParcelStatus === "loaded" ? cellParcels.length : cellParcelStatus === "loading" ? "Loading…" : "Cadastral source"}</span>
+                    </div>
+                    <p>Source-reported parcels in the selected cell. Selecting a record centers the map on its geometry; this list is not proof of ownership.</p>
+                    {cellParcelStatus === "loading" ? (
+                      <div className="cell-parcel-empty">Loading parcel records from the connected cadastral source…</div>
+                    ) : cellParcelStatus === "error" ? (
+                      <div className="cell-parcel-empty">The parcel list is temporarily unavailable. You can continue exploring the cell boundary on the map.</div>
+                    ) : cellParcels.length > 0 ? (
+                      <div className="cell-parcel-rows">
+                        {cellParcels.map((parcel) => (
+                          <button
+                            className="cell-parcel-row"
+                            key={parcel.id}
+                            onClick={() => {
+                              const parentCell = selectedArea;
+                              setCellParentArea(parentCell);
+                              setSelectedArea({
+                                level: "parcel",
+                                name: parcel.parcelNumber ? `Parcel ${parcel.parcelNumber}` : `Parcel ${parcel.upi}`,
+                                province: parentCell.province,
+                                district: parentCell.district,
+                                districtId: parentCell.districtId,
+                                sector: parentCell.sector,
+                                sectorId: parentCell.sectorId,
+                                cell: parentCell.name,
+                                cellId: parentCell.cellId,
+                                village: parcel.village,
+                                villageId: null,
+                                averageLandPricePerM2: null,
+                                sourceLabel: "Cadastral parcel source; verify legal title with the competent authority",
+                                sourceType: "cadastral-parcel",
+                                upi: parcel.upi,
+                                parcelNumber: parcel.parcelNumber,
+                                parcelSizeM2: parcel.parcelSizeM2,
+                                wetlandAreaM2: parcel.wetlandAreaM2,
+                                lastUpdatedOn: parcel.lastUpdatedOn
+                              });
+                              mapInstance?.flyTo({
+                                center: parcel.center,
+                                zoom: 18.2,
+                                duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 720,
+                                essential: false
+                              });
+                            }}
+                            type="button"
+                          >
+                            <span className="cell-parcel-row-copy">
+                              <strong>{parcel.parcelNumber ? `Plot ${parcel.parcelNumber}` : parcel.upi}</strong>
+                              <small>{parcel.upi}{parcel.village ? ` · ${parcel.village} Village` : ""}</small>
+                            </span>
+                            <span className="cell-parcel-size">
+                              {typeof parcel.parcelSizeM2 === "number"
+                                ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcel.parcelSizeM2)} m²`
+                                : "Area N/A"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="cell-parcel-empty">No parcel records were returned for this exact cell in the connected source.</div>
+                    )}
+                    {cellParcelListTruncated ? (
+                      <div className="cell-parcel-warning">The source query reached the 10,000-record safety cap. This list may be incomplete.</div>
+                    ) : null}
+                    <small className="cell-parcel-source">Source: Kigali Parcels FeatureServer / NLA LAIS Bugesera_Parcels. Coverage, currency and reuse terms remain subject to publisher confirmation.</small>
+                  </section>
+                ) : null}
                 <section aria-label="Projects in selected area" className="area-projects-empty">
                   <div className="area-projects-empty-heading">
                     <h3>Projects</h3>
