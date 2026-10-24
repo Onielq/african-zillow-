@@ -282,6 +282,34 @@ function numberValue(value: unknown): number | null {
   return null;
 }
 
+type BugeseraUpiLocationIds = {
+  provinceId: string | null;
+  districtId: string | null;
+  sectorId: string | null;
+  cellId: string | null;
+};
+
+/**
+ * UPI contains province/district/sector/cell codes before the parcel number.
+ * Match the live Bugesera administrative-ID format (e.g. 5/07/08/01/936 ->
+ * province 5, district 57, sector 5708, cell 570801). Village is not encoded
+ * in UPI and is joined in the map only by unique cell ID + exact village name.
+ */
+function bugeseraLocationIdsFromUpi(upi: string): BugeseraUpiLocationIds {
+  const parts = upi.match(/^(\\d+)\\/(\\d+)\\/(\\d+)\\/(\\d+)\\/(\\d+)$/);
+  if (!parts) {
+    return { provinceId: null, districtId: null, sectorId: null, cellId: null };
+  }
+
+  const [, provinceCode, districtCode, sectorCode, cellCode] = parts;
+  const compactDistrict = districtCode.replace(/^0+(?=\\d)/, "");
+  const districtId = `${provinceCode}${compactDistrict}`;
+  const sectorId = `${districtId}${sectorCode.padStart(2, "0")}`;
+  const cellId = `${sectorId}${cellCode.padStart(2, "0")}`;
+
+  return { provinceId: provinceCode, districtId, sectorId, cellId };
+}
+
 async function queryArcGisLayer(
   layerUrl: string,
   bounds: Bounds,
@@ -536,9 +564,7 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
         bounds,
         2000,
         "upi IS NOT NULL",
-        provider.id === "bugesera"
-          ? "upi"
-          : "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on"
+        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on"
       );
       return { provider, upstreamFeatures, failed: false };
     } catch (error) {
@@ -562,31 +588,40 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
       if (!upi || !geometry) return null;
 
       if (provider.id === "bugesera") {
-        // Small public polygon samples and UPI were found for this NLA-hosted
-        // LAIS layer. Reuse terms, completeness and live survey currency still
-        // need confirmation, so return only polygon geometry plus the UPI.
+        const district = textValue(attributeValue(attributes, ["district"]));
+        if (!district || district.toUpperCase() !== "BUGESERA") return null;
+
+        const locationIds = bugeseraLocationIdsFromUpi(upi);
+        const rawProvince = textValue(attributeValue(attributes, ["province"]));
+        const parcelNumber =
+          textValue(attributeValue(attributes, ["parcel_number", "parcelnumber"])) ??
+          upi.split("/").at(-1) ??
+          null;
+
         return {
           type: "Feature" as const,
           id: `parcel-bugesera-${upi ?? index}`,
           geometry,
           properties: {
-            province: "Eastern Province",
-            province_id: null,
-            district: "Bugesera",
-            district_id: null,
-            sector: null,
-            sector_id: null,
-            cell: null,
-            cell_id: null,
-            village: null,
+            province: rawProvince === "Eastern" ? "Eastern Province" : rawProvince ?? "Eastern Province",
+            province_id: locationIds.provinceId,
+            district,
+            district_id: locationIds.districtId,
+            sector: textValue(attributeValue(attributes, ["sector"])),
+            sector_id: locationIds.sectorId,
+            cell: textValue(attributeValue(attributes, ["cell"])),
+            cell_id: locationIds.cellId,
+            village: textValue(attributeValue(attributes, ["village"])),
+            // Village codes are not embedded in UPI. MapView joins this name
+            // to the authoritative village polygon by cell ID + exact name.
             village_id: null,
             upi,
-            parcel_number: null,
-            parcel_size_m2: null,
-            wetland_area_m2: null,
-            last_updated_on: null,
+            parcel_number: parcelNumber,
+            parcel_size_m2: numberValue(attributeValue(attributes, ["size"])),
+            wetland_area_m2: numberValue(attributeValue(attributes, ["area_in_wetland"])),
+            last_updated_on: numberValue(attributeValue(attributes, ["last_updated_on"])),
             source_type: "cadastral-parcel",
-            source_label: "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse terms and completeness to confirm)"
+            source_label: "National Land Authority · LAIS Bugesera_Parcels FeatureServer (source last edited 23 Oct 2026; reuse permission pending)"
           }
         };
       }
@@ -636,7 +671,7 @@ async function getParcels(bounds: Bounds): Promise<NextResponse> {
         "X-Parcel-Provider-Warning": failedProviders.length
           ? `Some parcel source(s) unavailable: ${failedProviders.join(", ")}`
           : "Bugesera source reuse terms, completeness, and current survey accuracy still need confirmation",
-        "X-Parcel-Record-Fields": "UPI; Kigali additionally exposes parcel number, area, wetland overlap, and last update"
+        "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed"
       }
     }
   );
