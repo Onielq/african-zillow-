@@ -893,6 +893,13 @@ export function MapExperience() {
                 ))}
               </div>
               <p className="metrics-menu-supply-note"><strong>Supply definitions:</strong> Market supply means plots currently available for sale and ready to transact. Upcoming supply covers a future pipeline that is not yet ready, potentially because subdivision, planning, negotiation or legal/administrative steps remain. No such constraints are inferred or published by this pilot.</p>
+              <p className="metrics-menu-quality">
+                {landPriceLoadStatus === "loaded"
+                  ? `Supplied file diagnostics: ${landPriceDiagnostics.usableRows} usable rows · ${landPriceDiagnostics.malformedRows} malformed rows · ${landPriceDiagnostics.conflictingLocations} conflicting locations. Observation date not supplied.`
+                  : landPriceLoadStatus === "error"
+                    ? "Supplied file diagnostics unavailable because the file could not be loaded."
+                    : "Loading supplied cell-price data and checking source-row quality…"}
+              </p>
             </div>
           </aside>
         ) : null}
