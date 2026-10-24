@@ -66,15 +66,15 @@ test("the average land price metric uses sourced district values and marks snaps
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
 
   assert.match(route, /DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2/);
-  assert.match(route, /GASABO: 36013/);
-  assert.match(route, /KICUKIRO: 61491/);
-  assert.match(route, /NYARUGENGE: 50735/);
-  assert.match(route, /BUGESERA: 4033/);
+  assert.match(route, /GASABO: 36103/);
+  assert.match(route, /KICUKIRO: 61499/);
+  assert.match(route, /NYARUGENGE: 50771/);
+  assert.match(route, /BUGESERA: 4038/);
   assert.match(route, /average_land_price_per_m2/);
   assert.match(route, /rwandalanddashboard\.lands\.rw\/prices/);
   assert.match(mapView, /showLandPriceHeatmap/);
   assert.match(mapView, /average_land_price_per_m2/);
-  assert.match(experience, /source observation date not exposed/i);
+  assert.match(experience, /effective date and calculation method are not disclosed/i);
   assert.match(experience, /district-level land prices are not a valid substitute/i);
 });
 
@@ -335,4 +335,52 @@ test("developer drawer renders only sourced logo assets and expands public agent
   assert.match(directoryData, /Gustave Niyonkuru/);
   assert.match(directoryData, /IZERE IRAKIZA Aime Johnson/);
   assert.match(experience, /No “top agent” ranking published/);
+});
+
+
+test("official dashboard price snapshots are provisional and separated from reference prices", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const districtSnapshot = await readProjectFile("public/land-price-district-snapshot.tsv");
+  const reconciliation = await readProjectFile("public/land-price-reconciliation.tsv");
+  const sourceRegister = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
+  const sourceAudit = await readProjectFile("docs/LAND_PRICE_SOURCE_RECONCILIATION.md");
+
+  assert.match(route, /provisional values transcribed from the publicly indexed \/prices table/i);
+  assert.match(experience, /Snapshot only/);
+  assert.match(experience, /50,865 for Nyarugenge transaction price/);
+  assert.match(experience, /Open National Land Dashboard reference prices/);
+  assert.match(experience, /Open National Land Dashboard transactions/);
+  assert.match(experience, /Open National Land Dashboard ownership/);
+  assert.match(experience, /Open National Land Dashboard land use/);
+
+  const districtRows = districtSnapshot.trim().split(/\r?\n/);
+  assert.equal(districtRows.length, 5);
+  assert.match(districtSnapshot, /Gasabo\t36103/);
+  assert.match(districtSnapshot, /Kicukiro\t61499/);
+  assert.match(districtSnapshot, /Nyarugenge\t50771/);
+  assert.match(districtSnapshot, /Bugesera\t4038/);
+  assert.match(districtSnapshot, /Not disclosed in visible source page/);
+
+  const auditRows = reconciliation.trim().split(/\r?\n/);
+  assert.equal(auditRows.length, 13);
+  assert.match(reconciliation, /Bugesera\tMayange\tKibenga\t6566;10980/);
+  assert.match(reconciliation, /Kicukiro\tGahanga\tKagasa\t22236;92377/);
+  assert.match(reconciliation, /MALFORMED\t61/);
+  assert.match(reconciliation, /MALFORMED\t74/);
+  assert.match(reconciliation, /do not average or pick one/);
+
+  for (const url of [
+    "https://rwandalanddashboard.lands.rw/",
+    "https://rwandalanddashboard.lands.rw/prices",
+    "https://rwandalanddashboard.lands.rw/reference",
+    "https://rwandalanddashboard.lands.rw/transactions",
+    "https://rwandalanddashboard.lands.rw/ownership",
+    "https://rwandalanddashboard.lands.rw/land-use"
+  ]) {
+    assert.ok(sourceRegister.includes(url), `Missing dashboard source link: ${url}`);
+  }
+  assert.match(sourceAudit, /Nyarugenge figure differs by \*\*94 RWF\/m²\*\*/);
+  assert.match(sourceAudit, /observation date is \*\*not confirmed\*\*/);
+  assert.match(sourceAudit, /Do not choose the higher value, lower value, mean/);
 });
