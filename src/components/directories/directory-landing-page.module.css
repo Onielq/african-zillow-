@@ -286,6 +286,135 @@
   line-height: 1.55;
 }
 
+
+.profileTypes {
+  margin-top: 48px;
+}
+
+.profileTypesHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.profileTypesHeading h2 {
+  max-width: 600px;
+  margin: 0;
+  font-size: clamp(24px, 3vw, 31px);
+  letter-spacing: -.05em;
+  line-height: 1.12;
+}
+
+.profileTypesHeading > p {
+  max-width: 390px;
+  margin: 0;
+  color: #77847d;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.profileTypeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profileTypeCard {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dce4de;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.profileTypeNumber {
+  color: #176b50;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .12em;
+}
+
+.profileTypeCard h3 {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 780;
+  letter-spacing: -.025em;
+}
+
+.profileTypeCard p {
+  margin: 9px 0 0;
+  color: #596861;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.profileTypeCard small {
+  display: block;
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid #e7ece8;
+  color: #77847d;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.templatePanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-top: 14px;
+  padding: 21px;
+  border: 1px solid #dce4de;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.templatePanel > div {
+  max-width: 640px;
+}
+
+.templatePanel h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 780;
+  letter-spacing: -.03em;
+}
+
+.templatePanel p:not(.eyebrow) {
+  margin: 8px 0 0;
+  color: #596861;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.templatePanel .eyebrow {
+  margin-bottom: 8px;
+}
+
+.templateAction {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 14px;
+  border: 1px solid #176b50;
+  border-radius: 11px;
+  background: #176b50;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.templateAction:hover {
+  background: #12563f;
+}
+
 .evidenceSection {
   margin-top: 52px;
 }
@@ -453,6 +582,23 @@
 
   .inventoryStatus {
     min-height: auto;
+  }
+
+  .profileTypesHeading {
+    display: block;
+  }
+
+  .profileTypesHeading > p {
+    margin-top: 10px;
+  }
+
+  .profileTypeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .templatePanel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .sectionHeading {
