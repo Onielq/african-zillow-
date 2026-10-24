@@ -17,6 +17,10 @@ import {
   RWANDA_PUBLIC_AGENT_CANDIDATES,
   RWANDA_REAL_ESTATE_AGENCIES
 } from "@/data/real-estate-directory";
+import {
+  TRANSACTION_BENCHMARK_SOURCE,
+  TRANSACTION_DASHBOARD_SOURCE
+} from "@/data/transaction-benchmarks";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
 type WorkspaceMode = "areas" | "projects";
@@ -61,6 +65,149 @@ type CellParcelResponse = {
   capped: boolean;
   parcels: CellParcelRecord[];
 };
+
+type ComparisonItem = SelectedArea & {
+  comparisonKind?: "area" | "project";
+  projectSourceUrl?: string | null;
+  transactionEstimate?: TransactionEstimateResponse | null;
+};
+
+type AreaSearchResult = SelectedArea & { id: string };
+type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string };
+type TransactionEstimateResponse = {
+  estimate: number | null;
+  status: "reported-current-month-unverified" | "historical-monthly-baseline" | "parcel-share-model" | "unavailable";
+  method: string;
+  unit?: string;
+  annualTransactions2023?: number;
+  currentMonthReported?: { count: number; observedOn: string; status: string; note: string } | null;
+  allocation?: { districtParcelCount: number; areaParcelCount: number; estimatedShare: number; method: string };
+};
+
+type UnitPriceEstimate = {
+  pricePerM2: number | null;
+  kind: "cell-reference-snapshot" | "derived-sector-mean" | "district-dashboard-snapshot" | "unavailable" | "conflicting";
+  explanation: string;
+};
+
+const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
+  gasabo: 36103,
+  kicukiro: 61499,
+  nyarugenge: 50771,
+  bugesera: 4038
+};
+
+function getUnitPriceEstimate(
+  rows: LandPriceRow[],
+  area: SelectedArea,
+  allowDistrictFallback = false
+): UnitPriceEstimate {
+  const districtKey = normalizeAreaName(area.district);
+  if (area.level === "district" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "district-dashboard-snapshot",
+      explanation: "Dashboard district price snapshot; effective date and calculation method are not disclosed."
+    };
+  }
+  if (area.level === "sector" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "derived-sector-mean",
+      explanation: "Indicative sector figure derived from available cell-level snapshots; not an official sector-weighted sale price."
+    };
+  }
+
+  if (area.level === "cell" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "cell-reference-snapshot",
+      explanation: "Cell-level source snapshot; the effective date and calculation method have not been confirmed."
+    };
+  }
+
+  if (area.level === "sector") {
+    const byCell = new Map<string, Set<number>>();
+    for (const row of rows) {
+      if (!row.valid ||
+        normalizeAreaName(row.district) !== districtKey ||
+        normalizeAreaName(row.sector) !== normalizeAreaName(area.name) ||
+        row.price === null) continue;
+      const key = normalizeAreaName(row.cell);
+      const prices = byCell.get(key) ?? new Set<number>();
+      prices.add(row.price);
+      byCell.set(key, prices);
+    }
+    const uniqueCellPrices = Array.from(byCell.values())
+      .filter((prices) => prices.size === 1)
+      .map((prices) => prices.values().next().value as number);
+    if (uniqueCellPrices.length > 0) {
+      return {
+        pricePerM2: uniqueCellPrices.reduce((sum, price) => sum + price, 0) / uniqueCellPrices.length,
+        kind: "derived-sector-mean",
+        explanation: "Indicative unweighted mean of unambiguous cell snapshots. Conflicting cells are excluded; this is not an official sector-weighted sale price."
+      };
+    }
+  }
+
+  const targetCell = area.level === "cell"
+    ? area.name
+    : area.level === "village" || area.level === "parcel"
+      ? area.cell
+      : null;
+  if (targetCell && area.sector) {
+    const matches = rows.filter((row) =>
+      row.valid &&
+      normalizeAreaName(row.district) === districtKey &&
+      normalizeAreaName(row.sector) === normalizeAreaName(area.sector) &&
+      normalizeAreaName(row.cell) === normalizeAreaName(targetCell)
+    );
+    const uniquePrices = new Set(matches.map((row) => row.price).filter((price): price is number => price !== null));
+    if (uniquePrices.size === 1) {
+      return {
+        pricePerM2: uniquePrices.values().next().value ?? null,
+        kind: "cell-reference-snapshot",
+        explanation: "Exact cell-level price reference; source date and calculation method have not been confirmed."
+      };
+    }
+    if (uniquePrices.size > 1) {
+      if (!allowDistrictFallback) {
+        return { pricePerM2: null, kind: "conflicting", explanation: "The cell reference contains conflicting values." };
+      }
+    }
+  }
+
+  const districtPrice = DISTRICT_PRICE_SNAPSHOTS[districtKey] ?? null;
+  if (allowDistrictFallback && districtPrice !== null) {
+    return {
+      pricePerM2: districtPrice,
+      kind: "district-dashboard-snapshot",
+      explanation: "No unique cell reference was available, so the district dashboard snapshot is used as a clearly labelled rough fallback."
+    };
+  }
+  return { pricePerM2: null, kind: "unavailable", explanation: "No defensible unit price is available at this geographic level." };
+}
+
+function comparisonItemKey(area: ComparisonItem): string {
+  return [
+    area.comparisonKind ?? "area",
+    area.level,
+    normalizeAreaName(area.district),
+    normalizeAreaName(area.sector),
+    normalizeAreaName(area.cell),
+    normalizeAreaName(area.village),
+    normalizeAreaName(area.name),
+    normalizeAreaName(area.projectSourceUrl)
+  ].join("|");
+}
+
+function areaLevelLabel(level: SelectedArea["level"]): string {
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function transactionEstimateKeyForArea(area: SelectedArea): string {
+  return [area.level, area.district, area.sector ?? "", area.cell ?? "", area.village ?? "", area.name].join("|");
+}
 
 function normalizeAreaName(value: string | null | undefined): string {
   return (value ?? "")
@@ -210,7 +357,7 @@ const MARKET_METRICS: Array<{
     label: "Transaction volume",
     shortLabel: "Transactions",
     description: "How many registered land transactions take place in an area.",
-    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized feed is not connected. A Bugesera month-to-date total of 4,350 was reported from /transactions on 24 Oct 2026. An earlier cached overview showed 4,031, plausibly an earlier cumulative snapshot; its observation date is not exposed. The 4,350 figure may be shown only as a dated provisional reference until a refreshable feed is connected. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
+    dataStatus: "NISR Statistical Yearbook 2025 Table 5.2 supplies annual district transaction totals for 2023. The app divides those totals by 12 for a historical monthly baseline in Gasabo, Kicukiro and Nyarugenge. For Bugesera, 4,350 is a user-reported month-to-date reading observed 24 Oct 2026; an indexed overview separately showed 4,031, so the current figure remains unverified. Sector, cell and village numbers are modelled by their share of returned cadastral parcel records, not official transaction counts. The public Data Sharing Platform lists transaction summaries by district, sector and cell, but approved access is required before integrating that dataset. Transaction volume is activity, not proof of price appreciation."
   },
   {
     id: "capitalAppreciation",
@@ -278,73 +425,6 @@ const FOCUS_OPTIONS: Array<{
     label: "Bugesera",
     center: [30.18, -2.28],
     zoom: 9.35
-  }
-];
-
-const PILOT_DISTRICT_SEARCH_AREAS: SelectedArea[] = [
-  {
-    level: "district",
-    name: "Gasabo",
-    province: "Kigali City",
-    district: "Gasabo",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 36103,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Kicukiro",
-    province: "Kigali City",
-    district: "Kicukiro",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 61499,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Nyarugenge",
-    province: "Kigali City",
-    district: "Nyarugenge",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 50771,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
-  },
-  {
-    level: "district",
-    name: "Bugesera",
-    province: "Eastern Province",
-    district: "Bugesera",
-    districtId: null,
-    sector: null,
-    sectorId: null,
-    cell: null,
-    cellId: null,
-    village: null,
-    villageId: null,
-    averageLandPricePerM2: 4038,
-    sourceLabel: "Rwanda Land Dashboard /prices · indexed snapshot; observation date not disclosed",
-    sourceType: "administrative-boundary"
   }
 ];
 
@@ -430,6 +510,7 @@ export function MapExperience() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
+  const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
@@ -441,8 +522,15 @@ export function MapExperience() {
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
-  const [comparedAreas, setComparedAreas] = useState<SelectedArea[]>([]);
+  const [comparisonSearchResults, setComparisonSearchResults] = useState<AreaSearchResult[]>([]);
+  const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
+  const [compareProjectName, setCompareProjectName] = useState("");
+  const [compareProjectUrl, setCompareProjectUrl] = useState("");
+  const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
+  const [selectedTransactionEstimateKey, setSelectedTransactionEstimateKey] = useState<string | null>(null);
+  const [selectedTransactionEstimateStatus, setSelectedTransactionEstimateStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
   );
@@ -473,35 +561,77 @@ export function MapExperience() {
     []
   );
 
+  const fetchTransactionEstimate = async (area: SelectedArea, signal?: AbortSignal): Promise<TransactionEstimateResponse | null> => {
+    if (area.level === "parcel") return null;
+    const params = new URLSearchParams({ district: area.district, level: area.level });
+    if (area.sector) params.set("sector", area.sector);
+    if (area.cell) params.set("cell", area.cell);
+    if (area.village) params.set("village", area.village);
+    try {
+      const response = await fetch("/api/geography/transaction-estimate?" + params.toString(), { signal });
+      if (!response.ok) throw new Error("Transaction estimate request failed (" + response.status + ")");
+      return await response.json() as TransactionEstimateResponse;
+    } catch {
+      if (signal?.aborted) return null;
+      return { estimate: null, status: "unavailable", method: "No usable estimate was returned." };
+    }
+  };
+
   const addAreaToComparison = (areaToAdd: SelectedArea) => {
-    const exists = comparedAreas.some(
-      (area) =>
-        area.level === areaToAdd.level &&
-        area.name === areaToAdd.name &&
-        area.district === areaToAdd.district
-    );
-
+    const item: ComparisonItem = { ...areaToAdd, comparisonKind: "area", transactionEstimate: null };
+    const itemKey = comparisonItemKey(item);
+    const exists = comparedAreas.some((area) => comparisonItemKey(area) === itemKey);
     if (exists) {
-      setComparisonFeedback(`${areaToAdd.name} is already on your comparison list.`);
+      setComparisonFeedback(areaToAdd.name + " is already on your comparison list.");
       setSourcesOpen(false);
       setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
-
-    if (comparedAreas.length >= 4) {
-      setComparisonFeedback("Compare up to four areas. Remove one to add another.");
-      setSourcesOpen(false);
-      setMetricInfoOpen(false);
-      setCompareOpen(true);
-      return;
-    }
-
-    setComparedAreas((areas) => [...areas, areaToAdd]);
-    setComparisonFeedback(`${areaToAdd.name} added to comparison.`);
+    setComparedAreas((areas) => [...areas, item]);
+    setComparisonFeedback(areaToAdd.name + " added to comparison.");
     setSourcesOpen(false);
     setMetricInfoOpen(false);
     setCompareOpen(true);
+    if (areaToAdd.level !== "parcel") {
+      void fetchTransactionEstimate(areaToAdd).then((estimate) => {
+        if (!estimate) return;
+        setComparedAreas((areas) => areas.map((area) =>
+          comparisonItemKey(area) === itemKey ? { ...area, transactionEstimate: estimate } : area
+        ));
+      });
+    }
+  };
+
+  const addManualProjectToComparison = () => {
+    const name = compareProjectName.trim();
+    if (!name) { setComparisonFeedback("Enter a project name first."); return; }
+    let sourceUrl: string | null = null;
+    if (compareProjectUrl.trim()) {
+      try {
+        const parsed = new URL(compareProjectUrl.trim());
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("unsupported protocol");
+        sourceUrl = parsed.toString();
+      } catch {
+        setComparisonFeedback("Use a valid http or https project source URL, or leave it blank.");
+        return;
+      }
+    }
+    const item: ComparisonItem = {
+      level: "district", name, province: null, district: "Project", districtId: null, sector: null, sectorId: null,
+      cell: null, cellId: null, village: null, villageId: null, averageLandPricePerM2: null,
+      sourceLabel: "Manually added project. A permitted, verified project data feed is not connected.",
+      comparisonKind: "project", projectSourceUrl: sourceUrl, transactionEstimate: null
+    };
+    const itemKey = comparisonItemKey(item);
+    if (comparedAreas.some((area) => comparisonItemKey(area) === itemKey)) {
+      setComparisonFeedback(name + " is already on your comparison list.");
+      return;
+    }
+    setComparedAreas((areas) => [...areas, item]);
+    setCompareProjectName("");
+    setCompareProjectUrl("");
+    setComparisonFeedback(name + " added. Project metrics remain blank until a verified source is connected.");
   };
 
   const addSelectedAreaToComparison = () => {
@@ -509,17 +639,9 @@ export function MapExperience() {
     addAreaToComparison(selectedArea);
   };
 
-  const removeComparedArea = (areaToRemove: SelectedArea) => {
-    setComparedAreas((areas) =>
-      areas.filter(
-        (area) =>
-          !(
-            area.level === areaToRemove.level &&
-            area.name === areaToRemove.name &&
-            area.district === areaToRemove.district
-          )
-      )
-    );
+  const removeComparedArea = (areaToRemove: ComparisonItem) => {
+    const removeKey = comparisonItemKey(areaToRemove);
+    setComparedAreas((areas) => areas.filter((area) => comparisonItemKey(area) !== removeKey));
     setComparisonFeedback("");
   };
 
@@ -539,23 +661,30 @@ export function MapExperience() {
       : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
-  const comparisonSearchResults = normalizedComparisonSearch
-    ? PILOT_DISTRICT_SEARCH_AREAS.filter((area) =>
-        area.name.toLocaleLowerCase().includes(normalizedComparisonSearch)
-      )
-    : [];
-  const canCompareDistrictPrices =
-    comparedAreas.length > 1 &&
-    comparedAreas.every(
-      (area) =>
-        area.level === "district" &&
-        typeof area.averageLandPricePerM2 === "number"
-    );
-  const highestDistrictPrice = canCompareDistrictPrices
-    ? Math.max(
-        ...comparedAreas.map((area) => area.averageLandPricePerM2 ?? Number.NEGATIVE_INFINITY)
-      )
+  const activeTransactionEstimateKey = selectedArea ? transactionEstimateKeyForArea(selectedArea) : null;
+  const transactionEstimateForSelected = activeTransactionEstimateKey === selectedTransactionEstimateKey
+    ? selectedTransactionEstimate
     : null;
+  const comparisonUnitPrices = comparedAreas.map((area) => ({
+    area,
+    estimate: area.comparisonKind === "project"
+      ? { pricePerM2: null, kind: "unavailable" as const, explanation: "Project price data is not connected." }
+      : getUnitPriceEstimate(landPriceRows, area)
+  }));
+  const comparisonPrices = comparisonUnitPrices
+    .filter(({ estimate }) => estimate.pricePerM2 !== null)
+    .map(({ estimate }) => estimate.pricePerM2 as number);
+  const highestComparisonPrice = comparisonPrices.length > 1 ? Math.max(...comparisonPrices) : null;
+  const parcelUnitPriceEstimate = selectedArea?.level === "parcel"
+    ? getUnitPriceEstimate(landPriceRows, selectedArea, true)
+    : null;
+  const estimatedParcelValue = selectedArea?.level === "parcel" &&
+    typeof selectedArea.parcelSizeM2 === "number" &&
+    selectedArea.parcelSizeM2 > 0 &&
+    parcelUnitPriceEstimate?.pricePerM2 !== null &&
+    parcelUnitPriceEstimate?.pricePerM2 !== undefined
+      ? Math.round(selectedArea.parcelSizeM2 * parcelUnitPriceEstimate.pricePerM2)
+      : null;
 
   useEffect(() => {
     let active = true;
@@ -576,6 +705,69 @@ export function MapExperience() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const query = compareSearch.trim();
+    if (query.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setComparisonSearchStatus("loading");
+      try {
+        const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(query), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Area search failed (" + response.status + ")");
+        const payload = await response.json() as AreaSearchResponse;
+        if (controller.signal.aborted) return;
+        setComparisonSearchResults(payload.areas ?? []);
+        setComparisonSearchStatus("ready");
+      } catch {
+        if (controller.signal.aborted) return;
+        setComparisonSearchResults([]);
+        setComparisonSearchStatus("error");
+      }
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [compareSearch]);
+
+  useEffect(() => {
+    if (!selectedArea || selectedArea.level === "parcel") return;
+
+    const area = selectedArea;
+    const areaKey = transactionEstimateKeyForArea(area);
+    const controller = new AbortController();
+
+    const params = new URLSearchParams({ district: area.district, level: area.level });
+    if (area.sector) params.set("sector", area.sector);
+    if (area.cell) params.set("cell", area.cell);
+    if (area.village) params.set("village", area.village);
+
+    const loadEstimate = async () => {
+      try {
+        const response = await fetch("/api/geography/transaction-estimate?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Transaction estimate request failed (" + response.status + ")");
+        const payload = await response.json() as TransactionEstimateResponse;
+        if (controller.signal.aborted) return;
+        setSelectedTransactionEstimate(payload);
+        setSelectedTransactionEstimateKey(areaKey);
+        setSelectedTransactionEstimateStatus("ready");
+      } catch {
+        if (controller.signal.aborted) return;
+        setSelectedTransactionEstimate(null);
+        setSelectedTransactionEstimateKey(areaKey);
+        setSelectedTransactionEstimateStatus("error");
+      }
+    };
+    void loadEstimate();
+    return () => controller.abort();
+  }, [selectedArea]);
 
   useEffect(() => {
     const level = selectedArea?.level;
@@ -712,7 +904,7 @@ export function MapExperience() {
                 strokeLinejoin="round"
               />
             </svg>
-            Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}/4` : ""}
+            Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
           <Link className="compare-control" href="/data-sources">
             Data sources
@@ -750,7 +942,8 @@ export function MapExperience() {
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
           showLayers={showLayers}
-          showScope={activeFocus === "kigali" ? "kigali" : activeFocus === "bugesera" ? "bugesera" : "pilot"}
+          showZoning={showZoning}
+          showScope="pilot"
           onMapReady={handleMapReady}
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
@@ -906,28 +1099,24 @@ export function MapExperience() {
 
 
         {showOpen ? (
-          <aside aria-label="Show map overlays" className="show-menu">
-            <div className="metrics-menu-header">
-              <div>
-                <p className="panel-eyebrow">MAP LAYERS / RWANDA</p>
-                <h2>Show on map</h2>
-              </div>
-              <button aria-label="Close map overlays" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+          <aside aria-label="Show map layers" className="show-menu">
+            <div className="show-menu-header">
+              <h2>Show</h2>
+              <button aria-label="Close map layers" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
             </div>
-            <p className="show-menu-description">
-              Turn contextual places on and off. Results are taken from OpenStreetMap and may be incomplete; they are not legal or official land records.
-            </p>
             <div className="show-option-list">
               {([
-                { id: "landmarks" as const, title: "Landmarks", detail: "Points of interest, historic places and attractions", marker: "◆" },
-                { id: "healthEducation" as const, title: "Medical & schools", detail: "Hospitals, clinics, pharmacies, schools and universities", marker: "+" },
-                { id: "transportation" as const, title: "Transportation", detail: "Main roads, bus stops and bus stations", marker: "↗" },
-                { id: "nature" as const, title: "Nature", detail: "Eco parks, nature reserves, lakes and waterfalls", marker: "⌁" }
+                { id: "landmarks" as const, title: "Landmarks" },
+                { id: "healthEducation" as const, title: "Medical & schools" },
+                { id: "transportation" as const, title: "Transportation" },
+                { id: "nature" as const, title: "Nature" }
               ]).map((layer) => {
                 const checked = showLayers.includes(layer.id);
                 return (
-                  <label className={checked ? "show-option show-option-active" : "show-option"} key={layer.id}>
+                  <label className={checked ? "show-toggle show-toggle-active" : "show-toggle"} key={layer.id}>
+                    <span>{layer.title}</span>
                     <input
+                      aria-label={layer.title}
                       checked={checked}
                       onChange={() => {
                         setShowLayers((current) =>
@@ -938,21 +1127,23 @@ export function MapExperience() {
                       }}
                       type="checkbox"
                     />
-                    <span className={"show-option-marker show-option-marker-" + layer.id} aria-hidden="true">{layer.marker}</span>
-                    <span className="show-option-copy">
-                      <strong>{layer.title}</strong>
-                      <small>{layer.detail}</small>
-                    </span>
-                    <span className="show-option-state">{checked ? "On" : "Off"}</span>
+                    <span className="show-toggle-track" aria-hidden="true"><span /></span>
+                    <span className="show-toggle-state">{checked ? "On" : "Off"}</span>
                   </label>
                 );
               })}
+              <label className={showZoning ? "show-toggle show-toggle-active" : "show-toggle"}>
+                <span>Zoning</span>
+                <input
+                  aria-label="Zoning"
+                  checked={showZoning}
+                  onChange={() => setShowZoning((value) => !value)}
+                  type="checkbox"
+                />
+                <span className="show-toggle-track" aria-hidden="true"><span /></span>
+                <span className="show-toggle-state">{showZoning ? "On" : "Off"}</span>
+              </label>
             </div>
-            <div className="show-menu-footer">
-              <span>Coverage</span>
-              <strong>{activeFocus === "kigali" ? "Kigali City" : activeFocus === "bugesera" ? "Bugesera District" : "Kigali City + Bugesera"}</strong>
-            </div>
-            <p className="show-menu-source">Source: © OpenStreetMap contributors · ODbL</p>
           </aside>
         ) : null}
 
@@ -1240,10 +1431,16 @@ export function MapExperience() {
                       Voluntary sale, succession, expropriation, exchange, donation, court decisions and auctions, subdivision, public-land title, parcel merge, and change of land use. Keep counts by type and month so different legal events are not treated as identical market demand.
                     </p>
                     <p>
-                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Do not infer sector/cell transaction counts from district totals without transaction-level geography.
+                      Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Sector, cell and village figures in this app are explicitly labelled parcel-share models, not official transaction counts. The public summary dataset offers finer-level counts but requires approved access before direct integration.
                     </p>
-                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                    <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                       Open district transaction and type tables ↗
+                    </a>
+                    <a className="metric-info-source" href={TRANSACTION_BENCHMARK_SOURCE} target="_blank" rel="noreferrer">
+                      Open NISR 2025 Statistical Yearbook (2023 historical totals) ↗
+                    </a>
+                    <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
+                      Transaction summary dataset · approved access required ↗
                     </a>
                   </div>
                 ) : null}
@@ -1268,7 +1465,7 @@ export function MapExperience() {
                     Open Rwanda Land Dashboard ↗
                   </a>
                 ) : selectedMetric === "transactionVolume" ? (
-                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
+                  <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                     Open official transaction dashboard ↗
                   </a>
                 ) : selectedMetric === "capitalAppreciation" ? (
@@ -1395,6 +1592,23 @@ export function MapExperience() {
                       : "Date not supplied"}
                   </strong>
                 </div>
+                <div className="parcel-estimate-card" aria-label="Estimated parcel value">
+                  <span>Indicative estimated parcel value</span>
+                  <strong>
+                    {estimatedParcelValue !== null
+                      ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedParcelValue)
+                      : "Not available"}
+                  </strong>
+                  {typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
+                    <p>
+                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m²
+                    </p>
+                  ) : null}
+                  <small>
+                    {parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable reference price per m² are both required."}
+                    {" "}This is a rough area-based estimate, not an official valuation, offer price, or proof of sale value.
+                  </small>
+                </div>
               </div>
             ) : (
               <>
@@ -1435,23 +1649,29 @@ export function MapExperience() {
                     </small>
                   </article>
                   <article className="area-market-card">
-                    <span>Transaction volume · month to date</span>
+                    <span>Transaction volume · monthly indicator</span>
                     <strong>
-                      {selectedMetric === "transactionVolume" &&
-                        selectedArea.level === "district" &&
-                        selectedArea.district.toLowerCase() === "bugesera"
-                        ? "4,350*"
-                        : "Not connected"}
+                      {activeTransactionEstimateKey !== selectedTransactionEstimateKey || selectedTransactionEstimateStatus === "loading"
+                        ? "Loading…"
+                        : transactionEstimateForSelected?.estimate !== null && transactionEstimateForSelected?.estimate !== undefined
+                          ? transactionEstimateForSelected.status === "reported-current-month-unverified"
+                            ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transactionEstimateForSelected.estimate) + "*"
+                            : "≈ " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transactionEstimateForSelected.estimate)
+                          : "Unavailable"}
                     </strong>
                     <small>
-                      {selectedMetric === "transactionVolume" &&
-                        selectedArea.level === "district" &&
-                        selectedArea.district.toLowerCase() === "bugesera"
-                        ? "Dated provisional reference reported from the official /transactions page on 24 Oct 2026; not a live value in this app. Refresh the source before treating it as current."
-                        : "Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation."}
+                      {transactionEstimateForSelected?.status === "reported-current-month-unverified"
+                        ? "User-reported Bugesera month-to-date dashboard reading, observed 24 Oct 2026 and not independently reconciled. An indexed overview separately showed 4,031; 4,350 is not a live verified feed."
+                        : transactionEstimateForSelected?.status === "historical-monthly-baseline"
+                          ? "Historical baseline: official 2023 annual district transactions ÷ 12. This is not the current month's count."
+                          : transactionEstimateForSelected?.status === "parcel-share-model"
+                            ? transactionEstimateForSelected.method
+                            : activeTransactionEstimateKey !== selectedTransactionEstimateKey || selectedTransactionEstimateStatus === "loading"
+                              ? "Calculating a sourced activity indicator…"
+                              : "No current verified count is available for this area."}
                     </small>
-                    <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
-                      Open transaction dashboard ↗
+                    <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
+                      Official dashboard ↗
                     </a>
                   </article>
                   <article className="area-market-card">
@@ -1722,7 +1942,7 @@ export function MapExperience() {
             <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/reference" rel="noreferrer" target="_blank">
               Open National Land Dashboard reference prices ↗
             </a>
-            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/transactions" rel="noreferrer" target="_blank">
+            <a className="source-register-link" href={TRANSACTION_DASHBOARD_SOURCE} rel="noreferrer" target="_blank">
               Open National Land Dashboard transactions ↗
             </a>
             <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/ownership" rel="noreferrer" target="_blank">
@@ -1782,42 +2002,42 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">AREA COMPARISON</p>
+            <p className="panel-eyebrow">COMPARISON</p>
             <div className="comparison-title-row">
               <div>
-                <h2 id="comparison-title">Compare areas</h2>
-                <p className="comparison-subtitle">Select up to four areas to compare side by side.</p>
+                <h2 id="comparison-title">Compare</h2>
+                <p className="comparison-subtitle">Mix districts, sectors, cells, villages and projects.</p>
               </div>
-              <span>{comparedAreas.length}/4 selected</span>
+              <span>{comparedAreas.length} selected</span>
             </div>
-            <label className="comparison-search-label" htmlFor="comparison-area-search">Search by district</label>
+            <label className="comparison-search-label" htmlFor="comparison-area-search">Find an area</label>
             <input
               autoComplete="off"
               className="comparison-search"
               id="comparison-area-search"
               onChange={(event) => setCompareSearch(event.target.value)}
-              placeholder="Search by district name"
+              placeholder="Search district, sector, cell or village"
               type="search"
               value={compareSearch}
             />
-            {normalizedComparisonSearch ? (
-              <div aria-label="Matching pilot districts" className="comparison-search-results" role="listbox">
-                {comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
-                  const isAdded = comparedAreas.some((existing) =>
-                    existing.level === area.level &&
-                    existing.name === area.name &&
-                    existing.district === area.district
-                  );
-                  const atLimit = comparedAreas.length >= 4 && !isAdded;
+            {normalizedComparisonSearch.length >= 2 ? (
+              <div aria-label="Matching administrative areas" className="comparison-search-results" role="listbox">
+                {comparisonSearchStatus === "loading" ? (
+                  <p className="comparison-no-results" role="status">Searching the four pilot districts…</p>
+                ) : comparisonSearchStatus === "error" ? (
+                  <p className="comparison-no-results" role="status">Area search is temporarily unavailable. You can still select an area from the map.</p>
+                ) : comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
+                  const candidate: ComparisonItem = { ...area, comparisonKind: "area" };
+                  const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
                   return (
                     <button
                       aria-selected={isAdded}
                       className="comparison-search-result"
-                      disabled={isAdded || atLimit}
-                      key={area.name}
+                      disabled={isAdded}
+                      key={area.id}
                       onClick={() => {
                         addAreaToComparison(area);
-                        if (!isAdded && !atLimit) setCompareSearch("");
+                        if (!isAdded) setCompareSearch("");
                       }}
                       role="option"
                       type="button"
@@ -1825,16 +2045,50 @@ export function MapExperience() {
                       <span className="comparison-search-dot" aria-hidden="true" />
                       <span className="comparison-search-result-copy">
                         <strong>{area.name}</strong>
-                        <small>{area.province} · District · pilot geography</small>
+                        <small>
+                          {areaLevelLabel(area.level)} · {area.district}
+                          {area.sector ? " · " + area.sector : ""}
+                          {area.cell ? " · " + area.cell : ""}
+                          {area.village ? " · " + area.village : ""}
+                        </small>
                       </span>
-                      <span className="comparison-search-result-action">{isAdded ? "Added" : atLimit ? "Limit reached" : "Add"}</span>
+                      <span className="comparison-search-result-action">{isAdded ? "Added" : "Add"}</span>
                     </button>
                   );
                 }) : (
-                  <p className="comparison-no-results">No pilot district matched “{compareSearch.trim()}”. Smaller areas can still be added from the map.</p>
+                  <p className="comparison-no-results">
+                    {comparisonSearchStatus === "ready"
+                      ? "No matching district, sector, cell or village found."
+                      : "Enter at least two characters to search."}
+                  </p>
                 )}
               </div>
             ) : null}
+            <div className="comparison-project-add">
+              <span className="comparison-project-add-title">Add a project</span>
+              <input
+                aria-label="Project name"
+                autoComplete="off"
+                className="comparison-search"
+                onChange={(event) => setCompareProjectName(event.target.value)}
+                placeholder="Project name"
+                type="text"
+                value={compareProjectName}
+              />
+              <input
+                aria-label="Project source URL (optional)"
+                autoComplete="url"
+                className="comparison-search"
+                onChange={(event) => setCompareProjectUrl(event.target.value)}
+                placeholder="Source URL (optional)"
+                type="url"
+                value={compareProjectUrl}
+              />
+              <button className="comparison-project-add-button" onClick={addManualProjectToComparison} type="button">
+                Add project
+              </button>
+              <small>Project metrics remain unpopulated until a verified, permitted feed is connected.</small>
+            </div>
             {comparisonFeedback ? (
               <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
             ) : null}
@@ -1851,9 +2105,9 @@ export function MapExperience() {
                     {comparedAreas.map((area) => (
                       <span
                         className="comparison-chip"
-                        key={`${area.level}-${area.district}-${area.name}`}
+                        key={comparisonItemKey(area)}
                       >
-                        <span>{area.name}</span>
+                        <span>{area.comparisonKind === "project" ? "Project · " + area.name : areaLevelLabel(area.level) + " · " + area.name}</span>
                         <button
                           aria-label={`Remove ${area.name} from comparison`}
                           className="comparison-chip-remove"
@@ -1885,9 +2139,10 @@ export function MapExperience() {
                         {comparedAreas.map((area) => (
                           <th
                             scope="col"
-                            key={`${area.level}-${area.district}-${area.name}`}
+                            key={comparisonItemKey(area)}
                           >
-                            {area.name}
+                            <span>{area.comparisonKind === "project" ? area.name : area.name}</span>
+                            <small>{area.comparisonKind === "project" ? "Project · no verified feed" : areaLevelLabel(area.level) + " · " + area.district}</small>
                           </th>
                         ))}
                       </tr>
@@ -1897,26 +2152,56 @@ export function MapExperience() {
                         <tr key={metric.id}>
                           <th scope="row">{metric.shortLabel}</th>
                           {comparedAreas.map((area) => {
-                            const landPrice =
-                              metric.id === "averageLandPricePerM2" &&
-                              area.level === "district"
-                                ? area.averageLandPricePerM2
-                                : null;
+                            const key = comparisonItemKey(area);
+                            const unitPrice = area.comparisonKind === "project" ? null : getUnitPriceEstimate(landPriceRows, area);
+                            const landPrice = metric.id === "averageLandPricePerM2" ? unitPrice?.pricePerM2 ?? null : null;
+                            const transaction = area.transactionEstimate;
+                            const isPriceLeader = landPrice !== null && highestComparisonPrice !== null && landPrice === highestComparisonPrice;
                             return (
-                              <td key={`${metric.id}-${area.level}-${area.district}-${area.name}`}>
-                                {landPrice !== null ? (
-                                  <div className="comparison-price-cell">
-                                    <span>{`${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`}</span>
-                                    {canCompareDistrictPrices && landPrice === highestDistrictPrice ? (
-                                      <span className="comparison-row-leader" aria-label="Highest mapped district price">
-                                        <span aria-hidden="true">★</span> Highest mapped
+                              <td key={metric.id + "-" + key}>
+                                {metric.id === "averageLandPricePerM2" ? (
+                                  landPrice !== null ? (
+                                    <div className="comparison-price-cell">
+                                      <span>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²</span>
+                                      {isPriceLeader ? (
+                                        <span className="comparison-row-leader" aria-label="Highest comparable supplied price">
+                                          <span aria-hidden="true">★</span> Highest supplied
+                                        </span>
+                                      ) : null}
+                                      <small>{unitPrice?.explanation}</small>
+                                    </div>
+                                  ) : (
+                                    <span>{area.comparisonKind === "project"
+                                      ? "No verified project data"
+                                      : unitPrice?.kind === "conflicting"
+                                        ? "Conflicting reference values"
+                                        : "No comparable price"}</span>
+                                  )
+                                ) : metric.id === "transactionVolume" ? (
+                                  transaction?.estimate !== null && transaction?.estimate !== undefined ? (
+                                    <div className="comparison-price-cell">
+                                      <span>
+                                        {transaction.status === "reported-current-month-unverified"
+                                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transaction.estimate) + "*"
+                                          : "≈ " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transaction.estimate)}
                                       </span>
-                                    ) : null}
-                                  </div>
-                                ) : metric.id === "averageLandPricePerM2" && area.level !== "district" ? (
-                                  "No value at this level"
+                                      <small>
+                                        {transaction.status === "reported-current-month-unverified"
+                                          ? "User-reported current month; unverified"
+                                          : transaction.status === "historical-monthly-baseline"
+                                            ? "2023 annual count ÷ 12; historical baseline"
+                                            : "Modelled from parcel-count share; not official"}
+                                      </small>
+                                    </div>
+                                  ) : (
+                                    <span>{area.comparisonKind === "project"
+                                      ? "No verified project data"
+                                      : area.level === "parcel"
+                                        ? "Not applicable to a parcel"
+                                        : transaction?.method ?? "Loading / no verified estimate"}</span>
+                                  )
                                 ) : (
-                                  "Pending"
+                                  <span>{area.comparisonKind === "project" ? "No verified project data" : "Pending verified data"}</span>
                                 )}
                               </td>
                             );

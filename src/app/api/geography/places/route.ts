@@ -126,30 +126,55 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
   return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\nout center tags;";
 }
 
+const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
+const overpassInFlight = new Map<string, Promise<OsmElement[]>>();
+const OVERPASS_CACHE_MS = 5 * 60 * 1000;
+const OVERPASS_CACHE_LIMIT = 48;
+
 async function queryOverpass(query: string): Promise<OsmElement[]> {
-  let lastError: unknown;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "Accept": "application/json",
-          "User-Agent": "Rwanda Land Intelligence map overlay"
-        },
-        body: new URLSearchParams({ data: query }).toString(),
-        signal: AbortSignal.timeout(24000),
-        next: { revalidate: 300 }
-      });
-      if (!response.ok) throw new Error("Overpass returned HTTP " + response.status);
-      const payload = await response.json() as OsmResponse;
-      if (payload.remark) throw new Error(payload.remark);
-      return payload.elements ?? [];
-    } catch (error) {
-      lastError = error;
+  const now = Date.now();
+  const cached = overpassCache.get(query);
+  if (cached && cached.expiresAt > now) return cached.elements;
+  if (cached) overpassCache.delete(query);
+
+  const inFlight = overpassInFlight.get(query);
+  if (inFlight) return inFlight;
+
+  const pending = (async () => {
+    let lastError: unknown;
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Accept": "application/json",
+            "User-Agent": "Rwanda Land Intelligence map overlay"
+          },
+          body: new URLSearchParams({ data: query }).toString(),
+          signal: AbortSignal.timeout(24000)
+        });
+        if (!response.ok) throw new Error("Overpass returned HTTP " + response.status);
+        const payload = await response.json() as OsmResponse;
+        if (payload.remark) throw new Error(payload.remark);
+        const elements = payload.elements ?? [];
+        overpassCache.set(query, { expiresAt: Date.now() + OVERPASS_CACHE_MS, elements });
+        while (overpassCache.size > OVERPASS_CACHE_LIMIT) {
+          const oldestKey = overpassCache.keys().next().value;
+          if (!oldestKey) break;
+          overpassCache.delete(oldestKey);
+        }
+        return elements;
+      } catch (error) {
+        lastError = error;
+      }
     }
-  }
-  throw lastError instanceof Error ? lastError : new Error("OpenStreetMap query failed");
+    throw lastError instanceof Error ? lastError : new Error("OpenStreetMap query failed");
+  })().finally(() => {
+    overpassInFlight.delete(query);
+  });
+  overpassInFlight.set(query, pending);
+  return pending;
 }
 
 function featureForElement(element: OsmElement, category: OverlayCategory): OverlayFeature | null {
@@ -388,8 +413,10 @@ export async function GET(request: NextRequest) {
           ) actualCategory = "transportation";
           else if (
             categories.includes("healthEducation") &&
-            ["school", "university", "college", "hospital", "clinic", "doctors", "pharmacy"].includes(tags.amenity ?? "") ||
-            ["hospital", "clinic", "doctor", "pharmacy"].includes(tags.healthcare ?? "")
+            (
+              ["school", "university", "college", "hospital", "clinic", "doctors", "pharmacy"].includes(tags.amenity ?? "") ||
+              ["hospital", "clinic", "doctor", "pharmacy"].includes(tags.healthcare ?? "")
+            )
           ) actualCategory = "healthEducation";
           else if (
             categories.includes("landmarks") &&

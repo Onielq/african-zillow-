@@ -81,6 +81,8 @@ type AreaProperties = {
   name?: string | null;
   detail?: string | null;
   source_id?: string | number | null;
+  zoning?: string | null;
+  zoning_source?: string | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -138,6 +140,7 @@ type MapViewProps = {
   basemapMode: BasemapMode;
   showLandPriceHeatmap: boolean;
   showLayers: MapOverlayCategory[];
+  showZoning: boolean;
   showScope: ShowScope;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
@@ -467,6 +470,7 @@ function featureToArea(
 export function MapView({
   basemapMode,
   showLandPriceHeatmap,
+  showZoning,
   onMapReady,
   onStatusChange,
   onBoundaryStatusChange,
@@ -480,7 +484,9 @@ export function MapView({
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
   const showLayersRef = useRef(showLayers);
   const showScopeRef = useRef(showScope);
+  const showZoningRef = useRef(showZoning);
   const refreshShowOverlaysRef = useRef<(() => void) | null>(null);
+  const refreshZoningRef = useRef<(() => void) | null>(null);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
@@ -513,6 +519,11 @@ export function MapView({
     applyShowOverlayFilters(map, showLayers);
     refreshShowOverlaysRef.current?.();
   }, [showLayers, showScope]);
+
+  useEffect(() => {
+    showZoningRef.current = showZoning;
+    refreshZoningRef.current?.();
+  }, [showZoning]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -747,7 +758,7 @@ export function MapView({
           type: "line",
           source: "show-overlays",
           minzoom: 8.6,
-          filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "overlay_category"], "transportation"]],
+          filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
           paint: {
             "line-color": "#2675C7",
             "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 1.2, 12, 2.2, 16, 3],
@@ -841,6 +852,65 @@ export function MapView({
         });
       }
       applyShowOverlayFilters(map, showLayersRef.current);
+    };
+
+    const addZoningOverlayLayers = () => {
+      if (!map.getSource("zoning-overlay")) {
+        map.addSource("zoning-overlay", {
+          type: "geojson",
+          data: emptyFeatureCollection()
+        });
+      }
+      if (!map.getLayer("zoning-overlay-fill")) {
+        map.addLayer({
+          id: "zoning-overlay-fill",
+          type: "fill",
+          source: "zoning-overlay",
+          filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+          paint: {
+            "fill-color": [
+              "match",
+              ["get", "zoning"],
+              "A1-Agriculture zone", "#9EBB84",
+              "A2-Livestock zone", "#B1C78C",
+              "R1-Low density residential zone", "#F4D7A0",
+              "R1A-Low density residential densification zone", "#F0C58B",
+              "R2-Medium density residential - Improvement zone", "#F5B66F",
+              "R3-Medium density residential - Expansion zone", "#F28D5C",
+              "R4-High density residential zone", "#E36A60",
+              "C1-Mixed use zone", "#C87BAD",
+              "C1-Mixed use commercial zone", "#C87BAD",
+              "C3-City commercial zone", "#B7679E",
+              "I1-Light industrial zone", "#A5A4B7",
+              "I2-General industrial zone", "#858BA1",
+              "P1-Parks and open spaces zone", "#79B88B",
+              "P2-Sport and Eco tourism zone", "#69AD91",
+              "P3B-Forest zone", "#479575",
+              "PF1-Education and research facilities", "#7DABD5",
+              "PF2-Health facilities", "#6D9EC9",
+              "T-Transportation zone", "#8B96A7",
+              "T1-Road reserve", "#8B96A7",
+              "WB-Waterbody zone", "#64B6D6",
+              "W1A-Wetland - Protected zone", "#91C9B7",
+              "#B8C5BE"
+            ],
+            "fill-opacity": 0.34
+          }
+        });
+      }
+      if (!map.getLayer("zoning-overlay-outline")) {
+        map.addLayer({
+          id: "zoning-overlay-outline",
+          type: "line",
+          source: "zoning-overlay",
+          filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+          paint: {
+            "line-color": "#627B6C",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 13, 0.8, 17, 1.2],
+            "line-opacity": 0.68
+          }
+        });
+      }
     };
 
     const updateLayerVisibility = () => {
@@ -1142,9 +1212,62 @@ export function MapView({
     };
     refreshShowOverlaysRef.current = scheduleShowOverlayRefresh;
 
+    let zoningOverlayController: AbortController | null = null;
+    let zoningOverlaySequence = 0;
+    let zoningOverlayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshZoningOverlay = async () => {
+      const source = map.getSource("zoning-overlay") as GeoJSONSource | undefined;
+      if (!map.isStyleLoaded() || !source) return;
+      zoningOverlayController?.abort();
+      zoningOverlayController = null;
+      const sequence = ++zoningOverlaySequence;
+      if (!showZoningRef.current) {
+        source.setData(emptyFeatureCollection());
+        return;
+      }
+
+      const controller = new AbortController();
+      zoningOverlayController = controller;
+      const bounds = map.getBounds();
+      const bbox = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ].map((value) => value.toFixed(6)).join(",");
+
+      try {
+        const response = await fetch("/api/geography/zoning?bbox=" + encodeURIComponent(bbox), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Zoning request failed (" + response.status + ")");
+        const data = await response.json() as MapFeatureCollection;
+        if (sequence !== zoningOverlaySequence || controller.signal.aborted) return;
+        source.setData(data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Official zoning overlay failed.", error);
+        source.setData(emptyFeatureCollection());
+      }
+    };
+
+    const scheduleZoningRefresh = () => {
+      if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
+      if (!showZoningRef.current) {
+        zoningOverlayController?.abort();
+        const source = map.getSource("zoning-overlay") as GeoJSONSource | undefined;
+        source?.setData(emptyFeatureCollection());
+        return;
+      }
+      zoningOverlayTimer = setTimeout(() => void refreshZoningOverlay(), 220);
+    };
+    refreshZoningRef.current = scheduleZoningRefresh;
+
     const scheduleRefresh = () => {
       updateLayerVisibility();
       scheduleShowOverlayRefresh();
+      scheduleZoningRefresh();
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => void refreshAreas(), 220);
     };
@@ -1218,9 +1341,11 @@ export function MapView({
       if (fallbackTimer) clearTimeout(fallbackTimer);
       addAdministrativeLayers();
       addShowOverlayLayers();
+      addZoningOverlayLayers();
       updateLayerVisibility();
       applyShowOverlayFilters(map, showLayersRef.current);
       void refreshShowOverlays();
+      void refreshZoningOverlay();
       onStatusChange("ready");
       void refreshAreas();
       attachInteractionHandlers();
@@ -1275,7 +1400,10 @@ export function MapView({
       if (refreshTimer) clearTimeout(refreshTimer);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayController?.abort();
+      if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
+      zoningOverlayController?.abort();
       refreshShowOverlaysRef.current = null;
+      refreshZoningRef.current = null;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();

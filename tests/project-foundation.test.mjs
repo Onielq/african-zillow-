@@ -144,14 +144,14 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /No project markers\s+or prices are fabricated/);
 });
 
-test("area comparison supports up to four areas without fabricating unavailable metrics", async () => {
+test("area comparison supports an unrestricted mixed set without fabricating unavailable metrics", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const css = await readProjectFile("src/app/globals.css");
 
   assert.match(experience, /setComparedAreas/);
-  assert.match(experience, /comparedAreas\.length >= 4/);
+  assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
   assert.match(experience, /Add to comparison/);
-  assert.match(experience, /Pending/);
+  assert.match(experience, /No verified project data/);
   assert.match(experience, /Clear shortlist/);
   assert.match(css, /\.comparison-panel/);
 });
@@ -276,12 +276,12 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.ok(audit.includes("Screenshot 2026-10-19 234441.jpg"));
   assert.ok(audit.includes("Screenshot 2026-10-19 235932.jpg"));
   assert.match(audit, /without permission|Do not redistribute/i);
-  assert.match(experience, /PILOT_DISTRICT_SEARCH_AREAS/);
+  assert.match(experience, /comparisonSearchResults/);
   assert.match(experience, /comparison-area-search/);
   assert.match(experience, /comparison-selected-chips/);
   assert.match(experience, /Clear all/);
-  assert.match(experience, /canCompareDistrictPrices/);
-  assert.match(experience, /Highest mapped district price/);
+  assert.match(experience, /highestComparisonPrice/);
+  assert.match(experience, /Highest supplied/);
   assert.match(experience, /aria-modal="true"/);
   assert.match(experience, /area-market-grid/);
   assert.match(experience, /Projects in selected area/);
@@ -418,7 +418,9 @@ test("Show menu exposes sourced overlays and scopes queries to the active pilot 
   assert.match(experience, /title: "Medical & schools"/);
   assert.match(experience, /title: "Transportation"/);
   assert.match(experience, /title: "Nature"/);
-  assert.match(experience, /activeFocus === "kigali" \? "kigali"/);
+  assert.match(experience, /showScope="pilot"/);
+  assert.match(experience, /show-toggle-track/);
+  assert.match(experience, /title: "Zoning"|showZoning/);
   assert.match(mapView, /show-road-lines/);
   assert.match(mapView, /show-poi-circles/);
   assert.match(mapView, /showLayersRef/);
@@ -450,15 +452,88 @@ test("cell selection offers UPI parcel inventory and zoom-to-parcel navigation",
   assert.match(css, /\.cell-parcel-row/);
 });
 
-test("transaction volume explains district priorities, transaction types, and non-appreciation caveats", async () => {
+test("transaction volume explains sourced baselines, model caveats, and current Bugesera discrepancy", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
 
   assert.match(experience, /Bugesera, Kicukiro, Gasabo and Nyarugenge/);
   assert.match(experience, /Transaction types to track/);
   assert.match(experience, /Voluntary sale, succession, expropriation/);
   assert.match(experience, /not proof of price appreciation/);
-  assert.match(experience, /rwandalanddashboard\.lands\.rw\/transactions/);
-  assert.match(experience, /Bugesera month-to-date total of 4,350/);
+  assert.match(experience, /TRANSACTION_DASHBOARD_SOURCE/);
+  assert.match(experience, /annual district transaction totals for 2023/);
+  assert.match(experience, /User-reported Bugesera month-to-date dashboard reading/);
   assert.match(experience, /4,031/);
-  assert.match(experience, /4,350\*/);
+  assert.match(experience, /reported-current-month-unverified/);
+});
+
+
+test("parcel selection calculates an indicative value from parcel area and unit price", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
+  assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
+  assert.match(experience, /Indicative estimated parcel value/);
+  assert.match(experience, /rough area-based estimate, not an official valuation/);
+});
+
+test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const places = await readProjectFile("src/app/api/geography/places/route.ts");
+  const zoning = await readProjectFile("src/app/api/geography/zoning/route.ts");
+
+  for (const label of ["Landmarks", "Medical & schools", "Transportation", "Nature", "Zoning"]) {
+    assert.match(experience, new RegExp(label.replace(/[.*+?^{}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(experience, /showScope="pilot"/);
+  assert.match(experience, /show-toggle-track/);
+  assert.match(mapView, /showZoning/);
+  assert.match(mapView, /\/api\/geography\/zoning\?bbox=/);
+  assert.match(places, /categories\.includes\("healthEducation"\) &&\s*\(/);
+  assert.match(places, /overpassCache/);
+  assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
+  assert.match(zoning, /Bugesera_DLUP/);
+});
+
+test("comparison searches every pilot administrative level and accepts any mixed comparison set", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const search = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+
+  assert.match(search, /layers: \{ district: 4, sector: 5, cell: 6, village: 7 \}/);
+  assert.match(search, /layers: \{ district: 2, sector: 4, cell: 3, village: 5 \}/);
+  assert.match(search, /returnGeometry: "false"/);
+  assert.match(experience, /setComparedAreas\(\(areas\) => \[\.\.\.areas, item\]\)/);
+  assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
+  assert.match(experience, /comparisonKind: "project"/);
+  assert.match(experience, /No verified project data/);
+  assert.match(experience, /Search district, sector, cell or village/);
+});
+
+test("transaction indicators distinguish NISR 2023 baselines from the unverified Bugesera month-to-date observation", async () => {
+  const data = await readProjectFile("src/data/transaction-benchmarks.ts");
+  const route = await readProjectFile("src/app/api/geography/transaction-estimate/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  for (const sourceValue of [
+    "annualTransactions2023: 50698",
+    "annualTransactions2023: 73377",
+    "annualTransactions2023: 40102",
+    "annualTransactions2023: 23527",
+    "count: 4350",
+    "user-reported-unverified"
+  ]) assert.ok(data.includes(sourceValue), "missing benchmark datum: " + sourceValue);
+  assert.match(route, /returnCountOnly: "true"/);
+  assert.match(route, /districtBaseline/);
+  assert.match(route, /estimatedShare: share/);
+  assert.match(route, /Modelled estimate only, not an official monthly transaction count/);
+  assert.match(experience, /Historical baseline: official 2023 annual district transactions ÷ 12/);
+  assert.match(experience, /An indexed overview separately showed 4,031/);
+});
+
+test("selected-area KPIs have more width and responsive two-column spacing", async () => {
+  const css = await readProjectFile("src/app/globals.css");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(css, /width: min\(400px, calc\(100% - 36px\)\)/);
+  assert.match(css, /\.area-market-grid\s*\{[^}]*align-items: stretch/s);
+  assert.match(css, /\.parcel-estimate-card\s*\{/);
+  assert.match(experience, /Transaction volume · monthly indicator/);
 });
