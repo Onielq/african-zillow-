@@ -134,7 +134,7 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
     ? ["in", ["get", "overlay_category"], ["literal", categories]]
     : ["==", ["get", "overlay_category"], "__hidden__"];
   const filters: Array<[string, unknown[]]> = [
-    ["show-road-lines", ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
+    ["show-road-lines", ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
     ["show-poi-fill", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
     ["show-poi-outline", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
     ["show-poi-circles", ["all", ["==", ["geometry-type"], "Point"], categoryFilter]],
