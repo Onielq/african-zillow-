@@ -642,6 +642,16 @@ export function MapExperience() {
     .filter(({ estimate }) => estimate.pricePerM2 !== null)
     .map(({ estimate }) => estimate.pricePerM2 as number);
   const highestComparisonPrice = comparisonPrices.length > 1 ? Math.max(...comparisonPrices) : null;
+  const parcelUnitPriceEstimate = selectedArea?.level === "parcel"
+    ? getUnitPriceEstimate(landPriceRows, selectedArea, true)
+    : null;
+  const estimatedParcelValue = selectedArea?.level === "parcel" &&
+    typeof selectedArea.parcelSizeM2 === "number" &&
+    selectedArea.parcelSizeM2 > 0 &&
+    parcelUnitPriceEstimate?.pricePerM2 !== null &&
+    parcelUnitPriceEstimate?.pricePerM2 !== undefined
+      ? Math.round(selectedArea.parcelSizeM2 * parcelUnitPriceEstimate.pricePerM2)
+      : null;
 
   useEffect(() => {
     let active = true;
@@ -1552,6 +1562,23 @@ export function MapExperience() {
                       : "Date not supplied"}
                   </strong>
                 </div>
+                <div className="parcel-estimate-card" aria-label="Estimated parcel value">
+                  <span>Indicative estimated parcel value</span>
+                  <strong>
+                    {estimatedParcelValue !== null
+                      ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedParcelValue)
+                      : "Not available"}
+                  </strong>
+                  {typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
+                    <p>
+                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m²
+                    </p>
+                  ) : null}
+                  <small>
+                    {parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable reference price per m² are both required."}
+                    {" "}This is a rough area-based estimate, not an official valuation, offer price, or proof of sale value.
+                  </small>
+                </div>
               </div>
             ) : (
               <>
@@ -1592,23 +1619,29 @@ export function MapExperience() {
                     </small>
                   </article>
                   <article className="area-market-card">
-                    <span>Transaction volume · month to date</span>
+                    <span>Transaction volume · monthly indicator</span>
                     <strong>
-                      {selectedMetric === "transactionVolume" &&
-                        selectedArea.level === "district" &&
-                        selectedArea.district.toLowerCase() === "bugesera"
-                        ? "4,350*"
-                        : "Not connected"}
+                      {selectedTransactionEstimateStatus === "loading"
+                        ? "Loading…"
+                        : transactionEstimateForSelected?.estimate !== null && transactionEstimateForSelected?.estimate !== undefined
+                          ? transactionEstimateForSelected.status === "reported-current-month-unverified"
+                            ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transactionEstimateForSelected.estimate) + "*"
+                            : "≈ " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transactionEstimateForSelected.estimate)
+                          : "Unavailable"}
                     </strong>
                     <small>
-                      {selectedMetric === "transactionVolume" &&
-                        selectedArea.level === "district" &&
-                        selectedArea.district.toLowerCase() === "bugesera"
-                        ? "Dated provisional reference reported from the official /transactions page on 24 Oct 2026; not a live value in this app. Refresh the source before treating it as current."
-                        : "Monthly counts and transaction types are not yet joined to this area. Priorities: Bugesera, Kicukiro, Gasabo and Nyarugenge. High volume signals activity, not guaranteed appreciation."}
+                      {transactionEstimateForSelected?.status === "reported-current-month-unverified"
+                        ? "User-reported Bugesera month-to-date dashboard reading, observed 24 Oct 2026 and not independently reconciled. An indexed overview separately showed 4,031; 4,350 is not a live verified feed."
+                        : transactionEstimateForSelected?.status === "historical-monthly-baseline"
+                          ? "Historical baseline: official 2023 annual district transactions ÷ 12. This is not the current month's count."
+                          : transactionEstimateForSelected?.status === "parcel-share-model"
+                            ? transactionEstimateForSelected.method
+                            : selectedTransactionEstimateStatus === "loading"
+                              ? "Calculating a sourced activity indicator…"
+                              : "No current verified count is available for this area."}
                     </small>
                     <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/transactions" target="_blank" rel="noreferrer">
-                      Open transaction dashboard ↗
+                      Official dashboard ↗
                     </a>
                   </article>
                   <article className="area-market-card">
