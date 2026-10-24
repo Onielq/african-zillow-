@@ -20,11 +20,11 @@ test("project and developer directories remain evidence-gated until a feed is ve
   assert.match(developers, /No verified developer directory is connected yet/i);
   assert.match(developers, /Authority to represent/i);
   assert.match(directory, /This means no records are verified and published in this directory/i);
-  assert.match(directory, /href: "\/projects"/);
-  assert.match(directory, /href: "\/developers"/);
-  assert.match(directory, /href: "\/data-sources"/);
-  assert.match(mapExperience, /href="\/projects">Open project directory/);
-  assert.match(mapExperience, /href="\/developers">Open developer directory/);
+  assert.ok(directory.includes('href: "/projects"'));
+  assert.ok(directory.includes('href: "/developers"'));
+  assert.ok(directory.includes('href: "/data-sources"'));
+  assert.ok(mapExperience.includes('href="/projects">Open project directory'));
+  assert.ok(mapExperience.includes('href="/developers">Open developer directory'));
 });
 
 test("official market-source checks test page availability without importing data rows", async () => {
