@@ -1446,6 +1446,12 @@ export function MapExperience() {
                     <a className="metric-info-source" href={TRANSACTION_DASHBOARD_SOURCE} target="_blank" rel="noreferrer">
                       Open district transaction and type tables ↗
                     </a>
+                    <a className="metric-info-source" href={TRANSACTION_BENCHMARK_SOURCE} target="_blank" rel="noreferrer">
+                      Open NISR 2025 Statistical Yearbook (2023 historical totals) ↗
+                    </a>
+                    <a className="metric-info-source" href="https://data.gov.rw/datasets/3cee397e-8da0-418f-a382-b97feffba7ed" target="_blank" rel="noreferrer">
+                      Transaction summary dataset · approved access required ↗
+                    </a>
                   </div>
                 ) : null}
                 <div className="metric-info-status">
