@@ -40,6 +40,9 @@ export type SelectedArea = {
   village: string | null;
   villageId: string | null;
   averageLandPricePerM2: number | null;
+  averageLandPriceKind?: string | null;
+  averageLandPriceSampleSize?: number | null;
+  averageLandPriceConflictingCells?: number | null;
   sourceLabel?: string | null;
   sourceType?: "administrative-boundary" | "cadastral-parcel";
   upi?: string | null;
@@ -391,6 +394,9 @@ function featureToArea(
       typeof properties.average_land_price_per_m2 === "number"
         ? properties.average_land_price_per_m2
         : null,
+    averageLandPriceKind: properties.average_land_price_kind ?? null,
+    averageLandPriceSampleSize: properties.average_land_price_sample_size ?? null,
+    averageLandPriceConflictingCells: properties.average_land_price_conflicting_cells ?? null,
     sourceLabel: properties.source_label ?? null,
     sourceType: properties.source_type === "cadastral-parcel"
       ? "cadastral-parcel"
