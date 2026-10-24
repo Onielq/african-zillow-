@@ -2107,9 +2107,9 @@ export function MapExperience() {
                     {comparedAreas.map((area) => (
                       <span
                         className="comparison-chip"
-                        key={`${area.level}-${area.district}-${area.name}`}
+                        key={comparisonItemKey(area)}
                       >
-                        <span>{area.name}</span>
+                        <span>{area.comparisonKind === "project" ? "Project · " + area.name : areaLevelLabel(area.level) + " · " + area.name}</span>
                         <button
                           aria-label={`Remove ${area.name} from comparison`}
                           className="comparison-chip-remove"
@@ -2153,26 +2153,56 @@ export function MapExperience() {
                         <tr key={metric.id}>
                           <th scope="row">{metric.shortLabel}</th>
                           {comparedAreas.map((area) => {
-                            const landPrice =
-                              metric.id === "averageLandPricePerM2" &&
-                              area.level === "district"
-                                ? area.averageLandPricePerM2
-                                : null;
+                            const key = comparisonItemKey(area);
+                            const unitPrice = area.comparisonKind === "project" ? null : getUnitPriceEstimate(landPriceRows, area);
+                            const landPrice = metric.id === "averageLandPricePerM2" ? unitPrice?.pricePerM2 ?? null : null;
+                            const transaction = area.transactionEstimate;
+                            const isPriceLeader = landPrice !== null && highestComparisonPrice !== null && landPrice === highestComparisonPrice;
                             return (
-                              <td key={`${metric.id}-${area.level}-${area.district}-${area.name}`}>
-                                {landPrice !== null ? (
-                                  <div className="comparison-price-cell">
-                                    <span>{`${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`}</span>
-                                    {canCompareDistrictPrices && landPrice === highestDistrictPrice ? (
-                                      <span className="comparison-row-leader" aria-label="Highest mapped district price">
-                                        <span aria-hidden="true">★</span> Highest mapped
+                              <td key={metric.id + "-" + key}>
+                                {metric.id === "averageLandPricePerM2" ? (
+                                  landPrice !== null ? (
+                                    <div className="comparison-price-cell">
+                                      <span>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²</span>
+                                      {isPriceLeader ? (
+                                        <span className="comparison-row-leader" aria-label="Highest comparable supplied price">
+                                          <span aria-hidden="true">★</span> Highest supplied
+                                        </span>
+                                      ) : null}
+                                      <small>{unitPrice?.explanation}</small>
+                                    </div>
+                                  ) : (
+                                    <span>{area.comparisonKind === "project"
+                                      ? "No verified project data"
+                                      : unitPrice?.kind === "conflicting"
+                                        ? "Conflicting reference values"
+                                        : "No comparable price"}</span>
+                                  )
+                                ) : metric.id === "transactionVolume" ? (
+                                  transaction?.estimate !== null && transaction?.estimate !== undefined ? (
+                                    <div className="comparison-price-cell">
+                                      <span>
+                                        {transaction.status === "reported-current-month-unverified"
+                                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transaction.estimate) + "*"
+                                          : "≈ " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(transaction.estimate)}
                                       </span>
-                                    ) : null}
-                                  </div>
-                                ) : metric.id === "averageLandPricePerM2" && area.level !== "district" ? (
-                                  "No value at this level"
+                                      <small>
+                                        {transaction.status === "reported-current-month-unverified"
+                                          ? "User-reported current month; unverified"
+                                          : transaction.status === "historical-monthly-baseline"
+                                            ? "2023 annual count ÷ 12; historical baseline"
+                                            : "Modelled from parcel-count share; not official"}
+                                      </small>
+                                    </div>
+                                  ) : (
+                                    <span>{area.comparisonKind === "project"
+                                      ? "No verified project data"
+                                      : area.level === "parcel"
+                                        ? "Not applicable to a parcel"
+                                        : transaction?.method ?? "Loading / no verified estimate"}</span>
+                                  )
                                 ) : (
-                                  "Pending"
+                                  <span>{area.comparisonKind === "project" ? "No verified project data" : "Pending verified data"}</span>
                                 )}
                               </td>
                             );
