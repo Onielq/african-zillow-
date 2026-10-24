@@ -77,8 +77,8 @@ test("the average land price metric uses sourced district values and marks snaps
   assert.match(mapView, /LAND_PRICE_RAMP/);
   assert.match(mapView, /#36B8B2/);
   assert.match(mapView, /#B7444B/);
-  assert.match(mapView, /13\.05/);
-  assert.match(mapView, /15\.25/);
+  assert.match(mapView, /15\.1/);
+  assert.match(mapView, /17\.35/);
   assert.match(experience, /effective date and calculation method are not disclosed/i);
   assert.match(experience, /district-level land prices are not a valid substitute/i);
 });
