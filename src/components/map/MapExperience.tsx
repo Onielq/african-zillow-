@@ -822,6 +822,10 @@ export function MapExperience() {
                     prices, availability, sales progress and completion figures will appear only
                     when a permitted, current source is connected.
                   </p>
+                  <div className="directory-route-links">
+                    <Link href="/projects">Open project directory ↗</Link>
+                    <Link href="/developers">Open developer directory ↗</Link>
+                  </div>
                 </section>
               </>
             )}
@@ -872,12 +876,18 @@ export function MapExperience() {
               </strong>
             </div>
             {workspaceMode === "projects" ? (
-              <p>
-                Project mode is ready for a verified project feed, but developer
-                launches, starting prices, payment plans, construction progress
-                and unit availability are not connected yet. No project markers
-                or prices are fabricated.
-              </p>
+              <>
+                <p>
+                  Project mode is ready for a verified project feed, but developer
+                  launches, starting prices, payment plans, construction progress
+                  and unit availability are not connected yet. No project markers
+                  or prices are fabricated.
+                </p>
+                <div className="directory-route-links">
+                  <Link href="/projects">Open project directory ↗</Link>
+                  <Link href="/developers">Developer directory ↗</Link>
+                </div>
+              </>
             ) : (
               <>
                 <p>{activeMetric.description}</p>
