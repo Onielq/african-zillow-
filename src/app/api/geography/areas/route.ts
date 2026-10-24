@@ -85,9 +85,9 @@ let landPriceIndexPromise: Promise<LandPriceIndex> | null = null;
 function normalizePriceKey(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .toLocaleLowerCase("en");
 }
 
@@ -110,9 +110,9 @@ async function loadLandPriceIndex(): Promise<LandPriceIndex> {
           prices: Set<number>;
           sourceLines: number[];
         }>();
-        text.split(/\\r?\\n/).slice(1).forEach((line, index) => {
+        text.split(/\r?\n/).slice(1).forEach((line, index) => {
           if (!line.trim()) return;
-          const fields = line.split("\\t");
+          const fields = line.split("\t");
           if (fields.length !== 5 || fields.slice(0, 4).some((field) => !field.trim())) return;
           const district = fields[1].trim();
           const sector = fields[2].trim();
@@ -676,9 +676,9 @@ type ParcelCellFilter = { district: string; sector: string; cell: string };
 function normalizeParcelLocation(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .toLocaleLowerCase("en");
 }
 
