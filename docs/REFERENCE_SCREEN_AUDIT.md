@@ -65,13 +65,13 @@ This comparison is based on the live application code on `main`, not assumptions
 | Selected-area drawer | Shows parcel attributes, source/level, an available district price, and comparison action. It doesn't yet provide the six-card investment summary or verified project list. | Re-layout as consistent metric cards with data statuses; no fabricated project cards. |
 | Comparison | Up to four clicked-map areas and a table; missing metrics are pending. | Match the centred modal/search/chips interaction and support row leaders only for fully comparable metrics. |
 | Historical data | No mapped year-by-year metric series. | No timeline until the source supports a real, queryable time series. |
-| Projects mode | Switching to Projects shows a clear note that the developer/project feed is not connected; no fake markers are drawn. | Build verified project discovery and project details after data access and provenance are agreed. |
-| Developers | No connected developer directory or validated development-pipeline source. | Keep developer records out until a legitimate, current source/partner feed exists. |
+| Projects mode and directory | The map's Projects mode explains that inventory is not connected. The dedicated `/projects` route now gives a source-gated empty state and explains the evidence required for a project record. | Connect an authorised, maintained project feed before showing project markers, prices, payments, stages or units. |
+| Developers | The dedicated `/developers` route states that no verified directory is connected and sets identity, authority, project linkage, contact-permission and freshness requirements. No developer profiles are fabricated. | Connect an authorised source or partner feed and verify record-level evidence before publishing profiles. |
 | Data governance | Dedicated `/data-sources` page and `docs/DATA_SOURCE_REGISTER.md` added; cadastral reuse issues are visible. | Record the permission decision and audit trail at each source integration. |
 
-### Baseline note and current review-branch work
+### Implementation checkpoint (24 October 2026)
 
-The “Current Rwanda application” column below records `main` before the changes proposed in PR #11. The review branch builds on that baseline with a centred comparison modal/search for the four pilot districts, selected-area chips and clear/remove actions, six evidence-aware market cards in the area inspector, an explicit Projects empty state, a metric-definition popover, and an on-demand metadata-only health check for the four GIS services. These changes remain subject to CI and review before production.
+The audit, comparison modal/search, selected-area chips, evidence-aware area cards, metric-definition popover and GIS metadata health check were merged to `main` in PR #11. The next implementation branch adds dedicated `/projects` and `/developers` routes and checks availability of the two official market-source pages. These directory pages deliberately publish no records until a permitted, current feed is verified. A source page being reachable does not mean its data has been imported or its terms approved.
 
 ## 4. Rwanda data source readiness
 
@@ -113,7 +113,7 @@ For every source, record four independent checks: **reuse permission, completene
 4. Add tests for missing values, duplicate IDs, schema changes, stale data, failed upstream requests and geographic-join rates.
 
 ### P2 — Projects and Developers pages
-Before publishing project/developer results, agree which publisher or partner owns the records and can authorize display. Each record needs a stable ID, update timestamp, geographic ID/coordinates, source, and a data-status trail. Project price, launch/availability state, completion progress and delivery units must not be guessed.
+The first version of both routes is implemented as evidence-gated directories with an explicit empty state. Before publishing project/developer results, agree which publisher or partner owns the records and can authorize display. Each record needs a stable ID, update timestamp, geographic ID/coordinates, source, and a data-status trail. Project price, launch/availability state, completion progress, payment plan and delivery units must not be guessed.
 
 ### P3 — contextual map overlays
 Select official or properly licensed sources for health facilities, schools, landmarks and Rwanda-appropriate transit/road layers. Add toggles and legends only after each overlay's licence, currentness, attribution and geographic quality have passed review.
@@ -130,6 +130,6 @@ Select official or properly licensed sources for health facilities, schools, lan
 - The 18 reference states are mapped to explicit requirements above.
 - Every implemented metric is tied to a defined source and measure; absent values are not faked.
 - The comparison UI works for one to four areas, clear/remove actions, duplicate selections, and partly missing metrics.
-- Project/developer information comes from a verified, permitted source; otherwise the UI explains that records are not connected.
+- Project/developer routes are navigable and clearly explain the empty state; they publish no records until a verified, permitted source exists.
 - Cadastral, administrative, zoning, listing and planning layers remain semantically distinct.
 - `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` pass before changes are merged.
