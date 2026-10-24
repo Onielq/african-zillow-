@@ -302,18 +302,24 @@ export function MapExperience() {
 
     if (exists) {
       setComparisonFeedback(`${areaToAdd.name} is already on your comparison list.`);
+      setSourcesOpen(false);
+      setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
 
     if (comparedAreas.length >= 4) {
       setComparisonFeedback("Compare up to four areas. Remove one to add another.");
+      setSourcesOpen(false);
+      setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
 
     setComparedAreas((areas) => [...areas, areaToAdd]);
     setComparisonFeedback(`${areaToAdd.name} added to comparison.`);
+    setSourcesOpen(false);
+    setMetricInfoOpen(false);
     setCompareOpen(true);
   };
 
@@ -655,10 +661,12 @@ export function MapExperience() {
                 {selectedMetric === "averageLandPricePerM2"
                   ? "RWF per m²"
                   : selectedMetric === "transactionVolume"
-                    ? "Registered land transactions"
+                    ? "Count of registered land transactions"
                     : selectedMetric === "capitalAppreciation" || selectedMetric === "rentalYield"
                       ? "Percent (%)"
-                      : "Count of verified records"}
+                      : selectedMetric === "marketSupply"
+                        ? "Count of active sale/rent listings"
+                        : "Count of expected units from verified projects"}
               </strong>
             </div>
             <div className="metric-info-status">
