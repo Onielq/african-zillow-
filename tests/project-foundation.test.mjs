@@ -74,6 +74,8 @@ test("the average land price metric uses sourced district values and marks snaps
   assert.match(route, /rwandalanddashboard\.lands\.rw\/prices/);
   assert.match(mapView, /showLandPriceHeatmap/);
   assert.match(mapView, /average_land_price_per_m2/);
+  assert.match(mapView, /4038, "#E2F0E5"/);
+  assert.match(mapView, /61499, "#B94943"/);
   assert.match(experience, /effective date and calculation method are not disclosed/i);
   assert.match(experience, /district-level land prices are not a valid substitute/i);
 });
