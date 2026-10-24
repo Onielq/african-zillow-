@@ -351,6 +351,18 @@ export function MapExperience() {
         area.name.toLocaleLowerCase().includes(normalizedComparisonSearch)
       )
     : [];
+  const canCompareDistrictPrices =
+    comparedAreas.length > 1 &&
+    comparedAreas.every(
+      (area) =>
+        area.level === "district" &&
+        typeof area.averageLandPricePerM2 === "number"
+    );
+  const highestDistrictPrice = canCompareDistrictPrices
+    ? Math.max(
+        ...comparedAreas.map((area) => area.averageLandPricePerM2 ?? Number.NEGATIVE_INFINITY)
+      )
+    : null;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1139,11 +1151,20 @@ export function MapExperience() {
                                 : null;
                             return (
                               <td key={`${metric.id}-${area.level}-${area.district}-${area.name}`}>
-                                {landPrice !== null
-                                  ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`
-                                  : metric.id === "averageLandPricePerM2" && area.level !== "district"
-                                    ? "No value at this level"
-                                    : "Pending"}
+                                {landPrice !== null ? (
+                                  <div className="comparison-price-cell">
+                                    <span>{`${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²`}</span>
+                                    {canCompareDistrictPrices && landPrice === highestDistrictPrice ? (
+                                      <span className="comparison-row-leader" aria-label="Highest mapped district price">
+                                        <span aria-hidden="true">★</span> Highest mapped
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : metric.id === "averageLandPricePerM2" && area.level !== "district" ? (
+                                  "No value at this level"
+                                ) : (
+                                  "Pending"
+                                )}
                               </td>
                             );
                           })}
