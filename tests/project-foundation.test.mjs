@@ -424,7 +424,7 @@ test("selected cell exposes parcel records and never infers subdistrict transact
   assert.match(experience, /X-Parcel-List-Truncated/);
   assert.match(experience, /mapInstance\?\.flyTo/);
   assert.match(experience, /District-level only/);
-  assert.match(experience, /activity does not prove price appreciation/);
+  assert.match(experience, /activity volume does not prove price appreciation/);
   assert.match(route, /cellFilter/);
   assert.match(route, /10_000/);
   assert.match(volume, /transactionCount: 4350/);
