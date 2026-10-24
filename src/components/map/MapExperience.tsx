@@ -664,6 +664,80 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
+    const query = compareSearch.trim();
+    if (query.length < 2) {
+      setComparisonSearchResults([]);
+      setComparisonSearchStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setComparisonSearchStatus("loading");
+      try {
+        const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(query), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Area search failed (" + response.status + ")");
+        const payload = await response.json() as AreaSearchResponse;
+        if (controller.signal.aborted) return;
+        setComparisonSearchResults(payload.areas ?? []);
+        setComparisonSearchStatus("ready");
+      } catch {
+        if (controller.signal.aborted) return;
+        setComparisonSearchResults([]);
+        setComparisonSearchStatus("error");
+      }
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [compareSearch]);
+
+  useEffect(() => {
+    if (!selectedArea || selectedArea.level === "parcel") {
+      setSelectedTransactionEstimate(null);
+      setSelectedTransactionEstimateKey(null);
+      setSelectedTransactionEstimateStatus("idle");
+      return;
+    }
+
+    const area = selectedArea;
+    const areaKey = transactionEstimateKeyForArea(area);
+    const controller = new AbortController();
+    setSelectedTransactionEstimate(null);
+    setSelectedTransactionEstimateKey(areaKey);
+    setSelectedTransactionEstimateStatus("loading");
+
+    const params = new URLSearchParams({ district: area.district, level: area.level });
+    if (area.sector) params.set("sector", area.sector);
+    if (area.cell) params.set("cell", area.cell);
+    if (area.village) params.set("village", area.village);
+
+    const loadEstimate = async () => {
+      try {
+        const response = await fetch("/api/geography/transaction-estimate?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Transaction estimate request failed (" + response.status + ")");
+        const payload = await response.json() as TransactionEstimateResponse;
+        if (controller.signal.aborted) return;
+        setSelectedTransactionEstimate(payload);
+        setSelectedTransactionEstimateKey(areaKey);
+        setSelectedTransactionEstimateStatus("ready");
+      } catch {
+        if (controller.signal.aborted) return;
+        setSelectedTransactionEstimate(null);
+        setSelectedTransactionEstimateStatus("error");
+      }
+    };
+    void loadEstimate();
+    return () => controller.abort();
+  }, [selectedArea?.level, selectedArea?.name, selectedArea?.district, selectedArea?.sector, selectedArea?.cell, selectedArea?.village]);
+
+  useEffect(() => {
     const level = selectedArea?.level;
     const district = selectedArea?.district;
     const sector = selectedArea?.sector;
