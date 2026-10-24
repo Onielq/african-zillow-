@@ -1447,6 +1447,105 @@ export function MapExperience() {
                     <small>Verified project stages and future unit counts are not available.</small>
                   </article>
                 </div>
+                {selectedArea.level === "cell" ? (
+                  <section aria-label="Land parcels inside selected cell" className="cell-parcel-list">
+                    <div className="cell-parcel-list-heading">
+                      <div>
+                        <h3>Land parcels in {selectedArea.name}</h3>
+                        <p>Parcel records for this cell. Select a row to zoom to the plot.</p>
+                      </div>
+                      <span>
+                        {cellParcelsStatus === "loaded"
+                          ? cellParcels.length.toLocaleString("en-RW")
+                          : cellParcelsStatus === "loading"
+                            ? "Loading…"
+                            : "UPI"}
+                      </span>
+                    </div>
+                    {cellParcelsStatus === "loading" ? (
+                      <p className="cell-parcel-message" role="status">Loading parcel identifiers and areas from the connected cadastral source…</p>
+                    ) : cellParcelsStatus === "error" ? (
+                      <p className="cell-parcel-message" role="status">The parcel list could not be loaded. The administrative cell and its market indicators remain available.</p>
+                    ) : cellParcelsStatus === "loaded" && cellParcels.length === 0 ? (
+                      <p className="cell-parcel-message" role="status">No matching parcel records were returned for this exact cell name. Try the map at parcel zoom, and verify the source's administrative names.</p>
+                    ) : cellParcelsStatus === "loaded" ? (
+                      <>
+                        <div className="cell-parcel-table-head">
+                          <span>Parcel / UPI</span>
+                          <span>Area</span>
+                        </div>
+                        <div className="cell-parcel-rows">
+                          {cellParcels.map((parcel) => (
+                            <button
+                              className="cell-parcel-row"
+                              key={parcel.id}
+                              onClick={() => {
+                                const [west, south, east, north] = parcel.bounds;
+                                const mobile = window.matchMedia("(max-width: 720px)").matches;
+                                if (mapInstance) {
+                                  mapInstance.fitBounds(
+                                    [[west, south], [east, north]],
+                                    {
+                                      padding: mobile
+                                        ? { top: 150, bottom: 150, left: 18, right: 18 }
+                                        : { top: 120, bottom: 70, left: 336, right: 72 },
+                                      maxZoom: 19.4,
+                                      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 620
+                                    }
+                                  );
+                                }
+                                setSelectedArea({
+                                  level: "parcel",
+                                  name: parcel.parcelNumber ? "Parcel " + parcel.parcelNumber : "Parcel " + parcel.upi,
+                                  province: selectedArea.province,
+                                  district: parcel.district,
+                                  districtId: selectedArea.districtId,
+                                  sector: parcel.sector,
+                                  sectorId: selectedArea.sectorId,
+                                  cell: parcel.cell,
+                                  cellId: selectedArea.cellId,
+                                  village: parcel.village,
+                                  villageId: null,
+                                  averageLandPricePerM2: null,
+                                  sourceLabel: parcel.district.toLowerCase() === "bugesera"
+                                    ? "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse permission pending)"
+                                    : "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)",
+                                  sourceType: "cadastral-parcel",
+                                  upi: parcel.upi,
+                                  parcelNumber: parcel.parcelNumber,
+                                  parcelSizeM2: parcel.areaM2,
+                                  wetlandAreaM2: parcel.wetlandAreaM2,
+                                  lastUpdatedOn: parcel.lastUpdatedOn,
+                                  bounds: parcel.bounds
+                                });
+                              }}
+                              key={parcel.id}
+                              type="button"
+                              title={"Zoom to UPI " + parcel.upi}
+                            >
+                              <span className="cell-parcel-row-main">
+                                <strong>{parcel.parcelNumber ? "Parcel " + parcel.parcelNumber : "Parcel record"}</strong>
+                                <small>{parcel.upi}</small>
+                                {parcel.village ? <small>{parcel.village} Village</small> : null}
+                              </span>
+                              <span className="cell-parcel-area">
+                                {typeof parcel.areaM2 === "number"
+                                  ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcel.areaM2) + " m²"
+                                  : "Area unavailable"}
+                                <icon-placeholder />
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="cell-parcel-message">
+                          {cellParcelsTotal.toLocaleString("en-RW")} source records matched this cell.
+                          {cellParcelsCapped ? " The API response limit was reached; this list may not be complete." : ""}
+                          Parcel shapes identify land records but do not prove legal title or current ownership.
+                        </p>
+                      </>
+                    ) : null}
+                  </section>
+                ) : null}
                 <section aria-label="Projects in selected area" className="area-projects-empty">
                   <div className="area-projects-empty-heading">
                     <h3>Projects</h3>
