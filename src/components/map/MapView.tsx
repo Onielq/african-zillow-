@@ -84,6 +84,55 @@ type AreaProperties = {
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
+type AdminSourceId = "kigali" | "bugesera";
+type ViewBounds = [number, number, number, number];
+
+const ADMIN_SOURCE_EXTENTS: Record<AdminSourceId, ViewBounds> = {
+  kigali: [29.58, -2.12, 30.32, -1.47],
+  bugesera: [29.82, -2.62, 30.56, -1.92]
+};
+
+// Outward-rounded request windows let nearby pans reuse the same response
+// without simplifying polygon vertices or trimming a boundary to the viewport.
+const AREA_QUERY_GRIDS: Record<AreaLevel, number> = {
+  district: 0.25,
+  sector: 0.05,
+  cell: 0.02,
+  village: 0.008,
+  parcel: 0.002
+};
+
+function boundsIntersect(a: ViewBounds, b: ViewBounds): boolean {
+  return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+}
+
+function boundsContain(outer: ViewBounds, inner: ViewBounds): boolean {
+  const epsilon = 0.000001;
+  return (
+    outer[0] <= inner[0] + epsilon &&
+    outer[1] <= inner[1] + epsilon &&
+    outer[2] >= inner[2] - epsilon &&
+    outer[3] >= inner[3] - epsilon
+  );
+}
+
+function requestBoundsForArea(bounds: ViewBounds, level: AreaLevel): ViewBounds {
+  const grid = AREA_QUERY_GRIDS[level];
+  return [
+    Math.floor(bounds[0] / grid) * grid,
+    Math.floor(bounds[1] / grid) * grid,
+    Math.ceil(bounds[2] / grid) * grid,
+    Math.ceil(bounds[3] / grid) * grid
+  ].map((value) => Number(value.toFixed(6))) as ViewBounds;
+}
+
+function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: collections.flatMap((collection) => collection.features)
+  };
+}
+
 
 type MapViewProps = {
   basemapMode: BasemapMode;
@@ -528,6 +577,7 @@ export function MapView({
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let activeController: AbortController | null = null;
     let refreshSequence = 0;
+    const areaCache = new Map<string, { bounds: ViewBounds; data: MapFeatureCollection }>();
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
 
@@ -820,18 +870,18 @@ export function MapView({
 
     const fetchAreas = async (
       level: AreaLevel,
+      adminSource: AdminSourceId,
+      viewBounds: ViewBounds,
       signal: AbortSignal
     ): Promise<MapFeatureCollection> => {
-      const bounds = map.getBounds();
-      const bbox = [
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth()
-      ].map((value) => value.toFixed(6)).join(",");
+      const cacheKey = `${adminSource}:${level}`;
+      const cached = areaCache.get(cacheKey);
+      if (cached && boundsContain(cached.bounds, viewBounds)) return cached.data;
 
+      const queryBounds = requestBoundsForArea(viewBounds, level);
+      const bbox = queryBounds.join(",");
       const response = await fetch(
-        `/api/geography/areas?level=${level}&bbox=${encodeURIComponent(bbox)}`,
+        `/api/geography/areas?level=${level}&source=${adminSource}&bbox=${encodeURIComponent(bbox)}`,
         { signal }
       );
 
@@ -839,7 +889,9 @@ export function MapView({
         throw new Error(`Administrative boundary request failed (${response.status})`);
       }
 
-      return (await response.json()) as MapFeatureCollection;
+      const data = (await response.json()) as MapFeatureCollection;
+      if (!signal.aborted) areaCache.set(cacheKey, { bounds: queryBounds, data });
+      return data;
     };
 
     const refreshAreas = async () => {
@@ -852,15 +904,85 @@ export function MapView({
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const requestedLevels = AREA_LEVELS.slice(0, activeIndex + 1);
+      const bounds = map.getBounds();
+      const viewBounds: ViewBounds = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ];
+      const requestSources = (Object.keys(ADMIN_SOURCE_EXTENTS) as AdminSourceId[])
+        .filter((adminSource) => boundsIntersect(viewBounds, ADMIN_SOURCE_EXTENTS[adminSource]));
+
+      const dataByLevel = new Map<AreaLevel, Map<AdminSourceId, MapFeatureCollection>>();
+      const pendingTasks: Promise<void>[] = [];
+      let activeSourceSuccesses = 0;
+      let activeSourceFailures = 0;
+      const activeSourceCount = requestSources.length;
+      let activeStatusReported = false;
+
+      const publishLevel = (level: AreaLevel) => {
+        if (sequence !== refreshSequence || controller.signal.aborted) return;
+        const source = map.getSource(AREA_LAYERS[level].source) as GeoJSONSource | undefined;
+        if (!source) return;
+        const sourceData = dataByLevel.get(level);
+        source.setData(mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []));
+        if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
+        if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
+      };
+
+      const reportActiveReady = () => {
+        if (activeStatusReported || activeSourceSuccesses === 0) return;
+        activeStatusReported = true;
+        onBoundaryStatusChange("ready");
+      };
+
+      for (const level of requestedLevels) {
+        const levelData = new Map<AdminSourceId, MapFeatureCollection>();
+        dataByLevel.set(level, levelData);
+
+        for (const adminSource of requestSources) {
+          const cacheKey = `${adminSource}:${level}`;
+          const cached = areaCache.get(cacheKey);
+          if (cached && boundsContain(cached.bounds, viewBounds)) {
+            levelData.set(adminSource, cached.data);
+            if (level === activeLevel) activeSourceSuccesses += 1;
+            continue;
+          }
+
+          pendingTasks.push(
+            fetchAreas(level, adminSource, viewBounds, controller.signal)
+              .then((data) => {
+                if (sequence !== refreshSequence || controller.signal.aborted) return;
+                levelData.set(adminSource, data);
+                publishLevel(level);
+                if (level === activeLevel) {
+                  activeSourceSuccesses += 1;
+                  reportActiveReady();
+                }
+              })
+              .catch((error: unknown) => {
+                if (controller.signal.aborted || sequence !== refreshSequence) return;
+                if (level === activeLevel) activeSourceFailures += 1;
+                console.error(`Administrative ${level} boundaries failed for ${adminSource}.`, error);
+              })
+          );
+        }
+      }
+
+      // Reuse warm boundary geometry immediately, then fill in only the
+      // source/level combinations not already covered by the cached viewport.
+      for (const level of requestedLevels) publishLevel(level);
+      reportActiveReady();
 
       try {
-        const results = await Promise.all(
-          requestedLevels.map(async (level) => ({
-            level,
-            data: await fetchAreas(level, controller.signal)
-          }))
-        );
-        if (sequence !== refreshSequence) return;
+        await Promise.all(pendingTasks);
+        if (sequence !== refreshSequence || controller.signal.aborted) return;
+
+        const results = requestedLevels.map((level) => ({
+          level,
+          data: mergeAreaCollections(Array.from(dataByLevel.get(level)?.values() ?? []))
+        }));
 
         // Some Bugesera village records publish cell_id but not the cell name.
         // Parent cell polygons have already been fetched at this zoom, so join
@@ -885,7 +1007,7 @@ export function MapView({
         // names can repeat across cells, so use cell ID + normalized exact name;
         // ambiguous matches are left blank rather than guessing.
         const normalisePlaceName = (value: string) =>
-          value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+          value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase().replace(/\\s+/g, " ");
         const villageIdByCellAndName = new Map<string, string>();
         const ambiguousVillageKeys = new Set<string>();
         if (villageResult) {
@@ -954,7 +1076,12 @@ export function MapView({
         updateLayerVisibility();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
-        onBoundaryStatusChange("ready");
+
+        if (activeSourceCount === 0 || activeSourceSuccesses > 0) {
+          onBoundaryStatusChange("ready");
+        } else if (activeSourceFailures >= activeSourceCount) {
+          onBoundaryStatusChange("error");
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error("Administrative boundary loading failed.", error);
