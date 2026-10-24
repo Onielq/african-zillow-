@@ -205,6 +205,10 @@ function areaLevelLabel(level: SelectedArea["level"]): string {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
+function transactionEstimateKeyForArea(area: SelectedArea): string {
+  return [area.level, area.district, area.sector ?? "", area.cell ?? "", area.village ?? "", area.name].join("|");
+}
+
 function normalizeAreaName(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFD")
@@ -557,9 +561,6 @@ export function MapExperience() {
     []
   );
 
-  const transactionEstimateKeyForArea = (area: SelectedArea) =>
-    [area.level, area.district, area.sector ?? "", area.cell ?? "", area.village ?? "", area.name].join("|");
-
   const fetchTransactionEstimate = async (area: SelectedArea, signal?: AbortSignal): Promise<TransactionEstimateResponse | null> => {
     if (area.level === "parcel") return null;
     const params = new URLSearchParams({ district: area.district, level: area.level });
@@ -707,11 +708,7 @@ export function MapExperience() {
 
   useEffect(() => {
     const query = compareSearch.trim();
-    if (query.length < 2) {
-      setComparisonSearchResults([]);
-      setComparisonSearchStatus("idle");
-      return;
-    }
+    if (query.length < 2) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -739,19 +736,11 @@ export function MapExperience() {
   }, [compareSearch]);
 
   useEffect(() => {
-    if (!selectedArea || selectedArea.level === "parcel") {
-      setSelectedTransactionEstimate(null);
-      setSelectedTransactionEstimateKey(null);
-      setSelectedTransactionEstimateStatus("idle");
-      return;
-    }
+    if (!selectedArea || selectedArea.level === "parcel") return;
 
     const area = selectedArea;
     const areaKey = transactionEstimateKeyForArea(area);
     const controller = new AbortController();
-    setSelectedTransactionEstimate(null);
-    setSelectedTransactionEstimateKey(areaKey);
-    setSelectedTransactionEstimateStatus("loading");
 
     const params = new URLSearchParams({ district: area.district, level: area.level });
     if (area.sector) params.set("sector", area.sector);
@@ -772,12 +761,13 @@ export function MapExperience() {
       } catch {
         if (controller.signal.aborted) return;
         setSelectedTransactionEstimate(null);
+        setSelectedTransactionEstimateKey(areaKey);
         setSelectedTransactionEstimateStatus("error");
       }
     };
     void loadEstimate();
     return () => controller.abort();
-  }, [selectedArea?.level, selectedArea?.name, selectedArea?.district, selectedArea?.sector, selectedArea?.cell, selectedArea?.village]);
+  }, [selectedArea]);
 
   useEffect(() => {
     const level = selectedArea?.level;
@@ -1661,7 +1651,7 @@ export function MapExperience() {
                   <article className="area-market-card">
                     <span>Transaction volume · monthly indicator</span>
                     <strong>
-                      {selectedTransactionEstimateStatus === "loading"
+                      {activeTransactionEstimateKey !== selectedTransactionEstimateKey || selectedTransactionEstimateStatus === "loading"
                         ? "Loading…"
                         : transactionEstimateForSelected?.estimate !== null && transactionEstimateForSelected?.estimate !== undefined
                           ? transactionEstimateForSelected.status === "reported-current-month-unverified"
@@ -1676,7 +1666,7 @@ export function MapExperience() {
                           ? "Historical baseline: official 2023 annual district transactions ÷ 12. This is not the current month's count."
                           : transactionEstimateForSelected?.status === "parcel-share-model"
                             ? transactionEstimateForSelected.method
-                            : selectedTransactionEstimateStatus === "loading"
+                            : activeTransactionEstimateKey !== selectedTransactionEstimateKey || selectedTransactionEstimateStatus === "loading"
                               ? "Calculating a sourced activity indicator…"
                               : "No current verified count is available for this area."}
                     </small>
