@@ -749,6 +749,7 @@ export function MapExperience() {
             className="compare-control"
             onClick={() => {
               setSourcesOpen(false);
+              setShowOpen(false);
               setMetricInfoOpen(false);
               setCompareOpen((open) => !open);
             }}
@@ -872,6 +873,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setDirectoryTab("developers");
                 setDevelopersOpen((open) => !open);
@@ -889,6 +891,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setDevelopersOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setProjectsOpen((open) => !open);
               }}
@@ -920,6 +923,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setMetricsOpen((open) => !open);
               }}
@@ -934,6 +938,7 @@ export function MapExperience() {
                 setMetricsOpen(false);
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen(false);
                 setSourcesOpen((open) => !open);
               }}
@@ -950,6 +955,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                setShowOpen(false);
                 setMetricInfoOpen((open) => !open);
               }}
               type="button"
