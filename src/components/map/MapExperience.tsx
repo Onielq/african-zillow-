@@ -353,7 +353,7 @@ const MARKET_METRICS: Array<{
     label: "Transaction volume",
     shortLabel: "Transactions",
     description: "How many registered land transactions take place in an area.",
-    dataStatus: "The Rwanda Land Dashboard publishes monthly district activity and transaction-type summaries, but a normalized feed is not connected. A Bugesera month-to-date total of 4,350 was reported from /transactions on 24 Oct 2026. An earlier cached overview showed 4,031, plausibly an earlier cumulative snapshot; its observation date is not exposed. The 4,350 figure may be shown only as a dated provisional reference until a refreshable feed is connected. Prioritize Bugesera, Kicukiro, Gasabo and Nyarugenge. Transaction volume is an activity signal, not proof of price appreciation."
+    dataStatus: "NISR Statistical Yearbook 2025 Table 5.2 supplies annual district transaction totals for 2023. The app divides those totals by 12 for a historical monthly baseline in Gasabo, Kicukiro and Nyarugenge. For Bugesera, 4,350 is a user-reported month-to-date reading observed 24 Oct 2026; an indexed overview separately showed 4,031, so the current figure remains unverified. Sector, cell and village numbers are modelled by their share of returned cadastral parcel records, not official transaction counts. The public Data Sharing Platform lists transaction summaries by district, sector and cell, but approved access is required before integrating that dataset. Transaction volume is activity, not proof of price appreciation."
   },
   {
     id: "capitalAppreciation",
