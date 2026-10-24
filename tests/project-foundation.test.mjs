@@ -383,6 +383,6 @@ test("official dashboard price snapshots are provisional and separated from refe
     assert.ok(sourceRegister.includes(url), `Missing dashboard source link: ${url}`);
   }
   assert.match(sourceAudit, /Nyarugenge figure differs by \*\*94 RWF\/m²\*\*/);
-  assert.match(sourceAudit, /observation date is \*\*not confirmed\*\*/);
+  assert.match(sourceAudit, /observation date of these values is \*\*not confirmed\*\*/);
   assert.match(sourceAudit, /Do not choose the higher value, lower value, mean/);
 });
