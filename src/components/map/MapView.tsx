@@ -13,7 +13,7 @@ import {
   getVersion,
   setWorkerUrl
 } from "maplibre-gl";
-import type { FeatureCollection, Geometry, Position } from "geojson";
+import type { FeatureCollection, Geometry } from "geojson";
 
 // Next.js 16 defaults to Turbopack. Serve both MapLibre worker modules from
 // the same versioned public directory so the worker can resolve its sibling.
