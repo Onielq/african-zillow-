@@ -339,6 +339,26 @@ function fitFeature(
   );
 }
 
+function featureBounds(feature: MapGeoJSONFeature): [number, number, number, number] | null {
+  const positions: Array<[number, number]> = [];
+  if (!("coordinates" in feature.geometry)) return null;
+  collectPositions(feature.geometry.coordinates, positions);
+  if (positions.length === 0) return null;
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  for (const [longitude, latitude] of positions) {
+    west = Math.min(west, longitude);
+    south = Math.min(south, latitude);
+    east = Math.max(east, longitude);
+    north = Math.max(north, latitude);
+  }
+  return [west, south, east, north].every(Number.isFinite)
+    ? [west, south, east, north]
+    : null;
+}
+
 function featureToArea(
   feature: MapGeoJSONFeature,
   level: AreaLevel
@@ -379,7 +399,8 @@ function featureToArea(
     parcelNumber: properties.parcel_number ?? null,
     parcelSizeM2: properties.parcel_size_m2 ?? null,
     wetlandAreaM2: properties.wetland_area_m2 ?? null,
-    lastUpdatedOn: properties.last_updated_on ?? null
+    lastUpdatedOn: properties.last_updated_on ?? null,
+    bounds: featureBounds(feature)
   };
 }
 
@@ -415,45 +436,13 @@ export function MapView({
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
     const map = mapRef.current;
-    if (!map || !map.getLayer("district-fill")) return;
-
-    map.setPaintProperty("district-fill", "fill-color", [
-      "case",
-      ["boolean", ["feature-state", "hover"], false],
-      "#81BDA0",
-      ["boolean", ["feature-state", "selected"], false],
-      "#A3D3B9",
-      showLandPriceHeatmap
-        ? [
-            "case",
-            ["has", "average_land_price_per_m2"],
-            [
-              "interpolate",
-              ["linear"],
-              ["get", "average_land_price_per_m2"],
-              4038, "#E2F0E5",
-              10000, "#C7DFAE",
-              25000, "#F0D16B",
-              40000, "#E98B59",
-              61499, "#B94943"
-            ],
-            "#DCE5DD"
-          ]
-        : "#DCEAE1"
-    ]);
-
-    map.setPaintProperty(
-      "district-fill",
-      "fill-opacity",
-      [
-        "case",
-        ["boolean", ["feature-state", "hover"], false],
-        0.5,
-        ["boolean", ["feature-state", "selected"], false],
-        0.35,
-        0.2
-      ]
-    );
+    if (!map) return;
+    for (const level of ["district", "sector", "cell"] as const) {
+      const layer = AREA_LAYERS[level];
+      if (!map.getLayer(layer.fill)) continue;
+      map.setPaintProperty(layer.fill, "fill-color", areaFillColorExpression(showLandPriceHeatmap, layer.color));
+      map.setPaintProperty(layer.fill, "fill-opacity", AREA_FILL_OPACITY_EXPRESSION);
+    }
   }, [showLandPriceHeatmap]);
 
   useEffect(() => {
@@ -566,38 +555,12 @@ export function MapView({
           source: layer.source,
           layout: { visibility: level === "district" ? "visible" : "none" },
           paint: {
-            "fill-color": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              "#81BDA0",
-              ["boolean", ["feature-state", "selected"], false],
-              "#A3D3B9",
-              level === "district" && showLandPriceHeatmapRef.current
-                ? [
-                    "case",
-                    ["has", "average_land_price_per_m2"],
-                    [
-                      "interpolate",
-                      ["linear"],
-                      ["get", "average_land_price_per_m2"],
-                      4038, "#E2F0E5",
-                      10000, "#C7DFAE",
-                      25000, "#F0D16B",
-                      40000, "#E98B59",
-                      61499, "#B94943"
-                    ],
-                    "#DCE5DD"
-                  ]
-                : layer.color
-            ],
-            "fill-opacity": [
-              "case",
-              ["boolean", ["feature-state", "hover"], false],
-              0.5,
-              ["boolean", ["feature-state", "selected"], false],
-              0.35,
-              0.2
-            ]
+            "fill-color": areaFillColorExpression(
+              showLandPriceHeatmapRef.current &&
+                (level === "district" || level === "sector" || level === "cell"),
+              layer.color
+            ),
+            "fill-opacity": AREA_FILL_OPACITY_EXPRESSION
           }
         });
       }
@@ -704,6 +667,112 @@ export function MapView({
       }
     };
 
+    const addShowOverlayLayers = () => {
+      if (!map.getSource("show-overlays")) {
+        map.addSource("show-overlays", { type: "geojson", data: emptyFeatureCollection() });
+      }
+      if (!map.getLayer("show-road-lines")) {
+        map.addLayer({
+          id: "show-road-lines",
+          type: "line",
+          source: "show-overlays",
+          minzoom: 8.6,
+          filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "overlay_category"], "transportation"]],
+          paint: {
+            "line-color": "#2675C7",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 1.2, 12, 2.2, 16, 3],
+            "line-opacity": 0.8
+          }
+        });
+      }
+      if (!map.getLayer("show-poi-fill")) {
+        map.addLayer({
+          id: "show-poi-fill",
+          type: "fill",
+          source: "show-overlays",
+          filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+          paint: {
+            "fill-color": [
+              "match", ["get", "overlay_category"],
+              "landmarks", "#D6A344",
+              "healthEducation", "#CB605B",
+              "transportation", "#4A89D0",
+              "nature", "#3C9B74",
+              "#7A8B80"
+            ],
+            "fill-opacity": 0.22
+          }
+        });
+      }
+      if (!map.getLayer("show-poi-outline")) {
+        map.addLayer({
+          id: "show-poi-outline",
+          type: "line",
+          source: "show-overlays",
+          filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+          paint: {
+            "line-color": [
+              "match", ["get", "overlay_category"],
+              "landmarks", "#B17B20",
+              "healthEducation", "#AA3934",
+              "transportation", "#1F5EA4",
+              "nature", "#23764F",
+              "#53645A"
+            ],
+            "line-width": 1.3,
+            "line-opacity": 0.84
+          }
+        });
+      }
+      if (!map.getLayer("show-poi-circles")) {
+        map.addLayer({
+          id: "show-poi-circles",
+          type: "circle",
+          source: "show-overlays",
+          minzoom: 7,
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3, 11, 4.6, 15, 6],
+            "circle-color": [
+              "match", ["get", "overlay_category"],
+              "landmarks", "#D6A344",
+              "healthEducation", "#CB605B",
+              "transportation", "#4A89D0",
+              "nature", "#3C9B74",
+              "#7A8B80"
+            ],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 1.4,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("show-poi-labels")) {
+        map.addLayer({
+          id: "show-poi-labels",
+          type: "symbol",
+          source: "show-overlays",
+          minzoom: 10.4,
+          filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "name"]],
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["Noto Sans Medium", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.05],
+            "text-anchor": "top",
+            "text-max-width": 12,
+            "text-allow-overlap": false
+          },
+          paint: {
+            "text-color": "#19392B",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.4
+          }
+        });
+      }
+      applyShowOverlayFilters(map, showLayersRef.current);
+    };
+
     const updateLayerVisibility = () => {
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
@@ -712,9 +781,10 @@ export function MapView({
         const level = AREA_LEVELS[index];
         const layer = AREA_LAYERS[level];
         const isActive = level === activeLevel;
-        // Keep one parent level's outline for geographic context; show only the
-        // active level's fill and labels to avoid stacking opaque polygons.
-        const showOutline = index >= Math.max(0, activeIndex - 1) && index <= activeIndex;
+        // Show a single administrative boundary scale at a time. Once the
+        // next zoom level takes over, the parent boundary disappears so sector
+        // and cell polygons no longer read as one visually joined district.
+        const showOutline = index === activeIndex;
 
         if (map.getLayer(layer.fill)) {
           map.setLayoutProperty(layer.fill, "visibility", isActive ? "visible" : "none");
