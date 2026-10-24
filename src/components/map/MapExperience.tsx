@@ -430,6 +430,7 @@ export function MapExperience() {
             className="compare-control"
             onClick={() => {
               setSourcesOpen(false);
+              setMetricInfoOpen(false);
               setCompareOpen((open) => !open);
             }}
             type="button"
