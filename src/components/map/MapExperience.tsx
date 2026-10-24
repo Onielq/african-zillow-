@@ -118,6 +118,38 @@ function getUnitPriceEstimate(
     };
   }
 
+  if (area.level === "cell" && area.averageLandPricePerM2 !== null) {
+    return {
+      pricePerM2: area.averageLandPricePerM2,
+      kind: "cell-reference-snapshot",
+      explanation: "Cell-level source snapshot; the effective date and calculation method have not been confirmed."
+    };
+  }
+
+  if (area.level === "sector") {
+    const byCell = new Map<string, Set<number>>();
+    for (const row of rows) {
+      if (!row.valid ||
+        normalizeAreaName(row.district) !== districtKey ||
+        normalizeAreaName(row.sector) !== normalizeAreaName(area.name) ||
+        row.price === null) continue;
+      const key = normalizeAreaName(row.cell);
+      const prices = byCell.get(key) ?? new Set<number>();
+      prices.add(row.price);
+      byCell.set(key, prices);
+    }
+    const uniqueCellPrices = Array.from(byCell.values())
+      .filter((prices) => prices.size === 1)
+      .map((prices) => prices.values().next().value as number);
+    if (uniqueCellPrices.length > 0) {
+      return {
+        pricePerM2: uniqueCellPrices.reduce((sum, price) => sum + price, 0) / uniqueCellPrices.length,
+        kind: "derived-sector-mean",
+        explanation: "Indicative unweighted mean of unambiguous cell snapshots. Conflicting cells are excluded; this is not an official sector-weighted sale price."
+      };
+    }
+  }
+
   const targetCell = area.level === "cell"
     ? area.name
     : area.level === "village" || area.level === "parcel"
