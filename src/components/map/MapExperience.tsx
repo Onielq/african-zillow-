@@ -525,35 +525,80 @@ export function MapExperience() {
     []
   );
 
+  const transactionEstimateKeyForArea = (area: SelectedArea) =>
+    [area.level, area.district, area.sector ?? "", area.cell ?? "", area.village ?? "", area.name].join("|");
+
+  const fetchTransactionEstimate = async (area: SelectedArea, signal?: AbortSignal): Promise<TransactionEstimateResponse | null> => {
+    if (area.level === "parcel") return null;
+    const params = new URLSearchParams({ district: area.district, level: area.level });
+    if (area.sector) params.set("sector", area.sector);
+    if (area.cell) params.set("cell", area.cell);
+    if (area.village) params.set("village", area.village);
+    try {
+      const response = await fetch("/api/geography/transaction-estimate?" + params.toString(), { signal });
+      if (!response.ok) throw new Error("Transaction estimate request failed (" + response.status + ")");
+      return await response.json() as TransactionEstimateResponse;
+    } catch {
+      if (signal?.aborted) return null;
+      return { estimate: null, status: "unavailable", method: "No usable estimate was returned." };
+    }
+  };
+
   const addAreaToComparison = (areaToAdd: SelectedArea) => {
-    const exists = comparedAreas.some(
-      (area) =>
-        area.level === areaToAdd.level &&
-        area.name === areaToAdd.name &&
-        area.district === areaToAdd.district
-    );
-
+    const item: ComparisonItem = { ...areaToAdd, comparisonKind: "area", transactionEstimate: null };
+    const itemKey = comparisonItemKey(item);
+    const exists = comparedAreas.some((area) => comparisonItemKey(area) === itemKey);
     if (exists) {
-      setComparisonFeedback(`${areaToAdd.name} is already on your comparison list.`);
+      setComparisonFeedback(areaToAdd.name + " is already on your comparison list.");
       setSourcesOpen(false);
       setMetricInfoOpen(false);
       setCompareOpen(true);
       return;
     }
-
-    if (comparedAreas.length >= 4) {
-      setComparisonFeedback("Compare up to four areas. Remove one to add another.");
-      setSourcesOpen(false);
-      setMetricInfoOpen(false);
-      setCompareOpen(true);
-      return;
-    }
-
-    setComparedAreas((areas) => [...areas, areaToAdd]);
-    setComparisonFeedback(`${areaToAdd.name} added to comparison.`);
+    setComparedAreas((areas) => [...areas, item]);
+    setComparisonFeedback(areaToAdd.name + " added to comparison.");
     setSourcesOpen(false);
     setMetricInfoOpen(false);
     setCompareOpen(true);
+    if (areaToAdd.level !== "parcel") {
+      void fetchTransactionEstimate(areaToAdd).then((estimate) => {
+        if (!estimate) return;
+        setComparedAreas((areas) => areas.map((area) =>
+          comparisonItemKey(area) === itemKey ? { ...area, transactionEstimate: estimate } : area
+        ));
+      });
+    }
+  };
+
+  const addManualProjectToComparison = () => {
+    const name = compareProjectName.trim();
+    if (!name) { setComparisonFeedback("Enter a project name first."); return; }
+    let sourceUrl: string | null = null;
+    if (compareProjectUrl.trim()) {
+      try {
+        const parsed = new URL(compareProjectUrl.trim());
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("unsupported protocol");
+        sourceUrl = parsed.toString();
+      } catch {
+        setComparisonFeedback("Use a valid http or https project source URL, or leave it blank.");
+        return;
+      }
+    }
+    const item: ComparisonItem = {
+      level: "district", name, province: null, district: "Project", districtId: null, sector: null, sectorId: null,
+      cell: null, cellId: null, village: null, villageId: null, averageLandPricePerM2: null,
+      sourceLabel: "Manually added project. A permitted, verified project data feed is not connected.",
+      comparisonKind: "project", projectSourceUrl: sourceUrl, transactionEstimate: null
+    };
+    const itemKey = comparisonItemKey(item);
+    if (comparedAreas.some((area) => comparisonItemKey(area) === itemKey)) {
+      setComparisonFeedback(name + " is already on your comparison list.");
+      return;
+    }
+    setComparedAreas((areas) => [...areas, item]);
+    setCompareProjectName("");
+    setCompareProjectUrl("");
+    setComparisonFeedback(name + " added. Project metrics remain blank until a verified source is connected.");
   };
 
   const addSelectedAreaToComparison = () => {
@@ -561,17 +606,9 @@ export function MapExperience() {
     addAreaToComparison(selectedArea);
   };
 
-  const removeComparedArea = (areaToRemove: SelectedArea) => {
-    setComparedAreas((areas) =>
-      areas.filter(
-        (area) =>
-          !(
-            area.level === areaToRemove.level &&
-            area.name === areaToRemove.name &&
-            area.district === areaToRemove.district
-          )
-      )
-    );
+  const removeComparedArea = (areaToRemove: ComparisonItem) => {
+    const removeKey = comparisonItemKey(areaToRemove);
+    setComparedAreas((areas) => areas.filter((area) => comparisonItemKey(area) !== removeKey));
     setComparisonFeedback("");
   };
 
