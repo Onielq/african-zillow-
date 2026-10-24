@@ -238,8 +238,8 @@ test("the reference screen audit and map comparison patterns are implemented wit
   const css = await readProjectFile("src/app/globals.css");
 
   assert.match(audit, /Audit of all 18 reference screenshots/);
-  assert.match(audit, /Screenshot 2026-10-19 234441\\.jpg/);
-  assert.match(audit, /Screenshot 2026-10-19 235932\\.jpg/);
+  assert.ok(audit.includes("Screenshot 2026-10-19 234441.jpg"));
+  assert.ok(audit.includes("Screenshot 2026-10-19 235932.jpg"));
   assert.match(audit, /without permission|Do not redistribute/i);
   assert.match(experience, /PILOT_DISTRICT_SEARCH_AREAS/);
   assert.match(experience, /comparison-area-search/);
