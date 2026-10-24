@@ -230,3 +230,25 @@ test("the standalone data source register exposes provenance, limitations, and s
   assert.match(docs, /approved sharing/);
   assert.match(experience, /href="\/data-sources"/);
 });
+
+
+test("the reference screen audit and map comparison patterns are implemented without invented metrics", async () => {
+  const audit = await readProjectFile("docs/REFERENCE_SCREEN_AUDIT.md");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(audit, /Audit of all 18 reference screenshots/);
+  assert.match(audit, /Screenshot 2026-10-19 234441\\.jpg/);
+  assert.match(audit, /Screenshot 2026-10-19 235932\\.jpg/);
+  assert.match(audit, /without permission|Do not redistribute/i);
+  assert.match(experience, /PILOT_DISTRICT_SEARCH_AREAS/);
+  assert.match(experience, /comparison-area-search/);
+  assert.match(experience, /comparison-selected-chips/);
+  assert.match(experience, /Clear all/);
+  assert.match(experience, /aria-modal="true"/);
+  assert.match(experience, /area-market-grid/);
+  assert.match(experience, /Projects in selected area/);
+  assert.match(experience, /Not connected/);
+  assert.match(css, /comparison-modal-backdrop/);
+  assert.match(css, /area-market-card/);
+});
