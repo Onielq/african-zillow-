@@ -185,12 +185,15 @@ const SATELLITE_STYLE: StyleSpecification = {
 
 // Administrative boundaries are real geographic polygons, not routes.
 // The thresholds reveal one progressively finer level at a time.
-const SECTOR_ZOOM = 10.4;
-const CELL_ZOOM = 13.05;
+// The click-to-fit zooms below aim to bring each parent polygon close to
+// the usable map viewport before showing its children: district → sector,
+// sector → cell, then selected-cell parcel outlines.
+const SECTOR_ZOOM = 12.0;
+const CELL_ZOOM = 15.1;
 // Keep village IDs available for parcel joins, but move visually from cells to
 // cadastral plots so a visible village outline does not obscure the cell view.
 const VILLAGE_ZOOM = 21;
-const PARCEL_ZOOM = 15.25;
+const PARCEL_ZOOM = 17.35;
 
 const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village", "parcel"];
 
@@ -264,15 +267,15 @@ function activeAreaLevel(zoom: number): AreaLevel {
 function zoomForLevel(level: AreaLevel): number {
   switch (level) {
     case "district":
-      return 10.8;
+      return 12.0;
     case "sector":
-      return 12.6;
-    case "cell":
       return 15.0;
+    case "cell":
+      return 17.25;
     case "village":
-      return 17.2;
+      return 18.0;
     case "parcel":
-      return 19.0;
+      return 19.35;
   }
 }
 
