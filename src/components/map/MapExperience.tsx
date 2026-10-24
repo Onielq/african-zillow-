@@ -2004,42 +2004,42 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">AREA COMPARISON</p>
+            <p className="panel-eyebrow">COMPARISON</p>
             <div className="comparison-title-row">
               <div>
-                <h2 id="comparison-title">Compare areas</h2>
-                <p className="comparison-subtitle">Select up to four areas to compare side by side.</p>
+                <h2 id="comparison-title">Compare</h2>
+                <p className="comparison-subtitle">Mix districts, sectors, cells, villages and projects.</p>
               </div>
-              <span>{comparedAreas.length}/4 selected</span>
+              <span>{comparedAreas.length} selected</span>
             </div>
-            <label className="comparison-search-label" htmlFor="comparison-area-search">Search by district</label>
+            <label className="comparison-search-label" htmlFor="comparison-area-search">Find an area</label>
             <input
               autoComplete="off"
               className="comparison-search"
               id="comparison-area-search"
               onChange={(event) => setCompareSearch(event.target.value)}
-              placeholder="Search by district name"
+              placeholder="Search district, sector, cell or village"
               type="search"
               value={compareSearch}
             />
-            {normalizedComparisonSearch ? (
-              <div aria-label="Matching pilot districts" className="comparison-search-results" role="listbox">
-                {comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
-                  const isAdded = comparedAreas.some((existing) =>
-                    existing.level === area.level &&
-                    existing.name === area.name &&
-                    existing.district === area.district
-                  );
-                  const atLimit = comparedAreas.length >= 4 && !isAdded;
+            {normalizedComparisonSearch.length >= 2 ? (
+              <div aria-label="Matching administrative areas" className="comparison-search-results" role="listbox">
+                {comparisonSearchStatus === "loading" ? (
+                  <p className="comparison-no-results" role="status">Searching the four pilot districts…</p>
+                ) : comparisonSearchStatus === "error" ? (
+                  <p className="comparison-no-results" role="status">Area search is temporarily unavailable. You can still select an area from the map.</p>
+                ) : comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
+                  const candidate: ComparisonItem = { ...area, comparisonKind: "area" };
+                  const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
                   return (
                     <button
                       aria-selected={isAdded}
                       className="comparison-search-result"
-                      disabled={isAdded || atLimit}
-                      key={area.name}
+                      disabled={isAdded}
+                      key={area.id}
                       onClick={() => {
                         addAreaToComparison(area);
-                        if (!isAdded && !atLimit) setCompareSearch("");
+                        if (!isAdded) setCompareSearch("");
                       }}
                       role="option"
                       type="button"
@@ -2047,16 +2047,50 @@ export function MapExperience() {
                       <span className="comparison-search-dot" aria-hidden="true" />
                       <span className="comparison-search-result-copy">
                         <strong>{area.name}</strong>
-                        <small>{area.province} · District · pilot geography</small>
+                        <small>
+                          {areaLevelLabel(area.level)} · {area.district}
+                          {area.sector ? " · " + area.sector : ""}
+                          {area.cell ? " · " + area.cell : ""}
+                          {area.village ? " · " + area.village : ""}
+                        </small>
                       </span>
-                      <span className="comparison-search-result-action">{isAdded ? "Added" : atLimit ? "Limit reached" : "Add"}</span>
+                      <span className="comparison-search-result-action">{isAdded ? "Added" : "Add"}</span>
                     </button>
                   );
                 }) : (
-                  <p className="comparison-no-results">No pilot district matched “{compareSearch.trim()}”. Smaller areas can still be added from the map.</p>
+                  <p className="comparison-no-results">
+                    {comparisonSearchStatus === "ready"
+                      ? "No matching district, sector, cell or village found."
+                      : "Enter at least two characters to search."}
+                  </p>
                 )}
               </div>
             ) : null}
+            <div className="comparison-project-add">
+              <span className="comparison-project-add-title">Add a project</span>
+              <input
+                aria-label="Project name"
+                autoComplete="off"
+                className="comparison-search"
+                onChange={(event) => setCompareProjectName(event.target.value)}
+                placeholder="Project name"
+                type="text"
+                value={compareProjectName}
+              />
+              <input
+                aria-label="Project source URL (optional)"
+                autoComplete="url"
+                className="comparison-search"
+                onChange={(event) => setCompareProjectUrl(event.target.value)}
+                placeholder="Source URL (optional)"
+                type="url"
+                value={compareProjectUrl}
+              />
+              <button className="comparison-project-add-button" onClick={addManualProjectToComparison} type="button">
+                Add project
+              </button>
+              <small>Project metrics remain unpopulated until a verified, permitted feed is connected.</small>
+            </div>
             {comparisonFeedback ? (
               <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
             ) : null}
