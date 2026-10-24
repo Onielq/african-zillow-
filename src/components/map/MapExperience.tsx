@@ -783,7 +783,7 @@ export function MapExperience() {
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? "Rwanda Land Dashboard · source observation date not exposed"
-                        : "No finer-level value is mapped; district averages are not reused for smaller areas."}
+                        : "District-level land prices are not a valid substitute for a sector, cell or village price. No finer-level value is mapped yet."}
                     </small>
                   </article>
                   <article className="area-market-card">
