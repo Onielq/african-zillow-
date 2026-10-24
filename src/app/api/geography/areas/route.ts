@@ -298,9 +298,9 @@ let landPriceIndexPromise: Promise<LandPriceIndex> | null = null;
 function normalisePricePart(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .toLocaleLowerCase("en");
 }
 
@@ -323,11 +323,11 @@ async function getLandPriceIndex(): Promise<LandPriceIndex> {
         prices: Set<number>;
         sourceRows: number[];
       }>();
-      const lines = source.split(/\\r?\\n/);
+      const lines = source.split(/\r?\n/);
       for (let index = 1; index < lines.length; index += 1) {
         const line = lines[index];
         if (!line?.trim()) continue;
-        const fields = line.split("\\t");
+        const fields = line.split("\t");
         if (fields.length !== 5 || fields.slice(0, 4).some((field) => !field.trim())) continue;
         const district = fields[1].trim();
         const sector = fields[2].trim();
