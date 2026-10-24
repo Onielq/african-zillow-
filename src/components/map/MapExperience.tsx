@@ -1138,6 +1138,7 @@ export function MapExperience() {
                       type="checkbox"
                     />
                     <span className="show-toggle-track" aria-hidden="true"><span /></span>
+                    <span className="show-toggle-state">{checked ? "On" : "Off"}</span>
                   </label>
                 );
               })}
@@ -1150,6 +1151,7 @@ export function MapExperience() {
                   type="checkbox"
                 />
                 <span className="show-toggle-track" aria-hidden="true"><span /></span>
+                <span className="show-toggle-state">{showZoning ? "On" : "Off"}</span>
               </label>
             </div>
           </aside>
