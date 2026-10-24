@@ -450,7 +450,7 @@ test("cell selection offers UPI parcel inventory and zoom-to-parcel navigation",
   assert.match(css, /\.cell-parcel-row/);
 });
 
-test("transaction volume explains district priorities, transaction types, and non-appreciation caveats", async () => {
+test("transaction volume explains sourced baselines, model caveats, and current Bugesera discrepancy", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
 
   assert.match(experience, /Bugesera, Kicukiro, Gasabo and Nyarugenge/);
@@ -458,9 +458,10 @@ test("transaction volume explains district priorities, transaction types, and no
   assert.match(experience, /Voluntary sale, succession, expropriation/);
   assert.match(experience, /not proof of price appreciation/);
   assert.match(experience, /rwandalanddashboard\.lands\.rw\/transactions/);
-  assert.match(experience, /Bugesera month-to-date total of 4,350/);
+  assert.match(experience, /annual district transaction totals for 2023/);
+  assert.match(experience, /User-reported Bugesera month-to-date dashboard reading/);
   assert.match(experience, /4,031/);
-  assert.match(experience, /4,350\*/);
+  assert.match(experience, /reported-current-month-unverified/);
 });
 
 
