@@ -120,7 +120,9 @@ test("the map supports a satellite basemap without removing administrative overl
   assert.match(mapView, /SATELLITE_STYLE/);
   assert.match(mapView, /World_Imagery/);
   assert.match(mapView, /Imagery © Esri/);
-  assert.match(mapView, /map\.setStyle\(basemapMode === "satellite"/);
+  assert.match(mapView, /map\.setStyle\(/);
+  assert.match(mapView, /basemapMode === "satellite"/);
+  assert.match(mapView, /isAppleBasemapMode\(basemapMode\)/);
   assert.match(experience, /aria-label="Basemap view"/);
   assert.match(experience, /setBasemapMode\("satellite"\)/);
   assert.match(experience, /setBasemapMode\("map"\)/);
