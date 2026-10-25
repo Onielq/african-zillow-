@@ -76,26 +76,30 @@ test("parcel boundary requests preserve source vertices and use a precise viewpo
   assert.match(mapView, /feature-state.*selected/s);
 });
 
-test("the average land price metric uses sourced district values and marks snapshot freshness limitations", async () => {
+test("average transaction price is the valuation basis and reference price remains a separate benchmark", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const benchmarks = await readProjectFile("src/data/land-price-benchmarks.ts");
 
-  assert.match(route, /DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2/);
-  assert.match(route, /GASABO: 36103/);
-  assert.match(route, /KICUKIRO: 61499/);
-  assert.match(route, /NYARUGENGE: 50771/);
-  assert.match(route, /BUGESERA: 4038/);
-  assert.match(route, /average_land_price_per_m2/);
-  assert.match(route, /rwandalanddashboard\.lands\.rw\/prices/);
+  assert.match(route, /DISTRICT_AVERAGE_TRANSACTION_PRICE_RWF_PER_M2/);
+  assert.match(route, /land-price-transaction\.tsv/);
+  assert.match(benchmarks, /averageTransactionPricePerM2: 36103/);
+  assert.match(benchmarks, /averageTransactionPricePerM2: 61499/);
+  assert.match(benchmarks, /averageTransactionPricePerM2: 50865/);
+  assert.match(benchmarks, /averageTransactionPricePerM2: 4038/);
+  assert.match(benchmarks, /averageReferencePricePerM2: 19976/);
+  assert.match(benchmarks, /averageReferencePricePerM2: 27914/);
+  assert.match(benchmarks, /averageReferencePricePerM2: 28077/);
+  assert.match(benchmarks, /averageReferencePricePerM2: 1145/);
+  assert.match(benchmarks, /94 RWF\/m² difference/);
   assert.match(mapView, /showLandPriceHeatmap/);
   assert.match(mapView, /average_land_price_per_m2/);
   assert.match(mapView, /LAND_PRICE_RAMP/);
-  assert.match(mapView, /#36B8B2/);
-  assert.match(mapView, /#B7444B/);
-  assert.match(mapView, /15\.1/);
-  assert.match(mapView, /17\.35/);
-  assert.match(experience, /effective date and calculation method are not disclosed/i);
+  assert.match(experience, /Average transaction price \/ m²/);
+  assert.match(experience, /Average reference price · district benchmark/);
+  assert.match(experience, /estimatedReferenceBenchmark/);
+  assert.match(experience, /observation date and weighting method are not disclosed/i);
   assert.match(experience, /district-level land prices are not a valid substitute/i);
 });
 
@@ -310,16 +314,21 @@ test("the market metrics dropdown presents land-first scope, periods and supply 
   assert.match(css, /\.metrics-menu/);
 });
 
-test("the uploaded land-price snapshot is preserved and ambiguous rows are not silently averaged", async () => {
+test("the original cell-price audit file is preserved while valuation reads the transaction-price snapshot", async () => {
   const source = await readProjectFile("public/land-price-reference.tsv");
+  const transactionSource = await readProjectFile("public/land-price-transaction.tsv");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const rows = source.trim().split(/\r?\n/);
+  const transactionRows = transactionSource.trim().split(/\r?\n/);
 
   assert.equal(rows.length, 245);
-  assert.equal(rows[0], "PROVINCE\tDISTRICT\tSECTOR\tCELL\tWEIGHTED AVERAGE (RWF/M²)");
-  assert.match(source, /Eastern\tBugesera\tMayange\tKibenga\t6,566/);
-  assert.match(source, /Kigali City\tGasabo\tRemera\tNyarutarama\t218,375/);
-  assert.match(experience, /parseLandPriceReference/);
+  assert.equal(rows[0], "PROVINCE\\tDISTRICT\\tSECTOR\\tCELL\\tWEIGHTED AVERAGE (RWF/M²)");
+  assert.equal(transactionRows.length, 245);
+  assert.equal(transactionRows[0], "PROVINCE\\tDISTRICT\\tSECTOR\\tCELL\\tWEIGHTED AVERAGE TRANSACTION PRICE (RWF/M²)");
+  assert.match(source, /Eastern\\tBugesera\\tMayange\\tKibenga\\t6,566/);
+  assert.match(transactionSource, /Kigali City\\tGasabo\\tRemera\\tNyarutarama\\t218,375/);
+  assert.match(experience, /parseLandPriceTransactionPrices/);
+  assert.match(experience, /fetch\("\/land-price-transaction\.tsv"\)/);
   assert.match(experience, /conflictingLocations/);
   assert.match(experience, /Conflicting values on source rows/);
   assert.match(experience, /No district average is substituted/);
@@ -367,11 +376,11 @@ test("official dashboard price snapshots are provisional and separated from refe
   const sourceRegister = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
   const sourceAudit = await readProjectFile("docs/LAND_PRICE_SOURCE_RECONCILIATION.md");
 
-  assert.match(route, /provisional values transcribed from the publicly indexed \/prices table/i);
+  assert.match(route, /explicitly labelled "Avg Transaction Price" column in the Rwanda Land Dashboard \/reference comparison table/i);
   assert.match(experience, /Snapshot only/);
-  assert.match(experience, /50,865 for Nyarugenge transaction price/);
-  assert.match(experience, /Open National Land Dashboard reference prices/);
-  assert.match(experience, /Open National Land Dashboard transactions/);
+  assert.match(experience, /Nyarugenge 50,865/);
+  assert.match(experience, /Open National Land Dashboard average transaction\/reference prices/);
+  assert.match(experience, /Open National Land Dashboard transaction analysis/);
   assert.match(experience, /Open National Land Dashboard ownership/);
   assert.match(experience, /Open National Land Dashboard land use/);
 
