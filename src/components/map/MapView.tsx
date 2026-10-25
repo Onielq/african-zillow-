@@ -111,6 +111,7 @@ export type SelectedArea = {
   bounds?: [number, number, number, number] | null;
   parcelMarketStatus?: PropertyMarketStatus | null;
   parcelMarketStatusSource?: "source" | "demonstration" | null;
+  parcelIsNewListingDemo?: boolean;
 };
 
 type AreaProperties = {
@@ -257,6 +258,26 @@ export function demoParcelMarketStatus(
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 31) === 0 ? "available" : "off-market";
+}
+
+/** Stable and independent of market status; this is for interface demonstration only. */
+export function demoParcelIsNewListing(
+  district: unknown,
+  upi: unknown,
+  parcelNumber: unknown,
+  featureId: unknown
+): boolean {
+  const identity = [
+    normalizeMetricKeyPart(district),
+    String(upi ?? parcelNumber ?? featureId ?? ""),
+    "new-listing-demo"
+  ].join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 30) === 0;
 }
 
 /** Only listing-feed dates qualify here; cadastral update timestamps are not listing dates. */
@@ -1310,7 +1331,12 @@ export function MapView({
         const isSelected = level === "parcel" &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
           String(selectedFeature.id) === String(feature.id);
-        const isNewListing = level === "parcel" && isRecentlyListed(properties.listing_created_at);
+        const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
+        const isNewListingDemo = level === "parcel" &&
+          !hasVerifiedListingDate &&
+          !sourceMarketStatus &&
+          demoParcelIsNewListing(district, properties.upi, properties.parcel_number, feature.id ?? index);
+        const isNewListing = hasVerifiedListingDate || isNewListingDemo;
         const pillDimensions = hasValue ? measureMetricPill(label, variant, isNewListing) : null;
         const iconImage = hasValue && pillDimensions
           ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected, isNewListing)
@@ -1340,6 +1366,7 @@ export function MapView({
             market_status_source: marketStatusSource,
             is_selected: isSelected,
             is_new_listing: isNewListing,
+            is_new_listing_demo: isNewListingDemo,
             area_feature_id: String(feature.id ?? index),
             upi: properties.upi ?? null,
             district,
@@ -2228,6 +2255,15 @@ export function MapView({
       const area = featureToArea(feature, level);
       if (id === null || !area) return;
 
+      if (
+        selectedFeature?.source === source &&
+        String(selectedFeature.id) === String(id)
+      ) {
+        selectFeatureState(null);
+        onAreaSelected(null);
+        return;
+      }
+
       const properties = feature.properties as AreaProperties | null;
       const suppliedMarketStatus = propertyMarketStatus(properties?.market_status);
       const parcelMarketStatus = level === "parcel"
@@ -2241,12 +2277,18 @@ export function MapView({
       const parcelMarketStatusSource = level === "parcel"
         ? suppliedMarketStatus ? "source" as const : "demonstration" as const
         : null;
+      const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties?.listing_created_at);
+      const parcelIsNewListingDemo = level === "parcel" &&
+        !hasVerifiedListingDate &&
+        !suppliedMarketStatus &&
+        demoParcelIsNewListing(properties?.district, properties?.upi, properties?.parcel_number, feature.id);
 
       selectFeatureState({ source, id });
       onAreaSelected({
         ...area,
         parcelMarketStatus,
-        parcelMarketStatusSource
+        parcelMarketStatusSource,
+        parcelIsNewListingDemo
       });
       fitFeature(map, feature, level);
     };
