@@ -227,7 +227,7 @@ function ensureMetricPillImage(
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(label, width / 2, height / 2, width - 12);
-  map.addImage(imageName, canvas, { pixelRatio });
+  map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
   return imageName;
 }
 
