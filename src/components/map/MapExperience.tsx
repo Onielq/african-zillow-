@@ -502,8 +502,6 @@ function getAreaParent(area: SelectedArea): string | null {
 
 export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
-  const [appleMapMenuOpen, setAppleMapMenuOpen] = useState(false);
-  const appleMapKitConfigured = Boolean(process.env.NEXT_PUBLIC_APPLE_MAPKIT_TOKEN?.trim());
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
   const [selectedMetric, setSelectedMetric] =
     useState<MarketMetric>("averageLandPricePerM2");
@@ -971,7 +969,7 @@ export function MapExperience() {
           <button
             aria-pressed={basemapMode === "map"}
             className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => { setBasemapMode("map"); setAppleMapMenuOpen(false); }}
+            onClick={() => setBasemapMode("map")}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -983,7 +981,7 @@ export function MapExperience() {
           <button
             aria-pressed={basemapMode === "satellite"}
             className={basemapMode === "satellite" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => { setBasemapMode("satellite"); setAppleMapMenuOpen(false); }}
+            onClick={() => setBasemapMode("satellite")}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -993,57 +991,7 @@ export function MapExperience() {
             </svg>
             Satellite
           </button>
-          <button
-            aria-expanded={appleMapMenuOpen}
-            aria-haspopup="true"
-            aria-pressed={basemapMode === "apple-hybrid" || basemapMode === "apple-satellite"}
-            className={basemapMode === "apple-hybrid" || basemapMode === "apple-satellite" || appleMapMenuOpen ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setAppleMapMenuOpen((open) => !open)}
-            type="button"
-          >
-            Apple Maps <span aria-hidden="true">⌄</span>
-          </button>
         </div>
-        {appleMapMenuOpen ? (
-          <aside aria-label="Apple Maps appearance" className="apple-basemap-menu">
-            <p className="apple-basemap-menu-title">Apple Maps</p>
-            <div className="apple-basemap-menu-options" role="group" aria-label="Apple map type">
-              <button
-                aria-pressed={basemapMode === "apple-hybrid"}
-                className={basemapMode === "apple-hybrid" ? "apple-basemap-option apple-basemap-option-active" : "apple-basemap-option"}
-                disabled={!appleMapKitConfigured}
-                onClick={() => {
-                  setBasemapMode("apple-hybrid");
-                  setAppleMapMenuOpen(false);
-                }}
-                type="button"
-              >
-                Hybrid
-              </button>
-              <button
-                aria-pressed={basemapMode === "apple-satellite"}
-                className={basemapMode === "apple-satellite" ? "apple-basemap-option apple-basemap-option-active" : "apple-basemap-option"}
-                disabled={!appleMapKitConfigured}
-                onClick={() => {
-                  setBasemapMode("apple-satellite");
-                  setAppleMapMenuOpen(false);
-                }}
-                type="button"
-              >
-                Satellite
-              </button>
-            </div>
-            {!appleMapKitConfigured ? (
-              <p className="apple-basemap-setup-note">
-                Apple Maps needs a domain-restricted MapKit JS token. Add <code>NEXT_PUBLIC_APPLE_MAPKIT_TOKEN</code> to the Vercel project for Production and Preview to enable these views. Your current Map and Satellite views remain available.
-              </p>
-            ) : (
-              <p className="apple-basemap-setup-note">
-                Apple imagery runs beneath the same area boundaries, parcel selection, metric overlays and filters.
-              </p>
-            )}
-          </aside>
-        ) : null}
 
         <div className="map-status-card">
           <span
