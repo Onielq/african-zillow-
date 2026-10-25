@@ -672,11 +672,12 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
 
-test("price bubbles stay red with a white border and only collision groups of three or more become dots", async () => {
+test("price bubbles retain collision behavior and style property markers by market status and selection", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /function measureMetricPill/);
-  assert.match(mapView, /context\.fillStyle = "#9D2932"/);
+  assert.match(mapView, /isSelected\s*\?\s*"#2563EB"/);
+  assert.match(mapView, /marketStatus === "off-market"\s*\?\s*"#343A40"/);
   assert.match(mapView, /context\.strokeStyle = "rgba\(255, 255, 255, 0\.98\)"/);
   assert.match(mapView, /export function findCrowdedMetricLabelIndexes/);
   assert.match(mapView, /minimumCrowdedGroupSize = 3/);
@@ -686,4 +687,24 @@ test("price bubbles stay red with a white border and only collision groups of th
   assert.match(mapView, /show_dot: crowdedLabelIndexes\.has\(featureIndex\)/);
   assert.match(mapView, /map\.on\("zoomend", scheduleRefresh\)/);
   assert.match(mapView, /map\.on\("moveend", scheduleRefresh\)/);
+});
+
+test("property markers use a separate NEW badge, blue selection override, and listing-date age rather than cadastral update time", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(mapView, /type PropertyMarketStatus = "available" \| "off-market"/);
+  assert.match(mapView, /listing_created_at\?: string \| number \| null/);
+  assert.match(mapView, /const RECENT_LISTING_WINDOW_MS = 14 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(mapView, /function isRecentlyListed\(value: unknown/);
+  assert.match(mapView, /function propertyMarketStatus\(value: unknown/);
+  assert.match(mapView, /const bodyHeight = isParcel \? 32 : 22/);
+  assert.match(mapView, /const tailHeight = isParcel \? 7 : 0/);
+  assert.match(mapView, /Math\.min\(84, Math\.max\(72, measuredWidth\)\)/);
+  assert.match(mapView, /id: "metric-bubbles-parcel-label"/);
+  assert.match(mapView, /id: "metric-bubbles-new-badge"/);
+  assert.match(mapView, /icon-offset: \[0, -42\]/);
+  assert.match(mapView, /is_new_listing: isNewListing/);
+  assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
+  assert.match(mapView, /selectFeatureState\(null\)/);
+  assert.match(mapView, /onAreaSelected\(null\)/);
 });
