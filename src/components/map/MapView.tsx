@@ -95,6 +95,7 @@ export type SelectedArea = {
   upi?: string | null;
   parcelNumber?: string | null;
   parcelSizeM2?: number | null;
+  parcelSizeSource?: "cadastral-attribute" | "geometry-estimate" | null;
   parcelPriceType?: ParcelPriceType | null;
   parcelPriceValue?: number | null;
   parcelPriceSource?: string | null;
@@ -496,6 +497,46 @@ function collectPositions(value: unknown, output: Array<[number, number]>) {
   for (const child of value) collectPositions(child, output);
 }
 
+const EARTH_RADIUS_METRES = 6_371_008.8;
+
+function ringAreaM2(ring: number[][]): number {
+  if (ring.length < 3) return 0;
+  let sum = 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const next = (index + 1) % ring.length;
+    const longitude1 = (ring[index][0] ?? 0) * Math.PI / 180;
+    const latitude1 = (ring[index][1] ?? 0) * Math.PI / 180;
+    const longitude2 = (ring[next][0] ?? 0) * Math.PI / 180;
+    const latitude2 = (ring[next][1] ?? 0) * Math.PI / 180;
+    sum += (longitude2 - longitude1) * (2 + Math.sin(latitude1) + Math.sin(latitude2));
+  }
+  return Math.abs(sum) * EARTH_RADIUS_METRES * EARTH_RADIUS_METRES / 2;
+}
+
+function polygonAreaM2(rings: number[][][]): number {
+  if (rings.length === 0) return 0;
+  const outerArea = ringAreaM2(rings[0]);
+  const holeArea = rings.slice(1).reduce((sum, ring) => sum + ringAreaM2(ring), 0);
+  return Math.max(0, outerArea - holeArea);
+}
+
+/**
+ * Use the published parcel polygon to estimate area when the GIS size field is
+ * absent. It is a geometry-derived estimate, not an official cadastral area.
+ */
+function geometryAreaM2(geometry: Geometry): number | null {
+  let area = 0;
+  if (geometry.type === "Polygon") {
+    area = polygonAreaM2(geometry.coordinates as unknown as number[][][]);
+  } else if (geometry.type === "MultiPolygon") {
+    area = (geometry.coordinates as unknown as number[][][][])
+      .reduce((sum, polygon) => sum + polygonAreaM2(polygon), 0);
+  } else {
+    return null;
+  }
+  return Number.isFinite(area) && area > 0 ? area : null;
+}
+
 function fitFeature(
   map: MapLibreMapInstance,
   feature: MapGeoJSONFeature,
@@ -601,7 +642,18 @@ function featureToArea(
       : "administrative-boundary",
     upi: properties.upi ?? null,
     parcelNumber: properties.parcel_number ?? null,
-    parcelSizeM2: properties.parcel_size_m2 ?? null,
+    parcelSizeM2:
+      typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
+        ? properties.parcel_size_m2
+        : level === "parcel"
+          ? geometryAreaM2(feature.geometry as Geometry)
+          : null,
+    parcelSizeSource:
+      typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
+        ? "cadastral-attribute"
+        : level === "parcel" && geometryAreaM2(feature.geometry as Geometry) !== null
+          ? "geometry-estimate"
+          : null,
     parcelPriceType: isParcelPriceType(properties.parcel_price_type) ? properties.parcel_price_type : null,
     parcelPriceValue: typeof properties.parcel_price_value === "number" ? properties.parcel_price_value : null,
     parcelPriceSource: properties.parcel_price_source ?? null,
@@ -814,6 +866,23 @@ export function MapView({
           );
         }
       }
+      const priceBySector = new Map<string, number>();
+      for (const feature of (areaDataRef.current.sector ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (
+          typeof unitPrice === "number" &&
+          Number.isFinite(unitPrice) &&
+          unitPrice > 0 &&
+          properties.district &&
+          properties.sector
+        ) {
+          priceBySector.set(
+            normalizedMetricKey(properties.district, properties.sector),
+            unitPrice
+          );
+        }
+      }
       const priceByDistrict = new Map<string, number>();
       for (const feature of (areaDataRef.current.district ?? emptyFeatureCollection()).features) {
         const properties = feature.properties ?? {};
@@ -872,47 +941,74 @@ export function MapView({
                 (properties.parcel_price_note ? ". " + properties.parcel_price_note : "") +
                 ". The amount is displayed according to its stated source type; verify the source record before relying on it.";
             } else {
-            const parcelArea = properties.parcel_size_m2;
+            const cadastralArea =
+              typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
+                ? properties.parcel_size_m2
+                : null;
+            const geometryArea = geometryAreaM2(feature.geometry as Geometry);
+            const parcelArea = cadastralArea ?? geometryArea;
             const directUnitPrice = properties.average_land_price_per_m2;
             const cellKey = normalizedMetricKey(district, sector, cell);
             const cellPrice = priceByCell.get(cellKey);
+            const sectorPrice = district && sector
+              ? priceBySector.get(normalizedMetricKey(district, sector))
+              : undefined;
             const districtPrice = district ? priceByDistrict.get(normalizeMetricKeyPart(district)) : undefined;
             const unitPrice =
               typeof directUnitPrice === "number" && directUnitPrice > 0
                 ? directUnitPrice
-                : cellPrice ?? districtPrice;
+                : cellPrice ?? sectorPrice ?? districtPrice;
             const unitPriceSource =
               typeof directUnitPrice === "number" && directUnitPrice > 0
                 ? "parcel-level"
                 : cellPrice !== undefined
-                  ? "matching cell-level"
-                  : districtPrice !== undefined
-                    ? "district-level fallback"
-                    : "unavailable";
+                  ? "matching cell-level transaction-price snapshot"
+                  : sectorPrice !== undefined
+                    ? "derived sector mean of available cell snapshots"
+                    : districtPrice !== undefined
+                      ? "district average transaction-price snapshot"
+                      : "unavailable";
 
             if (
-              typeof parcelArea === "number" &&
-              Number.isFinite(parcelArea) &&
-              parcelArea > 0 &&
               typeof unitPrice === "number" &&
               Number.isFinite(unitPrice) &&
               unitPrice > 0
             ) {
-              sortValue = Math.round(parcelArea * unitPrice);
-              label = formatCompactValue(sortValue);
-              hasValue = true;
-              status = "estimated-parcel-value";
-              detail =
-                "Indicative parcel value: " +
-                formatCompactValue(parcelArea) +
-                " m² × " +
-                formatCompactValue(unitPrice) +
-                " RWF/m² transaction-price snapshot. " +
-                "Unit-price basis: " +
-                unitPriceSource +
-                ". It is an estimate, not a registered sale price or formal valuation.";
+              if (typeof parcelArea === "number" && Number.isFinite(parcelArea) && parcelArea > 0) {
+                sortValue = Math.round(parcelArea * unitPrice);
+                label = formatCompactValue(sortValue);
+                hasValue = true;
+                status = "estimated-parcel-value";
+                detail =
+                  "Indicative parcel value: " +
+                  formatCompactValue(parcelArea) +
+                  " m² × " +
+                  formatCompactValue(unitPrice) +
+                  " RWF/m² transaction-price snapshot. " +
+                  (cadastralArea === null
+                    ? "Parcel area is estimated from the mapped parcel polygon. "
+                    : "") +
+                  "Unit-price basis: " +
+                  unitPriceSource +
+                  ". This is an indicative estimate, not a confirmed asking price, recorded sale price, or formal valuation.";
+              } else {
+                // Still show the existing price signal rather than blanking the
+                // marker: this is the available area-level price per m², not a
+                // total parcel price when no usable parcel area exists.
+                sortValue = unitPrice;
+                label = formatCompactValue(unitPrice);
+                hasValue = true;
+                status = "indicative-unit-price-per-m2";
+                detail =
+                  "Indicative area price: " + formatCompactValue(unitPrice) +
+                  " RWF/m² from the " + unitPriceSource +
+                  ". Parcel area is unavailable, so this is a per-square-metre benchmark, not a total parcel value.";
+              }
             } else {
-              detail = "No parcel value is shown because usable parcel area or a defensible transaction-price estimate is unavailable.";
+              // The pilot districts have dashboard transaction-price snapshots.
+              // If a GIS attribute is missing, do not substitute a made-up price;
+              // leave this branch for genuinely missing future source coverage.
+              detail = "No transaction-price snapshot is available for this parcel's district.";
             }
             }
           } else {
