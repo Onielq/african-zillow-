@@ -585,3 +585,36 @@ test("unavailable appreciation and supply metrics are not fabricated", async () 
   assert.match(mapView, /Registered parcel counts are not for-sale supply/);
   assert.match(experience, /Capital appreciation is calculated only when historical and current prices/);
 });
+
+
+test("Apple MapKit offers Hybrid and Satellite while preserving existing map overlays", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const setup = await readProjectFile("docs/apple-mapkit-setup.md");
+
+  assert.match(mapView, /apple-hybrid/);
+  assert.match(mapView, /apple-satellite/);
+  assert.match(mapView, /APPLE_OVERLAY_STYLE/);
+  assert.match(mapView, /appleRegionForMap/);
+  assert.match(mapView, /refreshAreas/);
+  assert.match(mapView, /addAdministrativeLayers/);
+  assert.match(experience, /Apple Maps/);
+  assert.match(experience, /Hybrid/);
+  assert.match(experience, /Satellite/);
+  assert.match(experience, /disabled=\{!appleMapKitConfigured\}/);
+  assert.match(setup, /MapLibre remains the interaction layer/);
+});
+
+test("Apple Maps configuration uses the official MapKit JS token and keeps legacy views available", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const setup = await readProjectFile("docs/apple-mapkit-setup.md");
+
+  assert.match(mapView, /https:\/\/cdn\.apple-mapkit\.com\/mk\/6\.x\.x\/mapkit\.js/);
+  assert.match(mapView, /authorizationCallback/);
+  assert.match(mapView, /NEXT_PUBLIC_APPLE_MAPKIT_TOKEN/);
+  assert.match(experience, /setBasemapMode\("map"\)/);
+  assert.match(experience, /setBasemapMode\("satellite"\)/);
+  assert.match(experience, /Apple Maps needs a domain-restricted MapKit JS token/);
+  assert.match(setup, /do not place an Apple private signing key/);
+});
