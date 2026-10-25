@@ -608,8 +608,12 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /minimumCrowdedGroupSize = 3/);
   assert.match(mapView, /if \(component\.length >= minimumCrowdedGroupSize\)/);
   assert.match(mapView, /"show_dot", true/);
+  assert.match(mapView, /\["!=", \["get", "show_dot"\], true\]/);
+  assert.match(mapView, /context\.fillStyle = "#9D2932"/);
   assert.match(mapView, /id: "metric-bubbles-circle"/);
-  assert.match(mapView, /"circle-radius": \["interpolate", \["linear"\], \["zoom"\], 5, 2\.5/);
+  assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\]/);
+  assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
+  assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
   assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
   assert.match(mapView, /status = "calculated-asking-price"/);
   assert.match(mapView, /properties\.parcel_size_m2/);
