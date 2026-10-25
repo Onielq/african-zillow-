@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { DISTRICT_LAND_PRICE_BENCHMARKS, LAND_PRICE_BENCHMARK_SOURCE } from "@/data/land-price-benchmarks";
 
 export const runtime = "nodejs";
 
@@ -19,17 +20,18 @@ const KIGALI_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE"] as const;
 // The public Kigali parcels layer includes UPI, parcel number, size, wetland
 // overlap and last-updated date. It is an identification layer, not proof of
 // current ownership or encumbrances.
-// Provisional values transcribed from the publicly indexed /prices table during
-// the 2026-10-24 source review. The page does not expose the effective date or
-// calculation method; do not treat this as a live or production-grade feed.
-const DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2: Record<string, number> = {
-  GASABO: 36103,
-  KICUKIRO: 61499,
-  NYARUGENGE: 50771,
-  BUGESERA: 4038
-};
-const DISTRICT_LAND_PRICE_SOURCE =
-  "https://rwandalanddashboard.lands.rw/prices";
+// Values from the explicitly labelled "Avg Transaction Price (m²)" column in
+// the Rwanda Land Dashboard /reference comparison table. The observation date
+// and weighting method are not disclosed. Nyarugenge differs from /prices
+// (50,771 vs 50,865 RWF/m²); this route uses the named transaction-price value
+// and keeps the cross-page discrepancy documented.
+const DISTRICT_AVERAGE_TRANSACTION_PRICE_RWF_PER_M2: Record<string, number> = Object.fromEntries(
+  Object.entries(DISTRICT_LAND_PRICE_BENCHMARKS).map(([district, benchmark]) => [
+    district.toUpperCase(),
+    benchmark.averageTransactionPricePerM2
+  ])
+) as Record<string, number>;
+const DISTRICT_TRANSACTION_PRICE_SOURCE = LAND_PRICE_BENCHMARK_SOURCE;
 
 // Broad service extents are used only to avoid requesting an unrelated GIS
 // service for a viewport outside its coverage.
@@ -315,7 +317,7 @@ function sectorPriceKey(district: string, sector: string): string {
 async function getLandPriceIndex(): Promise<LandPriceIndex> {
   if (!landPriceIndexPromise) {
     landPriceIndexPromise = (async () => {
-      const source = await readFile(join(process.cwd(), "public", "land-price-reference.tsv"), "utf8");
+      const source = await readFile(join(process.cwd(), "public", "land-price-transaction.tsv"), "utf8");
       const groups = new Map<string, {
         district: string;
         sector: string;
@@ -562,23 +564,23 @@ function normaliseAdministrativeFeature(
             average_land_price_kind: "derived-unweighted-cell-mean",
             average_land_price_sample_size: sectorPrice.pricedCells,
             average_land_price_conflicting_cells: sectorPrice.conflictingCells,
-            average_land_price_source: "public/land-price-reference.tsv",
-            average_land_price_date_status: "Derived unweighted mean of unambiguous cell-level weighted averages; not an official sector weighted average. Source effective date and method are unknown."
+            average_land_price_source: "public/land-price-transaction.tsv",
+            average_land_price_date_status: "Derived unweighted mean of unambiguous cell-level weighted-average transaction-price snapshots; not an official sector weighted transaction price. Source observation date and method are unknown."
           }
         : {}),
       ...(level === "cell" && cellPrice?.price !== null && cellPrice?.price !== undefined
         ? {
             average_land_price_per_m2: cellPrice.price,
             average_land_price_kind: "supplied-cell-price-snapshot",
-            average_land_price_source: "public/land-price-reference.tsv",
-            average_land_price_date_status: "Supplied cell snapshot; effective date and calculation method are unknown."
+            average_land_price_source: "public/land-price-transaction.tsv",
+            average_land_price_date_status: "Supplied cell-level weighted-average transaction-price snapshot; effective date and calculation method are unknown."
           }
         : {}),
       ...(level === "cell" && cellPrice?.conflict
         ? {
             average_land_price_conflicting: true,
             average_land_price_conflicting_cells: 1,
-            average_land_price_source: "public/land-price-reference.tsv"
+            average_land_price_source: "public/land-price-transaction.tsv"
           }
         : {}),
       source_label: sourceId === "kigali"
@@ -588,11 +590,11 @@ function normaliseAdministrativeFeature(
           : "Bugesera Masterplan GIS administrative boundaries (source vintage to confirm)",
       source_type: "administrative-boundary",
       ...(level === "district" &&
-      DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict] !== undefined
+      DISTRICT_AVERAGE_TRANSACTION_PRICE_RWF_PER_M2[upperDistrict] !== undefined
         ? {
             average_land_price_per_m2:
-              DISTRICT_AVERAGE_LAND_PRICE_RWF_PER_M2[upperDistrict],
-            average_land_price_source: DISTRICT_LAND_PRICE_SOURCE,
+              DISTRICT_AVERAGE_TRANSACTION_PRICE_RWF_PER_M2[upperDistrict],
+            average_land_price_source: DISTRICT_TRANSACTION_PRICE_SOURCE,
             average_land_price_date_status: "Effective date and calculation method not disclosed; provisional /prices page snapshot reviewed 2026-10-24"
           }
         : {})
