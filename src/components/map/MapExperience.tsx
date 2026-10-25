@@ -1601,7 +1601,7 @@ export function MapExperience() {
                 </strong>
                 <small>
                   {selectedArea.parcelMarketStatusSource === "demonstration"
-                    ? "Demonstration split only — not a verified property listing."
+                    ? "Demonstration market status and NEW markers only — not verified listing data."
                     : "Market status supplied by the connected listing source."}
                 </small>
               </div>
