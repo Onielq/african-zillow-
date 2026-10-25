@@ -255,7 +255,7 @@ export function demoParcelMarketStatus(
     hash ^= identity.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash >>> 0) % 2 === 0 ? "available" : "off-market";
+  return (hash >>> 31) === 0 ? "available" : "off-market";
 }
 
 /** Only listing-feed dates qualify here; cadastral update timestamps are not listing dates. */
