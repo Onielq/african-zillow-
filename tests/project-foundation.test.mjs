@@ -616,7 +616,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
   assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#77857C"/);
-  assert.match(mapView, /PARCEL_ZOOM, 0\.55/);
+  assert.match(mapView, /PARCEL_ZOOM,\s*0\.55/);
   assert.match(mapView, /PARCEL_ZOOM \+ 3\.85,\s*1\.2/);
   assert.match(mapView, /"icon-offset": \[0, -31\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
