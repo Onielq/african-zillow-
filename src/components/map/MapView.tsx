@@ -538,7 +538,7 @@ export function MapView({
         return;
       }
       try {
-        const response = await fetch("/api/geography/metric-bubbles?level=" + selectedMetric);
+        const response = await fetch("/api/geography/metric-bubbles");
         if (!response.ok) throw new Error("Map metric bubble request failed (" + response.status + ")");
         const payload = await response.json() as { values?: MetricBubbleValue[] };
         if (!active) return;
