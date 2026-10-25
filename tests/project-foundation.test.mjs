@@ -683,7 +683,7 @@ test("price bubbles retain collision behavior and style property markers by mark
 
   assert.match(mapView, /function measureMetricPill/);
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
-  assert.match(mapView, /marketStatus === "off-market"\s*\?\s*"#343A40"/);
+  assert.match(mapView, /marketStatus === "off-market"\s*\?\s*\["#3A3A42", "#2E2E35"\]/);
   assert.match(mapView, /marketStatus === "available"/);
   assert.match(mapView, /marketStatus === "off-market"[\s\S]*?: "#8B9690"/);
   assert.doesNotMatch(mapView.slice(mapView.indexOf("function ensureMetricPillImage"), mapView.indexOf("type MetricLabelCollisionBox")), /strokeStyle|context\.stroke\(\)/);
