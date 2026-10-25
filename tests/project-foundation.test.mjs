@@ -724,7 +724,7 @@ test("parcel listing colors use a stable district-scoped demonstration split and
 
   assert.match(mapView, /export function demoParcelMarketStatus/);
   assert.match(mapView, /normalizeMetricKeyPart\(district\)/);
-  assert.match(mapView, /\(hash >>> 0\) % 2 === 0 \? "available" : "off-market"/);
+  assert.match(mapView, /\(hash >>> 31\) === 0 \? "available" : "off-market"/);
   assert.match(mapView, /sourceMarketStatus \? "source" as const : "demonstration" as const/);
   assert.match(mapView, /a stable 50\/50 district-level demonstration split/);
   assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
