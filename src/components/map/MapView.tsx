@@ -211,6 +211,7 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
     ? ["in", ["get", "overlay_category"], ["literal", categories]]
     : ["==", ["get", "overlay_category"], "__hidden__"];
   const filters: Array<[string, unknown[]]> = [
+    ["show-road-casing", ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
     ["show-road-lines", ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
     ["show-poi-fill", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
     ["show-poi-outline", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
@@ -922,6 +923,20 @@ export function MapView({
     const addShowOverlayLayers = () => {
       if (!map.getSource("show-overlays")) {
         map.addSource("show-overlays", { type: "geojson", data: emptyFeatureCollection() });
+      }
+      if (!map.getLayer("show-road-casing")) {
+        map.addLayer({
+          id: "show-road-casing",
+          type: "line",
+          source: "show-overlays",
+          minzoom: 8.6,
+          filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
+          paint: {
+            "line-color": "#FFFFFF",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 3.2, 12, 5, 16, 7],
+            "line-opacity": 0.9
+          }
+        });
       }
       if (!map.getLayer("show-road-lines")) {
         map.addLayer({
