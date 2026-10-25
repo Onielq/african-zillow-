@@ -367,7 +367,7 @@ const MARKET_METRICS: Array<{
     label: "Capital appreciation",
     shortLabel: "Appreciation",
     description: "How comparable prices changed over a selected period.",
-    dataStatus: "The dashboard displays a land-price trend, but comparable dated transaction-price observations are not exposed as a validated area-level time series here. Capital appreciation is calculated only when historical and current prices for the same area and metric are available; this snapshot alone is not enough to produce a defensible percentage."
+    dataStatus: "The time series is not connected and validated here. The dashboard displays a land-price trend, but comparable dated transaction-price observations are not exposed as a validated area-level time series. Capital appreciation is calculated only when historical and current prices for the same area and metric are available; this snapshot alone is not enough to produce a defensible percentage."
   },
   {
     id: "rentalYield",
