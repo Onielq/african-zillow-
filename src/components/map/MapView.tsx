@@ -25,6 +25,25 @@ export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 export type MapOverlayCategory = "landmarks" | "healthEducation" | "transportation" | "nature";
+export type MapMetric =
+  | "averageLandPricePerM2"
+  | "transactionVolume"
+  | "capitalAppreciation"
+  | "rentalYield"
+  | "marketSupply"
+  | "upcomingSupply";
+
+type MetricBubbleValue = {
+  level: Exclude<AreaLevel, "parcel">;
+  district: string;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+  estimate: number;
+  label: string;
+  status: string;
+  method: string;
+};
 export type ShowScope = "kigali" | "bugesera" | "pilot";
 
 export type SelectedArea = {
@@ -83,6 +102,11 @@ type AreaProperties = {
   source_id?: string | number | null;
   zoning?: string | null;
   zoning_source?: string | null;
+  label?: string | null;
+  has_value?: boolean;
+  metric_label?: string | null;
+  metric_status?: string | null;
+  metric_detail?: string | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -139,6 +163,7 @@ function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCo
 type MapViewProps = {
   basemapMode: BasemapMode;
   showLandPriceHeatmap: boolean;
+  selectedMetric: MapMetric;
   showLayers: MapOverlayCategory[];
   showZoning: boolean;
   showScope: ShowScope;
@@ -161,7 +186,7 @@ const LAND_PRICE_RAMP = [
 function areaFillColorExpression(showPrice: boolean, baseColor: string) {
   return [
     "case",
-    ["boolean", ["feature-state", "hover"], false], "#B9EBD4",
+    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     ["boolean", ["feature-state", "selected"], false], "#FFE3A1",
     showPrice
       ? [
@@ -176,7 +201,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string) {
 
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
-  ["boolean", ["feature-state", "hover"], false], 0.58,
+  ["boolean", ["feature-state", "hover"], false], 0.74,
   ["boolean", ["feature-state", "selected"], false], 0.42,
   0.23
 ] as never;
@@ -186,6 +211,7 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
     ? ["in", ["get", "overlay_category"], ["literal", categories]]
     : ["==", ["get", "overlay_category"], "__hidden__"];
   const filters: Array<[string, unknown[]]> = [
+    ["show-road-casing", ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
     ["show-road-lines", ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"], categoryFilter]],
     ["show-poi-fill", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
     ["show-poi-outline", ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], categoryFilter]],
@@ -242,9 +268,8 @@ const SATELLITE_STYLE: StyleSpecification = {
 // sector → cell, then selected-cell parcel outlines.
 const SECTOR_ZOOM = 12.0;
 const CELL_ZOOM = 15.1;
-// Keep village IDs available for parcel joins, but move visually from cells to
-// cadastral plots so a visible village outline does not obscure the cell view.
-const VILLAGE_ZOOM = 21;
+// Keep every requested geography level visible in sequence before individual plots.
+const VILLAGE_ZOOM = 16.2;
 const PARCEL_ZOOM = 17.35;
 
 const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village", "parcel"];
@@ -323,9 +348,9 @@ function zoomForLevel(level: AreaLevel): number {
     case "sector":
       return 15.0;
     case "cell":
-      return 17.25;
+      return 16.0;
     case "village":
-      return 18.0;
+      return 17.0;
     case "parcel":
       return 19.35;
   }
@@ -470,6 +495,7 @@ function featureToArea(
 export function MapView({
   basemapMode,
   showLandPriceHeatmap,
+  selectedMetric,
   showZoning,
   onMapReady,
   onStatusChange,
@@ -482,6 +508,10 @@ export function MapView({
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
+  const selectedMetricRef = useRef<MapMetric>(selectedMetric);
+  const metricBubbleValuesRef = useRef<MetricBubbleValue[]>([]);
+  const areaDataRef = useRef<Partial<Record<AreaLevel, MapFeatureCollection>>>({});
+  const refreshMetricBubblesRef = useRef<(() => void) | null>(null);
   const showLayersRef = useRef(showLayers);
   const showScopeRef = useRef(showScope);
   const showZoningRef = useRef(showZoning);
@@ -498,6 +528,33 @@ export function MapView({
     onStatusChange("loading");
     map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
   }, [basemapMode, onStatusChange]);
+
+  useEffect(() => {
+    selectedMetricRef.current = selectedMetric;
+    let active = true;
+    const loadMetricBubbleValues = async () => {
+      if (selectedMetric !== "transactionVolume") {
+        metricBubbleValuesRef.current = [];
+        refreshMetricBubblesRef.current?.();
+        return;
+      }
+      try {
+        const response = await fetch("/api/geography/metric-bubbles");
+        if (!response.ok) throw new Error("Map metric bubble request failed (" + response.status + ")");
+        const payload = await response.json() as { values?: MetricBubbleValue[] };
+        if (!active) return;
+        metricBubbleValuesRef.current = payload.values ?? [];
+      } catch (error) {
+        if (!active) return;
+        metricBubbleValuesRef.current = [];
+        console.error("Map transaction-volume bubbles are unavailable.", error);
+      }
+      if (active) refreshMetricBubblesRef.current?.();
+    };
+    void loadMetricBubbleValues();
+    refreshMetricBubblesRef.current?.();
+    return () => { active = false; };
+  }, [selectedMetric]);
 
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
@@ -592,6 +649,90 @@ export function MapView({
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
 
+    const refreshMetricBubbles = () => {
+      if (!map.isStyleLoaded()) return;
+      const source = map.getSource("metric-bubbles") as GeoJSONSource | undefined;
+      if (!source) return;
+      const level = activeAreaLevel(map.getZoom());
+      if (level === "parcel") {
+        source.setData(emptyFeatureCollection());
+        return;
+      }
+      const collection = areaDataRef.current[level] ?? emptyFeatureCollection();
+      const valuesByKey = new Map<string, MetricBubbleValue>();
+      for (const value of metricBubbleValuesRef.current) {
+        const key = [value.level, value.district, value.sector, value.cell, value.village]
+          .map((part) => (part ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en"))
+          .join("|");
+        valuesByKey.set(key, value);
+      }
+      const metric = selectedMetricRef.current;
+      const features = collection.features.flatMap((feature, index) => {
+        if (!feature.geometry || !("coordinates" in feature.geometry)) return [];
+        const bounds = featureBounds({
+          type: "Feature",
+          geometry: feature.geometry,
+          properties: feature.properties ?? {}
+        } as MapGeoJSONFeature);
+        if (!bounds) return [];
+        const properties = feature.properties ?? {};
+        const key = [
+          level,
+          properties.district,
+          level === "district" ? null : properties.sector,
+          level === "cell" || level === "village" ? properties.cell : null,
+          level === "village" ? properties.village : null
+        ].map((part) => (part ?? "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en")).join("|");
+        let label = "—";
+        let hasValue = false;
+        let status = "unavailable";
+        let detail = "This metric is not connected to a verified source yet; no number is inferred.";
+        if (metric === "averageLandPricePerM2" && typeof properties.average_land_price_per_m2 === "number") {
+          const amount = properties.average_land_price_per_m2;
+          label = amount >= 1000 ? (amount / 1000).toFixed(amount >= 10000 ? 0 : 1) + "k" : Math.round(amount).toString();
+          hasValue = true;
+          status = "provisional-transaction-price-snapshot";
+          detail = properties.average_land_price_date_status ?? "Provisional average transaction-price snapshot per square metre; source timing and method require confirmation.";
+        } else if (metric === "transactionVolume") {
+          const observed = valuesByKey.get(key);
+          if (observed) {
+            label = observed.label;
+            hasValue = true;
+            status = observed.status;
+            detail = observed.method;
+          } else {
+            detail = "No metric summary was returned for this geography.";
+          }
+        } else if (metric === "capitalAppreciation") {
+          detail = "A dated historical and current comparable transaction-price series is not connected. Appreciation is withheld rather than fabricated.";
+        } else if (metric === "marketSupply") {
+          detail = "Verified current listings available to transact are not connected. Registered parcel counts are not for-sale supply.";
+        } else if (metric === "upcomingSupply") {
+          detail = "A verified developer and future-supply pipeline is not connected.";
+        } else if (metric === "rentalYield") {
+          detail = "Comparable verified rent and purchase-price data are not connected.";
+        }
+        return [{
+          type: "Feature" as const,
+          id: "metric-bubble-" + level + "-" + String(feature.id ?? index),
+          geometry: { type: "Point" as const, coordinates: [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] as [number, number] },
+          properties: {
+            label,
+            has_value: hasValue,
+            metric_label: metric,
+            metric_status: status,
+            metric_detail: detail,
+            district: properties.district ?? null,
+            sector: properties.sector ?? null,
+            cell: properties.cell ?? null,
+            village: properties.village ?? null
+          }
+        }];
+      });
+      source.setData({ type: "FeatureCollection", features } as never);
+    };
+    refreshMetricBubblesRef.current = refreshMetricBubbles;
+
     const setFeatureFlag = (
       featureRef: { source: string; id: string | number } | null,
       key: "hover" | "selected",
@@ -622,6 +763,10 @@ export function MapView({
         if (!map.getSource(layer.source)) {
           map.addSource(layer.source, { type: "geojson", data: empty });
         }
+      }
+
+      if (!map.getSource("metric-bubbles")) {
+        map.addSource("metric-bubbles", { type: "geojson", data: empty });
       }
 
       // Add every fill first, then outlines, then labels. This keeps the base
@@ -659,7 +804,7 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              "#126347",
+              "#06492E",
               ["boolean", ["feature-state", "selected"], false],
               "#126347",
               level === "parcel"
@@ -668,22 +813,14 @@ export function MapView({
                   ? "#A68A56"
                   : "#668878"
             ],
-            "line-width": level === "parcel"
-              ? [
-                  "case",
-                  ["boolean", ["feature-state", "selected"], false],
-                  [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    PARCEL_ZOOM,
-                    1.7,
-                    PARCEL_ZOOM + 2,
-                    2.5,
-                    PARCEL_ZOOM + 3.85,
-                    3.2
-                  ],
-                  [
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              level === "parcel" ? 3.2 : 3.0,
+              ["boolean", ["feature-state", "selected"], false],
+              level === "parcel" ? 2.8 : 2.5,
+              level === "parcel"
+                ? [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
@@ -694,18 +831,18 @@ export function MapView({
                     PARCEL_ZOOM + 3.85,
                     2.7
                   ]
-                ]
-              : [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  layer.minZoom,
-                  0.75,
-                  layer.minZoom + 2,
-                  1.35,
-                  layer.minZoom + 4,
-                  2
-                ],
+                : [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    layer.minZoom,
+                    0.75,
+                    layer.minZoom + 2,
+                    1.35,
+                    layer.minZoom + 4,
+                    2
+                  ]
+            ],
             "line-opacity": 0.94
           }
         });
@@ -746,11 +883,72 @@ export function MapView({
           }
         });
       }
+
+      if (!map.getLayer("metric-bubbles-circle")) {
+        map.addLayer({
+          id: "metric-bubbles-circle",
+          type: "circle",
+          source: "metric-bubbles",
+          minzoom: 5,
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], SECTOR_ZOOM, 15, CELL_ZOOM, 18, PARCEL_ZOOM - 0.1, 20],
+            "circle-color": [
+              "case",
+              ["==", ["get", "has_value"], false], "#7C8981",
+              ["match", ["get", "metric_label"],
+                "averageLandPricePerM2", "#145C40",
+                "transactionVolume", "#1C6597",
+                "capitalAppreciation", "#604BA3",
+                "rentalYield", "#9A6A18",
+                "marketSupply", "#9A6A18",
+                "upcomingSupply", "#69766E",
+                "#315F4A"]
+            ],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.97
+          }
+        });
+      }
+      if (!map.getLayer("metric-bubbles-label")) {
+        map.addLayer({
+          id: "metric-bubbles-label",
+          type: "symbol",
+          source: "metric-bubbles",
+          minzoom: 5,
+          layout: {
+            "text-field": ["get", "label"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Medium", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-allow-overlap": false,
+            "text-ignore-placement": false
+          },
+          paint: {
+            "text-color": "#FFFFFF",
+            "text-halo-color": "#17382A",
+            "text-halo-width": 0.25
+          }
+        });
+      }
     };
 
     const addShowOverlayLayers = () => {
       if (!map.getSource("show-overlays")) {
         map.addSource("show-overlays", { type: "geojson", data: emptyFeatureCollection() });
+      }
+      if (!map.getLayer("show-road-casing")) {
+        map.addLayer({
+          id: "show-road-casing",
+          type: "line",
+          source: "show-overlays",
+          minzoom: 8.6,
+          filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
+          paint: {
+            "line-color": "#FFFFFF",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 3.2, 12, 5, 16, 7],
+            "line-opacity": 0.9
+          }
+        });
       }
       if (!map.getLayer("show-road-lines")) {
         map.addLayer({
@@ -761,8 +959,8 @@ export function MapView({
           filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
           paint: {
             "line-color": "#2675C7",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 1.2, 12, 2.2, 16, 3],
-            "line-opacity": 0.8
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8.6, 1.5, 12, 2.6, 16, 3.8],
+            "line-opacity": 0.94
           }
         });
       }
@@ -781,7 +979,13 @@ export function MapView({
               "nature", "#3C9B74",
               "#7A8B80"
             ],
-            "fill-opacity": 0.22
+            "fill-opacity": [
+              "match", ["get", "overlay_category"],
+              "nature", 0.25,
+              "transportation", 0.2,
+              "healthEducation", 0.18,
+              0.16
+            ]
           }
         });
       }
@@ -800,8 +1004,8 @@ export function MapView({
               "nature", "#23764F",
               "#53645A"
             ],
-            "line-width": 1.3,
-            "line-opacity": 0.84
+            "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 13, 1.8, 17, 2.4],
+            "line-opacity": 0.95
           }
         });
       }
@@ -813,7 +1017,7 @@ export function MapView({
           minzoom: 7,
           filter: ["==", ["geometry-type"], "Point"],
           paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3, 11, 4.6, 15, 6],
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3.6, 11, 5.2, 15, 7],
             "circle-color": [
               "match", ["get", "overlay_category"],
               "landmarks", "#D6A344",
@@ -823,8 +1027,8 @@ export function MapView({
               "#7A8B80"
             ],
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 1.4,
-            "circle-opacity": 0.96
+            "circle-stroke-width": 1.8,
+            "circle-opacity": 0.98
           }
         });
       }
@@ -838,8 +1042,8 @@ export function MapView({
           layout: {
             "text-field": ["get", "name"],
             "text-font": ["Noto Sans Medium", "Arial Unicode MS Regular"],
-            "text-size": 10,
-            "text-offset": [0, 1.05],
+            "text-size": ["interpolate", ["linear"], ["zoom"], 10.4, 10, 15, 12],
+            "text-offset": [0, 1.15],
             "text-anchor": "top",
             "text-max-width": 12,
             "text-allow-overlap": false
@@ -847,7 +1051,8 @@ export function MapView({
           paint: {
             "text-color": "#19392B",
             "text-halo-color": "#FFFFFF",
-            "text-halo-width": 1.4
+            "text-halo-width": 1.8,
+            "text-halo-blur": 0.35
           }
         });
       }
@@ -996,7 +1201,10 @@ export function MapView({
         const source = map.getSource(AREA_LAYERS[level].source) as GeoJSONSource | undefined;
         if (!source) return;
         const sourceData = dataByLevel.get(level);
-        source.setData(mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []));
+        const merged = mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []);
+        areaDataRef.current[level] = merged;
+        source.setData(merged);
+        refreshMetricBubbles();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
       };
@@ -1136,12 +1344,16 @@ export function MapView({
 
         for (const result of results) {
           const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;
+          areaDataRef.current[result.level] = result.data;
           source.setData(result.data);
         }
         for (const level of AREA_LEVELS.slice(activeIndex + 1)) {
           const source = map.getSource(AREA_LAYERS[level].source) as GeoJSONSource;
-          source.setData(emptyFeatureCollection());
+          const emptyData = emptyFeatureCollection();
+          areaDataRef.current[level] = emptyData;
+          source.setData(emptyData);
         }
+        refreshMetricBubbles();
 
         updateLayerVisibility();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
@@ -1268,6 +1480,7 @@ export function MapView({
       updateLayerVisibility();
       scheduleShowOverlayRefresh();
       scheduleZoningRefresh();
+      refreshMetricBubbles();
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => void refreshAreas(), 220);
     };
@@ -1404,6 +1617,8 @@ export function MapView({
       zoningOverlayController?.abort();
       refreshShowOverlaysRef.current = null;
       refreshZoningRef.current = null;
+      refreshMetricBubblesRef.current = null;
+      areaDataRef.current = {};
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();

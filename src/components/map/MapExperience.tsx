@@ -10,6 +10,7 @@ import {
   type BoundaryStatus,
   type BasemapMode,
   type MapOverlayCategory,
+  type MapMetric,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -202,6 +203,8 @@ function comparisonItemKey(area: ComparisonItem): string {
     normalizeAreaName(area.sector),
     normalizeAreaName(area.cell),
     normalizeAreaName(area.village),
+    normalizeAreaName(area.upi),
+    normalizeAreaName(area.parcelNumber),
     normalizeAreaName(area.name),
     normalizeAreaName(area.projectSourceUrl)
   ].join("|");
@@ -336,13 +339,7 @@ function initialsForName(name: string): string {
     .join("")
     .toUpperCase();
 }
-type MarketMetric =
-  | "averageLandPricePerM2"
-  | "transactionVolume"
-  | "capitalAppreciation"
-  | "rentalYield"
-  | "marketSupply"
-  | "upcomingSupply";
+type MarketMetric = MapMetric;
 
 const MARKET_METRICS: Array<{
   id: MarketMetric;
@@ -370,7 +367,7 @@ const MARKET_METRICS: Array<{
     label: "Capital appreciation",
     shortLabel: "Appreciation",
     description: "How comparable prices changed over a selected period.",
-    dataStatus: "The Rwanda Land Dashboard displays a land-price trend, but its time series is not connected and validated here. It must not be treated as a house-price index."
+    dataStatus: "The time series is not connected and validated here. The dashboard displays a land-price trend, but comparable dated transaction-price observations are not exposed as a validated area-level time series. Capital appreciation is calculated only when historical and current prices for the same area and metric are available; this snapshot alone is not enough to produce a defensible percentage."
   },
   {
     id: "rentalYield",
@@ -956,6 +953,7 @@ export function MapExperience() {
         <MapView
           basemapMode={basemapMode}
           showLandPriceHeatmap={selectedMetric === "averageLandPricePerM2"}
+          selectedMetric={selectedMetric}
           showLayers={showLayers}
           showZoning={showZoning}
           showScope="pilot"
@@ -2048,7 +2046,7 @@ export function MapExperience() {
             <div className="comparison-title-row">
               <div>
                 <h2 id="comparison-title">Compare</h2>
-                <p className="comparison-subtitle">Mix districts, sectors, cells, villages and projects.</p>
+                <p className="comparison-subtitle">Compare districts, sectors, cells, villages, cadastral parcels and projects.</p>
               </div>
               <span>{comparedAreas.length} selected</span>
             </div>
@@ -2058,7 +2056,7 @@ export function MapExperience() {
               className="comparison-search"
               id="comparison-area-search"
               onChange={(event) => setCompareSearch(event.target.value)}
-              placeholder="Search district, sector, cell or village"
+              placeholder="Search district, sector, cell or village, UPI or parcel number"
               type="search"
               value={compareSearch}
             />
@@ -2092,6 +2090,7 @@ export function MapExperience() {
                           {area.sector ? " · " + area.sector : ""}
                           {area.cell ? " · " + area.cell : ""}
                           {area.village ? " · " + area.village : ""}
+                          {area.level === "parcel" ? " · " + (area.parcelNumber ? "Parcel " + area.parcelNumber : "Parcel") + " · UPI " + (area.upi ?? "not supplied") : ""}
                         </small>
                       </span>
                       <span className="comparison-search-result-action">{isAdded ? "Added" : "Add"}</span>
@@ -2100,7 +2099,7 @@ export function MapExperience() {
                 }) : (
                   <p className="comparison-no-results">
                     {comparisonSearchStatus === "ready"
-                      ? "No matching district, sector, cell or village found."
+                      ? "No matching district, sector, cell, village, UPI or parcel number found."
                       : "Enter at least two characters to search."}
                   </p>
                 )}

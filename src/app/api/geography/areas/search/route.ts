@@ -7,8 +7,13 @@ const KIGALI_MAP_SERVER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer";
 const BUGESERA_MAP_SERVER =
   "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
+const KIGALI_PARCELS =
+  "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
+const BUGESERA_PARCELS =
+  "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0";
 
-type AreaLevel = "district" | "sector" | "cell" | "village";
+type AdminAreaLevel = "district" | "sector" | "cell" | "village";
+type AreaLevel = AdminAreaLevel | "parcel";
 type SourceId = "kigali" | "bugesera";
 type FieldMetadata = { name: string; alias?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
@@ -29,7 +34,12 @@ type SearchArea = {
   villageId: string | null;
   averageLandPricePerM2: number | null;
   sourceLabel: string;
-  sourceType: "administrative-boundary";
+  sourceType: "administrative-boundary" | "cadastral-parcel";
+  upi?: string | null;
+  parcelNumber?: string | null;
+  parcelSizeM2?: number | null;
+  lastUpdatedOn?: number | null;
+  bounds?: [number, number, number, number] | null;
 };
 
 const PILOT_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
@@ -40,7 +50,7 @@ const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
   bugesera: 4038
 };
 
-const CANDIDATES: Record<AreaLevel, { name: string[]; district: string[]; sector: string[]; cell: string[]; village: string[]; ids: Record<AreaLevel, string[]> }> = {
+const CANDIDATES: Record<AdminAreaLevel, { name: string[]; district: string[]; sector: string[]; cell: string[]; village: string[]; ids: Record<AdminAreaLevel, string[]> }> = {
   district: {
     name: ["district", "district_name", "district_1", "dist_name", "name", "name_e"],
     district: ["district", "district_name", "district_1", "dist_name"],
@@ -120,7 +130,7 @@ async function getLayerMetadata(url: string): Promise<LayerMetadata> {
   return pending;
 }
 
-async function searchLayer(source: SourceId, baseUrl: string, level: AreaLevel, layerId: number, query: string): Promise<SearchArea[]> {
+async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLevel, layerId: number, query: string): Promise<SearchArea[]> {
   const layerUrl = baseUrl + "/" + layerId;
   const metadata = await getLayerMetadata(layerUrl);
   const fields = metadata.fields ?? [];
@@ -192,6 +202,64 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AreaLevel, 
   });
 }
 
+async function searchParcels(source: SourceId, layerUrl: string, query: string): Promise<SearchArea[]> {
+  const escaped = query.replace(/'/g, "''");
+  const params = new URLSearchParams({
+    where: "upi LIKE '%" + escaped + "%' OR parcel_number LIKE '%" + escaped + "%'",
+    outFields: "upi,province,district,sector,cell,village,parcel_number,size,last_updated_on",
+    returnGeometry: "false",
+    resultRecordCount: "25",
+    f: "json"
+  });
+  const response = await fetch(layerUrl + "/query?" + params.toString(), {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error("Parcel identifier search failed (" + response.status + ")");
+  const payload = await response.json() as LayerQueryResponse;
+  if (payload.error) throw new Error(payload.error.message ?? "Parcel identifier search failed");
+
+  return (payload.features ?? []).flatMap((feature, index) => {
+    const attributes = feature.attributes ?? {};
+    const upi = value(attributes, ["upi"]);
+    const district = value(attributes, ["district", "district_name"]);
+    const parcelNumber = value(attributes, ["parcel_number", "parcelnumber"]);
+    if (!upi || !district || !PILOT_DISTRICTS.has(normalizeKey(district))) return [];
+    const sector = value(attributes, ["sector", "sector_name"]);
+    const cell = value(attributes, ["cell", "cell_name"]);
+    const village = value(attributes, ["village", "village_name"]);
+    const sizeRaw = value(attributes, ["size", "parcel_size_m2", "area"]);
+    const size = sizeRaw === null ? null : Number(sizeRaw);
+    const updatedRaw = value(attributes, ["last_updated_on", "lastupdatedon"]);
+    const updated = updatedRaw === null ? null : Number(updatedRaw);
+    return [{
+      id: "parcel-" + normalizeKey(upi),
+      level: "parcel" as const,
+      name: parcelNumber ? "Parcel " + parcelNumber : "Parcel " + upi,
+      province: value(attributes, ["province"]) ?? (source === "bugesera" ? "Eastern Province" : "Kigali City"),
+      district,
+      districtId: null,
+      sector,
+      sectorId: null,
+      cell,
+      cellId: null,
+      village,
+      villageId: null,
+      averageLandPricePerM2: null,
+      sourceLabel: source === "kigali"
+        ? "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)"
+        : "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse permission pending)",
+      sourceType: "cadastral-parcel" as const,
+      upi,
+      parcelNumber,
+      parcelSizeM2: size !== null && Number.isFinite(size) ? size : null,
+      lastUpdatedOn: updated !== null && Number.isFinite(updated) ? updated : null,
+      bounds: null
+    }];
+  });
+}
+
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (rawQuery.length < 2) {
@@ -201,31 +269,43 @@ export async function GET(request: NextRequest) {
   }
   const query = rawQuery.slice(0, 80);
   const sources = [
-    { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
-    { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
+    { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
+    { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
   ];
-  const tasks = sources.flatMap((source) =>
-    (Object.entries(source.layers) as Array<[AreaLevel, number]>).map(([level, layerId]) =>
-      searchLayer(source.id, source.baseUrl, level, layerId, query)
+  const tasks = [
+    ...sources.flatMap((source) =>
+      (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
+        searchLayer(source.id, source.baseUrl, level, layerId, query)
+          .then((areas) => ({ areas, failed: false }))
+          .catch((error) => {
+            console.error("Comparison area search failed for " + source.id + " " + level + ".", error);
+            return { areas: [] as SearchArea[], failed: true };
+          })
+      )
+    ),
+    ...sources.map((source) =>
+      searchParcels(source.id, source.parcelUrl, query)
         .then((areas) => ({ areas, failed: false }))
         .catch((error) => {
-          console.error("Comparison area search failed for " + source.id + " " + level + ".", error);
+          console.error("Parcel identifier search failed for " + source.id + ".", error);
           return { areas: [] as SearchArea[], failed: true };
         })
     )
-  );
+  ];
   const results = await Promise.all(tasks);
   const areas = results.flatMap((result) => result.areas);
   const deduplicated = new Map<string, SearchArea>();
   for (const area of areas) {
-    const key = [area.level, normalizeKey(area.district), normalizeKey(area.sector ?? ""), normalizeKey(area.cell ?? ""), normalizeKey(area.village ?? ""), normalizeKey(area.name)].join("|");
+    const key = area.level === "parcel"
+      ? "parcel|" + normalizeKey(area.upi ?? area.parcelNumber ?? area.name)
+      : [area.level, normalizeKey(area.district), normalizeKey(area.sector ?? ""), normalizeKey(area.cell ?? ""), normalizeKey(area.village ?? ""), normalizeKey(area.name)].join("|");
     if (!deduplicated.has(key)) deduplicated.set(key, area);
   }
   const sorted = Array.from(deduplicated.values()).sort((a, b) => {
-    const aExact = normalizeKey(a.name) === normalizeKey(query) ? 0 : 1;
-    const bExact = normalizeKey(b.name) === normalizeKey(query) ? 0 : 1;
+    const aExact = [a.name, a.upi, a.parcelNumber].some((value) => normalizeKey(value ?? "") === normalizeKey(query)) ? 0 : 1;
+    const bExact = [b.name, b.upi, b.parcelNumber].some((value) => normalizeKey(value ?? "") === normalizeKey(query)) ? 0 : 1;
     if (aExact !== bExact) return aExact - bExact;
-    const order: Record<AreaLevel, number> = { district: 0, sector: 1, cell: 2, village: 3 };
+    const order: Record<AreaLevel, number> = { district: 0, sector: 1, cell: 2, village: 3, parcel: 4 };
     return order[a.level] - order[b.level] || a.name.localeCompare(b.name);
   }).slice(0, 80);
 
