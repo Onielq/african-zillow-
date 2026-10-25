@@ -1594,7 +1594,11 @@ export function MapExperience() {
             <h2>{selectedArea.name}</h2>
             {selectedArea.level === "parcel" && selectedArea.parcelMarketStatus ? (
               <div className={`parcel-market-status parcel-market-status-${selectedArea.parcelMarketStatus}`}>
-                <strong>{selectedArea.parcelMarketStatus === "available" ? "Available (demo)" : "Off market (demo)"}</strong>
+                <strong>
+                  {selectedArea.parcelMarketStatus === "available"
+                    ? selectedArea.parcelMarketStatusSource === "demonstration" ? "Available (demo)" : "Available"
+                    : selectedArea.parcelMarketStatusSource === "demonstration" ? "Off market (demo)" : "Off market"}
+                </strong>
                 <small>
                   {selectedArea.parcelMarketStatusSource === "demonstration"
                     ? "Demonstration split only — not a verified property listing."
