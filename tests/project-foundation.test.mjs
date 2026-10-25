@@ -476,13 +476,15 @@ test("transaction volume explains sourced baselines, model caveats, and current 
 });
 
 
-test("parcel selection calculates an indicative value from parcel area and unit price", async () => {
+test("parcel asking price is parcel area multiplied by the available average transaction price per square metre", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const pricing = await readProjectFile("src/lib/parcel-pricing.ts");
   assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
-  assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
-  assert.match(experience, /displayedParcelPriceTypeLabel/);
-  assert.match(experience, /parcelPriceTypeLabel\(displayedParcelPriceType\)/);
-  assert.match(experience, /indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
+  assert.match(experience, /calculateParcelAskingPrice\(selectedArea\.parcelSizeM2, parcelUnitPriceEstimate\?\.pricePerM2\)/);
+  assert.match(experience, /parcelPriceTypeLabel\("calculated-asking-price"\)/);
+  assert.match(experience, /Asking price is calculated as parcel area × the available average transaction price per m²/);
+  assert.match(pricing, /Math\.round\(parcelAreaM2 \* averageTransactionPricePerM2\)/);
+  assert.equal(Math.round(546 * 49757), 27167322);
 });
 
 test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
@@ -605,7 +607,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /id: "metric-bubbles-circle"/);
   assert.match(mapView, /"circle-radius": \["interpolate", \["linear"\], \["zoom"\], 5, 2\.5/);
   assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
-  assert.match(mapView, /status = "estimated-parcel-value"/);
+  assert.match(mapView, /status = "calculated-asking-price"/);
   assert.match(mapView, /properties\.parcel_size_m2/);
   assert.match(mapView, /selectedMetricRef\.current === "averageLandPricePerM2"/);
   assert.match(metricRoute, /formatCompactValue\(value\)/);
@@ -617,6 +619,7 @@ test("parcel price labels distinguish estimates from source-backed asking prices
   const areaRoute = await readProjectFile("src/app/api/geography/areas/route.ts");
 
   for (const kind of [
+    "calculated-asking-price",
     "indicative-estimate",
     "confirmed-asking-price",
     "recorded-sale-price",
@@ -634,7 +637,7 @@ test("parcel price labels distinguish estimates from source-backed asking prices
 
   assert.match(experience, /displayedParcelPriceTypeLabel/);
   assert.match(experience, /Source: \{selectedArea\.parcelPriceSource\}/);
-  assert.match(experience, /This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
+  assert.match(experience, /Asking price is calculated as parcel area × the available average transaction price per m²/);
   assert.match(areaRoute, /upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on/);
   assert.doesNotMatch(areaRoute, /asking_price|recorded_sale_price|formal_valuation/i);
 });
@@ -652,11 +655,11 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(mapView, /matching cell-level transaction-price snapshot/);
   assert.match(mapView, /derived sector mean of available cell snapshots/);
   assert.match(mapView, /district average transaction-price snapshot/);
-  assert.match(mapView, /status = "indicative-unit-price-per-m2"/);
-  assert.match(mapView, /Parcel area is unavailable, so this is a per-square-metre benchmark, not a total parcel value/);
+  assert.match(mapView, /status = "asking-price-unit-rate"/);
+  assert.match(mapView, /The parcel total uses parcel area × this rate when the parcel area is available/);
 
   assert.match(experience, /allowDistrictFallback && area\.level === "parcel" && area\.sector/);
   assert.match(experience, /Approx\. area from mapped boundary/);
-  assert.match(experience, /Indicative area price \/ m²/);
+  assert.match(experience, /Average transaction price \/ m²/);
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
