@@ -638,3 +638,25 @@ test("parcel price labels distinguish estimates from source-backed asking prices
   assert.match(areaRoute, /upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on/);
   assert.doesNotMatch(areaRoute, /asking_price|recorded_sale_price|formal_valuation/i);
 });
+
+test("parcel price estimates exhaust existing price snapshots and use mapped geometry area before showing a unit-price fallback", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(mapView, /function geometryAreaM2\(geometry: Geometry\)/);
+  assert.match(mapView, /geometryAreaM2\(feature\.geometry as Geometry\)/);
+  assert.match(mapView, /parcelSizeSource/);
+  assert.match(mapView, /priceByCell/);
+  assert.match(mapView, /priceBySector/);
+  assert.match(mapView, /priceByDistrict/);
+  assert.match(mapView, /matching cell-level transaction-price snapshot/);
+  assert.match(mapView, /derived sector mean of available cell snapshots/);
+  assert.match(mapView, /district average transaction-price snapshot/);
+  assert.match(mapView, /status = "indicative-unit-price-per-m2"/);
+  assert.match(mapView, /not a total parcel value when no usable parcel area exists/);
+
+  assert.match(experience, /allowDistrictFallback && area\.level === "parcel" && area\.sector/);
+  assert.match(experience, /Approx\. area from mapped boundary/);
+  assert.match(experience, /Indicative area price \/ m²/);
+  assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
+});
