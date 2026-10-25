@@ -609,7 +609,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /if \(component\.length >= minimumCrowdedGroupSize\)/);
   assert.match(mapView, /\["get", "show_dot"\], true/);
   assert.match(mapView, /\["!=", \["get", "show_dot"\], true\]/);
-  assert.match(mapView, /context\.fillStyle = "#9D2932"/);
+  assert.match(mapView, /const fillColor = isSelected/);
   assert.match(mapView, /id: "metric-bubbles-circle"/);
   assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\]/);
   assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
@@ -702,7 +702,7 @@ test("property markers use a separate NEW badge, blue selection override, and li
   assert.match(mapView, /Math\.min\(84, Math\.max\(72, measuredWidth\)\)/);
   assert.match(mapView, /id: "metric-bubbles-parcel-label"/);
   assert.match(mapView, /id: "metric-bubbles-new-badge"/);
-  assert.match(mapView, /icon-offset: \[0, -42\]/);
+  assert.match(mapView, /"icon-offset": \\[0, -42\\]/);
   assert.match(mapView, /is_new_listing: isNewListing/);
   assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
   assert.match(mapView, /selectFeatureState\(null\)/);
