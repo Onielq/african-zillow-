@@ -1359,9 +1359,7 @@ export function MapView({
             sort_priority: hasValue ? -Math.abs(sortValue) : 0,
             metric_label: metric,
             metric_status: status,
-            metric_detail: level === "parcel" && marketStatusSource === "demonstration"
-              ? detail + " Market-status colors use a stable 50/50 district-level demonstration split; they are not verified listings."
-              : detail,
+            metric_detail: detail,
             market_status: marketStatus,
             market_status_source: marketStatusSource,
             is_selected: isSelected,
@@ -1468,7 +1466,7 @@ export function MapView({
                 (level === "district" || level === "sector" || level === "cell"),
               layer.color
             ),
-            // Parcels stay fully transparent so the basemap shows through; their outlines define the lots.
+            // Cadastral parcels are outline-only: never tint or fill the land inside each boundary.
             "fill-opacity": level === "parcel" ? 0 : AREA_FILL_OPACITY_EXPRESSION
           }
         });
@@ -1491,7 +1489,7 @@ export function MapView({
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? "#2563EB" : "#126347",
               level === "parcel"
-                ? "#77857C"
+                ? "#FFFFFF"
                 : level === "village"
                   ? "#A68A56"
                   : "#668878"
@@ -1499,20 +1497,20 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.7 : 3.0,
+              level === "parcel" ? 2.5 : 3.0,
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 2.0 : 2.5,
+              level === "parcel" ? 2.6 : 2.5,
               level === "parcel"
                 ? [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     PARCEL_ZOOM,
-                    0.55,
+                    0.95,
                     PARCEL_ZOOM + 1.5,
-                    0.85,
+                    1.45,
                     PARCEL_ZOOM + 3.85,
-                    1.2
+                    1.9
                   ]
                 : [
                     "interpolate",
@@ -1526,7 +1524,7 @@ export function MapView({
                     2
                   ]
             ],
-            "line-opacity": level === "parcel" ? 0.82 : 0.94
+            "line-opacity": level === "parcel" ? 0.98 : 0.94
           }
         });
       }
