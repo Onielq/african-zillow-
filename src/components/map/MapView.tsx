@@ -22,7 +22,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
-export type BasemapMode = "map" | "satellite" | "apple-hybrid" | "apple-satellite";
+export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 export type MapOverlayCategory = "landmarks" | "healthEducation" | "transportation" | "nature";
 export type MapMetric =
@@ -32,107 +32,6 @@ export type MapMetric =
   | "rentalYield"
   | "marketSupply"
   | "upcomingSupply";
-
-type AppleMapKitRegion = {
-  center: { latitude: number; longitude: number };
-  span: { latitudeDelta: number; longitudeDelta: number };
-};
-type AppleMapKitMapInstance = {
-  mapType: "hybrid" | "satellite" | string;
-  region: AppleMapKitRegion;
-  destroy?: () => void;
-};
-type AppleMapKitApi = {
-  init(options: {
-    authorizationCallback: (done: (token: string) => void) => void;
-    language?: string;
-  }): void;
-  Map: new (
-    container: HTMLElement,
-    options?: {
-      region?: AppleMapKitRegion;
-      mapType?: "hybrid" | "satellite";
-      showsMapTypeControl?: boolean;
-      showsZoomControl?: boolean;
-      showsCompass?: boolean;
-      showsScale?: boolean;
-      isScrollEnabled?: boolean;
-      isZoomEnabled?: boolean;
-      isRotateEnabled?: boolean;
-      isPitchEnabled?: boolean;
-    }
-  ) => AppleMapKitMapInstance;
-};
-type AppleMapKitWindow = Window & { mapkit?: AppleMapKitApi };
-
-const APPLE_MAPKIT_TOKEN = process.env.NEXT_PUBLIC_APPLE_MAPKIT_TOKEN?.trim() ?? "";
-const APPLE_MAPKIT_SCRIPT_URL = "https://cdn.apple-mapkit.com/mk/6.x.x/mapkit.js";
-let appleMapKitLoadPromise: Promise<AppleMapKitApi> | null = null;
-let appleMapKitInitializedToken: string | null = null;
-
-function isAppleBasemapMode(mode: BasemapMode): boolean {
-  return mode === "apple-hybrid" || mode === "apple-satellite";
-}
-
-function appleMapTypeForMode(mode: BasemapMode): "hybrid" | "satellite" {
-  return mode === "apple-satellite" ? "satellite" : "hybrid";
-}
-
-function loadAppleMapKit(token: string): Promise<AppleMapKitApi> {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("Apple Maps can only be initialized in a browser."));
-  }
-
-  if (!appleMapKitLoadPromise) {
-    appleMapKitLoadPromise = new Promise<AppleMapKitApi>((resolve, reject) => {
-      const loadedApi = (window as AppleMapKitWindow).mapkit;
-      if (loadedApi) {
-        resolve(loadedApi);
-        return;
-      }
-
-      const existingScript = document.querySelector<HTMLScriptElement>("script[data-apple-mapkit]");
-      const script = existingScript ?? document.createElement("script");
-      const onLoad = () => {
-        const api = (window as AppleMapKitWindow).mapkit;
-        if (api) resolve(api);
-        else reject(new Error("Apple MapKit JS loaded without exposing its API."));
-      };
-      const onError = () => reject(new Error("Apple MapKit JS could not be loaded."));
-      script.addEventListener("load", onLoad, { once: true });
-      script.addEventListener("error", onError, { once: true });
-      if (!existingScript) {
-        script.src = APPLE_MAPKIT_SCRIPT_URL;
-        script.async = true;
-        script.dataset.appleMapkit = "true";
-        document.head.appendChild(script);
-      }
-    });
-  }
-
-  return appleMapKitLoadPromise.then((api) => {
-    if (appleMapKitInitializedToken !== token) {
-      api.init({
-        authorizationCallback: (done) => done(token),
-        language: "en"
-      });
-      appleMapKitInitializedToken = token;
-    }
-    return api;
-  });
-}
-
-const APPLE_OVERLAY_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {},
-  layers: [
-    {
-      id: "apple-map-transparent-background",
-      type: "background",
-      paint: { "background-color": "rgba(0, 0, 0, 0)" }
-    }
-  ]
-};
 
 type MetricBubbleValue = {
   level: Exclude<AreaLevel, "parcel">;
@@ -325,18 +224,6 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
 }
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
-
-function appleRegionForMap(map: MapLibreMapInstance): AppleMapKitRegion {
-  const center = map.getCenter();
-  const bounds = map.getBounds();
-  return {
-    center: { latitude: center.lat, longitude: center.lng },
-    span: {
-      latitudeDelta: Math.max(0.0005, bounds.getNorth() - bounds.getSouth()),
-      longitudeDelta: Math.max(0.0005, bounds.getEast() - bounds.getWest())
-    }
-  };
-}
 
 // Approximate geographic envelope of Rwanda with a small safety margin.
 // maxBounds constrains panning; a viewport-derived min zoom prevents zooming
@@ -618,8 +505,6 @@ export function MapView({
   showScope
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const appleMapContainerRef = useRef<HTMLDivElement>(null);
-  const appleMapRef = useRef<AppleMapKitMapInstance | null>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
@@ -641,95 +526,8 @@ export function MapView({
 
     activeBasemapModeRef.current = basemapMode;
     onStatusChange("loading");
-    const appleMode = isAppleBasemapMode(basemapMode);
-    map.getContainer().style.backgroundColor = appleMode ? "transparent" : "#E7EDE8";
-    map.getCanvas().style.backgroundColor = appleMode ? "transparent" : "";
-    map.setStyle(
-      appleMode
-        ? APPLE_OVERLAY_STYLE
-        : basemapMode === "satellite"
-          ? SATELLITE_STYLE
-          : NORMAL_STYLE_URL,
-      { diff: false }
-    );
+    map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
   }, [basemapMode, onStatusChange]);
-
-
-  useEffect(() => {
-    const container = appleMapContainerRef.current;
-    if (!container) return;
-    const appleMode = isAppleBasemapMode(basemapMode);
-    container.style.visibility = appleMode && APPLE_MAPKIT_TOKEN ? "visible" : "hidden";
-
-    if (!appleMode || !APPLE_MAPKIT_TOKEN) {
-      appleMapRef.current?.destroy?.();
-      appleMapRef.current = null;
-      container.replaceChildren();
-      return;
-    }
-
-    let cancelled = false;
-    onStatusChange("loading");
-    const initializeAppleMap = async () => {
-      try {
-        const api = await loadAppleMapKit(APPLE_MAPKIT_TOKEN);
-        if (cancelled || !appleMapContainerRef.current) return;
-
-        if (appleMapRef.current) {
-          appleMapRef.current.mapType = appleMapTypeForMode(activeBasemapModeRef.current);
-          if (mapRef.current) appleMapRef.current.region = appleRegionForMap(mapRef.current);
-          return;
-        }
-
-        const currentMap = mapRef.current;
-        const appleMap = new api.Map(appleMapContainerRef.current, {
-          mapType: appleMapTypeForMode(activeBasemapModeRef.current),
-          region: currentMap
-            ? appleRegionForMap(currentMap)
-            : {
-                center: { latitude: -1.98, longitude: 30.10 },
-                span: { latitudeDelta: 1.65, longitudeDelta: 1.9 }
-              },
-          showsMapTypeControl: false,
-          showsZoomControl: false,
-          showsCompass: false,
-          showsScale: false,
-          isScrollEnabled: false,
-          isZoomEnabled: false,
-          isRotateEnabled: false,
-          isPitchEnabled: false
-        });
-        if (cancelled) {
-          appleMap.destroy?.();
-          return;
-        }
-        appleMapRef.current = appleMap;
-        onStatusChange("ready");
-      } catch (error) {
-        if (cancelled) return;
-        console.error("Apple Maps basemap failed to initialize.", error);
-        onStatusChange("error");
-      }
-    };
-
-    void initializeAppleMap();
-    return () => {
-      cancelled = true;
-      if (isAppleBasemapMode(activeBasemapModeRef.current) === false) {
-        appleMapRef.current?.destroy?.();
-        appleMapRef.current = null;
-        container.replaceChildren();
-      }
-    };
-  }, [isAppleBasemapMode(basemapMode), onStatusChange]);
-
-  useEffect(() => {
-    if (!isAppleBasemapMode(basemapMode)) return;
-    const appleMap = appleMapRef.current;
-    if (!appleMap) return;
-    appleMap.mapType = appleMapTypeForMode(basemapMode);
-    if (mapRef.current) appleMap.region = appleRegionForMap(mapRef.current);
-  }, [basemapMode]);
 
   useEffect(() => {
     selectedMetricRef.current = selectedMetric;
@@ -824,18 +622,6 @@ export function MapView({
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
 
-    const scheduleAppleRegionSync = () => {
-      if (appleRegionSyncFrame !== null) return;
-      appleRegionSyncFrame = window.requestAnimationFrame(() => {
-        appleRegionSyncFrame = null;
-        const appleMap = appleMapRef.current;
-        if (!appleMap || !isAppleBasemapMode(activeBasemapModeRef.current)) return;
-        appleMap.region = appleRegionForMap(map);
-      });
-    };
-    map.on("move", scheduleAppleRegionSync);
-    map.on("resize", scheduleAppleRegionSync);
-
     const updateRwandaZoomFloor = () => {
       const mobile = window.matchMedia("(max-width: 720px)").matches;
       const camera = map.cameraForBounds(RWANDA_CAMERA_BOUNDS, {
@@ -857,7 +643,6 @@ export function MapView({
     let viewportListenersAttached = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    let appleRegionSyncFrame: number | null = null;
     let activeController: AbortController | null = null;
     let refreshSequence = 0;
     const areaCache = new Map<string, { bounds: ViewBounds; data: MapFeatureCollection }>();
@@ -1774,7 +1559,7 @@ export function MapView({
       applyShowOverlayFilters(map, showLayersRef.current);
       void refreshShowOverlays();
       void refreshZoningOverlay();
-      if (!isAppleBasemapMode(activeBasemapModeRef.current)) onStatusChange("ready");
+      onStatusChange("ready");
       void refreshAreas();
       attachInteractionHandlers();
 
@@ -1826,7 +1611,6 @@ export function MapView({
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
-      if (appleRegionSyncFrame !== null) window.cancelAnimationFrame(appleRegionSyncFrame);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
@@ -1839,8 +1623,6 @@ export function MapView({
       activeController?.abort();
       resizeObserver?.disconnect();
       map.remove();
-      appleMapRef.current?.destroy?.();
-      appleMapRef.current = null;
       mapRef.current = null;
       activeBasemapModeRef.current = "map";
       onMapReady(null);
@@ -1853,18 +1635,11 @@ export function MapView({
   ]);
 
   return (
-    <div className={isAppleBasemapMode(basemapMode) ? "map-provider-stage map-provider-stage-apple" : "map-provider-stage"}>
-      <div
-        aria-label="Apple Maps basemap"
-        className="apple-mapkit-mount"
-        ref={appleMapContainerRef}
-      />
-      <div
-        aria-label="Interactive map focused on Kigali City and Bugesera District"
-        className="maplibre-mount"
-        ref={containerRef}
-        role="application"
-      />
-    </div>
+    <div
+      aria-label="Interactive map focused on Kigali City and Bugesera District"
+      className="maplibre-mount"
+      ref={containerRef}
+      role="application"
+    />
   );
 }
