@@ -876,7 +876,7 @@ export function MapView({
           id: "metric-bubbles-circle",
           type: "circle",
           source: "metric-bubbles",
-          minzoom: SECTOR_ZOOM,
+          minzoom: 5,
           paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], SECTOR_ZOOM, 15, CELL_ZOOM, 18, PARCEL_ZOOM - 0.1, 20],
             "circle-color": [
@@ -902,7 +902,7 @@ export function MapView({
           id: "metric-bubbles-label",
           type: "symbol",
           source: "metric-bubbles",
-          minzoom: SECTOR_ZOOM,
+          minzoom: 5,
           layout: {
             "text-field": ["get", "label"],
             "text-font": ["Noto Sans Bold", "Noto Sans Medium", "Arial Unicode MS Regular"],
