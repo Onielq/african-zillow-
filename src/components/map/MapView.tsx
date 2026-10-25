@@ -202,7 +202,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string) {
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
   ["boolean", ["feature-state", "hover"], false], 0.74,
-  ["boolean", ["feature-state", "selected"], false], 0.5,
+  ["boolean", ["feature-state", "selected"], false], 0.42,
   0.23
 ] as never;
 
@@ -819,17 +819,29 @@ export function MapView({
               level === "parcel" ? 3.2 : 3.0,
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? 2.8 : 2.5,
-              [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                layer.minZoom,
-                level === "parcel" ? 0.9 : 0.75,
-                layer.minZoom + 2,
-                level === "parcel" ? 1.7 : 1.35,
-                layer.minZoom + 4,
-                level === "parcel" ? 2.7 : 2
-              ]
+              level === "parcel"
+                ? [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    PARCEL_ZOOM,
+                    0.9,
+                    PARCEL_ZOOM + 1.5,
+                    1.7,
+                    PARCEL_ZOOM + 3.85,
+                    2.7
+                  ]
+                : [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    layer.minZoom,
+                    0.75,
+                    layer.minZoom + 2,
+                    1.35,
+                    layer.minZoom + 4,
+                    2
+                  ]
             ],
             "line-opacity": 0.94
           }
