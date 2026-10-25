@@ -1411,7 +1411,11 @@ export function MapView({
           type: "symbol",
           source: "metric-bubbles",
           minzoom: 5,
-          filter: ["==", ["get", "has_value"], true],
+          filter: [
+            "all",
+            ["==", ["get", "has_value"], true],
+            ["!=", ["get", "show_dot"], true]
+          ],
           layout: {
             "icon-image": ["get", "icon_image"],
             "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.84, 12, 0.92, 16, 1, 19, 1.02],
