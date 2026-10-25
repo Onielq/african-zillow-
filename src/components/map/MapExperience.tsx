@@ -14,6 +14,12 @@ import {
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
 import {
+  DISTRICT_LAND_PRICE_BENCHMARKS,
+  getDistrictLandPriceBenchmark,
+  LAND_PRICE_BENCHMARK_SOURCE,
+  LAND_PRICE_PRICES_CROSSCHECK_SOURCE
+} from "@/data/land-price-benchmarks";
+import {
   RWANDA_PUBLIC_AGENT_CANDIDATES,
   RWANDA_REAL_ESTATE_AGENCIES
 } from "@/data/real-estate-directory";
@@ -86,16 +92,16 @@ type TransactionEstimateResponse = {
 
 type UnitPriceEstimate = {
   pricePerM2: number | null;
-  kind: "cell-reference-snapshot" | "derived-sector-mean" | "district-dashboard-snapshot" | "unavailable" | "conflicting";
+  kind: "cell-transaction-price-snapshot" | "derived-sector-mean" | "district-transaction-price-snapshot" | "unavailable" | "conflicting";
   explanation: string;
 };
 
-const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
-  gasabo: 36103,
-  kicukiro: 61499,
-  nyarugenge: 50771,
-  bugesera: 4038
-};
+const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = Object.fromEntries(
+  Object.entries(DISTRICT_LAND_PRICE_BENCHMARKS).map(([key, benchmark]) => [
+    key,
+    benchmark.averageTransactionPricePerM2
+  ])
+) as Record<string, number>;
 
 function getUnitPriceEstimate(
   rows: LandPriceRow[],
@@ -106,23 +112,23 @@ function getUnitPriceEstimate(
   if (area.level === "district" && area.averageLandPricePerM2 !== null) {
     return {
       pricePerM2: area.averageLandPricePerM2,
-      kind: "district-dashboard-snapshot",
-      explanation: "Dashboard district price snapshot; effective date and calculation method are not disclosed."
+      kind: "district-transaction-price-snapshot",
+      explanation: "Dashboard average transaction price snapshot; source observation date and weighting method are not disclosed."
     };
   }
   if (area.level === "sector" && area.averageLandPricePerM2 !== null) {
     return {
       pricePerM2: area.averageLandPricePerM2,
       kind: "derived-sector-mean",
-      explanation: "Indicative sector figure derived from available cell-level snapshots; not an official sector-weighted sale price."
+      explanation: "Indicative sector figure derived from available cell-level transaction-price snapshots; not an official sector-weighted transaction price."
     };
   }
 
   if (area.level === "cell" && area.averageLandPricePerM2 !== null) {
     return {
       pricePerM2: area.averageLandPricePerM2,
-      kind: "cell-reference-snapshot",
-      explanation: "Cell-level source snapshot; the effective date and calculation method have not been confirmed."
+      kind: "cell-transaction-price-snapshot",
+      explanation: "Cell-level weighted-average transaction-price snapshot; source observation date and calculation method have not been confirmed."
     };
   }
 
@@ -145,7 +151,7 @@ function getUnitPriceEstimate(
       return {
         pricePerM2: uniqueCellPrices.reduce((sum, price) => sum + price, 0) / uniqueCellPrices.length,
         kind: "derived-sector-mean",
-        explanation: "Indicative unweighted mean of unambiguous cell snapshots. Conflicting cells are excluded; this is not an official sector-weighted sale price."
+        explanation: "Indicative unweighted mean of unambiguous cell transaction-price snapshots. Conflicting cells are excluded; this is not an official sector-weighted transaction price."
       };
     }
   }
@@ -166,13 +172,13 @@ function getUnitPriceEstimate(
     if (uniquePrices.size === 1) {
       return {
         pricePerM2: uniquePrices.values().next().value ?? null,
-        kind: "cell-reference-snapshot",
-        explanation: "Exact cell-level price reference; source date and calculation method have not been confirmed."
+        kind: "cell-transaction-price-snapshot",
+        explanation: "Exact cell-level weighted-average transaction-price snapshot; source date and calculation method have not been confirmed."
       };
     }
     if (uniquePrices.size > 1) {
       if (!allowDistrictFallback) {
-        return { pricePerM2: null, kind: "conflicting", explanation: "The cell reference contains conflicting values." };
+        return { pricePerM2: null, kind: "conflicting", explanation: "The cell transaction-price snapshot contains conflicting values." };
       }
     }
   }
@@ -181,7 +187,7 @@ function getUnitPriceEstimate(
   if (allowDistrictFallback && districtPrice !== null) {
     return {
       pricePerM2: districtPrice,
-      kind: "district-dashboard-snapshot",
+      kind: "district-transaction-price-snapshot",
       explanation: "No unique cell reference was available, so the district dashboard snapshot is used as a clearly labelled rough fallback."
     };
   }
@@ -218,7 +224,7 @@ function normalizeAreaName(value: string | null | undefined): string {
     .toLocaleLowerCase("en");
 }
 
-function parseLandPriceReference(text: string): LandPriceRow[] {
+function parseLandPriceTransactionPrices(text: string): LandPriceRow[] {
   return text
     .split(/\r?\n/)
     .slice(1)
@@ -347,10 +353,10 @@ const MARKET_METRICS: Array<{
 }> = [
   {
     id: "averageLandPricePerM2",
-    label: "Average land price / m²",
-    shortLabel: "Land price / m²",
-    description: "Dashboard-reported average land price by district, in Rwandan francs per square metre. This is distinct from the separate land-reference-price table and from asking prices for individual plots.",
-    dataStatus: "The /prices page snapshot lists Kicukiro 61,499, Nyarugenge 50,771, Gasabo 36,103 and Bugesera 4,038 RWF/m². The effective date and calculation method are not shown in the visible page text. The /reference page separately labels transaction prices and reference prices and reports 50,865 for Nyarugenge transaction price, so cross-page reconciliation remains open. Repeated geographic keys also appear in the indexed /prices table; the detailed supplied cell file is provisional, not production-grade."
+    label: "Average transaction price / m²",
+    shortLabel: "Transaction price / m²",
+    description: "Average land transaction price in Rwandan francs per square metre. The average reference price is a separate benchmark and is not used for the primary parcel-value estimate.",
+    dataStatus: "The /reference comparison table explicitly lists average transaction prices of Gasabo 36,103, Kicukiro 61,499, Nyarugenge 50,865 and Bugesera 4,038 RWF/m², alongside separate average reference prices of 19,976, 27,914, 28,077 and 1,145 RWF/m². The /prices page lists Nyarugenge at 50,771, leaving a 94 RWF/m² cross-page discrepancy. Source observation date and weighting method are not disclosed. Cell-level weighted averages remain provisional; duplicate geographic keys are withheld rather than silently averaged."
   },
   {
     id: "transactionVolume",
@@ -685,22 +691,31 @@ export function MapExperience() {
     parcelUnitPriceEstimate?.pricePerM2 !== undefined
       ? Math.round(selectedArea.parcelSizeM2 * parcelUnitPriceEstimate.pricePerM2)
       : null;
+  const selectedDistrictPriceBenchmark = selectedArea
+    ? getDistrictLandPriceBenchmark(selectedArea.district)
+    : null;
+  const estimatedReferenceBenchmark = selectedArea?.level === "parcel" &&
+    typeof selectedArea.parcelSizeM2 === "number" &&
+    selectedArea.parcelSizeM2 > 0 &&
+    selectedDistrictPriceBenchmark
+      ? Math.round(selectedArea.parcelSizeM2 * selectedDistrictPriceBenchmark.averageReferencePricePerM2)
+      : null;
 
   useEffect(() => {
     let active = true;
-    const loadLandPriceReference = async () => {
+    const loadLandPriceTransactionPrices = async () => {
       try {
-        const response = await fetch("/land-price-reference.tsv");
+        const response = await fetch("/land-price-transaction.tsv");
         if (!response.ok) throw new Error("Land-price reference could not be loaded.");
         const text = await response.text();
         if (!active) return;
-        setLandPriceRows(parseLandPriceReference(text));
+        setLandPriceRows(parseLandPriceTransactionPrices(text));
         setLandPriceLoadStatus("loaded");
       } catch {
         if (active) setLandPriceLoadStatus("error");
       }
     };
-    void loadLandPriceReference();
+    void loadLandPriceTransactionPrices();
     return () => {
       active = false;
     };
@@ -1215,7 +1230,7 @@ export function MapExperience() {
                       <strong>{metric.label}</strong>
                       <small>
                         {metric.id === "averageLandPricePerM2"
-                          ? "Weighted average land price per square metre"
+                          ? "Average transaction price per square metre"
                           : metric.id === "marketSupply"
                             ? "Plots currently listed and ready for sale"
                             : metric.id === "upcomingSupply"
@@ -1447,7 +1462,7 @@ export function MapExperience() {
                 <div className="metric-info-status">
                   <strong>Map interpretation</strong>
                   <p>
-                    Current filters: {selectedMetric === "averageLandPricePerM2" ? (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "Land") + " · static district/cell snapshot" : (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "All") + " · " + (ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label ?? "1 year")}.
+                    Current filters: {selectedMetric === "averageLandPricePerM2" ? (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "Land") + " · static district/cell transaction-price snapshot" : (PROPERTY_SCOPES.find((item) => item.value === propertyScope)?.label ?? "All") + " · " + (ANALYSIS_PERIODS.find((item) => item.value === analysisPeriod)?.label ?? "1 year")}.
                     {selectedMetric === "averageLandPricePerM2"
                       ? " District polygons are shaded by the sourced land-price snapshot. Period filtering is not applied because the source observation date is not exposed; prices for sectors, cells, villages or individual plots are not inferred."
                       : " The map keeps administrative colors for this metric until verified market data can be joined to the polygons."}
@@ -1461,7 +1476,7 @@ export function MapExperience() {
                   </div>
                 ) : null}
                 {selectedMetric === "averageLandPricePerM2" ? (
-                  <a className="metric-info-source" href="https://rwandalanddashboard.lands.rw/prices" target="_blank" rel="noreferrer">
+                  <a className="metric-info-source" href={LAND_PRICE_PRICES_CROSSCHECK_SOURCE} target="_blank" rel="noreferrer">
                     Open Rwanda Land Dashboard ↗
                   </a>
                 ) : selectedMetric === "transactionVolume" ? (
@@ -1601,11 +1616,38 @@ export function MapExperience() {
                   </strong>
                   {typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
                     <p>
-                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m²
+                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction price
                     </p>
                   ) : null}
+                  <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
+                    <div>
+                      <span>Average transaction price</span>
+                      <strong>
+                        {parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined
+                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
+                          : "Not available"}
+                      </strong>
+                      <small>Used for the headline parcel estimate.</small>
+                    </div>
+                    <div>
+                      <span>Average reference price · district benchmark</span>
+                      <strong>
+                        {selectedDistrictPriceBenchmark
+                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedDistrictPriceBenchmark.averageReferencePricePerM2) + " RWF/m²"
+                          : "Not available"}
+                      </strong>
+                      <small>Separate official dashboard reference-price series.</small>
+                    </div>
+                    {estimatedReferenceBenchmark !== null ? (
+                      <div className="parcel-reference-total">
+                        <span>Reference-price benchmark for this area</span>
+                        <strong>RWF {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedReferenceBenchmark)}</strong>
+                        <small>Parcel area × district average reference price. Comparison only; it does not determine the headline estimate.</small>
+                      </div>
+                    ) : null}
+                  </div>
                   <small>
-                    {parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable reference price per m² are both required."}
+                    {parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable average transaction price per m² are both required."}
                     {" "}This is a rough area-based estimate, not an official valuation, offer price, or proof of sale value.
                   </small>
                 </div>
@@ -1614,7 +1656,7 @@ export function MapExperience() {
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
                   <article className="area-market-card area-market-card-featured">
-                    <span>{selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean" ? "Indicative sector mean / m²" : "Weighted average land price / m²"}</span>
+                    <span>{selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean" ? "Indicative transaction-price mean / m²" : "Average transaction price / m²"}</span>
                     <strong>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
                         ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.averageLandPricePerM2)} RWF`
@@ -1630,17 +1672,17 @@ export function MapExperience() {
                     </strong>
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
-                        ? "Rwanda Land Dashboard /prices · provisional indexed snapshot reviewed 24 Oct 2026; effective date and calculation method are not disclosed."
+                        ? "Rwanda Land Dashboard /prices · provisional average-transaction-price snapshot reviewed 25 Oct 2026; observation date and weighting method are not disclosed."
                         : selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean"
-                          ? `Indicative arithmetic mean of ${selectedArea.averageLandPriceSampleSize ?? 0} unambiguous cell-level weighted-average snapshots, rounded to RWF. This is not an official sector weighted average. ${selectedArea.averageLandPriceConflictingCells ?? 0} conflicting cell values were excluded; source dates and methodology remain unverified.`
+                          ? `Indicative arithmetic mean of ${selectedArea.averageLandPriceSampleSize ?? 0} unambiguous cell-level weighted-average transaction-price snapshots, rounded to RWF. This is not an official sector weighted average. ${selectedArea.averageLandPriceConflictingCells ?? 0} conflicting cell values were excluded; source dates and methodology remain unverified.`
                           : landPriceLoadStatus === "loading"
-                            ? "Loading the supplied sector/cell reference table…"
+                            ? "Loading the supplied sector/cell transaction-price table…"
                             : landPriceLoadStatus === "error"
-                              ? "The supplied reference table could not be loaded; no value is inferred."
+                              ? "The supplied transaction-price table could not be loaded; no value is inferred."
                               : selectedArea.level === "sector"
-                                ? `No defensible sector estimate is available. The source file contains cell-level values, not an official sector weighted average.`
+                                ? `No defensible sector estimate is available. The source file contains cell-level transaction-price values, not an official sector weighted transaction price.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "found"
-                                ? `Supplied cell-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
+                                ? `Supplied cell-level weighted-average transaction-price snapshot · observation date and calculation method not supplied; not yet reconciled with the dashboard output. Source row ${selectedLandPrice.sourceLines.join(", ")}.`
                                 : selectedArea.level === "cell" && selectedLandPrice?.status === "ambiguous"
                                   ? `Conflicting values on source rows ${selectedLandPrice.sourceLines.join(", ")}. The dashboard /prices table also repeats some location keys; no value is selected until the publisher clarifies row identity.`
                                   : selectedArea.level === "cell"
@@ -1890,7 +1932,7 @@ export function MapExperience() {
               <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Average district land prices</strong>
-                <p>Provisional /prices snapshot: Gasabo 36,103, Kicukiro 61,499, Nyarugenge 50,771, Bugesera 4,038 RWF/m². Effective date/method are not shown. The separate /reference comparison lists Nyarugenge transaction price 50,865. Supplied cell file: 2 malformed rows and 10 conflicting keys; public /prices output repeats some of those keys. See the reconciliation audit.</p>
+                <p>The /reference comparison explicitly separates average transaction price from average reference price. Valuations use transaction price; reference prices are shown only as a separate benchmark. Nyarugenge is 50,865 RWF/m² on /reference versus 50,771 on /prices; discrepancy remains unresolved. The supplied cell snapshot has 2 malformed rows and 10 conflicting keys; conflicting cell prices are withheld.</p>
               </div>
             </div>
             <div className="source-register-item">
@@ -1933,17 +1975,17 @@ export function MapExperience() {
             </a>
             <a
               className="source-register-link"
-              href="https://rwandalanddashboard.lands.rw/prices"
+              href={LAND_PRICE_PRICES_CROSSCHECK_SOURCE}
               rel="noreferrer"
               target="_blank"
             >
               Open National Land Dashboard prices ↗
             </a>
-            <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/reference" rel="noreferrer" target="_blank">
-              Open National Land Dashboard reference prices ↗
+            <a className="source-register-link" href={LAND_PRICE_BENCHMARK_SOURCE} rel="noreferrer" target="_blank">
+              Open National Land Dashboard average transaction/reference prices ↗
             </a>
             <a className="source-register-link" href={TRANSACTION_DASHBOARD_SOURCE} rel="noreferrer" target="_blank">
-              Open National Land Dashboard transactions ↗
+              Open National Land Dashboard transaction analysis ↗
             </a>
             <a className="source-register-link" href="https://rwandalanddashboard.lands.rw/ownership" rel="noreferrer" target="_blank">
               Open National Land Dashboard ownership ↗
