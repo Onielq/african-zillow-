@@ -156,9 +156,9 @@ function requestBoundsForArea(bounds: ViewBounds, level: AreaLevel): ViewBounds 
 function normalizeMetricKeyPart(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .toLocaleLowerCase("en");
 }
 
@@ -1106,6 +1106,7 @@ export function MapView({
           }
         });
       }
+    };
 
     const addShowOverlayLayers = () => {
       if (!map.getSource("show-overlays")) {
