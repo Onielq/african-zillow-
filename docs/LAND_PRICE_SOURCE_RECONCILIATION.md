@@ -63,6 +63,18 @@ The `/prices` output also contains several of the same repeated keys. This sugge
 - The app does not use ownership totals as active supply; planned land use as sellable inventory; or transaction summaries as per-parcel title records.
 - Source observation date, retrieval/review date, definition, geography level, unit and source URL remain separate metadata fields.
 
+## Valuation implementation update — 25 October 2026
+
+The parcel-value estimate now uses **average transaction price per m²** as its primary rate and displays average reference price as a separate district benchmark. The reference-price rate is not used to calculate the headline estimate.
+
+- For a parcel, use an unambiguous cell-level weighted-average transaction-price snapshot where one is available.
+- If the cell value is absent or has conflicting values, use the district's explicitly labelled **Avg Transaction Price** from the `/reference` comparison table and label the result as a rough district-based estimate.
+- Show the district **Avg Reference Price** separately, including an area × reference-price benchmark for comparison only.
+- Do not average transaction and reference prices together, and do not silently average duplicate cell rows.
+- The app now reads `public/land-price-transaction.tsv`; `public/land-price-reference.tsv` remains unchanged as the original supplied audit file. The transaction-labelled file preserves the same 244 data rows. Its row identity, observation date and weighting method remain provisional and need confirmation from the publisher.
+
+The district transaction/reference benchmarks currently shown by the `/reference` comparison table are: Gasabo 36,103 / 19,976; Kicukiro 61,499 / 27,914; Nyarugenge 50,865 / 28,077; Bugesera 4,038 / 1,145 RWF/m². The separate `/prices` table reports Nyarugenge at 50,771 RWF/m², so the app uses the explicitly labelled `/reference` **Avg Transaction Price** of 50,865 and continues to flag the 94 RWF/m² discrepancy. The observation date and calculation method remain undisclosed; this choice is a clear source-label rule, not a claim that the two page outputs have been reconciled.
+
 ## Next evidence required from the source owner
 
 1. A complete downloadable export or supported API for the `/prices` and `/reference` tables, including row IDs and all geographic/classification fields.
