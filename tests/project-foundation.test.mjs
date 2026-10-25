@@ -322,11 +322,11 @@ test("the original cell-price audit file is preserved while valuation reads the 
   const transactionRows = transactionSource.trim().split(/\r?\n/);
 
   assert.equal(rows.length, 245);
-  assert.equal(rows[0], "PROVINCE\\tDISTRICT\\tSECTOR\\tCELL\\tWEIGHTED AVERAGE (RWF/M²)");
+  assert.equal(rows[0], "PROVINCE\tDISTRICT\tSECTOR\tCELL\tWEIGHTED AVERAGE (RWF/M²)");
   assert.equal(transactionRows.length, 245);
-  assert.equal(transactionRows[0], "PROVINCE\\tDISTRICT\\tSECTOR\\tCELL\\tWEIGHTED AVERAGE TRANSACTION PRICE (RWF/M²)");
-  assert.match(source, /Eastern\\tBugesera\\tMayange\\tKibenga\\t6,566/);
-  assert.match(transactionSource, /Kigali City\\tGasabo\\tRemera\\tNyarutarama\\t218,375/);
+  assert.equal(transactionRows[0], "PROVINCE\tDISTRICT\tSECTOR\tCELL\tWEIGHTED AVERAGE TRANSACTION PRICE (RWF/M²)");
+  assert.match(source, /Eastern\tBugesera\tMayange\tKibenga\t6,566/);
+  assert.match(transactionSource, /Kigali City\tGasabo\tRemera\tNyarutarama\t218,375/);
   assert.match(experience, /parseLandPriceTransactionPrices/);
   assert.match(experience, /fetch\("\/land-price-transaction\.tsv"\)/);
   assert.match(experience, /conflictingLocations/);
