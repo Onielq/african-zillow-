@@ -2860,3 +2860,54 @@ button:disabled {
     gap: 6px;
   }
 }
+
+
+/* Keep the valuation basis (transaction price) separate from the reference benchmark. */
+.parcel-valuation-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 3px;
+}
+.parcel-valuation-comparison > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 9px;
+  border: 1px solid #d9e5dc;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 72%);
+}
+.parcel-valuation-comparison > div > span {
+  color: #52685a;
+  font-size: 9px;
+  font-weight: 780;
+  line-height: 1.4;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+.parcel-valuation-comparison > div > strong {
+  color: #203d2d;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.parcel-valuation-comparison > div > small {
+  color: #68796d;
+  font-size: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.parcel-valuation-comparison > .parcel-reference-total {
+  grid-column: 1 / -1;
+  background: #f7f8f5;
+}
+@media (max-width: 460px) {
+  .parcel-valuation-comparison {
+    grid-template-columns: 1fr;
+  }
+  .parcel-valuation-comparison > .parcel-reference-total {
+    grid-column: auto;
+  }
+}
