@@ -56,10 +56,11 @@ The `/prices` output also contains several of the same repeated keys. This sugge
 
 ## Current product treatment
 
-- District price values are shown as a **provisional dashboard snapshot** with an undisclosed effective date. They are not advertised as current asking prices, achieved price for an individual plot or a legal reference/valuation price.
-- The supplied cell-price table remains visible for audit and diagnostics, but a unique row from that unversioned file is described as an **unreconciled supplied snapshot**, not a verified current cell price.
-- Cells with conflicting values do not show a numeric price.
-- No average is computed from duplicate values, and no cell/sector/village price is inferred from district averages.
+- District transaction-price and reference-price values are provisional dashboard snapshots with undisclosed observation dates and weighting methods. They are not asking prices for an individual plot, formal valuations or guaranteed sale values.
+- The original supplied file `public/land-price-reference.tsv` remains unchanged for audit. The valuation UI reads the same row set under the explicitly labelled `public/land-price-transaction.tsv` snapshot, provisionally mapped to the `/prices` weighted-average series; this mapping still needs confirmation from the publisher.
+- A unique cell value may be used as a provisional transaction-price input; cells with conflicting values do not display a numeric cell price.
+- A parcel estimate may fall back to the explicitly labelled district Avg Transaction Price when its cell-level transaction price is absent or conflicting. Such estimates are marked rough. Map shading does not infer missing cell/sector/village prices from district values.
+- No average is computed from duplicate values, and transaction and reference prices are never averaged together.
 - The app does not use ownership totals as active supply; planned land use as sellable inventory; or transaction summaries as per-parcel title records.
 - Source observation date, retrieval/review date, definition, geography level, unit and source URL remain separate metadata fields.
 
