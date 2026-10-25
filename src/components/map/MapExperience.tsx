@@ -31,6 +31,7 @@ import {
   TRANSACTION_BENCHMARK_SOURCE,
   TRANSACTION_DASHBOARD_SOURCE
 } from "@/data/transaction-benchmarks";
+import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
 type FocusArea = "combined" | "kigali" | "bugesera";
 type WorkspaceMode = "areas" | "projects";
@@ -708,13 +709,9 @@ export function MapExperience() {
   const parcelUnitPriceEstimate = selectedArea?.level === "parcel"
     ? getUnitPriceEstimate(landPriceRows, selectedArea, true)
     : null;
-  const estimatedParcelValue = selectedArea?.level === "parcel" &&
-    typeof selectedArea.parcelSizeM2 === "number" &&
-    selectedArea.parcelSizeM2 > 0 &&
-    parcelUnitPriceEstimate?.pricePerM2 !== null &&
-    parcelUnitPriceEstimate?.pricePerM2 !== undefined
-      ? Math.round(selectedArea.parcelSizeM2 * parcelUnitPriceEstimate.pricePerM2)
-      : null;
+  const calculatedParcelAskingPrice = selectedArea?.level === "parcel"
+    ? calculateParcelAskingPrice(selectedArea.parcelSizeM2, parcelUnitPriceEstimate?.pricePerM2)
+    : null;
   // Use direct-price records only when a recognized type and named source exist.
   // Otherwise keep the current area-based figure explicitly labelled as an estimate.
   const hasSourcedParcelPrice = selectedArea?.level === "parcel" &&
@@ -724,23 +721,23 @@ export function MapExperience() {
     selectedArea.parcelPriceValue > 0 &&
     typeof selectedArea.parcelPriceSource === "string" &&
     selectedArea.parcelPriceSource.trim().length > 0;
-  const hasParcelTotalEstimate = estimatedParcelValue !== null;
+  const hasParcelAskingPrice = calculatedParcelAskingPrice !== null;
   const hasParcelUnitPriceOnly = selectedArea?.level === "parcel" &&
-    !hasParcelTotalEstimate &&
+    !hasParcelAskingPrice &&
     parcelUnitPriceEstimate?.pricePerM2 !== null &&
     parcelUnitPriceEstimate?.pricePerM2 !== undefined;
   const displayedParcelValue = hasSourcedParcelPrice
     ? selectedArea?.parcelPriceValue ?? null
-    : estimatedParcelValue ?? (hasParcelUnitPriceOnly ? parcelUnitPriceEstimate?.pricePerM2 ?? null : null);
+    : calculatedParcelAskingPrice ?? (hasParcelUnitPriceOnly ? parcelUnitPriceEstimate?.pricePerM2 ?? null : null);
   const displayedParcelPriceType: ParcelPriceType =
     hasSourcedParcelPrice && isParcelPriceType(selectedArea?.parcelPriceType)
       ? selectedArea.parcelPriceType
-      : "indicative-estimate";
+      : "calculated-asking-price";
   const displayedParcelPriceTypeLabel = hasSourcedParcelPrice
     ? parcelPriceTypeLabel(displayedParcelPriceType)
     : hasParcelUnitPriceOnly
-      ? "Indicative area price / m²"
-      : parcelPriceTypeLabel("indicative-estimate");
+      ? "Average transaction price / m²"
+      : parcelPriceTypeLabel("calculated-asking-price");
   const selectedDistrictPriceBenchmark = selectedArea
     ? getDistrictLandPriceBenchmark(selectedArea.district)
     : null;
@@ -1672,7 +1669,7 @@ export function MapExperience() {
                     </p>
                   ) : hasParcelUnitPriceOnly ? (
                     <p>
-                      Parcel area is missing, so this is the available area-level benchmark per square metre—not a total parcel value.
+                      Parcel area is missing, so this shows the available average transaction price per m². Total asking price is parcel area × this rate.
                     </p>
                   ) : typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
                     <p>
@@ -1690,7 +1687,7 @@ export function MapExperience() {
                           ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
                           : "Not available"}
                       </strong>
-                      <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used for the headline indicative estimate."}</small>
+                      <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used to calculate the parcel asking price."}</small>
                     </div>
                     <div>
                       <span>Average reference price · district benchmark</span>
@@ -1711,10 +1708,10 @@ export function MapExperience() {
                   </div>
                   <small>
                     {hasSourcedParcelPrice
-                      ? "Shown as a " + displayedParcelPriceTypeLabel.toLowerCase() + " based on the source recorded above. Check the source document and date before relying on it."
+                      ? "Shown as a " + displayedParcelPriceTypeLabel.toLowerCase() + " using the source recorded above."
                       : hasParcelUnitPriceOnly
-                        ? (parcelUnitPriceEstimate?.explanation ?? "Using the currently connected area-level price snapshot.") + " The amount is shown per m² because parcel area is missing; it is not a total parcel value."
-                        : (parcelUnitPriceEstimate?.explanation ?? "Uses the currently connected district transaction-price snapshot where finer-level data is missing.") + " This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation."}
+                        ? (parcelUnitPriceEstimate?.explanation ?? "Using the currently connected average transaction-price snapshot.") + " The parcel total is calculated as parcel area × this price per m² when area is available."
+                        : (parcelUnitPriceEstimate?.explanation ?? "Uses the currently connected district transaction-price snapshot where finer-level data is missing.") + " Asking price is calculated as parcel area × the available average transaction price per m²."}
                   </small>
                 </div>
               </div>
