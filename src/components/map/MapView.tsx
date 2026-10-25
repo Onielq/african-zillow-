@@ -148,6 +148,10 @@ type AreaProperties = {
   zoning_source?: string | null;
   label?: string | null;
   has_value?: boolean;
+  icon_image?: string;
+  pill_width?: number;
+  pill_height?: number;
+  show_dot?: boolean;
   metric_label?: string | null;
   metric_status?: string | null;
   metric_detail?: string | null;
@@ -219,26 +223,37 @@ function metricPillImageName(label: string, variant: MetricPillVariant): string 
   return "metric-price-pill-" + variant + "-" + hash.toString(36);
 }
 
+type MetricPillDimensions = { width: number; height: number; font: string };
+
+function measureMetricPill(label: string, variant: MetricPillVariant): MetricPillDimensions {
+  const font = variant === "parcel"
+    ? "600 10px Arial, sans-serif"
+    : "600 11px Arial, sans-serif";
+  const height = variant === "parcel" ? 20 : 22;
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+  if (!measureContext) {
+    return { width: Math.max(34, label.length * 7 + 16), height, font };
+  }
+  measureContext.font = font;
+  return {
+    width: Math.max(34, Math.ceil(measureContext.measureText(label).width) + 16),
+    height,
+    font
+  };
+}
+
 function ensureMetricPillImage(
   map: MapLibreMapInstance,
   label: string,
-  variant: MetricPillVariant
+  variant: MetricPillVariant,
+  dimensions: MetricPillDimensions
 ): string {
   const imageName = metricPillImageName(label, variant);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
-  const font = variant === "parcel"
-    ? "600 10px Arial, sans-serif"
-    : "600 11px Arial, sans-serif";
-  const measureCanvas = document.createElement("canvas");
-  const measureContext = measureCanvas.getContext("2d");
-  if (!measureContext) return "";
-
-  measureContext.font = font;
-  const textWidth = Math.ceil(measureContext.measureText(label).width);
-  const height = variant === "parcel" ? 20 : 22;
-  const width = Math.max(34, textWidth + 16);
+  const { width, height, font } = dimensions;
   const canvas = document.createElement("canvas");
   canvas.width = width * pixelRatio;
   canvas.height = height * pixelRatio;
@@ -246,9 +261,10 @@ function ensureMetricPillImage(
   if (!context) return "";
 
   context.scale(pixelRatio, pixelRatio);
-  context.fillStyle = variant === "parcel" ? "#68747B" : "#9D2932";
-  context.strokeStyle = "rgba(255, 255, 255, 0.94)";
-  context.lineWidth = 1;
+  // All price labels use the same red capsule and white outline as the reference.
+  context.fillStyle = "#9D2932";
+  context.strokeStyle = "rgba(255, 255, 255, 0.98)";
+  context.lineWidth = 1.25;
 
   const radius = height / 2;
   context.beginPath();
@@ -272,6 +288,87 @@ function ensureMetricPillImage(
   context.fillText(label, width / 2, height / 2, width - 12);
   map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
   return imageName;
+}
+
+type MetricLabelCollisionBox = {
+  featureIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * Return labels that belong to a collision group of at least three. Pairs are
+ * deliberately kept as pills. A screen-space grid keeps the check local and
+ * efficient even when the viewport contains many cadastral parcels.
+ */
+export function findCrowdedMetricLabelIndexes(
+  boxes: MetricLabelCollisionBox[],
+  minimumCrowdedGroupSize = 3
+): Set<number> {
+  const neighbours = new Map<number, Set<number>>();
+  const buckets = new Map<string, MetricLabelCollisionBox[]>();
+  const bucketSize = 64;
+  const edgeGap = 2;
+
+  for (const box of boxes) neighbours.set(box.featureIndex, new Set<number>());
+
+  for (const box of boxes) {
+    const minX = Math.floor((box.x - box.width / 2 - edgeGap) / bucketSize);
+    const maxX = Math.floor((box.x + box.width / 2 + edgeGap) / bucketSize);
+    const minY = Math.floor((box.y - box.height / 2 - edgeGap) / bucketSize);
+    const maxY = Math.floor((box.y + box.height / 2 + edgeGap) / bucketSize);
+
+    for (let gridX = minX; gridX <= maxX; gridX += 1) {
+      for (let gridY = minY; gridY <= maxY; gridY += 1) {
+        const key = gridX + ":" + gridY;
+        const bucket = buckets.get(key) ?? [];
+        for (const other of bucket) {
+          const knownNeighbours = neighbours.get(box.featureIndex);
+          if (knownNeighbours?.has(other.featureIndex)) continue;
+          const overlaps =
+            Math.abs(box.x - other.x) < (box.width + other.width) / 2 + edgeGap &&
+            Math.abs(box.y - other.y) < (box.height + other.height) / 2 + edgeGap;
+          if (!overlaps) continue;
+          knownNeighbours?.add(other.featureIndex);
+          neighbours.get(other.featureIndex)?.add(box.featureIndex);
+        }
+        bucket.push(box);
+        buckets.set(key, bucket);
+      }
+    }
+  }
+
+  const crowded = new Set<number>();
+  const visited = new Set<number>();
+  for (const box of boxes) {
+    if (visited.has(box.featureIndex)) continue;
+    const component: number[] = [];
+    const queue = [box.featureIndex];
+    visited.add(box.featureIndex);
+    while (queue.length > 0) {
+      const current = queue.pop() as number;
+      component.push(current);
+      for (const neighbour of neighbours.get(current) ?? []) {
+        if (visited.has(neighbour)) continue;
+        visited.add(neighbour);
+        queue.push(neighbour);
+      }
+    }
+    if (component.length >= minimumCrowdedGroupSize) {
+      for (const featureIndex of component) crowded.add(featureIndex);
+    }
+  }
+  return crowded;
+}
+
+function metricPillScaleAtZoom(zoom: number): number {
+  if (zoom <= 5) return 0.84;
+  if (zoom <= 12) return 0.84 + ((zoom - 5) / 7) * 0.08;
+  if (zoom <= 16) return 0.92 + ((zoom - 12) / 4) * 0.08;
+  if (zoom <= 19) return 1 + ((zoom - 16) / 3) * 0.02;
+  return 1.02;
 }
 
 function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCollection {
