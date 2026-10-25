@@ -595,7 +595,7 @@ function normaliseAdministrativeFeature(
             average_land_price_per_m2:
               DISTRICT_AVERAGE_TRANSACTION_PRICE_RWF_PER_M2[upperDistrict],
             average_land_price_source: DISTRICT_TRANSACTION_PRICE_SOURCE,
-            average_land_price_date_status: "Effective date and calculation method not disclosed; provisional /prices page snapshot reviewed 2026-10-24"
+            average_land_price_date_status: "Provisional Avg Transaction Price from the /reference comparison table reviewed 2026-10-25; observation date and weighting method are not disclosed. The /prices page differs for Nyarugenge by 94 RWF/m²."
           }
         : {})
     }
