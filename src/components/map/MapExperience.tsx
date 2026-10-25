@@ -842,17 +842,11 @@ export function MapExperience() {
       current.district === district &&
       (current.upi?.trim() ?? "") === upi;
 
-    if (!upi) {
-      setSelectedArea((current) => matchesSelectedParcel(current)
-        ? { ...current, zoning: [], zoningStatus: "unavailable", zoningSource: null }
-        : current);
-      return;
-    }
+    // Render the initial checking/missing-UPI state from the current parcel.
+    // Avoid a synchronous state update in this effect; only async results mutate state.
+    if (!upi) return;
 
     const controller = new AbortController();
-    setSelectedArea((current) => matchesSelectedParcel(current)
-      ? { ...current, zoning: null, zoningStatus: "loading", zoningSource: null }
-      : current);
 
     const loadParcelZoning = async () => {
       try {
@@ -1713,9 +1707,11 @@ export function MapExperience() {
                 <div className="parcel-zoning-row">
                   <span>Zoning / planning designation</span>
                   <strong>
-                    {selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus
-                      ? "Checking the official zoning layer…"
-                      : selectedArea.zoningStatus === "found"
+                    {!selectedArea.upi
+                      ? "Zoning lookup unavailable — parcel UPI is missing"
+                      : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus
+                        ? "Checking the official zoning layer…"
+                        : selectedArea.zoningStatus === "found"
                         ? selectedArea.zoning?.length
                           ? selectedArea.zoning.map((zone) => {
                               const code = zone.code?.trim();
@@ -1727,9 +1723,7 @@ export function MapExperience() {
                           : "Mapped zone found, but the source has no classification label"
                         : selectedArea.zoningStatus === "not-covered"
                           ? "No zoning designation mapped for this parcel"
-                          : selectedArea.zoningStatus === "unavailable"
-                            ? "Zoning lookup unavailable — parcel UPI is missing"
-                            : "Zoning data unavailable"}
+                          : "Zoning data unavailable"}
                   </strong>
                   {selectedArea.zoningSource ? (
                     <small className="parcel-zoning-source">Source: {selectedArea.zoningSource}</small>
