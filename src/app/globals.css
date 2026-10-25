@@ -192,33 +192,9 @@ button:disabled {
   background: #E7EDE8;
 }
 
-.map-provider-stage {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.apple-mapkit-mount {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  overflow: hidden;
-  background: #E7EDE8;
-  visibility: hidden;
-}
-
-.apple-mapkit-mount > .mk-map-view {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
 .maplibre-mount {
   position: absolute;
-  z-index: 1;
+  z-index: 0;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -227,14 +203,6 @@ button:disabled {
 
 .maplibre-mount .maplibregl-canvas {
   outline: none;
-}
-
-.map-provider-stage-apple .maplibre-mount {
-  background: transparent;
-}
-
-.map-provider-stage-apple .maplibre-mount .maplibregl-canvas {
-  background-color: transparent !important;
 }
 
 .maplibregl-ctrl-bottom-left {
@@ -506,75 +474,6 @@ button:disabled {
 .basemap-button:hover {
   background: #F0F5F1;
   color: var(--brand);
-}
-
-
-.apple-basemap-menu {
-  position: absolute;
-  z-index: 6;
-  top: 112px;
-  right: 18px;
-  width: min(260px, calc(100% - 36px));
-  padding: 12px;
-  border: 1px solid rgb(220 228 222 / 96%);
-  border-radius: 13px;
-  background: rgb(255 255 255 / 97%);
-  color: var(--ink);
-  box-shadow: var(--shadow-floating);
-  backdrop-filter: blur(16px);
-}
-
-.apple-basemap-menu-title {
-  margin: 0 0 9px;
-  color: #2D4035;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.apple-basemap-menu-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-}
-
-.apple-basemap-option {
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid #DCE4DE;
-  border-radius: 8px;
-  background: #FFFFFF;
-  color: #52635A;
-  font-size: 11px;
-  font-weight: 720;
-  cursor: pointer;
-}
-
-.apple-basemap-option:hover:not(:disabled),
-.apple-basemap-option-active {
-  border-color: #B9DCC8;
-  background: #EEF7F1;
-  color: #176B50;
-}
-
-.apple-basemap-option:disabled {
-  background: #F6F8F6;
-  color: #9AA59D;
-  cursor: not-allowed;
-}
-
-.apple-basemap-setup-note {
-  margin: 10px 0 0;
-  padding-top: 9px;
-  border-top: 1px solid #E7ECE8;
-  color: #68776D;
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.apple-basemap-setup-note code {
-  color: #365B46;
-  font-size: 9px;
-  overflow-wrap: anywhere;
 }
 
 .basemap-button-active,
