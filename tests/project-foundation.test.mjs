@@ -481,7 +481,7 @@ test("parcel selection calculates an indicative value from parcel area and unit 
   assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
   assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
   assert.match(experience, /displayedParcelPriceTypeLabel/);
-  assert.match(experience, /Indicative estimated value/);
+  assert.match(experience, /parcelPriceTypeLabel\(displayedParcelPriceType\)/);
   assert.match(experience, /indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
 });
 
