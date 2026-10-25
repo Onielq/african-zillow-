@@ -653,7 +653,7 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(mapView, /derived sector mean of available cell snapshots/);
   assert.match(mapView, /district average transaction-price snapshot/);
   assert.match(mapView, /status = "indicative-unit-price-per-m2"/);
-  assert.match(mapView, /not a total parcel value when no usable parcel area exists/);
+  assert.match(mapView, /Parcel area is unavailable, so this is a per-square-metre benchmark, not a total parcel value/);
 
   assert.match(experience, /allowDistrictFallback && area\.level === "parcel" && area\.sector/);
   assert.match(experience, /Approx\. area from mapped boundary/);
