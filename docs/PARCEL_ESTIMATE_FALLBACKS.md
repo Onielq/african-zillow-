@@ -1,29 +1,29 @@
-# Parcel price estimates from currently connected data
+# Parcel asking price from the connected transaction-price data
 
-This pilot intentionally makes an indicative estimate from the data already connected, rather than waiting for property-by-property asking-price or completed-sale feeds that do not yet exist for much of the market.
+## Product pricing rule
 
-## Price fallback order
+For a mapped parcel, the asking price is calculated as:
 
-For an individual parcel, the current system uses the following existing inputs:
+**Asking price = parcel area (m²) × average transaction price per m²**
 
-1. A source-backed price attached to that exact parcel, if one is present with a recognized type and source.
-2. The transaction-price-per-square-metre snapshot for its matching cell.
-3. An indicative sector mean calculated from unambiguous cell snapshots in the same sector when that cell is missing or conflicting.
-4. The district average transaction-price snapshot from the Rwanda Land Dashboard.
+The input is the best available value already connected to the map. This calculation is the product's asking-price rule for the pilot; it does not wait for a separate seller-by-seller asking-price feed.
 
-The fallback order only changes the input used for an **indicative estimate**. An area or district average is not claimed to be a verified asking price or the recorded sale price of the individual parcel.
+## Price-per-square-metre fallback order
+
+1. The average transaction-price snapshot for the matching cell.
+2. An indicative sector mean calculated from the available unambiguous cell snapshots in that same sector when the cell value is missing or conflicting.
+3. The district average transaction-price snapshot from the Rwanda Land Dashboard when the finer-level values are unavailable.
+
+The selected parcel details name the available price basis. The separate district average reference price remains a comparison benchmark; it does not replace the average transaction-price input.
 
 ## Parcel area
 
-The preferred area is the parcel size value supplied by the connected cadastral layer. When that field is blank, the app estimates area from the connected parcel polygon geometry and marks it as an approximate geometry-derived area. When polygon area also cannot be calculated, the map still shows the available price per square metre as an **Indicative area price / m²**, rather than presenting that unit rate as the parcel's total value.
+The preferred area is the parcel size value supplied by the connected cadastral layer. When that field is blank, the app calculates approximate area from the connected parcel polygon and marks it as approximate. If the polygon cannot produce an area either, the map shows the available average transaction price per m² rather than hiding the available price signal or mislabelling a unit rate as a total parcel price.
 
-## What users see
+## Example
 
-- A compact map tag such as `500K` or `1M`.
-- The selected parcel panel explains whether the total is an indicative estimate or a per-square-metre proxy.
-- It names the available basis (cell, derived sector, or district snapshot) and the area basis (cadastral attribute or approximate mapped boundary).
-- The separate district average reference price remains a comparison benchmark. It does not silently replace the average transaction-price input used for the indicative estimate.
+For a parcel of **546 m²** using **49,757 RWF/m²**, the system calculates an asking price of **27,167,322 RWF**. On the map, that total is shown in compact form, such as `27.2M`; the parcel details show the area, rate, calculation, and whether the rate came from the matching cell, sector fallback, or district fallback.
 
 ## Future corrections
 
-These are explicit, replaceable estimation rules. When property-specific asking prices, registered sale records or formal valuation sources become available and are connected, they can be shown as their own source-backed price types without changing today's map labels into a false claim about a completed sale.
+The fallback and pricing rules are deliberately explicit and can be adjusted when stronger or more precise source data becomes available. For the current pilot, the calculation uses the connected data rather than suppressing parcel prices while waiting for future feeds.
