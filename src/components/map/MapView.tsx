@@ -853,7 +853,6 @@ export function MapView({
           if (metric === "averageLandPricePerM2") {
             const directParcelPriceIsSourced =
               isParcelPriceType(properties.parcel_price_type) &&
-              properties.parcel_price_type !== "indicative-estimate" &&
               typeof properties.parcel_price_value === "number" &&
               Number.isFinite(properties.parcel_price_value) &&
               properties.parcel_price_value > 0 &&
