@@ -225,7 +225,12 @@ function metricPillImageName(label: string, variant: MetricPillVariant): string 
 
 type MetricPillDimensions = { width: number; height: number; font: string };
 
+const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
+
 function measureMetricPill(label: string, variant: MetricPillVariant): MetricPillDimensions {
+  const cacheKey = variant + "|" + label;
+  const cached = metricPillDimensionsCache.get(cacheKey);
+  if (cached) return cached;
   const font = variant === "parcel"
     ? "600 10px Arial, sans-serif"
     : "600 11px Arial, sans-serif";
@@ -233,14 +238,18 @@ function measureMetricPill(label: string, variant: MetricPillVariant): MetricPil
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
   if (!measureContext) {
-    return { width: Math.max(34, label.length * 7 + 16), height, font };
+    const dimensions = { width: Math.max(34, label.length * 7 + 16), height, font };
+    metricPillDimensionsCache.set(cacheKey, dimensions);
+    return dimensions;
   }
   measureContext.font = font;
-  return {
+  const dimensions = {
     width: Math.max(34, Math.ceil(measureContext.measureText(label).width) + 16),
     height,
     font
   };
+  metricPillDimensionsCache.set(cacheKey, dimensions);
+  return dimensions;
 }
 
 function ensureMetricPillImage(
