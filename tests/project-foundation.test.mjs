@@ -607,7 +607,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /findCrowdedMetricLabelIndexes\(collisionBoxes\)/);
   assert.match(mapView, /minimumCrowdedGroupSize = 3/);
   assert.match(mapView, /if \(component\.length >= minimumCrowdedGroupSize\)/);
-  assert.match(mapView, /"show_dot", true/);
+  assert.match(mapView, /\["get", "show_dot"\], true/);
   assert.match(mapView, /\["!=", \["get", "show_dot"\], true\]/);
   assert.match(mapView, /context\.fillStyle = "#9D2932"/);
   assert.match(mapView, /id: "metric-bubbles-circle"/);
