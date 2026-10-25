@@ -24,6 +24,10 @@ type ArcGisResponse = {
   features?: ArcGisFeature[];
   error?: { code?: number; message?: string; details?: string[] };
 };
+
+function hasPolygonGeometry(geometry: ArcGisGeometry | null | undefined): geometry is ArcGisGeometry & { rings: unknown[] } {
+  return Boolean(geometry && Array.isArray(geometry.rings) && geometry.rings.length > 0);
+}
 type ParcelZoning = {
   code: string | null;
   name: string;
@@ -147,10 +151,9 @@ export async function GET(request: NextRequest) {
     const parcelPayload = await queryArcGis(parcelLayer, parcelParams, "GET");
     const matchingParcel = (parcelPayload.features ?? []).find((feature) =>
       normaliseValue(readText(feature.attributes, ["district"])) === districtKey &&
-      Array.isArray(feature.geometry?.rings) &&
-      feature.geometry.rings.length > 0
+      hasPolygonGeometry(feature.geometry)
     );
-    if (!matchingParcel?.geometry) {
+    if (!matchingParcel || !hasPolygonGeometry(matchingParcel.geometry)) {
       return NextResponse.json({
         error: "The parcel geometry could not be resolved from the connected cadastral source."
       }, { status: 404, headers: { "Cache-Control": "no-store" } });
@@ -159,9 +162,10 @@ export async function GET(request: NextRequest) {
     // Ask the published zoning feature service which zone polygons intersect
     // the exact cadastral polygon. A parcel crossing a zone boundary can return
     // multiple designations, which are preserved rather than guessing one.
+    const parcelGeometry = matchingParcel.geometry;
     const zoningParams = new URLSearchParams({
       where: "1=1",
-      geometry: JSON.stringify(matchingParcel.geometry),
+      geometry: JSON.stringify(parcelGeometry),
       geometryType: "esriGeometryPolygon",
       inSR: "4326",
       spatialRel: "esriSpatialRelIntersects",
