@@ -6,11 +6,14 @@ import { gsap } from "gsap";
 import type { Map as MapLibreMapInstance } from "maplibre-gl";
 import {
   MapView,
+  isParcelPriceType,
+  parcelPriceTypeLabel,
   type BasemapStatus,
   type BoundaryStatus,
   type BasemapMode,
   type MapOverlayCategory,
   type MapMetric,
+  type ParcelPriceType,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -688,6 +691,24 @@ export function MapExperience() {
     parcelUnitPriceEstimate?.pricePerM2 !== undefined
       ? Math.round(selectedArea.parcelSizeM2 * parcelUnitPriceEstimate.pricePerM2)
       : null;
+  // Use direct-price records only when a recognized type and named source exist.
+  // Otherwise keep the current area-based figure explicitly labelled as an estimate.
+  const hasSourcedParcelPrice = selectedArea?.level === "parcel" &&
+    isParcelPriceType(selectedArea.parcelPriceType) &&
+    selectedArea.parcelPriceType !== "indicative-estimate" &&
+    typeof selectedArea.parcelPriceValue === "number" &&
+    Number.isFinite(selectedArea.parcelPriceValue) &&
+    selectedArea.parcelPriceValue > 0 &&
+    typeof selectedArea.parcelPriceSource === "string" &&
+    selectedArea.parcelPriceSource.trim().length > 0;
+  const displayedParcelValue = hasSourcedParcelPrice
+    ? selectedArea?.parcelPriceValue ?? null
+    : estimatedParcelValue;
+  const displayedParcelPriceType: ParcelPriceType =
+    hasSourcedParcelPrice && isParcelPriceType(selectedArea?.parcelPriceType)
+      ? selectedArea.parcelPriceType
+      : "indicative-estimate";
+  const displayedParcelPriceTypeLabel = parcelPriceTypeLabel(displayedParcelPriceType);
   const selectedDistrictPriceBenchmark = selectedArea
     ? getDistrictLandPriceBenchmark(selectedArea.district)
     : null;
@@ -1605,17 +1626,25 @@ export function MapExperience() {
                       : "Date not supplied"}
                   </strong>
                 </div>
-                <div className="parcel-estimate-card" aria-label="Estimated parcel value">
-                  <span>Indicative estimated parcel value</span>
+                <div className="parcel-estimate-card" aria-label={displayedParcelPriceTypeLabel}>
+                  <span>{displayedParcelPriceTypeLabel}</span>
                   <strong>
-                    {estimatedParcelValue !== null
-                      ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedParcelValue)
+                    {displayedParcelValue !== null
+                      ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(displayedParcelValue)
                       : "Not available"}
                   </strong>
-                  {typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
+                  {hasSourcedParcelPrice ? (
                     <p>
-                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction price
+                      Source: {selectedArea.parcelPriceSource}
+                      {selectedArea.parcelPriceDate ? ` · Date: ${selectedArea.parcelPriceDate}` : ""}
                     </p>
+                  ) : typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
+                    <p>
+                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction-price snapshot
+                    </p>
+                  ) : null}
+                  {hasSourcedParcelPrice && selectedArea.parcelPriceNote ? (
+                    <p>{selectedArea.parcelPriceNote}</p>
                   ) : null}
                   <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
                     <div>
@@ -1625,7 +1654,7 @@ export function MapExperience() {
                           ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
                           : "Not available"}
                       </strong>
-                      <small>Used for the headline parcel estimate.</small>
+                      <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used for the headline indicative estimate."}</small>
                     </div>
                     <div>
                       <span>Average reference price · district benchmark</span>
@@ -1645,8 +1674,9 @@ export function MapExperience() {
                     ) : null}
                   </div>
                   <small>
-                    {parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable average transaction price per m² are both required."}
-                    {" "}This is a rough area-based estimate, not an official valuation, offer price, or proof of sale value.
+                    {hasSourcedParcelPrice
+                      ? "Shown as a " + displayedParcelPriceTypeLabel.toLowerCase() + " based on the source recorded above. Check the source document and date before relying on it."
+                      : (parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable average transaction price per m² are both required.") + " This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation."}
                   </small>
                 </div>
               </div>
