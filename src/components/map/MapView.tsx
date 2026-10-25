@@ -1393,7 +1393,12 @@ export function MapView({
             ]
           ],
           paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6],
+            "circle-radius": [
+              "case",
+              ["==", ["get", "show_dot"], true],
+              ["interpolate", ["linear"], ["zoom"], 5, 1.8, SECTOR_ZOOM, 2, CELL_ZOOM, 2.1, PARCEL_ZOOM, 2.4],
+              ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6]
+            ],
             "circle-color": [
               "case",
               ["==", ["get", "has_value"], false], "#8B9690",
