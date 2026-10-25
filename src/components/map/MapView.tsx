@@ -335,8 +335,12 @@ function ensureMetricPillImage(
   // charcoal is used only for a property explicitly marked off-market by a listing feed.
   const fillColor = isSelected
     ? "#2563EB"
-    : marketStatus === "off-market"
-      ? "#343A40"
+    : variant === "parcel"
+      ? marketStatus === "available"
+        ? "#9D2932"
+        : marketStatus === "off-market"
+          ? "#343A40"
+          : "#8B9690"
       : "#9D2932";
   context.fillStyle = fillColor;
   context.strokeStyle = "rgba(255, 255, 255, 0.98)";
@@ -1540,8 +1544,10 @@ export function MapView({
             "circle-color": [
               "case",
               ["==", ["get", "is_selected"], true], "#2563EB",
+              ["==", ["get", "market_status"], "available"], "#9D2932",
               ["==", ["get", "market_status"], "off-market"], "#343A40",
               ["==", ["get", "has_value"], false], "#8B9690",
+              ["==", ["get", "level"], "parcel"], "#8B9690",
               "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
