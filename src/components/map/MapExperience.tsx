@@ -836,8 +836,9 @@ export function MapExperience() {
 
     const district = selectedArea.district;
     const upi = selectedArea.upi?.trim() ?? "";
-    const matchesSelectedParcel = (current: SelectedArea | null) =>
-      current?.level === "parcel" &&
+    const matchesSelectedParcel = (current: SelectedArea | null): current is SelectedArea =>
+      current !== null &&
+      current.level === "parcel" &&
       current.district === district &&
       (current.upi?.trim() ?? "") === upi;
 
