@@ -480,8 +480,9 @@ test("parcel selection calculates an indicative value from parcel area and unit 
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
   assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
-  assert.match(experience, /Indicative estimated parcel value/);
-  assert.match(experience, /rough area-based estimate, not an official valuation/);
+  assert.match(experience, /displayedParcelPriceTypeLabel/);
+  assert.match(experience, /parcelPriceTypeLabel\(displayedParcelPriceType\)/);
+  assert.match(experience, /indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
 });
 
 test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
@@ -608,4 +609,32 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /properties\.parcel_size_m2/);
   assert.match(mapView, /selectedMetricRef\.current === "averageLandPricePerM2"/);
   assert.match(metricRoute, /formatCompactValue\(value\)/);
+});
+
+test("parcel price labels distinguish estimates from source-backed asking prices, recorded sales, and valuations", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const areaRoute = await readProjectFile("src/app/api/geography/areas/route.ts");
+
+  for (const kind of [
+    "indicative-estimate",
+    "confirmed-asking-price",
+    "recorded-sale-price",
+    "formal-valuation"
+  ]) {
+    assert.ok(mapView.includes(kind), "missing parcel price type: " + kind);
+  }
+
+  assert.match(mapView, /parcel_price_type\?: ParcelPriceType \| null/);
+  assert.match(mapView, /parcel_price_value\?: number \| null/);
+  assert.match(mapView, /parcel_price_source\?: string \| null/);
+  assert.match(mapView, /directParcelPriceIsSourced/);
+  assert.match(mapView, /properties\.parcel_price_source\.trim\(\)\.length > 0/);
+  assert.match(mapView, /status = properties\.parcel_price_type as ParcelPriceType/);
+
+  assert.match(experience, /displayedParcelPriceTypeLabel/);
+  assert.match(experience, /Source: \{selectedArea\.parcelPriceSource\}/);
+  assert.match(experience, /This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
+  assert.match(areaRoute, /upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on/);
+  assert.doesNotMatch(areaRoute, /asking_price|recorded_sale_price|formal_valuation/i);
 });
