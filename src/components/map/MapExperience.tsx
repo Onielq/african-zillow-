@@ -1591,21 +1591,28 @@ export function MapExperience() {
               ×
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
-            <h2>{selectedArea.name}</h2>
-            {selectedArea.level === "parcel" && selectedArea.parcelMarketStatus ? (
-              <div className={`parcel-market-status parcel-market-status-${selectedArea.parcelMarketStatus}`}>
-                <strong>
-                  {selectedArea.parcelMarketStatus === "available"
-                    ? selectedArea.parcelMarketStatusSource === "demonstration" ? "Available (demo)" : "Available"
-                    : selectedArea.parcelMarketStatusSource === "demonstration" ? "Off market (demo)" : "Off market"}
-                </strong>
-                <small>
-                  {selectedArea.parcelMarketStatusSource === "demonstration"
-                    ? "Demonstration market status and NEW markers only — not verified listing data."
-                    : "Market status supplied by the connected listing source."}
-                </small>
-              </div>
-            ) : null}
+            <div className="selected-area-title-row">
+              <h2>{selectedArea.name}</h2>
+              {selectedArea.level === "parcel" && selectedArea.parcelMarketStatus ? (
+                <span
+                  className={`parcel-market-status-inline parcel-market-status-inline-${selectedArea.parcelMarketStatus}`}
+                  title={
+                    selectedArea.parcelMarketStatusSource === "demonstration"
+                      ? "Illustrative status only; this parcel is not confirmed as listed."
+                      : "Status supplied by the connected listing source."
+                  }
+                  aria-label={`${
+                    selectedArea.parcelMarketStatus === "available" ? "Land for sale" : "Off the market"
+                  }${
+                    selectedArea.parcelMarketStatusSource === "demonstration"
+                      ? " — illustrative status, not a verified listing"
+                      : " — status supplied by the connected listing source"
+                  }`}
+                >
+                  ({selectedArea.parcelMarketStatus === "available" ? "Land for sale" : "Off the market"})
+                </span>
+              ) : null}
+            </div>
             {selectedArea.level === "parcel" ? (
               <div className="parcel-details">
                 <div>
