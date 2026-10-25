@@ -404,7 +404,7 @@ function ensureMetricPillImage(
   context.shadowBlur = 4;
   context.shadowOffsetY = 2;
 
-  const radius = bodyHeight / 2;
+  const radius = variant === "parcel" ? 10 : bodyHeight / 2;
   const tailHalfWidth = 4;
   context.beginPath();
   context.moveTo(radius, 0.5);
@@ -2256,6 +2256,7 @@ export function MapView({
       if (id === null || !area) return;
 
       if (
+        level === "parcel" &&
         selectedFeature?.source === source &&
         String(selectedFeature.id) === String(id)
       ) {
