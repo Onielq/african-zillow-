@@ -832,6 +832,56 @@ export function MapExperience() {
   }, [selectedArea]);
 
   useEffect(() => {
+    if (selectedArea?.level !== "parcel") return;
+
+    const district = selectedArea.district;
+    const upi = selectedArea.upi?.trim() ?? "";
+    const matchesSelectedParcel = (current: SelectedArea | null): current is SelectedArea =>
+      current !== null &&
+      current.level === "parcel" &&
+      current.district === district &&
+      (current.upi?.trim() ?? "") === upi;
+
+    // Render the initial checking/missing-UPI state from the current parcel.
+    // Avoid a synchronous state update in this effect; only async results mutate state.
+    if (!upi) return;
+
+    const controller = new AbortController();
+
+    const loadParcelZoning = async () => {
+      try {
+        const params = new URLSearchParams({ district, upi });
+        const response = await fetch("/api/geography/parcel-zoning?" + params.toString(), {
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Parcel zoning lookup failed (" + response.status + ")");
+        const payload = await response.json() as {
+          status: "found" | "not-covered";
+          zones: NonNullable<SelectedArea["zoning"]>;
+          source: string | null;
+        };
+        if (controller.signal.aborted) return;
+        setSelectedArea((current) => matchesSelectedParcel(current)
+          ? {
+              ...current,
+              zoning: payload.zones ?? [],
+              zoningStatus: payload.status,
+              zoningSource: payload.source ?? null
+            }
+          : current);
+      } catch {
+        if (controller.signal.aborted) return;
+        setSelectedArea((current) => matchesSelectedParcel(current)
+          ? { ...current, zoning: [], zoningStatus: "error", zoningSource: null }
+          : current);
+      }
+    };
+
+    void loadParcelZoning();
+    return () => controller.abort();
+  }, [selectedArea?.level, selectedArea?.district, selectedArea?.upi]);
+
+  useEffect(() => {
     const level = selectedArea?.level;
     const district = selectedArea?.district;
     const sector = selectedArea?.sector;
@@ -1653,6 +1703,31 @@ export function MapExperience() {
                       ? `${selectedArea.village}${selectedArea.villageId ? ` · ID ${selectedArea.villageId}` : ""}`
                       : "Not published"}
                   </strong>
+                </div>
+                <div className="parcel-zoning-row">
+                  <span>Zoning / planning designation</span>
+                  <strong>
+                    {!selectedArea.upi
+                      ? "Zoning lookup unavailable — parcel UPI is missing"
+                      : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus
+                        ? "Checking the official zoning layer…"
+                        : selectedArea.zoningStatus === "found"
+                        ? selectedArea.zoning?.length
+                          ? selectedArea.zoning.map((zone) => {
+                              const code = zone.code?.trim();
+                              const name = zone.name.trim();
+                              return code && !name.toLowerCase().startsWith(code.toLowerCase())
+                                ? code + " — " + name
+                                : name;
+                            }).join("; ")
+                          : "Mapped zone found, but the source has no classification label"
+                        : selectedArea.zoningStatus === "not-covered"
+                          ? "No zoning designation mapped for this parcel"
+                          : "Zoning data unavailable"}
+                  </strong>
+                  {selectedArea.zoningSource ? (
+                    <small className="parcel-zoning-source">Source: {selectedArea.zoningSource}</small>
+                  ) : null}
                 </div>
                 <div>
                   <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>

@@ -646,6 +646,13 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.parcel-zoning-source {
+  color: #66766D;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .area-price-metric {
   display: flex;
   flex-direction: column;

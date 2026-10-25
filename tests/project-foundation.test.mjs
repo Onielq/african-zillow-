@@ -740,3 +740,35 @@ test("parcel listing colors use a stable district-scoped demonstration split and
   assert.match(experience, /parcel-market-status-inline/);
   assert.match(css, /\.parcel-market-status-inline-off-market/);
 });
+
+test("parcel outlines keep a high-contrast casing above road and zoning overlays", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(mapView, /const PARCEL_OUTLINE_CASING_LAYER = "parcel-outline-casing"/);
+  assert.match(mapView, /"line-color": \[/);
+  assert.match(mapView, /"#1C2935"/);
+  assert.match(mapView, /"line-blur": \["case", \["boolean", \["feature-state", "selected"\], false\], 1\.25, 0\]/);
+  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
+  assert.match(mapView, /map\.moveLayer\(layerId\)/);
+  assert.match(mapView, /keepParcelBoundariesAndMarkersAboveContext\(\);/);
+});
+
+test("parcel detail zoning uses exact cadastral geometry and reports mapped classifications", async () => {
+  const route = await readProjectFile("src/app/api/geography/parcel-zoning/route.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(route, /Kigali_Parcels_1June2026_for_search\/FeatureServer\/0/);
+  assert.match(route, /Masterplan2020_22Apr2026\/MapServer\/117/);
+  assert.match(route, /Bugesera_Parcels\/FeatureServer\/0/);
+  assert.match(route, /Bugesera_DLUP\/FeatureServer\/0/);
+  assert.match(route, /geometry: JSON\.stringify\(parcelGeometry\)/);
+  assert.match(route, /geometryType: "esriGeometryPolygon"/);
+  assert.match(route, /spatialRel: "esriSpatialRelIntersects"/);
+  assert.match(route, /status: zones\.length > 0 \? "found" : "not-covered"/);
+  assert.match(mapView, /zoningStatus\?: ParcelZoningStatus/);
+  assert.match(experience, /Zoning \/ planning designation/);
+  assert.match(experience, /No zoning designation mapped for this parcel/);
+  assert.match(experience, /parcel-zoning\?/);
+});

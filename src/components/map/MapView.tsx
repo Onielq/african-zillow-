@@ -79,6 +79,15 @@ type MetricBubbleValue = {
 };
 export type ShowScope = "kigali" | "bugesera" | "pilot";
 
+export type ParcelZoningEntry = {
+  code: string | null;
+  name: string;
+  condition: string | null;
+  prohibited: string | null;
+  buffer: string | null;
+};
+export type ParcelZoningStatus = "loading" | "found" | "not-covered" | "error" | "unavailable";
+
 export type SelectedArea = {
   level: AreaLevel;
   name: string;
@@ -112,6 +121,9 @@ export type SelectedArea = {
   parcelMarketStatus?: PropertyMarketStatus | null;
   parcelMarketStatusSource?: "source" | "demonstration" | null;
   parcelIsNewListingDemo?: boolean;
+  zoning?: ParcelZoningEntry[] | null;
+  zoningStatus?: ParcelZoningStatus | null;
+  zoningSource?: string | null;
 };
 
 type AreaProperties = {
@@ -170,6 +182,7 @@ type AreaProperties = {
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 type AdminSourceId = "kigali" | "bugesera";
 type ViewBounds = [number, number, number, number];
+const PARCEL_OUTLINE_CASING_LAYER = "parcel-outline-casing";
 
 const ADMIN_SOURCE_EXTENTS: Record<AdminSourceId, ViewBounds> = {
   kigali: [29.58, -2.12, 30.32, -1.47],
@@ -1472,6 +1485,33 @@ export function MapView({
         });
       }
 
+      // A dark casing is drawn beneath the fine parcel stroke. It preserves
+      // cadastral boundaries against satellite roofs, light map tiles and roads.
+      if (!map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
+        map.addLayer({
+          id: PARCEL_OUTLINE_CASING_LAYER,
+          type: "line",
+          source: AREA_LAYERS.parcel.source,
+          layout: { visibility: "none" },
+          paint: {
+            "line-color": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false], "#2563EB",
+              ["boolean", ["feature-state", "hover"], false], "#16734A",
+              "#1C2935"
+            ],
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false], 5.2,
+              ["boolean", ["feature-state", "hover"], false], 4.2,
+              ["interpolate", ["linear"], ["zoom"], PARCEL_ZOOM, 2.4, PARCEL_ZOOM + 1.5, 2.8, PARCEL_ZOOM + 3.85, 3.2]
+            ],
+            "line-opacity": 0.98,
+            "line-blur": ["case", ["boolean", ["feature-state", "selected"], false], 1.25, 0]
+          }
+        });
+      }
+
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
         if (map.getLayer(layer.outline)) continue;
@@ -1839,6 +1879,22 @@ export function MapView({
       }
     };
 
+    const keepParcelBoundariesAndMarkersAboveContext = () => {
+      // Show/road and zoning overlays are added after administrative layers. Move
+      // the cadastral strokes back above those overlays while keeping parcel labels
+      // and price markers as the top-most interactive symbols.
+      for (const layerId of [
+        PARCEL_OUTLINE_CASING_LAYER,
+        AREA_LAYERS.parcel.outline,
+        AREA_LAYERS.parcel.label,
+        "metric-bubbles-circle",
+        "metric-bubbles-label",
+        "metric-bubbles-parcel-label"
+      ]) {
+        if (map.getLayer(layerId)) map.moveLayer(layerId);
+      }
+    };
+
     const updateLayerVisibility = () => {
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
@@ -1857,6 +1913,9 @@ export function MapView({
         }
         if (map.getLayer(layer.outline)) {
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
+        }
+        if (level === "parcel" && map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
+          map.setLayoutProperty(PARCEL_OUTLINE_CASING_LAYER, "visibility", showOutline ? "visible" : "none");
         }
         if (map.getLayer(layer.label)) {
           const showLabel =
@@ -2354,6 +2413,7 @@ export function MapView({
       addAdministrativeLayers();
       addShowOverlayLayers();
       addZoningOverlayLayers();
+      keepParcelBoundariesAndMarkersAboveContext();
       updateLayerVisibility();
       applyShowOverlayFilters(map, showLayersRef.current);
       void refreshShowOverlays();
