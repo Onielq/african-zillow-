@@ -111,6 +111,7 @@ export type SelectedArea = {
   bounds?: [number, number, number, number] | null;
   parcelMarketStatus?: PropertyMarketStatus | null;
   parcelMarketStatusSource?: "source" | "demonstration" | null;
+  parcelIsNewListingDemo?: boolean;
 };
 
 type AreaProperties = {
@@ -259,6 +260,26 @@ export function demoParcelMarketStatus(
   return (hash >>> 31) === 0 ? "available" : "off-market";
 }
 
+/** Stable and independent of market status; this is for interface demonstration only. */
+export function demoParcelIsNewListing(
+  district: unknown,
+  upi: unknown,
+  parcelNumber: unknown,
+  featureId: unknown
+): boolean {
+  const identity = [
+    normalizeMetricKeyPart(district),
+    String(upi ?? parcelNumber ?? featureId ?? ""),
+    "new-listing-demo"
+  ].join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 30) === 0;
+}
+
 /** Only listing-feed dates qualify here; cadastral update timestamps are not listing dates. */
 function isRecentlyListed(value: unknown, now = Date.now()): boolean {
   let timestamp: number;
@@ -288,6 +309,7 @@ type MetricPillDimensions = {
   bodyHeight: number;
   tailHeight: number;
   font: string;
+  isNewListing: boolean;
 };
 
 const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
@@ -296,44 +318,49 @@ function metricPillImageName(
   label: string,
   variant: MetricPillVariant,
   marketStatus: PropertyMarketStatus | null,
-  isSelected: boolean
+  isSelected: boolean,
+  isNewListing: boolean
 ): string {
   let hash = 5381;
   for (let index = 0; index < label.length; index += 1) {
     hash = (Math.imul(hash, 33) ^ label.charCodeAt(index)) >>> 0;
   }
   const state = isSelected ? "selected" : marketStatus ?? "default";
-  return "metric-price-pill-" + variant + "-" + state + "-" + hash.toString(36);
+  return "metric-price-pill-" + variant + "-" + state + "-" +
+    (isNewListing ? "new-" : "standard-") + hash.toString(36);
 }
 
-function measureMetricPill(label: string, variant: MetricPillVariant): MetricPillDimensions {
-  const cacheKey = variant + "|" + label;
+function measureMetricPill(
+  label: string,
+  variant: MetricPillVariant,
+  isNewListing = false
+): MetricPillDimensions {
+  const cacheKey = variant + "|" + label + "|" + (isNewListing ? "new" : "standard");
   const cached = metricPillDimensionsCache.get(cacheKey);
   if (cached) return cached;
 
   const isParcel = variant === "parcel";
   const font = isParcel
-    ? "600 10px Arial, sans-serif"
+    ? isNewListing ? "700 10px Arial, sans-serif" : "700 11px Arial, sans-serif"
     : "600 11px Arial, sans-serif";
-  const bodyHeight = isParcel ? 24 : 22;
-  const tailHeight = isParcel ? 4 : 0;
+  const bodyHeight = isParcel ? (isNewListing ? 27 : 20) : 22;
+  const tailHeight = isParcel ? 5 : 0;
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
   const measuredTextWidth = (() => {
-    if (!measureContext) return label.length * (isParcel ? 7 : 6.5);
+    if (!measureContext) return label.length * (isParcel ? 6 : 6.5);
     measureContext.font = font;
     return Math.ceil(measureContext.measureText(label).width);
   })();
-  const measuredWidth = measuredTextWidth + (isParcel ? 12 : 16);
-  const width = isParcel
-    ? Math.min(68, Math.max(56, measuredWidth))
-    : Math.max(34, measuredWidth);
+  const measuredWidth = measuredTextWidth + (isParcel ? 6 : 16);
+  const width = isParcel ? 39 : Math.max(34, measuredWidth);
   const dimensions = {
     width,
     height: bodyHeight + tailHeight,
     bodyHeight,
     tailHeight,
-    font
+    font,
+    isNewListing
   };
   metricPillDimensionsCache.set(cacheKey, dimensions);
   return dimensions;
@@ -345,9 +372,10 @@ function ensureMetricPillImage(
   variant: MetricPillVariant,
   dimensions: MetricPillDimensions,
   marketStatus: PropertyMarketStatus | null = null,
-  isSelected = false
+  isSelected = false,
+  isNewListing = false
 ): string {
-  const imageName = metricPillImageName(label, variant, marketStatus, isSelected);
+  const imageName = metricPillImageName(label, variant, marketStatus, isSelected, isNewListing);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
@@ -359,20 +387,25 @@ function ensureMetricPillImage(
   if (!context) return "";
 
   context.scale(pixelRatio, pixelRatio);
-  // Selection overrides market status. Unknown status keeps the existing red price capsule;
-  // charcoal is used only for a property explicitly marked off-market by a listing feed.
   const fillColor = isSelected
-    ? "#2563EB"
-    : variant === "parcel"
-      ? marketStatus === "available"
-        ? "#9D2932"
-        : marketStatus === "off-market"
-          ? "#343A40"
-          : "#8B9690"
-      : "#9D2932";
-  context.fillStyle = fillColor;
+    ? ["#2563EB", "#1D4ED8"]
+    : variant === "parcel" && marketStatus === "available"
+      ? ["#D41A3A", "#B8142E"]
+      : variant === "parcel" && marketStatus === "off-market"
+        ? ["#3A3A42", "#2E2E35"]
+        : variant === "parcel"
+          ? ["#8B9690", "#748079"]
+          : ["#9D2932", "#7F2028"];
+  const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
+  gradient.addColorStop(0, fillColor[0]);
+  gradient.addColorStop(1, fillColor[1]);
+  context.fillStyle = gradient;
+  context.shadowColor = isSelected ? "rgba(37, 99, 235, 0.32)" : "rgba(0, 0, 0, 0.15)";
+  context.shadowBlur = 4;
+  context.shadowOffsetY = 2;
 
-  const radius = bodyHeight / 2;
+  const radius = variant === "parcel" ? 10 : bodyHeight / 2;
+  const tailHalfWidth = 4;
   context.beginPath();
   context.moveTo(radius, 0.5);
   context.lineTo(width - radius, 0.5);
@@ -380,9 +413,9 @@ function ensureMetricPillImage(
   context.lineTo(width - 0.5, bodyHeight - radius);
   context.quadraticCurveTo(width - 0.5, bodyHeight - 0.5, width - radius, bodyHeight - 0.5);
   if (tailHeight > 0) {
-    context.lineTo(width / 2 + 6, bodyHeight - 0.5);
+    context.lineTo(width / 2 + tailHalfWidth, bodyHeight - 0.5);
     context.lineTo(width / 2, height - 1);
-    context.lineTo(width / 2 - 6, bodyHeight - 0.5);
+    context.lineTo(width / 2 - tailHalfWidth, bodyHeight - 0.5);
   }
   context.lineTo(radius, bodyHeight - 0.5);
   context.quadraticCurveTo(0.5, bodyHeight - 0.5, 0.5, bodyHeight - radius);
@@ -391,48 +424,21 @@ function ensureMetricPillImage(
   context.closePath();
   context.fill();
 
+  context.shadowColor = "transparent";
+  context.shadowBlur = 0;
+  context.shadowOffsetY = 0;
   context.fillStyle = "#FFFFFF";
-  context.font = font;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, width / 2, bodyHeight / 2, width - 16);
-  map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
-  return imageName;
-}
-
-function ensureNewListingBadgeImage(map: MapLibreMapInstance): string {
-  const imageName = "metric-new-listing-badge";
-  if (map.hasImage(imageName)) return imageName;
-
-  const pixelRatio = 2;
-  const width = 34;
-  const height = 14;
-  const radius = 6;
-  const canvas = document.createElement("canvas");
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const context = canvas.getContext("2d");
-  if (!context) return imageName;
-
-  context.scale(pixelRatio, pixelRatio);
-  context.fillStyle = "#155E43";
-  context.beginPath();
-  context.moveTo(radius, 0.5);
-  context.lineTo(width - radius, 0.5);
-  context.quadraticCurveTo(width - 0.5, 0.5, width - 0.5, radius);
-  context.lineTo(width - 0.5, height - radius);
-  context.quadraticCurveTo(width - 0.5, height - 0.5, width - radius, height - 0.5);
-  context.lineTo(radius, height - 0.5);
-  context.quadraticCurveTo(0.5, height - 0.5, 0.5, height - radius);
-  context.lineTo(0.5, radius);
-  context.quadraticCurveTo(0.5, 0.5, radius, 0.5);
-  context.closePath();
-  context.fill();
-  context.fillStyle = "#FFFFFF";
-  context.font = "800 7px Arial, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText("NEW", width / 2, height / 2);
+  if (variant === "parcel" && isNewListing) {
+    context.font = "700 8px Arial, sans-serif";
+    context.fillText("New", width / 2, 7.5, width - 4);
+    context.font = "700 10px Arial, sans-serif";
+    context.fillText(label, width / 2, 19, width - 4);
+  } else {
+    context.font = font;
+    context.fillText(label, width / 2, bodyHeight / 2, width - 4);
+  }
   map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
   return imageName;
 }
@@ -1325,10 +1331,15 @@ export function MapView({
         const isSelected = level === "parcel" &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
           String(selectedFeature.id) === String(feature.id);
-        const isNewListing = level === "parcel" && isRecentlyListed(properties.listing_created_at);
-        const pillDimensions = hasValue ? measureMetricPill(label, variant) : null;
+        const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
+        const isNewListingDemo = level === "parcel" &&
+          !hasVerifiedListingDate &&
+          !sourceMarketStatus &&
+          demoParcelIsNewListing(district, properties.upi, properties.parcel_number, feature.id ?? index);
+        const isNewListing = hasVerifiedListingDate || isNewListingDemo;
+        const pillDimensions = hasValue ? measureMetricPill(label, variant, isNewListing) : null;
         const iconImage = hasValue && pillDimensions
-          ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected)
+          ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected, isNewListing)
           : "";
         return [{
           type: "Feature" as const,
@@ -1355,6 +1366,7 @@ export function MapView({
             market_status_source: marketStatusSource,
             is_selected: isSelected,
             is_new_listing: isNewListing,
+            is_new_listing_demo: isNewListingDemo,
             area_feature_id: String(feature.id ?? index),
             upi: properties.upi ?? null,
             district,
@@ -1555,8 +1567,6 @@ export function MapView({
         });
       }
 
-      ensureNewListingBadgeImage(map);
-
       if (!map.getLayer("metric-bubbles-circle")) {
         map.addLayer({
           id: "metric-bubbles-circle",
@@ -1632,7 +1642,7 @@ export function MapView({
           ],
           layout: {
             "icon-image": ["get", "icon_image"],
-            "icon-size": ["interpolate", ["linear"], ["zoom"], PARCEL_ZOOM, 0.95, 19, 1, 21, 1.02],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], PARCEL_ZOOM, 1, 19, 1, 21, 1.02],
             "icon-anchor": "bottom",
             "icon-padding": 2,
             "icon-allow-overlap": true,
@@ -1643,31 +1653,6 @@ export function MapView({
         });
       }
 
-      if (!map.getLayer("metric-bubbles-new-badge")) {
-        map.addLayer({
-          id: "metric-bubbles-new-badge",
-          type: "symbol",
-          source: "metric-bubbles",
-          minzoom: PARCEL_ZOOM,
-          filter: [
-            "all",
-            ["==", ["get", "level"], "parcel"],
-            ["==", ["get", "has_value"], true],
-            ["==", ["get", "is_new_listing"], true]
-          ],
-          layout: {
-            "icon-image": "metric-new-listing-badge",
-            "icon-size": 1,
-            "icon-anchor": "bottom",
-            "icon-offset": [0, -31],
-            "icon-padding": 0,
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-            "symbol-sort-key": ["get", "sort_priority"],
-            "visibility": "visible"
-          }
-        });
-      }
     };
 
     const addShowOverlayLayers = () => {
@@ -2270,6 +2255,16 @@ export function MapView({
       const area = featureToArea(feature, level);
       if (id === null || !area) return;
 
+      if (
+        level === "parcel" &&
+        selectedFeature?.source === source &&
+        String(selectedFeature.id) === String(id)
+      ) {
+        selectFeatureState(null);
+        onAreaSelected(null);
+        return;
+      }
+
       const properties = feature.properties as AreaProperties | null;
       const suppliedMarketStatus = propertyMarketStatus(properties?.market_status);
       const parcelMarketStatus = level === "parcel"
@@ -2283,12 +2278,18 @@ export function MapView({
       const parcelMarketStatusSource = level === "parcel"
         ? suppliedMarketStatus ? "source" as const : "demonstration" as const
         : null;
+      const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties?.listing_created_at);
+      const parcelIsNewListingDemo = level === "parcel" &&
+        !hasVerifiedListingDate &&
+        !suppliedMarketStatus &&
+        demoParcelIsNewListing(properties?.district, properties?.upi, properties?.parcel_number, feature.id);
 
       selectFeatureState({ source, id });
       onAreaSelected({
         ...area,
         parcelMarketStatus,
-        parcelMarketStatusSource
+        parcelMarketStatusSource,
+        parcelIsNewListingDemo
       });
       fitFeature(map, feature, level);
     };
@@ -2327,7 +2328,6 @@ export function MapView({
       };
 
       map.on("click", "metric-bubbles-parcel-label", selectParcelFromMarker);
-      map.on("click", "metric-bubbles-new-badge", selectParcelFromMarker);
       map.on("click", "metric-bubbles-circle", selectParcelFromMarker);
 
       // Clicking an unoccupied part of the map clears selection and restores
@@ -2338,7 +2338,6 @@ export function MapView({
           "metric-bubbles-circle",
           "metric-bubbles-label",
           "metric-bubbles-parcel-label",
-          "metric-bubbles-new-badge"
         ].filter((layerId) => Boolean(map.getLayer(layerId)));
 
         const hits = clickableLayers.length
