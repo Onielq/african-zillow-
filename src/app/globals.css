@@ -592,6 +592,34 @@ button:disabled {
   font-size: 9px;
 }
 
+.parcel-market-status {
+  display: grid;
+  gap: 3px;
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+.parcel-market-status strong {
+  font-size: 11px;
+  font-weight: 800;
+}
+.parcel-market-status small {
+  color: #596861;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.parcel-market-status-available {
+  border-color: #E6B8BC;
+  background: #FFF4F4;
+  color: #9D2932;
+}
+.parcel-market-status-off-market {
+  border-color: #C8CDD1;
+  background: #F2F3F4;
+  color: #343A40;
+}
+
 .parcel-details {
   display: grid;
   gap: 10px;
