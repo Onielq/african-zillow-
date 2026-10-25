@@ -3,6 +3,7 @@ import {
   getMonthlyHistoricalBaseline,
   TRANSACTION_DISTRICT_BENCHMARKS
 } from "@/data/transaction-benchmarks";
+import { formatCompactValue } from "@/lib/format-compact-value";
 
 export const runtime = "nodejs";
 export const revalidate = 3600;
@@ -99,9 +100,7 @@ function districtMonthlyBaseline(district: string): {
 }
 
 function compact(value: number): string {
-  if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + "k";
-  if (value >= 100) return Math.round(value).toLocaleString("en-RW");
-  return value.toFixed(value < 10 && value % 1 !== 0 ? 1 : 0);
+  return formatCompactValue(value);
 }
 
 async function countDistrict(layerUrl: string, district: string): Promise<number> {

@@ -585,3 +585,27 @@ test("unavailable appreciation and supply metrics are not fabricated", async () 
   assert.match(mapView, /Registered parcel counts are not for-sale supply/);
   assert.match(experience, /Capital appreciation is calculated only when historical and current prices/);
 });
+
+test("map price tags use one compact uppercase formatter, preserve zoom hierarchy, and collapse collisions to dots", async () => {
+  const formatter = await readProjectFile("src/lib/format-compact-value.ts");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const metricRoute = await readProjectFile("src/app/api/geography/metric-bubbles/route.ts");
+
+  assert.match(formatter, /notation:\s*"compact"/);
+  assert.match(formatter, /compactDisplay:\s*"short"/);
+  assert.match(formatter, /suffix\.toUpperCase\(\)/);
+  assert.match(formatter, /return "—"/);
+
+  assert.match(mapView, /formatCompactValue\(sortValue\)/);
+  assert.match(mapView, /ensureMetricPillImage/);
+  assert.match(mapView, /"icon-image": \["get", "icon_image"\]/);
+  assert.match(mapView, /"icon-allow-overlap": false/);
+  assert.match(mapView, /"icon-ignore-placement": false/);
+  assert.match(mapView, /id: "metric-bubbles-circle"/);
+  assert.match(mapView, /"circle-radius": \["interpolate", \["linear"\], \["zoom"\], 5, 2\.5/);
+  assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
+  assert.match(mapView, /status = "estimated-parcel-value"/);
+  assert.match(mapView, /properties\.parcel_size_m2/);
+  assert.match(mapView, /selectedMetricRef\.current === "averageLandPricePerM2"/);
+  assert.match(metricRoute, /formatCompactValue\(value\)/);
+});

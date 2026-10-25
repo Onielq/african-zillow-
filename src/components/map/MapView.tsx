@@ -14,6 +14,7 @@ import {
   setWorkerUrl
 } from "maplibre-gl";
 import type { FeatureCollection, Geometry } from "geojson";
+import { formatCompactValue } from "@/lib/format-compact-value";
 
 // Next.js 16 defaults to Turbopack. Serve both MapLibre worker modules from
 // the same versioned public directory so the worker can resolve its sibling.
@@ -150,6 +151,84 @@ function requestBoundsForArea(bounds: ViewBounds, level: AreaLevel): ViewBounds 
     Math.ceil(bounds[2] / grid) * grid,
     Math.ceil(bounds[3] / grid) * grid
   ].map((value) => Number(value.toFixed(6))) as ViewBounds;
+}
+
+function normalizeMetricKeyPart(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+function normalizedMetricKey(...parts: unknown[]): string {
+  return parts.map(normalizeMetricKeyPart).join("|");
+}
+
+type MetricPillVariant = "area" | "parcel";
+
+function metricPillImageName(label: string, variant: MetricPillVariant): string {
+  let hash = 5381;
+  for (let index = 0; index < label.length; index += 1) {
+    hash = (Math.imul(hash, 33) ^ label.charCodeAt(index)) >>> 0;
+  }
+  return "metric-price-pill-" + variant + "-" + hash.toString(36);
+}
+
+function ensureMetricPillImage(
+  map: MapLibreMapInstance,
+  label: string,
+  variant: MetricPillVariant
+): string {
+  const imageName = metricPillImageName(label, variant);
+  if (map.hasImage(imageName)) return imageName;
+
+  const pixelRatio = 2;
+  const font = variant === "parcel"
+    ? "600 10px Arial, sans-serif"
+    : "600 11px Arial, sans-serif";
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+  if (!measureContext) return "";
+
+  measureContext.font = font;
+  const textWidth = Math.ceil(measureContext.measureText(label).width);
+  const height = variant === "parcel" ? 20 : 22;
+  const width = Math.max(34, textWidth + 16);
+  const canvas = document.createElement("canvas");
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const context = canvas.getContext("2d");
+  if (!context) return "";
+
+  context.scale(pixelRatio, pixelRatio);
+  context.fillStyle = variant === "parcel" ? "#68747B" : "#9D2932";
+  context.strokeStyle = "rgba(255, 255, 255, 0.94)";
+  context.lineWidth = 1;
+
+  const radius = height / 2;
+  context.beginPath();
+  context.moveTo(radius, 0.5);
+  context.lineTo(width - radius, 0.5);
+  context.quadraticCurveTo(width - 0.5, 0.5, width - 0.5, radius);
+  context.lineTo(width - 0.5, height - radius);
+  context.quadraticCurveTo(width - 0.5, height - 0.5, width - radius, height - 0.5);
+  context.lineTo(radius, height - 0.5);
+  context.quadraticCurveTo(0.5, height - 0.5, 0.5, height - radius);
+  context.lineTo(0.5, radius);
+  context.quadraticCurveTo(0.5, 0.5, radius, 0.5);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "#FFFFFF";
+  context.font = font;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, width / 2, height / 2, width - 12);
+  map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
+  return imageName;
 }
 
 function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCollection {
@@ -531,6 +610,17 @@ export function MapView({
 
   useEffect(() => {
     selectedMetricRef.current = selectedMetric;
+    const currentMap = mapRef.current;
+    if (currentMap?.isStyleLoaded() && currentMap.getLayer(AREA_LAYERS.parcel.label)) {
+      const showParcelNumber =
+        activeAreaLevel(currentMap.getZoom()) === "parcel" &&
+        selectedMetric !== "averageLandPricePerM2";
+      currentMap.setLayoutProperty(
+        AREA_LAYERS.parcel.label,
+        "visibility",
+        showParcelNumber ? "visible" : "none"
+      );
+    }
     let active = true;
     const loadMetricBubbleValues = async () => {
       if (selectedMetric !== "transactionVolume") {
@@ -653,19 +743,49 @@ export function MapView({
       if (!map.isStyleLoaded()) return;
       const source = map.getSource("metric-bubbles") as GeoJSONSource | undefined;
       if (!source) return;
+
       const level = activeAreaLevel(map.getZoom());
-      if (level === "parcel") {
-        source.setData(emptyFeatureCollection());
-        return;
-      }
       const collection = areaDataRef.current[level] ?? emptyFeatureCollection();
       const valuesByKey = new Map<string, MetricBubbleValue>();
       for (const value of metricBubbleValuesRef.current) {
-        const key = [value.level, value.district, value.sector, value.cell, value.village]
-          .map((part) => (part ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en"))
-          .join("|");
-        valuesByKey.set(key, value);
+        valuesByKey.set(
+          normalizedMetricKey(value.level, value.district, value.sector, value.cell, value.village),
+          value
+        );
       }
+
+      // A parcel's map price is a size × transaction price per m² estimate.
+      // Prefer a matching cell snapshot; use the existing district fallback only
+      // when the cell has no unique usable value, just as the parcel detail does.
+      const priceByCell = new Map<string, number>();
+      for (const feature of (areaDataRef.current.cell ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (
+          typeof unitPrice === "number" &&
+          Number.isFinite(unitPrice) &&
+          unitPrice > 0
+        ) {
+          priceByCell.set(
+            normalizedMetricKey(properties.district, properties.sector, properties.cell),
+            unitPrice
+          );
+        }
+      }
+      const priceByDistrict = new Map<string, number>();
+      for (const feature of (areaDataRef.current.district ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (
+          typeof unitPrice === "number" &&
+          Number.isFinite(unitPrice) &&
+          unitPrice > 0 &&
+          properties.district
+        ) {
+          priceByDistrict.set(normalizeMetricKeyPart(properties.district), unitPrice);
+        }
+      }
+
       const metric = selectedMetricRef.current;
       const features = collection.features.flatMap((feature, index) => {
         if (!feature.geometry || !("coordinates" in feature.geometry)) return [];
@@ -675,60 +795,135 @@ export function MapView({
           properties: feature.properties ?? {}
         } as MapGeoJSONFeature);
         if (!bounds) return [];
+
         const properties = feature.properties ?? {};
-        const key = [
-          level,
-          properties.district,
-          level === "district" ? null : properties.sector,
-          level === "cell" || level === "village" ? properties.cell : null,
-          level === "village" ? properties.village : null
-        ].map((part) => (part ?? "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en")).join("|");
-        let label = "—";
+        const district = properties.district ?? null;
+        const sector = properties.sector ?? null;
+        const cell = properties.cell ?? null;
+        const village = properties.village ?? null;
+        let label = "";
         let hasValue = false;
         let status = "unavailable";
         let detail = "This metric is not connected to a verified source yet; no number is inferred.";
-        if (metric === "averageLandPricePerM2" && typeof properties.average_land_price_per_m2 === "number") {
-          const amount = properties.average_land_price_per_m2;
-          label = amount >= 1000 ? (amount / 1000).toFixed(amount >= 10000 ? 0 : 1) + "k" : Math.round(amount).toString();
-          hasValue = true;
-          status = "provisional-transaction-price-snapshot";
-          detail = properties.average_land_price_date_status ?? "Provisional average transaction-price snapshot per square metre; source timing and method require confirmation.";
-        } else if (metric === "transactionVolume") {
-          const observed = valuesByKey.get(key);
-          if (observed) {
-            label = observed.label;
-            hasValue = true;
-            status = observed.status;
-            detail = observed.method;
+        let sortValue = 0;
+
+        if (level === "parcel") {
+          if (metric === "averageLandPricePerM2") {
+            const parcelArea = properties.parcel_size_m2;
+            const directUnitPrice = properties.average_land_price_per_m2;
+            const cellKey = normalizedMetricKey(district, sector, cell);
+            const cellPrice = priceByCell.get(cellKey);
+            const districtPrice = district ? priceByDistrict.get(normalizeMetricKeyPart(district)) : undefined;
+            const unitPrice =
+              typeof directUnitPrice === "number" && directUnitPrice > 0
+                ? directUnitPrice
+                : cellPrice ?? districtPrice;
+            const unitPriceSource =
+              typeof directUnitPrice === "number" && directUnitPrice > 0
+                ? "parcel-level"
+                : cellPrice !== undefined
+                  ? "matching cell-level"
+                  : districtPrice !== undefined
+                    ? "district-level fallback"
+                    : "unavailable";
+
+            if (
+              typeof parcelArea === "number" &&
+              Number.isFinite(parcelArea) &&
+              parcelArea > 0 &&
+              typeof unitPrice === "number" &&
+              Number.isFinite(unitPrice) &&
+              unitPrice > 0
+            ) {
+              sortValue = Math.round(parcelArea * unitPrice);
+              label = formatCompactValue(sortValue);
+              hasValue = true;
+              status = "estimated-parcel-value";
+              detail =
+                "Indicative parcel value: " +
+                formatCompactValue(parcelArea) +
+                " m² × " +
+                formatCompactValue(unitPrice) +
+                " RWF/m² transaction-price snapshot. " +
+                "Unit-price basis: " +
+                unitPriceSource +
+                ". It is an estimate, not a registered sale price or formal valuation.";
+            } else {
+              detail = "No parcel value is shown because usable parcel area or a defensible transaction-price estimate is unavailable.";
+            }
           } else {
-            detail = "No metric summary was returned for this geography.";
+            detail =
+              "A parcel-level value for the selected metric is not available; a broader-area number is not copied onto individual parcels.";
           }
-        } else if (metric === "capitalAppreciation") {
-          detail = "A dated historical and current comparable transaction-price series is not connected. Appreciation is withheld rather than fabricated.";
-        } else if (metric === "marketSupply") {
-          detail = "Verified current listings available to transact are not connected. Registered parcel counts are not for-sale supply.";
-        } else if (metric === "upcomingSupply") {
-          detail = "A verified developer and future-supply pipeline is not connected.";
-        } else if (metric === "rentalYield") {
-          detail = "Comparable verified rent and purchase-price data are not connected.";
+        } else {
+          const key = normalizedMetricKey(
+            level,
+            properties.district,
+            level === "district" ? null : properties.sector,
+            level === "cell" || level === "village" ? properties.cell : null,
+            level === "village" ? properties.village : null
+          );
+
+          if (
+            metric === "averageLandPricePerM2" &&
+            typeof properties.average_land_price_per_m2 === "number" &&
+            Number.isFinite(properties.average_land_price_per_m2)
+          ) {
+            sortValue = properties.average_land_price_per_m2;
+            label = formatCompactValue(sortValue);
+            hasValue = true;
+            status = "provisional-transaction-price-snapshot";
+            detail =
+              properties.average_land_price_date_status ??
+              "Provisional average transaction-price snapshot per square metre; source timing and method require confirmation.";
+          } else if (metric === "transactionVolume") {
+            const observed = valuesByKey.get(key);
+            if (observed) {
+              label = observed.label;
+              sortValue = observed.estimate;
+              hasValue = true;
+              status = observed.status;
+              detail = observed.method;
+            } else {
+              detail = "No metric summary was returned for this geography.";
+            }
+          } else if (metric === "capitalAppreciation") {
+            detail = "A dated historical and current comparable transaction-price series is not connected. Appreciation is withheld rather than fabricated.";
+          } else if (metric === "marketSupply") {
+            detail = "Verified current listings available to transact are not connected. Registered parcel counts are not for-sale supply.";
+          } else if (metric === "upcomingSupply") {
+            detail = "A verified developer and future-supply pipeline is not connected.";
+          } else if (metric === "rentalYield") {
+            detail = "Comparable verified rent and purchase-price data are not connected.";
+          }
         }
+
+        const variant: MetricPillVariant = level === "parcel" ? "parcel" : "area";
+        const iconImage = hasValue ? ensureMetricPillImage(map, label, variant) : "";
         return [{
           type: "Feature" as const,
           id: "metric-bubble-" + level + "-" + String(feature.id ?? index),
-          geometry: { type: "Point" as const, coordinates: [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] as [number, number] },
+          geometry: {
+            type: "Point" as const,
+            coordinates: [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] as [number, number]
+          },
           properties: {
             label,
             has_value: hasValue,
+            icon_image: iconImage,
+            level,
+            sort_priority: hasValue ? -Math.abs(sortValue) : 0,
             metric_label: metric,
             metric_status: status,
             metric_detail: detail,
-            district: properties.district ?? null,
-            sector: properties.sector ?? null,
-            cell: properties.cell ?? null,
-            village: properties.village ?? null
+            district,
+            sector,
+            cell,
+            village
           }
         }];
       });
+
       source.setData({ type: "FeatureCollection", features } as never);
     };
     refreshMetricBubblesRef.current = refreshMetricBubbles;
@@ -891,22 +1086,16 @@ export function MapView({
           source: "metric-bubbles",
           minzoom: 5,
           paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], SECTOR_ZOOM, 15, CELL_ZOOM, 18, PARCEL_ZOOM - 0.1, 20],
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6],
             "circle-color": [
               "case",
-              ["==", ["get", "has_value"], false], "#7C8981",
-              ["match", ["get", "metric_label"],
-                "averageLandPricePerM2", "#145C40",
-                "transactionVolume", "#1C6597",
-                "capitalAppreciation", "#604BA3",
-                "rentalYield", "#9A6A18",
-                "marketSupply", "#9A6A18",
-                "upcomingSupply", "#69766E",
-                "#315F4A"]
+              ["==", ["get", "has_value"], false], "#8B9690",
+              ["==", ["get", "level"], "parcel"], "#68747B",
+              "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 2,
-            "circle-opacity": 0.97
+            "circle-stroke-width": 1,
+            "circle-opacity": 0.98
           }
         });
       }
@@ -916,17 +1105,15 @@ export function MapView({
           type: "symbol",
           source: "metric-bubbles",
           minzoom: 5,
+          filter: ["==", ["get", "has_value"], true],
           layout: {
-            "text-field": ["get", "label"],
-            "text-font": ["Noto Sans Bold", "Noto Sans Medium", "Arial Unicode MS Regular"],
-            "text-size": 10,
-            "text-allow-overlap": false,
-            "text-ignore-placement": false
-          },
-          paint: {
-            "text-color": "#FFFFFF",
-            "text-halo-color": "#17382A",
-            "text-halo-width": 0.25
+            "icon-image": ["get", "icon_image"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.84, 12, 0.92, 16, 1, 19, 1.02],
+            "icon-anchor": "center",
+            "icon-padding": 2,
+            "icon-allow-overlap": false,
+            "icon-ignore-placement": false,
+            "symbol-sort-key": ["get", "sort_priority"]
           }
         });
       }
@@ -1138,7 +1325,9 @@ export function MapView({
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
         }
         if (map.getLayer(layer.label)) {
-          map.setLayoutProperty(layer.label, "visibility", isActive ? "visible" : "none");
+          const showLabel =
+            isActive && !(level === "parcel" && selectedMetricRef.current === "averageLandPricePerM2");
+          map.setLayoutProperty(layer.label, "visibility", showLabel ? "visible" : "none");
         }
       }
     };
