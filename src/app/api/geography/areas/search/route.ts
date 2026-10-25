@@ -50,7 +50,7 @@ const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
   bugesera: 4038
 };
 
-const CANDIDATES: Record<AdminAreaLevel, { name: string[]; district: string[]; sector: string[]; cell: string[]; village: string[]; ids: Record<AreaLevel, string[]> }> = {
+const CANDIDATES: Record<AdminAreaLevel, { name: string[]; district: string[]; sector: string[]; cell: string[]; village: string[]; ids: Record<AdminAreaLevel, string[]> }> = {
   district: {
     name: ["district", "district_name", "district_1", "dist_name", "name", "name_e"],
     district: ["district", "district_name", "district_1", "dist_name"],
