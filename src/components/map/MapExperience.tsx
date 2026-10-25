@@ -187,6 +187,30 @@ function getUnitPriceEstimate(
     }
   }
 
+  if (allowDistrictFallback && area.level === "parcel" && area.sector) {
+    const byCell = new Map<string, Set<number>>();
+    for (const row of rows) {
+      if (!row.valid ||
+        normalizeAreaName(row.district) !== districtKey ||
+        normalizeAreaName(row.sector) !== normalizeAreaName(area.sector) ||
+        row.price === null) continue;
+      const key = normalizeAreaName(row.cell);
+      const prices = byCell.get(key) ?? new Set<number>();
+      prices.add(row.price);
+      byCell.set(key, prices);
+    }
+    const uniqueCellPrices = Array.from(byCell.values())
+      .filter((prices) => prices.size === 1)
+      .map((prices) => prices.values().next().value as number);
+    if (uniqueCellPrices.length > 0) {
+      return {
+        pricePerM2: uniqueCellPrices.reduce((sum, price) => sum + price, 0) / uniqueCellPrices.length,
+        kind: "derived-sector-mean",
+        explanation: "Indicative sector mean from available unambiguous cell transaction-price snapshots. Conflicting cells are excluded; this is used as a proxy because no unique cell snapshot was available."
+      };
+    }
+  }
+
   const districtPrice = DISTRICT_PRICE_SNAPSHOTS[districtKey] ?? null;
   if (allowDistrictFallback && districtPrice !== null) {
     return {
@@ -700,14 +724,23 @@ export function MapExperience() {
     selectedArea.parcelPriceValue > 0 &&
     typeof selectedArea.parcelPriceSource === "string" &&
     selectedArea.parcelPriceSource.trim().length > 0;
+  const hasParcelTotalEstimate = estimatedParcelValue !== null;
+  const hasParcelUnitPriceOnly = selectedArea?.level === "parcel" &&
+    !hasParcelTotalEstimate &&
+    parcelUnitPriceEstimate?.pricePerM2 !== null &&
+    parcelUnitPriceEstimate?.pricePerM2 !== undefined;
   const displayedParcelValue = hasSourcedParcelPrice
     ? selectedArea?.parcelPriceValue ?? null
-    : estimatedParcelValue;
+    : estimatedParcelValue ?? (hasParcelUnitPriceOnly ? parcelUnitPriceEstimate?.pricePerM2 ?? null : null);
   const displayedParcelPriceType: ParcelPriceType =
     hasSourcedParcelPrice && isParcelPriceType(selectedArea?.parcelPriceType)
       ? selectedArea.parcelPriceType
       : "indicative-estimate";
-  const displayedParcelPriceTypeLabel = parcelPriceTypeLabel(displayedParcelPriceType);
+  const displayedParcelPriceTypeLabel = hasSourcedParcelPrice
+    ? parcelPriceTypeLabel(displayedParcelPriceType)
+    : hasParcelUnitPriceOnly
+      ? "Indicative area price / m²"
+      : parcelPriceTypeLabel("indicative-estimate");
   const selectedDistrictPriceBenchmark = selectedArea
     ? getDistrictLandPriceBenchmark(selectedArea.district)
     : null;
@@ -1604,7 +1637,7 @@ export function MapExperience() {
                   </strong>
                 </div>
                 <div>
-                  <span>Parcel area</span>
+                  <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>
                   <strong>
                     {typeof selectedArea.parcelSizeM2 === "number"
                       ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m²`
@@ -1637,9 +1670,13 @@ export function MapExperience() {
                       Source: {selectedArea.parcelPriceSource}
                       {selectedArea.parcelPriceDate ? ` · Date: ${selectedArea.parcelPriceDate}` : ""}
                     </p>
+                  ) : hasParcelUnitPriceOnly ? (
+                    <p>
+                      Parcel area is missing, so this is the available area-level benchmark per square metre—not a total parcel value.
+                    </p>
                   ) : typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
                     <p>
-                      {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction-price snapshot
+                      {selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. " : ""}{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction-price snapshot
                     </p>
                   ) : null}
                   {hasSourcedParcelPrice && selectedArea.parcelPriceNote ? (
@@ -1675,7 +1712,9 @@ export function MapExperience() {
                   <small>
                     {hasSourcedParcelPrice
                       ? "Shown as a " + displayedParcelPriceTypeLabel.toLowerCase() + " based on the source recorded above. Check the source document and date before relying on it."
-                      : (parcelUnitPriceEstimate?.explanation ?? "A parcel area and a usable average transaction price per m² are both required.") + " This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation."}
+                      : hasParcelUnitPriceOnly
+                        ? (parcelUnitPriceEstimate?.explanation ?? "Using the currently connected area-level price snapshot.") + " The amount is shown per m² because parcel area is missing; it is not a total parcel value."
+                        : (parcelUnitPriceEstimate?.explanation ?? "Uses the currently connected district transaction-price snapshot where finer-level data is missing.") + " This is an indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation."}
                   </small>
                 </div>
               </div>
