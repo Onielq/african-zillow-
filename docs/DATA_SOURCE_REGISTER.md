@@ -71,11 +71,11 @@ The average reference price is shown separately for comparison. The panel also c
 
 The dashboard's `/reference` comparison reports these district values in RWF/m²: Gasabo 36,103 transaction / 19,976 reference; Kicukiro 61,499 / 27,914; Nyarugenge 50,865 / 28,077; Bugesera 4,038 / 1,145. The `/prices` page reports Nyarugenge at 50,771 rather than 50,865. The app uses the column explicitly labelled **Avg Transaction Price** on `/reference` and displays the 94 RWF/m² cross-page discrepancy as unresolved. All price values remain provisional because source dates and weighting methods are not disclosed.
 
-## User-supplied cell-price snapshot
+## Cell-level source snapshot and transaction-price use
 
 The file `public/land-price-reference.tsv` preserves the table supplied for this implementation. It has 244 data rows and a header identifying province, district, sector, cell and weighted average price in RWF/m². Its observation date and the method used to calculate each weighted average were not included.
 
-The application checks the shape of each row and groups repeated locations using normalized district + sector + cell names. A cell price is displayed only when the exact location key has one distinct valid value. Duplicate keys with conflicting values remain unresolved with their source row numbers visible. Rows with missing or extra fields remain in the raw file for audit but are not used as a price. Sector prices are not calculated by averaging the supplied cells, because the file does not provide a sector-level weighted average or the underlying weights.
+For the valuation UI, `public/land-price-transaction.tsv` carries the same cell rows with a transaction-price header and is used provisionally as the `/prices` weighted-average transaction-price snapshot. This mapping is based on the supplied rows' geography/value correspondence with `/prices`, but the supplied file contains no series ID, observation date or methodology, so the publisher still needs to confirm it. The app matches normalized district + sector + cell keys and uses a cell value only when one distinct valid value exists. Duplicate keys with conflicting values remain unresolved; malformed rows are not used. The original `public/land-price-reference.tsv` is retained unchanged for audit and is not loaded by the valuation UI. Sector prices are not presented as official weighted averages: any sector mean is a modelled unweighted mean of unambiguous cell transaction-price snapshots.
 
 Initial diagnostics: 242 valid-shaped rows, 2 malformed rows and 10 location keys with more than one price. These are data-quality findings, not a correction of the source values. Review the original source and observation date before production use.
 
@@ -88,9 +88,9 @@ The drawer separately lists estate-agency candidates found through public websit
 
 ## Price reconciliation record
 
-The official source review on 24 October 2026 is documented in `docs/LAND_PRICE_SOURCE_RECONCILIATION.md`. The district values are stored in `public/land-price-district-snapshot.tsv` with separate review and observation-date fields. The row-level problem list is in `public/land-price-reconciliation.tsv`.
+The official source review is documented in `docs/LAND_PRICE_SOURCE_RECONCILIATION.md`. The `/prices` district cross-check remains in `public/land-price-district-snapshot.tsv`; the separate transaction/reference benchmarks used by the app are defined in `src/data/land-price-benchmarks.ts`. The cell-level row problem list is in `public/land-price-reconciliation.tsv`.
 
-The review timestamp must not be mistaken for the underlying price observation date. District values are marked provisional until the publisher confirms the effective date and method. The raw 244-row user-supplied TSV remains unchanged so that source corrections can be audited rather than silently rewritten.
+The review timestamp must not be mistaken for the underlying price observation date. The parcel estimate uses transaction price as its primary basis; district reference price is shown separately and is not substituted into the main calculation. Nyarugenge's `/prices` and `/reference` transaction values differ by 94 RWF/m²; the app uses the explicitly labelled `/reference` Avg Transaction Price and flags the unresolved difference. The original 244-row user-supplied TSV remains unchanged for audit.
 
 ## Contextual place overlays (Show menu)
 
