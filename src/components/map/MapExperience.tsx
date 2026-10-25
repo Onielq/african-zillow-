@@ -695,7 +695,6 @@ export function MapExperience() {
   // Otherwise keep the current area-based figure explicitly labelled as an estimate.
   const hasSourcedParcelPrice = selectedArea?.level === "parcel" &&
     isParcelPriceType(selectedArea.parcelPriceType) &&
-    selectedArea.parcelPriceType !== "indicative-estimate" &&
     typeof selectedArea.parcelPriceValue === "number" &&
     Number.isFinite(selectedArea.parcelPriceValue) &&
     selectedArea.parcelPriceValue > 0 &&
