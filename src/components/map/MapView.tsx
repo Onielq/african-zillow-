@@ -1163,7 +1163,10 @@ export function MapView({
         }
 
         const variant: MetricPillVariant = level === "parcel" ? "parcel" : "area";
-        const iconImage = hasValue ? ensureMetricPillImage(map, label, variant) : "";
+        const pillDimensions = hasValue ? measureMetricPill(label, variant) : null;
+        const iconImage = hasValue && pillDimensions
+          ? ensureMetricPillImage(map, label, variant, pillDimensions)
+          : "";
         return [{
           type: "Feature" as const,
           id: "metric-bubble-" + level + "-" + String(feature.id ?? index),
@@ -1175,6 +1178,9 @@ export function MapView({
             label,
             has_value: hasValue,
             icon_image: iconImage,
+            pill_width: pillDimensions?.width ?? 0,
+            pill_height: pillDimensions?.height ?? 0,
+            show_dot: false,
             level,
             sort_priority: hasValue ? -Math.abs(sortValue) : 0,
             metric_label: metric,
@@ -1188,7 +1194,36 @@ export function MapView({
         }];
       });
 
-      source.setData({ type: "FeatureCollection", features } as never);
+      // Measure collisions in viewport pixels instead of letting MapLibre hide
+      // every overlapping symbol. One or two labels remain price capsules;
+      // only connected collision groups of three or more become red dots.
+      const pillScale = metricPillScaleAtZoom(map.getZoom());
+      const collisionBoxes = features.flatMap((feature, featureIndex) => {
+        if (
+          !feature.properties.has_value ||
+          !feature.properties.label ||
+          !feature.properties.icon_image
+        ) return [];
+        const coordinates = feature.geometry.coordinates;
+        const screenPoint = map.project(coordinates);
+        return [{
+          featureIndex,
+          x: screenPoint.x,
+          y: screenPoint.y,
+          width: (feature.properties.pill_width ?? 34) * pillScale,
+          height: (feature.properties.pill_height ?? 20) * pillScale
+        }];
+      });
+      const crowdedLabelIndexes = findCrowdedMetricLabelIndexes(collisionBoxes);
+      const renderedFeatures = features.map((feature, featureIndex) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          show_dot: crowdedLabelIndexes.has(featureIndex)
+        }
+      }));
+
+      source.setData({ type: "FeatureCollection", features: renderedFeatures } as never);
     };
     refreshMetricBubblesRef.current = refreshMetricBubbles;
 
@@ -1349,12 +1384,19 @@ export function MapView({
           type: "circle",
           source: "metric-bubbles",
           minzoom: 5,
+          filter: [
+            "any",
+            ["==", ["get", "show_dot"], true],
+            ["all",
+              ["==", ["get", "has_value"], false],
+              ["!=", ["get", "metric_label"], "averageLandPricePerM2"]
+            ]
+          ],
           paint: {
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6],
             "circle-color": [
               "case",
               ["==", ["get", "has_value"], false], "#8B9690",
-              ["==", ["get", "level"], "parcel"], "#68747B",
               "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
@@ -1375,9 +1417,10 @@ export function MapView({
             "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.84, 12, 0.92, 16, 1, 19, 1.02],
             "icon-anchor": "center",
             "icon-padding": 2,
-            "icon-allow-overlap": false,
-            "icon-ignore-placement": false,
-            "symbol-sort-key": ["get", "sort_priority"]
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "symbol-sort-key": ["get", "sort_priority"],
+            "visibility": "visible"
           }
         });
       }
