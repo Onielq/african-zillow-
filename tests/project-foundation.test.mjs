@@ -615,9 +615,10 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
   assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
   assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
-  assert.match(mapView, /level === "parcel"\s*\?\s*"#77857C"/);
-  assert.match(mapView, /PARCEL_ZOOM,\s*0\.55/);
-  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85,\s*1\.2/);
+  assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
+  assert.match(mapView, /PARCEL_ZOOM,\s*0\.95/);
+  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85,\s*1\.9/);
+  assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.98 : 0\.94/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
@@ -717,7 +718,7 @@ test("parcel price markers match the compact reference and combine NEW with pric
   assert.ok(mapView.includes("export function demoParcelIsNewListing"));
   assert.ok(mapView.includes('map.on("click", "metric-bubbles-parcel-label", selectParcelFromMarker)'));
   assert.ok(mapView.includes("String(selectedFeature.id) === String(id)"));
-  assert.ok(experience.includes("Demonstration market status and NEW markers only"));
+  assert.ok(experience.includes("Illustrative status only; this parcel is not confirmed as listed."));
   assert.ok(mapView.includes("refreshMetricBubblesRef.current?.()"));
   assert.ok(mapView.includes("selectFeatureState(null)"));
   assert.ok(mapView.includes("onAreaSelected(null)"));
@@ -734,7 +735,8 @@ test("parcel listing colors use a stable district-scoped demonstration split and
   assert.match(mapView, /sourceMarketStatus \? "source" as const : "demonstration" as const/);
   assert.match(mapView, /a stable 50\/50 district-level demonstration split/);
   assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
-  assert.match(experience, /Available \(demo\)/);
-  assert.match(experience, /Demonstration market status and NEW markers only — not verified listing data/);
-  assert.match(css, /\.parcel-market-status-off-market/);
+  assert.match(experience, /Land for sale/);
+  assert.match(experience, /Off the market/);
+  assert.match(experience, /parcel-market-status-inline/);
+  assert.match(css, /\.parcel-market-status-inline-off-market/);
 });
