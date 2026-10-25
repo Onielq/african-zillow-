@@ -614,6 +614,12 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\]/);
   assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
   assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
+  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /level === "parcel"\s*\?\s*"#77857C"/);
+  assert.match(mapView, /PARCEL_ZOOM,\s*0\.55/);
+  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85,\s*1\.2/);
+  assert.match(mapView, /"icon-offset": \[0, -31\]/);
+  assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
   assert.match(mapView, /status = "calculated-asking-price"/);
   assert.match(mapView, /properties\.parcel_size_m2/);
@@ -680,7 +686,7 @@ test("price bubbles retain collision behavior and style property markers by mark
   assert.match(mapView, /marketStatus === "off-market"\s*\?\s*"#343A40"/);
   assert.match(mapView, /marketStatus === "available"/);
   assert.match(mapView, /marketStatus === "off-market"[\s\S]*?: "#8B9690"/);
-  assert.match(mapView, /context\.strokeStyle = "rgba\(255, 255, 255, 0\.98\)"/);
+  assert.doesNotMatch(mapView.slice(mapView.indexOf("function ensureMetricPillImage"), mapView.indexOf("function ensureNewListingBadgeImage")), /strokeStyle|context\.stroke\(\)/);
   assert.match(mapView, /export function findCrowdedMetricLabelIndexes/);
   assert.match(mapView, /minimumCrowdedGroupSize = 3/);
   assert.match(mapView, /component\.length >= minimumCrowdedGroupSize/);
@@ -699,14 +705,30 @@ test("property markers use a separate NEW badge, blue selection override, and li
   assert.match(mapView, /const RECENT_LISTING_WINDOW_MS = 14 \* 24 \* 60 \* 60 \* 1000/);
   assert.match(mapView, /function isRecentlyListed\(value: unknown/);
   assert.match(mapView, /function propertyMarketStatus\(value: unknown/);
-  assert.match(mapView, /const bodyHeight = isParcel \? 32 : 22/);
-  assert.match(mapView, /const tailHeight = isParcel \? 7 : 0/);
-  assert.match(mapView, /Math\.min\(84, Math\.max\(72, measuredWidth\)\)/);
+  assert.match(mapView, /const bodyHeight = isParcel \? 24 : 22/);
+  assert.match(mapView, /const tailHeight = isParcel \? 4 : 0/);
+  assert.match(mapView, /Math\.min\(68, Math\.max\(56, measuredWidth\)\)/);
   assert.match(mapView, /id: "metric-bubbles-parcel-label"/);
   assert.match(mapView, /id: "metric-bubbles-new-badge"/);
-  assert.match(mapView, /"icon-offset": \[0, -42\]/);
+  assert.match(mapView, /"icon-offset": \[0, -31\]/);
   assert.match(mapView, /is_new_listing: isNewListing/);
   assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
   assert.match(mapView, /selectFeatureState\(null\)/);
   assert.match(mapView, /onAreaSelected\(null\)/);
+});
+
+test("parcel listing colors use a stable district-scoped demonstration split and disclose that it is not verified data", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(mapView, /export function demoParcelMarketStatus/);
+  assert.match(mapView, /normalizeMetricKeyPart\(district\)/);
+  assert.match(mapView, /\(hash >>> 31\) === 0 \? "available" : "off-market"/);
+  assert.match(mapView, /sourceMarketStatus \? "source" as const : "demonstration" as const/);
+  assert.match(mapView, /a stable 50\/50 district-level demonstration split/);
+  assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
+  assert.match(experience, /Available \(demo\)/);
+  assert.match(experience, /Demonstration split only — not a verified property listing/);
+  assert.match(css, /\.parcel-market-status-off-market/);
 });

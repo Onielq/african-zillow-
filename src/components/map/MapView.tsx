@@ -109,6 +109,8 @@ export type SelectedArea = {
   wetlandAreaM2?: number | null;
   lastUpdatedOn?: number | null;
   bounds?: [number, number, number, number] | null;
+  parcelMarketStatus?: PropertyMarketStatus | null;
+  parcelMarketStatusSource?: "source" | "demonstration" | null;
 };
 
 type AreaProperties = {
@@ -156,9 +158,11 @@ type AreaProperties = {
   metric_status?: string | null;
   metric_detail?: string | null;
   market_status?: PropertyMarketStatus | null;
+  market_status_source?: "source" | "demonstration" | null;
   listing_created_at?: string | number | null;
   is_selected?: boolean;
   is_new_listing?: boolean;
+  level?: AreaLevel;
   area_feature_id?: string | null;
 };
 
@@ -231,6 +235,30 @@ function propertyMarketStatus(value: unknown): PropertyMarketStatus | null {
   return null;
 }
 
+/**
+ * The cadastral feed has no verified for-sale status. For interface testing,
+ * give each parcel a stable status based on its district and cadastral ID.
+ * Hash parity produces a roughly even 50/50 split and never changes on pan/zoom.
+ * This is a visual demonstration, not a claim that the land is actually listed.
+ */
+export function demoParcelMarketStatus(
+  district: unknown,
+  upi: unknown,
+  parcelNumber: unknown,
+  featureId: unknown
+): PropertyMarketStatus {
+  const identity = [
+    normalizeMetricKeyPart(district),
+    String(upi ?? parcelNumber ?? featureId ?? "")
+  ].join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 31) === 0 ? "available" : "off-market";
+}
+
 /** Only listing-feed dates qualify here; cadastral update timestamps are not listing dates. */
 function isRecentlyListed(value: unknown, now = Date.now()): boolean {
   let timestamp: number;
@@ -285,10 +313,10 @@ function measureMetricPill(label: string, variant: MetricPillVariant): MetricPil
 
   const isParcel = variant === "parcel";
   const font = isParcel
-    ? "600 12px Arial, sans-serif"
+    ? "600 10px Arial, sans-serif"
     : "600 11px Arial, sans-serif";
-  const bodyHeight = isParcel ? 32 : 22;
-  const tailHeight = isParcel ? 7 : 0;
+  const bodyHeight = isParcel ? 24 : 22;
+  const tailHeight = isParcel ? 4 : 0;
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
   const measuredTextWidth = (() => {
@@ -296,9 +324,9 @@ function measureMetricPill(label: string, variant: MetricPillVariant): MetricPil
     measureContext.font = font;
     return Math.ceil(measureContext.measureText(label).width);
   })();
-  const measuredWidth = measuredTextWidth + (isParcel ? 16 : 16);
+  const measuredWidth = measuredTextWidth + (isParcel ? 12 : 16);
   const width = isParcel
-    ? Math.min(84, Math.max(72, measuredWidth))
+    ? Math.min(68, Math.max(56, measuredWidth))
     : Math.max(34, measuredWidth);
   const dimensions = {
     width,
@@ -343,8 +371,6 @@ function ensureMetricPillImage(
           : "#8B9690"
       : "#9D2932";
   context.fillStyle = fillColor;
-  context.strokeStyle = "rgba(255, 255, 255, 0.98)";
-  context.lineWidth = 1.25;
 
   const radius = bodyHeight / 2;
   context.beginPath();
@@ -364,7 +390,6 @@ function ensureMetricPillImage(
   context.quadraticCurveTo(0.5, 0.5, radius, 0.5);
   context.closePath();
   context.fill();
-  context.stroke();
 
   context.fillStyle = "#FFFFFF";
   context.font = font;
@@ -380,9 +405,9 @@ function ensureNewListingBadgeImage(map: MapLibreMapInstance): string {
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
-  const width = 38;
-  const height = 16;
-  const radius = 7;
+  const width = 34;
+  const height = 14;
+  const radius = 6;
   const canvas = document.createElement("canvas");
   canvas.width = width * pixelRatio;
   canvas.height = height * pixelRatio;
@@ -391,8 +416,6 @@ function ensureNewListingBadgeImage(map: MapLibreMapInstance): string {
 
   context.scale(pixelRatio, pixelRatio);
   context.fillStyle = "#155E43";
-  context.strokeStyle = "rgba(255, 255, 255, 0.98)";
-  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(radius, 0.5);
   context.lineTo(width - radius, 0.5);
@@ -405,9 +428,8 @@ function ensureNewListingBadgeImage(map: MapLibreMapInstance): string {
   context.quadraticCurveTo(0.5, 0.5, radius, 0.5);
   context.closePath();
   context.fill();
-  context.stroke();
   context.fillStyle = "#FFFFFF";
-  context.font = "800 8px Arial, sans-serif";
+  context.font = "800 7px Arial, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText("NEW", width / 2, height / 2);
@@ -1288,7 +1310,18 @@ export function MapView({
         }
 
         const variant: MetricPillVariant = level === "parcel" ? "parcel" : "area";
-        const marketStatus = level === "parcel" ? propertyMarketStatus(properties.market_status) : null;
+        const sourceMarketStatus = level === "parcel" ? propertyMarketStatus(properties.market_status) : null;
+        const marketStatus = level === "parcel"
+          ? sourceMarketStatus ?? demoParcelMarketStatus(
+              district,
+              properties.upi,
+              properties.parcel_number,
+              feature.id ?? index
+            )
+          : null;
+        const marketStatusSource = level === "parcel"
+          ? sourceMarketStatus ? "source" as const : "demonstration" as const
+          : null;
         const isSelected = level === "parcel" &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
           String(selectedFeature.id) === String(feature.id);
@@ -1315,8 +1348,11 @@ export function MapView({
             sort_priority: hasValue ? -Math.abs(sortValue) : 0,
             metric_label: metric,
             metric_status: status,
-            metric_detail: detail,
+            metric_detail: level === "parcel" && marketStatusSource === "demonstration"
+              ? detail + " Market-status colors use a stable 50/50 district-level demonstration split; they are not verified listings."
+              : detail,
             market_status: marketStatus,
+            market_status_source: marketStatusSource,
             is_selected: isSelected,
             is_new_listing: isNewListing,
             area_feature_id: String(feature.id ?? index),
@@ -1420,7 +1456,8 @@ export function MapView({
                 (level === "district" || level === "sector" || level === "cell"),
               layer.color
             ),
-            "fill-opacity": AREA_FILL_OPACITY_EXPRESSION
+            // Parcels stay fully transparent so the basemap shows through; their outlines define the lots.
+            "fill-opacity": level === "parcel" ? 0 : AREA_FILL_OPACITY_EXPRESSION
           }
         });
       }
@@ -1440,9 +1477,9 @@ export function MapView({
               ["boolean", ["feature-state", "hover"], false],
               "#06492E",
               ["boolean", ["feature-state", "selected"], false],
-              "#126347",
+              level === "parcel" ? "#2563EB" : "#126347",
               level === "parcel"
-                ? "#A56A0A"
+                ? "#77857C"
                 : level === "village"
                   ? "#A68A56"
                   : "#668878"
@@ -1450,20 +1487,20 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 3.2 : 3.0,
+              level === "parcel" ? 1.7 : 3.0,
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 2.8 : 2.5,
+              level === "parcel" ? 2.0 : 2.5,
               level === "parcel"
                 ? [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     PARCEL_ZOOM,
-                    0.9,
+                    0.55,
                     PARCEL_ZOOM + 1.5,
-                    1.7,
+                    0.85,
                     PARCEL_ZOOM + 3.85,
-                    2.7
+                    1.2
                   ]
                 : [
                     "interpolate",
@@ -1477,7 +1514,7 @@ export function MapView({
                     2
                   ]
             ],
-            "line-opacity": 0.94
+            "line-opacity": level === "parcel" ? 0.82 : 0.94
           }
         });
       }
@@ -1622,7 +1659,7 @@ export function MapView({
             "icon-image": "metric-new-listing-badge",
             "icon-size": 1,
             "icon-anchor": "bottom",
-            "icon-offset": [0, -42],
+            "icon-offset": [0, -31],
             "icon-padding": 0,
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
@@ -2233,8 +2270,26 @@ export function MapView({
       const area = featureToArea(feature, level);
       if (id === null || !area) return;
 
+      const properties = feature.properties as AreaProperties | null;
+      const suppliedMarketStatus = propertyMarketStatus(properties?.market_status);
+      const parcelMarketStatus = level === "parcel"
+        ? suppliedMarketStatus ?? demoParcelMarketStatus(
+            properties?.district,
+            properties?.upi,
+            properties?.parcel_number,
+            feature.id
+          )
+        : null;
+      const parcelMarketStatusSource = level === "parcel"
+        ? suppliedMarketStatus ? "source" as const : "demonstration" as const
+        : null;
+
       selectFeatureState({ source, id });
-      onAreaSelected(area);
+      onAreaSelected({
+        ...area,
+        parcelMarketStatus,
+        parcelMarketStatusSource
+      });
       fitFeature(map, feature, level);
     };
 
@@ -2250,6 +2305,30 @@ export function MapView({
           handleAreaClick(level, layer.source, event.features?.[0])
         );
       }
+
+      // Clicking a price capsule or collision dot selects that parcel too.
+      // The marker carries the original cadastral feature ID so map styling and
+      // the information panel stay in sync with polygon selection.
+      const selectParcelFromMarker = (event: { features?: MapGeoJSONFeature[]; point: { x: number; y: number } }) => {
+        const marker = event.features?.[0];
+        const markerProperties = marker?.properties as AreaProperties | null;
+        if (!markerProperties || markerProperties.level !== "parcel") return;
+        const targetId = String(markerProperties.area_feature_id ?? "");
+        if (!targetId) return;
+
+        const renderedParcel = map.queryRenderedFeatures([event.point.x, event.point.y], {
+          layers: [AREA_LAYERS.parcel.fill]
+        }).find((candidate) => String(getFeatureId(candidate)) === targetId);
+        const cachedParcel = areaDataRef.current.parcel?.features.find(
+          (candidate) => String(candidate.id) === targetId
+        ) as unknown as MapGeoJSONFeature | undefined;
+        const parcelFeature = renderedParcel ?? cachedParcel;
+        if (parcelFeature) handleAreaClick("parcel", AREA_LAYERS.parcel.source, parcelFeature);
+      };
+
+      map.on("click", "metric-bubbles-parcel-label", selectParcelFromMarker);
+      map.on("click", "metric-bubbles-new-badge", selectParcelFromMarker);
+      map.on("click", "metric-bubbles-circle", selectParcelFromMarker);
 
       // Clicking an unoccupied part of the map clears selection and restores
       // the selected parcel capsule to its underlying market-status color.
