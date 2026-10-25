@@ -155,6 +155,11 @@ type AreaProperties = {
   metric_label?: string | null;
   metric_status?: string | null;
   metric_detail?: string | null;
+  market_status?: PropertyMarketStatus | null;
+  listing_created_at?: string | number | null;
+  is_selected?: boolean;
+  is_new_listing?: boolean;
+  area_feature_id?: string | null;
 };
 
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
@@ -213,39 +218,93 @@ function normalizedMetricKey(...parts: unknown[]): string {
   return parts.map(normalizeMetricKeyPart).join("|");
 }
 
+type PropertyMarketStatus = "available" | "off-market";
+
+const RECENT_LISTING_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+function propertyMarketStatus(value: unknown): PropertyMarketStatus | null {
+  const normalized = typeof value === "string"
+    ? value.trim().toLowerCase().replace(/[ _]+/g, "-")
+    : "";
+  if (normalized === "available") return "available";
+  if (normalized === "off-market" || normalized === "offmarket") return "off-market";
+  return null;
+}
+
+/** Only listing-feed dates qualify here; cadastral update timestamps are not listing dates. */
+function isRecentlyListed(value: unknown, now = Date.now()): boolean {
+  let timestamp: number;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
+  } else if (typeof value === "string" && value.trim()) {
+    const normalized = value.trim();
+    if (/^\\d+(?:\\.\\d+)?$/.test(normalized)) {
+      const numeric = Number(normalized);
+      timestamp = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    } else {
+      timestamp = Date.parse(normalized);
+    }
+  } else {
+    return false;
+  }
+
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= RECENT_LISTING_WINDOW_MS;
+}
+
 type MetricPillVariant = "area" | "parcel";
 
-function metricPillImageName(label: string, variant: MetricPillVariant): string {
+type MetricPillDimensions = {
+  width: number;
+  height: number;
+  bodyHeight: number;
+  tailHeight: number;
+  font: string;
+};
+
+const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
+
+function metricPillImageName(
+  label: string,
+  variant: MetricPillVariant,
+  marketStatus: PropertyMarketStatus | null,
+  isSelected: boolean
+): string {
   let hash = 5381;
   for (let index = 0; index < label.length; index += 1) {
     hash = (Math.imul(hash, 33) ^ label.charCodeAt(index)) >>> 0;
   }
-  return "metric-price-pill-" + variant + "-" + hash.toString(36);
+  const state = isSelected ? "selected" : marketStatus ?? "default";
+  return "metric-price-pill-" + variant + "-" + state + "-" + hash.toString(36);
 }
-
-type MetricPillDimensions = { width: number; height: number; font: string };
-
-const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
 
 function measureMetricPill(label: string, variant: MetricPillVariant): MetricPillDimensions {
   const cacheKey = variant + "|" + label;
   const cached = metricPillDimensionsCache.get(cacheKey);
   if (cached) return cached;
-  const font = variant === "parcel"
-    ? "600 10px Arial, sans-serif"
+
+  const isParcel = variant === "parcel";
+  const font = isParcel
+    ? "600 12px Arial, sans-serif"
     : "600 11px Arial, sans-serif";
-  const height = variant === "parcel" ? 20 : 22;
+  const bodyHeight = isParcel ? 32 : 22;
+  const tailHeight = isParcel ? 7 : 0;
   const measureCanvas = document.createElement("canvas");
   const measureContext = measureCanvas.getContext("2d");
-  if (!measureContext) {
-    const dimensions = { width: Math.max(34, label.length * 7 + 16), height, font };
-    metricPillDimensionsCache.set(cacheKey, dimensions);
-    return dimensions;
-  }
-  measureContext.font = font;
+  const measuredTextWidth = (() => {
+    if (!measureContext) return label.length * (isParcel ? 7 : 6.5);
+    measureContext.font = font;
+    return Math.ceil(measureContext.measureText(label).width);
+  })();
+  const measuredWidth = measuredTextWidth + (isParcel ? 16 : 16);
+  const width = isParcel
+    ? Math.min(84, Math.max(72, measuredWidth))
+    : Math.max(34, measuredWidth);
   const dimensions = {
-    width: Math.max(34, Math.ceil(measureContext.measureText(label).width) + 16),
-    height,
+    width,
+    height: bodyHeight + tailHeight,
+    bodyHeight,
+    tailHeight,
     font
   };
   metricPillDimensionsCache.set(cacheKey, dimensions);
@@ -256,13 +315,15 @@ function ensureMetricPillImage(
   map: MapLibreMapInstance,
   label: string,
   variant: MetricPillVariant,
-  dimensions: MetricPillDimensions
+  dimensions: MetricPillDimensions,
+  marketStatus: PropertyMarketStatus | null = null,
+  isSelected = false
 ): string {
-  const imageName = metricPillImageName(label, variant);
+  const imageName = metricPillImageName(label, variant, marketStatus, isSelected);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
-  const { width, height, font } = dimensions;
+  const { width, height, bodyHeight, tailHeight, font } = dimensions;
   const canvas = document.createElement("canvas");
   canvas.width = width * pixelRatio;
   canvas.height = height * pixelRatio;
@@ -270,12 +331,64 @@ function ensureMetricPillImage(
   if (!context) return "";
 
   context.scale(pixelRatio, pixelRatio);
-  // All price labels use the same red capsule and white outline as the reference.
-  context.fillStyle = "#9D2932";
+  // Selection overrides market status. Unknown status keeps the existing red price capsule;
+  // charcoal is used only for a property explicitly marked off-market by a listing feed.
+  const fillColor = isSelected
+    ? "#2563EB"
+    : marketStatus === "off-market"
+      ? "#343A40"
+      : "#9D2932";
+  context.fillStyle = fillColor;
   context.strokeStyle = "rgba(255, 255, 255, 0.98)";
   context.lineWidth = 1.25;
 
-  const radius = height / 2;
+  const radius = bodyHeight / 2;
+  context.beginPath();
+  context.moveTo(radius, 0.5);
+  context.lineTo(width - radius, 0.5);
+  context.quadraticCurveTo(width - 0.5, 0.5, width - 0.5, radius);
+  context.lineTo(width - 0.5, bodyHeight - radius);
+  context.quadraticCurveTo(width - 0.5, bodyHeight - 0.5, width - radius, bodyHeight - 0.5);
+  if (tailHeight > 0) {
+    context.lineTo(width / 2 + 6, bodyHeight - 0.5);
+    context.lineTo(width / 2, height - 1);
+    context.lineTo(width / 2 - 6, bodyHeight - 0.5);
+  }
+  context.lineTo(radius, bodyHeight - 0.5);
+  context.quadraticCurveTo(0.5, bodyHeight - 0.5, 0.5, bodyHeight - radius);
+  context.lineTo(0.5, radius);
+  context.quadraticCurveTo(0.5, 0.5, radius, 0.5);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "#FFFFFF";
+  context.font = font;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, width / 2, bodyHeight / 2, width - 16);
+  map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
+  return imageName;
+}
+
+function ensureNewListingBadgeImage(map: MapLibreMapInstance): string {
+  const imageName = "metric-new-listing-badge";
+  if (map.hasImage(imageName)) return imageName;
+
+  const pixelRatio = 2;
+  const width = 38;
+  const height = 16;
+  const radius = 7;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const context = canvas.getContext("2d");
+  if (!context) return imageName;
+
+  context.scale(pixelRatio, pixelRatio);
+  context.fillStyle = "#155E43";
+  context.strokeStyle = "rgba(255, 255, 255, 0.98)";
+  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(radius, 0.5);
   context.lineTo(width - radius, 0.5);
@@ -289,12 +402,11 @@ function ensureMetricPillImage(
   context.closePath();
   context.fill();
   context.stroke();
-
   context.fillStyle = "#FFFFFF";
-  context.font = font;
+  context.font = "800 8px Arial, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, width / 2, height / 2, width - 12);
+  context.fillText("NEW", width / 2, height / 2);
   map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
   return imageName;
 }
@@ -1172,9 +1284,14 @@ export function MapView({
         }
 
         const variant: MetricPillVariant = level === "parcel" ? "parcel" : "area";
+        const marketStatus = level === "parcel" ? propertyMarketStatus(properties.market_status) : null;
+        const isSelected = level === "parcel" &&
+          selectedFeature?.source === AREA_LAYERS.parcel.source &&
+          String(selectedFeature.id) === String(feature.id);
+        const isNewListing = level === "parcel" && isRecentlyListed(properties.listing_created_at);
         const pillDimensions = hasValue ? measureMetricPill(label, variant) : null;
         const iconImage = hasValue && pillDimensions
-          ? ensureMetricPillImage(map, label, variant, pillDimensions)
+          ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected)
           : "";
         return [{
           type: "Feature" as const,
@@ -1195,6 +1312,11 @@ export function MapView({
             metric_label: metric,
             metric_status: status,
             metric_detail: detail,
+            market_status: marketStatus,
+            is_selected: isSelected,
+            is_new_listing: isNewListing,
+            area_feature_id: String(feature.id ?? index),
+            upi: properties.upi ?? null,
             district,
             sector,
             cell,
@@ -1218,7 +1340,11 @@ export function MapView({
         return [{
           featureIndex,
           x: screenPoint.x,
-          y: screenPoint.y,
+          y: screenPoint.y - (
+            feature.properties.level === "parcel"
+              ? (feature.properties.pill_height ?? 20) * pillScale / 2
+              : 0
+          ),
           width: (feature.properties.pill_width ?? 34) * pillScale,
           height: (feature.properties.pill_height ?? 20) * pillScale
         }];
@@ -1255,6 +1381,7 @@ export function MapView({
       setFeatureFlag(selectedFeature, "selected", false);
       selectedFeature = nextFeature;
       setFeatureFlag(selectedFeature, "selected", true);
+      refreshMetricBubblesRef.current?.();
     };
 
     const addAdministrativeLayers = () => {
@@ -1387,6 +1514,8 @@ export function MapView({
         });
       }
 
+      ensureNewListingBadgeImage(map);
+
       if (!map.getLayer("metric-bubbles-circle")) {
         map.addLayer({
           id: "metric-bubbles-circle",
@@ -1410,6 +1539,8 @@ export function MapView({
             ],
             "circle-color": [
               "case",
+              ["==", ["get", "is_selected"], true], "#2563EB",
+              ["==", ["get", "market_status"], "off-market"], "#343A40",
               ["==", ["get", "has_value"], false], "#8B9690",
               "#9D2932"
             ],
@@ -1428,6 +1559,7 @@ export function MapView({
           filter: [
             "all",
             ["==", ["get", "has_value"], true],
+            ["!=", ["get", "level"], "parcel"],
             ["!=", ["get", "show_dot"], true]
           ],
           layout: {
@@ -1435,6 +1567,57 @@ export function MapView({
             "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.84, 12, 0.92, 16, 1, 19, 1.02],
             "icon-anchor": "center",
             "icon-padding": 2,
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "symbol-sort-key": ["get", "sort_priority"],
+            "visibility": "visible"
+          }
+        });
+      }
+
+      if (!map.getLayer("metric-bubbles-parcel-label")) {
+        map.addLayer({
+          id: "metric-bubbles-parcel-label",
+          type: "symbol",
+          source: "metric-bubbles",
+          minzoom: PARCEL_ZOOM,
+          filter: [
+            "all",
+            ["==", ["get", "level"], "parcel"],
+            ["==", ["get", "has_value"], true],
+            ["!=", ["get", "show_dot"], true]
+          ],
+          layout: {
+            "icon-image": ["get", "icon_image"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], PARCEL_ZOOM, 0.95, 19, 1, 21, 1.02],
+            "icon-anchor": "bottom",
+            "icon-padding": 2,
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "symbol-sort-key": ["get", "sort_priority"],
+            "visibility": "visible"
+          }
+        });
+      }
+
+      if (!map.getLayer("metric-bubbles-new-badge")) {
+        map.addLayer({
+          id: "metric-bubbles-new-badge",
+          type: "symbol",
+          source: "metric-bubbles",
+          minzoom: PARCEL_ZOOM,
+          filter: [
+            "all",
+            ["==", ["get", "level"], "parcel"],
+            ["==", ["get", "has_value"], true],
+            ["==", ["get", "is_new_listing"], true]
+          ],
+          layout: {
+            "icon-image": "metric-new-listing-badge",
+            "icon-size": 1,
+            "icon-anchor": "bottom",
+            "icon-offset": [0, -42],
+            "icon-padding": 0,
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "symbol-sort-key": ["get", "sort_priority"],
@@ -2061,6 +2244,26 @@ export function MapView({
           handleAreaClick(level, layer.source, event.features?.[0])
         );
       }
+
+      // Clicking an unoccupied part of the map clears selection and restores
+      // the selected parcel capsule to its underlying market-status color.
+      map.on("click", (event) => {
+        const clickableLayers = [
+          ...AREA_LEVELS.map((level) => AREA_LAYERS[level].fill),
+          "metric-bubbles-circle",
+          "metric-bubbles-label",
+          "metric-bubbles-parcel-label",
+          "metric-bubbles-new-badge"
+        ].filter((layerId) => Boolean(map.getLayer(layerId)));
+
+        const hits = clickableLayers.length
+          ? map.queryRenderedFeatures(event.point, { layers: clickableLayers })
+          : [];
+        if (hits.length > 0) return;
+
+        selectFeatureState(null);
+        onAreaSelected(null);
+      });
     };
 
     map.on("style.load", () => {
