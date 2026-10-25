@@ -148,6 +148,10 @@ type AreaProperties = {
   zoning_source?: string | null;
   label?: string | null;
   has_value?: boolean;
+  icon_image?: string;
+  pill_width?: number;
+  pill_height?: number;
+  show_dot?: boolean;
   metric_label?: string | null;
   metric_status?: string | null;
   metric_detail?: string | null;
@@ -219,26 +223,46 @@ function metricPillImageName(label: string, variant: MetricPillVariant): string 
   return "metric-price-pill-" + variant + "-" + hash.toString(36);
 }
 
+type MetricPillDimensions = { width: number; height: number; font: string };
+
+const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
+
+function measureMetricPill(label: string, variant: MetricPillVariant): MetricPillDimensions {
+  const cacheKey = variant + "|" + label;
+  const cached = metricPillDimensionsCache.get(cacheKey);
+  if (cached) return cached;
+  const font = variant === "parcel"
+    ? "600 10px Arial, sans-serif"
+    : "600 11px Arial, sans-serif";
+  const height = variant === "parcel" ? 20 : 22;
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+  if (!measureContext) {
+    const dimensions = { width: Math.max(34, label.length * 7 + 16), height, font };
+    metricPillDimensionsCache.set(cacheKey, dimensions);
+    return dimensions;
+  }
+  measureContext.font = font;
+  const dimensions = {
+    width: Math.max(34, Math.ceil(measureContext.measureText(label).width) + 16),
+    height,
+    font
+  };
+  metricPillDimensionsCache.set(cacheKey, dimensions);
+  return dimensions;
+}
+
 function ensureMetricPillImage(
   map: MapLibreMapInstance,
   label: string,
-  variant: MetricPillVariant
+  variant: MetricPillVariant,
+  dimensions: MetricPillDimensions
 ): string {
   const imageName = metricPillImageName(label, variant);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
-  const font = variant === "parcel"
-    ? "600 10px Arial, sans-serif"
-    : "600 11px Arial, sans-serif";
-  const measureCanvas = document.createElement("canvas");
-  const measureContext = measureCanvas.getContext("2d");
-  if (!measureContext) return "";
-
-  measureContext.font = font;
-  const textWidth = Math.ceil(measureContext.measureText(label).width);
-  const height = variant === "parcel" ? 20 : 22;
-  const width = Math.max(34, textWidth + 16);
+  const { width, height, font } = dimensions;
   const canvas = document.createElement("canvas");
   canvas.width = width * pixelRatio;
   canvas.height = height * pixelRatio;
@@ -246,9 +270,10 @@ function ensureMetricPillImage(
   if (!context) return "";
 
   context.scale(pixelRatio, pixelRatio);
-  context.fillStyle = variant === "parcel" ? "#68747B" : "#9D2932";
-  context.strokeStyle = "rgba(255, 255, 255, 0.94)";
-  context.lineWidth = 1;
+  // All price labels use the same red capsule and white outline as the reference.
+  context.fillStyle = "#9D2932";
+  context.strokeStyle = "rgba(255, 255, 255, 0.98)";
+  context.lineWidth = 1.25;
 
   const radius = height / 2;
   context.beginPath();
@@ -272,6 +297,87 @@ function ensureMetricPillImage(
   context.fillText(label, width / 2, height / 2, width - 12);
   map.addImage(imageName, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio });
   return imageName;
+}
+
+type MetricLabelCollisionBox = {
+  featureIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * Return labels that belong to a collision group of at least three. Pairs are
+ * deliberately kept as pills. A screen-space grid keeps the check local and
+ * efficient even when the viewport contains many cadastral parcels.
+ */
+export function findCrowdedMetricLabelIndexes(
+  boxes: MetricLabelCollisionBox[],
+  minimumCrowdedGroupSize = 3
+): Set<number> {
+  const neighbours = new Map<number, Set<number>>();
+  const buckets = new Map<string, MetricLabelCollisionBox[]>();
+  const bucketSize = 64;
+  const edgeGap = 2;
+
+  for (const box of boxes) neighbours.set(box.featureIndex, new Set<number>());
+
+  for (const box of boxes) {
+    const minX = Math.floor((box.x - box.width / 2 - edgeGap) / bucketSize);
+    const maxX = Math.floor((box.x + box.width / 2 + edgeGap) / bucketSize);
+    const minY = Math.floor((box.y - box.height / 2 - edgeGap) / bucketSize);
+    const maxY = Math.floor((box.y + box.height / 2 + edgeGap) / bucketSize);
+
+    for (let gridX = minX; gridX <= maxX; gridX += 1) {
+      for (let gridY = minY; gridY <= maxY; gridY += 1) {
+        const key = gridX + ":" + gridY;
+        const bucket = buckets.get(key) ?? [];
+        for (const other of bucket) {
+          const knownNeighbours = neighbours.get(box.featureIndex);
+          if (knownNeighbours?.has(other.featureIndex)) continue;
+          const overlaps =
+            Math.abs(box.x - other.x) < (box.width + other.width) / 2 + edgeGap &&
+            Math.abs(box.y - other.y) < (box.height + other.height) / 2 + edgeGap;
+          if (!overlaps) continue;
+          knownNeighbours?.add(other.featureIndex);
+          neighbours.get(other.featureIndex)?.add(box.featureIndex);
+        }
+        bucket.push(box);
+        buckets.set(key, bucket);
+      }
+    }
+  }
+
+  const crowded = new Set<number>();
+  const visited = new Set<number>();
+  for (const box of boxes) {
+    if (visited.has(box.featureIndex)) continue;
+    const component: number[] = [];
+    const queue = [box.featureIndex];
+    visited.add(box.featureIndex);
+    while (queue.length > 0) {
+      const current = queue.pop() as number;
+      component.push(current);
+      for (const neighbour of neighbours.get(current) ?? []) {
+        if (visited.has(neighbour)) continue;
+        visited.add(neighbour);
+        queue.push(neighbour);
+      }
+    }
+    if (component.length >= minimumCrowdedGroupSize) {
+      for (const featureIndex of component) crowded.add(featureIndex);
+    }
+  }
+  return crowded;
+}
+
+function metricPillScaleAtZoom(zoom: number): number {
+  if (zoom <= 5) return 0.84;
+  if (zoom <= 12) return 0.84 + ((zoom - 5) / 7) * 0.08;
+  if (zoom <= 16) return 0.92 + ((zoom - 12) / 4) * 0.08;
+  if (zoom <= 19) return 1 + ((zoom - 16) / 3) * 0.02;
+  return 1.02;
 }
 
 function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCollection {
@@ -1066,7 +1172,10 @@ export function MapView({
         }
 
         const variant: MetricPillVariant = level === "parcel" ? "parcel" : "area";
-        const iconImage = hasValue ? ensureMetricPillImage(map, label, variant) : "";
+        const pillDimensions = hasValue ? measureMetricPill(label, variant) : null;
+        const iconImage = hasValue && pillDimensions
+          ? ensureMetricPillImage(map, label, variant, pillDimensions)
+          : "";
         return [{
           type: "Feature" as const,
           id: "metric-bubble-" + level + "-" + String(feature.id ?? index),
@@ -1078,6 +1187,9 @@ export function MapView({
             label,
             has_value: hasValue,
             icon_image: iconImage,
+            pill_width: pillDimensions?.width ?? 0,
+            pill_height: pillDimensions?.height ?? 0,
+            show_dot: false,
             level,
             sort_priority: hasValue ? -Math.abs(sortValue) : 0,
             metric_label: metric,
@@ -1091,7 +1203,36 @@ export function MapView({
         }];
       });
 
-      source.setData({ type: "FeatureCollection", features } as never);
+      // Measure collisions in viewport pixels instead of letting MapLibre hide
+      // every overlapping symbol. One or two labels remain price capsules;
+      // only connected collision groups of three or more become red dots.
+      const pillScale = metricPillScaleAtZoom(map.getZoom());
+      const collisionBoxes = features.flatMap((feature, featureIndex) => {
+        if (
+          !feature.properties.has_value ||
+          !feature.properties.label ||
+          !feature.properties.icon_image
+        ) return [];
+        const coordinates = feature.geometry.coordinates;
+        const screenPoint = map.project(coordinates);
+        return [{
+          featureIndex,
+          x: screenPoint.x,
+          y: screenPoint.y,
+          width: (feature.properties.pill_width ?? 34) * pillScale,
+          height: (feature.properties.pill_height ?? 20) * pillScale
+        }];
+      });
+      const crowdedLabelIndexes = findCrowdedMetricLabelIndexes(collisionBoxes);
+      const renderedFeatures = features.map((feature, featureIndex) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          show_dot: crowdedLabelIndexes.has(featureIndex)
+        }
+      }));
+
+      source.setData({ type: "FeatureCollection", features: renderedFeatures } as never);
     };
     refreshMetricBubblesRef.current = refreshMetricBubbles;
 
@@ -1252,12 +1393,24 @@ export function MapView({
           type: "circle",
           source: "metric-bubbles",
           minzoom: 5,
+          filter: [
+            "any",
+            ["==", ["get", "show_dot"], true],
+            ["all",
+              ["==", ["get", "has_value"], false],
+              ["!=", ["get", "metric_label"], "averageLandPricePerM2"]
+            ]
+          ],
           paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6],
+            "circle-radius": [
+              "case",
+              ["==", ["get", "show_dot"], true],
+              ["interpolate", ["linear"], ["zoom"], 5, 1.8, SECTOR_ZOOM, 2, CELL_ZOOM, 2.1, PARCEL_ZOOM, 2.4],
+              ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6]
+            ],
             "circle-color": [
               "case",
               ["==", ["get", "has_value"], false], "#8B9690",
-              ["==", ["get", "level"], "parcel"], "#68747B",
               "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
@@ -1272,15 +1425,20 @@ export function MapView({
           type: "symbol",
           source: "metric-bubbles",
           minzoom: 5,
-          filter: ["==", ["get", "has_value"], true],
+          filter: [
+            "all",
+            ["==", ["get", "has_value"], true],
+            ["!=", ["get", "show_dot"], true]
+          ],
           layout: {
             "icon-image": ["get", "icon_image"],
             "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.84, 12, 0.92, 16, 1, 19, 1.02],
             "icon-anchor": "center",
             "icon-padding": 2,
-            "icon-allow-overlap": false,
-            "icon-ignore-placement": false,
-            "symbol-sort-key": ["get", "sort_priority"]
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "symbol-sort-key": ["get", "sort_priority"],
+            "visibility": "visible"
           }
         });
       }

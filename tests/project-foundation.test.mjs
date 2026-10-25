@@ -602,10 +602,18 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /formatCompactValue\(sortValue\)/);
   assert.match(mapView, /ensureMetricPillImage/);
   assert.match(mapView, /"icon-image": \["get", "icon_image"\]/);
-  assert.match(mapView, /"icon-allow-overlap": false/);
-  assert.match(mapView, /"icon-ignore-placement": false/);
+  assert.match(mapView, /"icon-allow-overlap": true/);
+  assert.match(mapView, /"icon-ignore-placement": true/);
+  assert.match(mapView, /findCrowdedMetricLabelIndexes\(collisionBoxes\)/);
+  assert.match(mapView, /minimumCrowdedGroupSize = 3/);
+  assert.match(mapView, /if \(component\.length >= minimumCrowdedGroupSize\)/);
+  assert.match(mapView, /\["get", "show_dot"\], true/);
+  assert.match(mapView, /\["!=", \["get", "show_dot"\], true\]/);
+  assert.match(mapView, /context\.fillStyle = "#9D2932"/);
   assert.match(mapView, /id: "metric-bubbles-circle"/);
-  assert.match(mapView, /"circle-radius": \["interpolate", \["linear"\], \["zoom"\], 5, 2\.5/);
+  assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\]/);
+  assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
+  assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
   assert.match(mapView, /const requestedLevels = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
   assert.match(mapView, /status = "calculated-asking-price"/);
   assert.match(mapView, /properties\.parcel_size_m2/);
@@ -662,4 +670,20 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /Approx\. area from mapped boundary/);
   assert.match(experience, /Average transaction price \/ m²/);
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
+});
+
+test("price bubbles stay red with a white border and only collision groups of three or more become dots", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(mapView, /function measureMetricPill/);
+  assert.match(mapView, /context\.fillStyle = "#9D2932"/);
+  assert.match(mapView, /context\.strokeStyle = "rgba\(255, 255, 255, 0\.98\)"/);
+  assert.match(mapView, /export function findCrowdedMetricLabelIndexes/);
+  assert.match(mapView, /minimumCrowdedGroupSize = 3/);
+  assert.match(mapView, /component\.length >= minimumCrowdedGroupSize/);
+  assert.match(mapView, /const pillScale = metricPillScaleAtZoom\(map\.getZoom\(\)\)/);
+  assert.match(mapView, /const screenPoint = map\.project\(coordinates\)/);
+  assert.match(mapView, /show_dot: crowdedLabelIndexes\.has\(featureIndex\)/);
+  assert.match(mapView, /map\.on\("zoomend", scheduleRefresh\)/);
+  assert.match(mapView, /map\.on\("moveend", scheduleRefresh\)/);
 });
