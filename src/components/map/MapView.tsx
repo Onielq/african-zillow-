@@ -25,6 +25,33 @@ export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
+
+export type ParcelPriceType =
+  | "indicative-estimate"
+  | "confirmed-asking-price"
+  | "recorded-sale-price"
+  | "formal-valuation";
+
+export function isParcelPriceType(value: unknown): value is ParcelPriceType {
+  return value === "indicative-estimate" ||
+    value === "confirmed-asking-price" ||
+    value === "recorded-sale-price" ||
+    value === "formal-valuation";
+}
+
+export function parcelPriceTypeLabel(type: ParcelPriceType): string {
+  switch (type) {
+    case "indicative-estimate":
+      return "Indicative estimated value";
+    case "confirmed-asking-price":
+      return "Confirmed asking price";
+    case "recorded-sale-price":
+      return "Recorded sale price";
+    case "formal-valuation":
+      return "Formal valuation";
+  }
+}
+
 export type MapOverlayCategory = "landmarks" | "healthEducation" | "transportation" | "nature";
 export type MapMetric =
   | "averageLandPricePerM2"
@@ -68,6 +95,11 @@ export type SelectedArea = {
   upi?: string | null;
   parcelNumber?: string | null;
   parcelSizeM2?: number | null;
+  parcelPriceType?: ParcelPriceType | null;
+  parcelPriceValue?: number | null;
+  parcelPriceSource?: string | null;
+  parcelPriceDate?: string | null;
+  parcelPriceNote?: string | null;
   wetlandAreaM2?: number | null;
   lastUpdatedOn?: number | null;
   bounds?: [number, number, number, number] | null;
@@ -92,6 +124,11 @@ type AreaProperties = {
   upi?: string | null;
   parcel_number?: string | null;
   parcel_size_m2?: number | null;
+  parcel_price_type?: ParcelPriceType | null;
+  parcel_price_value?: number | null;
+  parcel_price_source?: string | null;
+  parcel_price_date?: string | null;
+  parcel_price_note?: string | null;
   wetland_area_m2?: number | null;
   last_updated_on?: number | null;
   average_land_price_kind?: string | null;
@@ -565,6 +602,11 @@ function featureToArea(
     upi: properties.upi ?? null,
     parcelNumber: properties.parcel_number ?? null,
     parcelSizeM2: properties.parcel_size_m2 ?? null,
+    parcelPriceType: isParcelPriceType(properties.parcel_price_type) ? properties.parcel_price_type : null,
+    parcelPriceValue: typeof properties.parcel_price_value === "number" ? properties.parcel_price_value : null,
+    parcelPriceSource: properties.parcel_price_source ?? null,
+    parcelPriceDate: properties.parcel_price_date ?? null,
+    parcelPriceNote: properties.parcel_price_note ?? null,
     wetlandAreaM2: properties.wetland_area_m2 ?? null,
     lastUpdatedOn: properties.last_updated_on ?? null,
     bounds: featureBounds(feature)
@@ -809,6 +851,28 @@ export function MapView({
 
         if (level === "parcel") {
           if (metric === "averageLandPricePerM2") {
+            const directParcelPriceIsSourced =
+              isParcelPriceType(properties.parcel_price_type) &&
+              properties.parcel_price_type !== "indicative-estimate" &&
+              typeof properties.parcel_price_value === "number" &&
+              Number.isFinite(properties.parcel_price_value) &&
+              properties.parcel_price_value > 0 &&
+              typeof properties.parcel_price_source === "string" &&
+              properties.parcel_price_source.trim().length > 0;
+
+            if (directParcelPriceIsSourced) {
+              sortValue = properties.parcel_price_value as number;
+              label = formatCompactValue(sortValue);
+              hasValue = true;
+              status = properties.parcel_price_type as ParcelPriceType;
+              detail =
+                parcelPriceTypeLabel(properties.parcel_price_type as ParcelPriceType) +
+                ": " + formatCompactValue(sortValue) +
+                ". Source: " + properties.parcel_price_source +
+                (properties.parcel_price_date ? ". Date: " + properties.parcel_price_date : "") +
+                (properties.parcel_price_note ? ". " + properties.parcel_price_note : "") +
+                ". The amount is displayed according to its stated source type; verify the source record before relying on it.";
+            } else {
             const parcelArea = properties.parcel_size_m2;
             const directUnitPrice = properties.average_land_price_per_m2;
             const cellKey = normalizedMetricKey(district, sector, cell);
@@ -850,6 +914,7 @@ export function MapView({
                 ". It is an estimate, not a registered sale price or formal valuation.";
             } else {
               detail = "No parcel value is shown because usable parcel area or a defensible transaction-price estimate is unavailable.";
+            }
             }
           } else {
             detail =
