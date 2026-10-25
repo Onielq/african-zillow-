@@ -1592,6 +1592,16 @@ export function MapExperience() {
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             <h2>{selectedArea.name}</h2>
+            {selectedArea.level === "parcel" && selectedArea.parcelMarketStatus ? (
+              <div className={`parcel-market-status parcel-market-status-${selectedArea.parcelMarketStatus}`}>
+                <strong>{selectedArea.parcelMarketStatus === "available" ? "Available (demo)" : "Off market (demo)"}</strong>
+                <small>
+                  {selectedArea.parcelMarketStatusSource === "demonstration"
+                    ? "Demonstration split only — not a verified property listing."
+                    : "Market status supplied by the connected listing source."}
+                </small>
+              </div>
+            ) : null}
             {selectedArea.level === "parcel" ? (
               <div className="parcel-details">
                 <div>
