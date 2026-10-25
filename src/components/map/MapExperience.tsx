@@ -706,7 +706,7 @@ export function MapExperience() {
     const loadLandPriceTransactionPrices = async () => {
       try {
         const response = await fetch("/land-price-transaction.tsv");
-        if (!response.ok) throw new Error("Land-price reference could not be loaded.");
+        if (!response.ok) throw new Error("Land transaction-price snapshot could not be loaded.");
         const text = await response.text();
         if (!active) return;
         setLandPriceRows(parseLandPriceTransactionPrices(text));
@@ -1672,7 +1672,7 @@ export function MapExperience() {
                     </strong>
                     <small>
                       {selectedArea.level === "district" && selectedArea.averageLandPricePerM2 !== null
-                        ? "Rwanda Land Dashboard /prices · provisional average-transaction-price snapshot reviewed 25 Oct 2026; observation date and weighting method are not disclosed."
+                        ? "Rwanda Land Dashboard /reference · explicitly labelled Avg Transaction Price; reviewed 25 Oct 2026. Observation date and weighting method are not disclosed; /prices differs for Nyarugenge."
                         : selectedArea.level === "sector" && selectedArea.averageLandPriceKind === "derived-unweighted-cell-mean"
                           ? `Indicative arithmetic mean of ${selectedArea.averageLandPriceSampleSize ?? 0} unambiguous cell-level weighted-average transaction-price snapshots, rounded to RWF. This is not an official sector weighted average. ${selectedArea.averageLandPriceConflictingCells ?? 0} conflicting cell values were excluded; source dates and methodology remain unverified.`
                           : landPriceLoadStatus === "loading"
