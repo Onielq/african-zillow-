@@ -56,12 +56,25 @@ The `/prices` output also contains several of the same repeated keys. This sugge
 
 ## Current product treatment
 
-- District price values are shown as a **provisional dashboard snapshot** with an undisclosed effective date. They are not advertised as current asking prices, achieved price for an individual plot or a legal reference/valuation price.
-- The supplied cell-price table remains visible for audit and diagnostics, but a unique row from that unversioned file is described as an **unreconciled supplied snapshot**, not a verified current cell price.
-- Cells with conflicting values do not show a numeric price.
-- No average is computed from duplicate values, and no cell/sector/village price is inferred from district averages.
+- District transaction-price and reference-price values are provisional dashboard snapshots with undisclosed observation dates and weighting methods. They are not asking prices for an individual plot, formal valuations or guaranteed sale values.
+- The original supplied file `public/land-price-reference.tsv` remains unchanged for audit. The valuation UI reads the same row set under the explicitly labelled `public/land-price-transaction.tsv` snapshot, provisionally mapped to the `/prices` weighted-average series; this mapping still needs confirmation from the publisher.
+- A unique cell value may be used as a provisional transaction-price input; cells with conflicting values do not display a numeric cell price.
+- A parcel estimate may fall back to the explicitly labelled district Avg Transaction Price when its cell-level transaction price is absent or conflicting. Such estimates are marked rough. Map shading does not infer missing cell/sector/village prices from district values.
+- No average is computed from duplicate values, and transaction and reference prices are never averaged together.
 - The app does not use ownership totals as active supply; planned land use as sellable inventory; or transaction summaries as per-parcel title records.
 - Source observation date, retrieval/review date, definition, geography level, unit and source URL remain separate metadata fields.
+
+## Valuation implementation update — 25 October 2026
+
+The parcel-value estimate now uses **average transaction price per m²** as its primary rate and displays average reference price as a separate district benchmark. The reference-price rate is not used to calculate the headline estimate.
+
+- For a parcel, use an unambiguous cell-level weighted-average transaction-price snapshot where one is available.
+- If the cell value is absent or has conflicting values, use the district's explicitly labelled **Avg Transaction Price** from the `/reference` comparison table and label the result as a rough district-based estimate.
+- Show the district **Avg Reference Price** separately, including an area × reference-price benchmark for comparison only.
+- Do not average transaction and reference prices together, and do not silently average duplicate cell rows.
+- The app now reads `public/land-price-transaction.tsv`; `public/land-price-reference.tsv` remains unchanged as the original supplied audit file. The transaction-labelled file preserves the same 244 data rows. Its row identity, observation date and weighting method remain provisional and need confirmation from the publisher.
+
+The district transaction/reference benchmarks currently shown by the `/reference` comparison table are: Gasabo 36,103 / 19,976; Kicukiro 61,499 / 27,914; Nyarugenge 50,865 / 28,077; Bugesera 4,038 / 1,145 RWF/m². The separate `/prices` table reports Nyarugenge at 50,771 RWF/m², so the app uses the explicitly labelled `/reference` **Avg Transaction Price** of 50,865 and continues to flag the 94 RWF/m² discrepancy. The observation date and calculation method remain undisclosed; this choice is a clear source-label rule, not a claim that the two page outputs have been reconciled.
 
 ## Next evidence required from the source owner
 
