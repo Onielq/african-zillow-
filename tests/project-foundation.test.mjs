@@ -546,3 +546,42 @@ test("selected-area KPIs have more width and responsive two-column spacing", asy
   assert.match(css, /\.parcel-estimate-card\s*\{/);
   assert.match(experience, /Transaction volume · monthly indicator/);
 });
+
+
+test("map hover and metric bubbles follow the selected indicator at each administrative level", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const metrics = await readProjectFile("src/app/api/geography/metric-bubbles/route.ts");
+
+  assert.match(mapView, /feature-state.*hover/s);
+  assert.match(mapView, /#65D5A1/);
+  assert.match(mapView, /VILLAGE_ZOOM = 16\.2/);
+  assert.match(mapView, /metric-bubbles-circle/);
+  assert.match(mapView, /selectedMetricRef/);
+  assert.match(experience, /selectedMetric=\{selectedMetric\}/);
+  assert.match(metrics, /groupByFieldsForStatistics/);
+  assert.match(metrics, /parcel-share-model/);
+  assert.match(metrics, /not an official sector\/cell\/village transaction count/i);
+});
+
+test("comparison search includes cadastral UPI and parcel number", async () => {
+  const search = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(search, /KIGALI_PARCELS/);
+  assert.match(search, /BUGESERA_PARCELS/);
+  assert.match(search, /async function searchParcels/);
+  assert.match(search, /outFields: "upi,province,district,sector,cell,village,parcel_number,size,last_updated_on"/);
+  assert.match(experience, /UPI or parcel number/);
+  assert.match(experience, /area\.upi/);
+  assert.match(experience, /normalizeAreaName\(area\.parcelNumber\)/);
+});
+
+test("unavailable appreciation and supply metrics are not fabricated", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(mapView, /A dated historical and current comparable transaction-price series is not connected/);
+  assert.match(mapView, /Registered parcel counts are not for-sale supply/);
+  assert.match(experience, /Capital appreciation is calculated only when historical and current prices/);
+});
