@@ -238,7 +238,7 @@ function isRecentlyListed(value: unknown, now = Date.now()): boolean {
     timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
   } else if (typeof value === "string" && value.trim()) {
     const normalized = value.trim();
-    if (/^\\d+(?:\\.\\d+)?$/.test(normalized)) {
+    if (/^\d+(?:\.\d+)?$/.test(normalized)) {
       const numeric = Number(normalized);
       timestamp = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
     } else {
