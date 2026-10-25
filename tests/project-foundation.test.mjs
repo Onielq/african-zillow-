@@ -682,7 +682,7 @@ test("price bubbles retain collision behavior and style property markers by mark
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /function measureMetricPill/);
-  assert.match(mapView, /isSelected\s*\?\s*"#2563EB"/);
+  assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /marketStatus === "off-market"\s*\?\s*"#343A40"/);
   assert.match(mapView, /marketStatus === "available"/);
   assert.match(mapView, /marketStatus === "off-market"[\s\S]*?: "#8B9690"/);
@@ -735,6 +735,6 @@ test("parcel listing colors use a stable district-scoped demonstration split and
   assert.match(mapView, /a stable 50\/50 district-level demonstration split/);
   assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
   assert.match(experience, /Available \(demo\)/);
-  assert.match(experience, /Demonstration split only — not a verified property listing/);
+  assert.match(experience, /Demonstration market status and NEW markers only — not verified listing data/);
   assert.match(css, /\.parcel-market-status-off-market/);
 });
