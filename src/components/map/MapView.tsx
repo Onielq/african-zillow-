@@ -15,6 +15,7 @@ import {
 } from "maplibre-gl";
 import type { FeatureCollection, Geometry } from "geojson";
 import { formatCompactValue } from "@/lib/format-compact-value";
+import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
 // Next.js 16 defaults to Turbopack. Serve both MapLibre worker modules from
 // the same versioned public directory so the worker can resolve its sibling.
@@ -27,13 +28,15 @@ export type BasemapMode = "map" | "satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type ParcelPriceType =
+  | "calculated-asking-price"
   | "indicative-estimate"
   | "confirmed-asking-price"
   | "recorded-sale-price"
   | "formal-valuation";
 
 export function isParcelPriceType(value: unknown): value is ParcelPriceType {
-  return value === "indicative-estimate" ||
+  return value === "calculated-asking-price" ||
+    value === "indicative-estimate" ||
     value === "confirmed-asking-price" ||
     value === "recorded-sale-price" ||
     value === "formal-valuation";
@@ -41,6 +44,8 @@ export function isParcelPriceType(value: unknown): value is ParcelPriceType {
 
 export function parcelPriceTypeLabel(type: ParcelPriceType): string {
   switch (type) {
+    case "calculated-asking-price":
+      return "Asking price";
     case "indicative-estimate":
       return "Indicative estimated value";
     case "confirmed-asking-price":
@@ -975,22 +980,24 @@ export function MapView({
               unitPrice > 0
             ) {
               if (typeof parcelArea === "number" && Number.isFinite(parcelArea) && parcelArea > 0) {
-                sortValue = Math.round(parcelArea * unitPrice);
+                sortValue = calculateParcelAskingPrice(parcelArea, unitPrice) ?? 0;
                 label = formatCompactValue(sortValue);
                 hasValue = true;
-                status = "estimated-parcel-value";
+                status = "calculated-asking-price";
                 detail =
-                  "Indicative parcel value: " +
+                  "Asking price: " +
                   formatCompactValue(parcelArea) +
                   " m² × " +
                   formatCompactValue(unitPrice) +
-                  " RWF/m² transaction-price snapshot. " +
+                  " RWF/m² average transaction-price snapshot = " +
+                  formatCompactValue(sortValue) +
+                  ". " +
                   (cadastralArea === null
-                    ? "Parcel area is estimated from the mapped parcel polygon. "
-                    : "") +
-                  "Unit-price basis: " +
+                    ? "Parcel area is calculated approximately from the mapped parcel polygon. "
+                    : "Parcel area comes from the cadastral size attribute. ") +
+                  "Price basis: " +
                   unitPriceSource +
-                  ". This is an indicative estimate, not a confirmed asking price, recorded sale price, or formal valuation.";
+                  ". The current system defines asking price as parcel area × the available average transaction price per m².";
               } else {
                 // Still show the existing price signal rather than blanking the
                 // marker: this is the available area-level price per m², not a
@@ -998,11 +1005,11 @@ export function MapView({
                 sortValue = unitPrice;
                 label = formatCompactValue(unitPrice);
                 hasValue = true;
-                status = "indicative-unit-price-per-m2";
+                status = "asking-price-unit-rate";
                 detail =
-                  "Indicative area price: " + formatCompactValue(unitPrice) +
+                  "Average transaction price: " + formatCompactValue(unitPrice) +
                   " RWF/m² from the " + unitPriceSource +
-                  ". Parcel area is unavailable, so this is a per-square-metre benchmark, not a total parcel value.";
+                  ". The parcel total uses parcel area × this rate when the parcel area is available.";
               }
             } else {
               // The pilot districts have dashboard transaction-price snapshots.
