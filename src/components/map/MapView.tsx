@@ -162,6 +162,7 @@ type AreaProperties = {
   listing_created_at?: string | number | null;
   is_selected?: boolean;
   is_new_listing?: boolean;
+  level?: AreaLevel;
   area_feature_id?: string | null;
 };
 
@@ -2315,7 +2316,7 @@ export function MapView({
         const targetId = String(markerProperties.area_feature_id ?? "");
         if (!targetId) return;
 
-        const renderedParcel = map.queryRenderedFeatures(event.point, {
+        const renderedParcel = map.queryRenderedFeatures([event.point.x, event.point.y], {
           layers: [AREA_LAYERS.parcel.fill]
         }).find((candidate) => String(getFeatureId(candidate)) === targetId);
         const cachedParcel = areaDataRef.current.parcel?.features.find(
