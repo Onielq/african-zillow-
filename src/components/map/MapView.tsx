@@ -610,6 +610,17 @@ export function MapView({
 
   useEffect(() => {
     selectedMetricRef.current = selectedMetric;
+    const currentMap = mapRef.current;
+    if (currentMap?.isStyleLoaded() && currentMap.getLayer(AREA_LAYERS.parcel.label)) {
+      const showParcelNumber =
+        activeAreaLevel(currentMap.getZoom()) === "parcel" &&
+        selectedMetric !== "averageLandPricePerM2";
+      currentMap.setLayoutProperty(
+        AREA_LAYERS.parcel.label,
+        "visibility",
+        showParcelNumber ? "visible" : "none"
+      );
+    }
     let active = true;
     const loadMetricBubbleValues = async () => {
       if (selectedMetric !== "transactionVolume") {
@@ -1314,7 +1325,9 @@ export function MapView({
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
         }
         if (map.getLayer(layer.label)) {
-          map.setLayoutProperty(layer.label, "visibility", isActive ? "visible" : "none");
+          const showLabel =
+            isActive && !(level === "parcel" && selectedMetricRef.current === "averageLandPricePerM2");
+          map.setLayoutProperty(layer.label, "visibility", showLabel ? "visible" : "none");
         }
       }
     };
