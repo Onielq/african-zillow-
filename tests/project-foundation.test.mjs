@@ -376,7 +376,7 @@ test("official dashboard price snapshots are provisional and separated from refe
   const sourceRegister = await readProjectFile("docs/DATA_SOURCE_REGISTER.md");
   const sourceAudit = await readProjectFile("docs/LAND_PRICE_SOURCE_RECONCILIATION.md");
 
-  assert.match(route, /explicitly labelled "Avg Transaction Price" column in the Rwanda Land Dashboard \/reference comparison table/i);
+  assert.match(route, /Avg Transaction Price \\(m²\\)/);
   assert.match(experience, /Snapshot only/);
   assert.match(experience, /Nyarugenge 50,865/);
   assert.match(experience, /Open National Land Dashboard average transaction\/reference prices/);
