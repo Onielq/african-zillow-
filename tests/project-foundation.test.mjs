@@ -480,8 +480,9 @@ test("parcel selection calculates an indicative value from parcel area and unit 
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   assert.match(experience, /getUnitPriceEstimate\(landPriceRows, selectedArea, true\)/);
   assert.match(experience, /selectedArea\.parcelSizeM2 \* parcelUnitPriceEstimate\.pricePerM2/);
-  assert.match(experience, /Indicative estimated parcel value/);
-  assert.match(experience, /rough area-based estimate, not an official valuation/);
+  assert.match(experience, /displayedParcelPriceTypeLabel/);
+  assert.match(experience, /Indicative estimated value/);
+  assert.match(experience, /indicative area-based estimate, not a confirmed asking price, recorded sale price, or formal valuation/);
 });
 
 test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
