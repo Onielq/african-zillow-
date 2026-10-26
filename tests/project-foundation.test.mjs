@@ -741,29 +741,29 @@ test("parcel price markers match the compact reference and combine NEW with pric
   assert.ok(mapView.includes('id: "metric-bubbles-parcel-label"'));
   assert.doesNotMatch(mapView, /metric-bubbles-new-badge|metric-new-listing-badge|icon-offset/);
   assert.ok(mapView.includes("is_new_listing: isNewListing"));
-  assert.ok(mapView.includes("export function demoParcelIsNewListing"));
+  assert.match(mapView, /const isNewListing = hasVerifiedListingDate && sourceMarketStatus === "available"/);
+  assert.doesNotMatch(mapView, /demoParcelIsNewListing|demoParcelMarketStatus|isNewListingDemo/);
   assert.ok(mapView.includes('map.on("click", "metric-bubbles-parcel-label", selectParcelFromMarker)'));
   assert.ok(mapView.includes("String(selectedFeature.id) === String(id)"));
-  assert.ok(experience.includes("Illustrative status only; this parcel is not confirmed as listed."));
+  assert.ok(experience.includes("Availability unverified"));
   assert.ok(mapView.includes("refreshMetricBubblesRef.current?.()"));
   assert.ok(mapView.includes("selectFeatureState(null)"));
   assert.ok(mapView.includes("onAreaSelected(null)"));
 });
 
-test("parcel listing colors use a stable district-scoped demonstration split and disclose that it is not verified data", async () => {
+test("parcel availability is never invented when no verified listing source is connected", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const css = await readProjectFile("src/app/globals.css");
 
-  assert.match(mapView, /export function demoParcelMarketStatus/);
-  assert.match(mapView, /normalizeMetricKeyPart\(district\)/);
-  assert.match(mapView, /\(hash >>> 31\) === 0 \? "available" : "off-market"/);
-  assert.match(mapView, /sourceMarketStatus \? "source" as const : "demonstration" as const/);
-  assert.match(mapView, /give each parcel a stable status based on its district and cadastral ID/);
-  assert.match(mapView, /refreshMetricBubblesRef\.current\?\.\(\)/);
-  assert.match(experience, /Land for sale/);
-  assert.match(experience, /Off the market/);
-  assert.match(experience, /parcel-market-status-inline/);
+  assert.doesNotMatch(mapView, /demoParcelMarketStatus|demoParcelIsNewListing|isNewListingDemo|parcelIsNewListingDemo|is_new_listing_demo/);
+  assert.match(mapView, /const marketStatus = level === "parcel" \? sourceMarketStatus : null/);
+  assert.match(mapView, /const parcelMarketStatus = level === "parcel" \? suppliedMarketStatus : null/);
+  assert.match(mapView, /const marketStatusSource = sourceMarketStatus \? "source" as const : null/);
+  assert.match(mapView, /Verified current listings available to transact are not connected/);
+  assert.match(experience, /Availability unverified/);
+  assert.match(experience, /For-sale status unverified/);
+  assert.match(css, /\.parcel-market-status-inline-unverified/);
   assert.match(css, /\.parcel-market-status-inline-off-market/);
 });
 
