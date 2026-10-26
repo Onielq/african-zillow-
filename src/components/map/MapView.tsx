@@ -85,6 +85,8 @@ export type ParcelZoningEntry = {
   condition: string | null;
   prohibited: string | null;
   buffer: string | null;
+  /** True when a single published source record explicitly lists multiple zone codes together. */
+  sourceListsMultipleCodes?: boolean;
 };
 export type ParcelZoningStatus = "loading" | "found" | "not-covered" | "error" | "unavailable";
 
@@ -1480,8 +1482,9 @@ export function MapView({
                 (level === "district" || level === "sector" || level === "cell"),
               layer.color
             ),
-            // Cadastral parcels are outline-only: never tint or fill the land inside each boundary.
-            "fill-opacity": level === "parcel" ? 0 : AREA_FILL_OPACITY_EXPRESSION
+            // Parcels remain visually outline-only. The nearly transparent fill stays queryable,
+            // allowing a parcel to be selected when parcel outlines appear at village zoom.
+            "fill-opacity": level === "parcel" ? 0.005 : AREA_FILL_OPACITY_EXPRESSION
           }
         });
       }
@@ -1899,24 +1902,32 @@ export function MapView({
     const updateLayerVisibility = () => {
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
+      const villageIndex = AREA_LEVELS.indexOf("village");
+      // Show cadastral outlines as soon as village boundaries appear. Parcel
+      // outlines are an additional detail layer, not a replacement for villages.
+      const showParcelBoundaries = activeIndex >= villageIndex;
 
       for (let index = 0; index < AREA_LEVELS.length; index += 1) {
         const level = AREA_LEVELS[index];
         const layer = AREA_LAYERS[level];
         const isActive = level === activeLevel;
-        // Show a single administrative boundary scale at a time. Once the
-        // next zoom level takes over, the parent boundary disappears so sector
-        // and cell polygons no longer read as one visually joined district.
-        const showOutline = index === activeIndex;
+        // Administrative fills/labels stay at one scale. At village and parcel
+        // zoom, parcel outlines are drawn on top of the active administrative level.
+        const showOutline = index === activeIndex || (level === "parcel" && showParcelBoundaries);
 
         if (map.getLayer(layer.fill)) {
-          map.setLayoutProperty(layer.fill, "visibility", isActive ? "visible" : "none");
+          const showFill = isActive || (level === "parcel" && showParcelBoundaries);
+          map.setLayoutProperty(layer.fill, "visibility", showFill ? "visible" : "none");
         }
         if (map.getLayer(layer.outline)) {
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
         }
         if (level === "parcel" && map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
-          map.setLayoutProperty(PARCEL_OUTLINE_CASING_LAYER, "visibility", showOutline ? "visible" : "none");
+          map.setLayoutProperty(
+            PARCEL_OUTLINE_CASING_LAYER,
+            "visibility",
+            showParcelBoundaries ? "visible" : "none"
+          );
         }
         if (map.getLayer(layer.label)) {
           const showLabel =
@@ -1961,7 +1972,11 @@ export function MapView({
       activeController = controller;
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
-      const requestedLevels = AREA_LEVELS.slice(0, activeIndex + 1);
+      const requestedLevels: AreaLevel[] = AREA_LEVELS.slice(0, activeIndex + 1);
+      // At village zoom, request the parcel geometry as well as administrative
+      // geometry. Previously this request stopped at "village", so the parcel
+      // outline layer had no data at the zoom level where users need it most.
+      if (activeLevel === "village") requestedLevels.push("parcel");
       const bounds = map.getBounds();
       const viewBounds: ViewBounds = [
         bounds.getWest(),
@@ -2130,7 +2145,8 @@ export function MapView({
           areaDataRef.current[result.level] = result.data;
           source.setData(result.data);
         }
-        for (const level of AREA_LEVELS.slice(activeIndex + 1)) {
+        const requestedLevelSet = new Set(requestedLevels);
+        for (const level of AREA_LEVELS.filter((candidate) => !requestedLevelSet.has(candidate))) {
           const source = map.getSource(AREA_LAYERS[level].source) as GeoJSONSource;
           const emptyData = emptyFeatureCollection();
           areaDataRef.current[level] = emptyData;
