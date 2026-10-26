@@ -8,13 +8,13 @@ const baseUrl = (process.env.APP_BASE_URL ?? "http://127.0.0.1:3000").replace(/\
 const cases = [
   {
     source: "kigali",
-    bbox: "29.95,-2.06,30.05,-2.00",
-    label: "Kigali viewport around a known sample parcel"
+    bbox: "29.996,-2.036,29.998,-2.034",
+    label: "Small Kigali viewport around a known sample parcel"
   },
   {
     source: "bugesera",
-    bbox: "30.10,-2.32,30.16,-2.25",
-    label: "Bugesera viewport around a known sample parcel"
+    bbox: "30.131,-2.285,30.135,-2.281",
+    label: "Small Bugesera viewport around a known sample parcel"
   }
 ];
 
@@ -38,11 +38,9 @@ async function fetchWithRetry(url, attempts = 30) {
 function firstCoordinate(geometry) {
   const visit = (value) => {
     if (!Array.isArray(value)) return null;
-    if (
-      value.length >= 2 &&
-      typeof value[0] === "number" &&
-      typeof value[1] === "number"
-    ) return [value[0], value[1]];
+    if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+      return [value[0], value[1]];
+    }
     for (const item of value) {
       const candidate = visit(item);
       if (candidate) return candidate;
@@ -50,6 +48,27 @@ function firstCoordinate(geometry) {
     return null;
   };
   return visit(geometry?.coordinates);
+}
+
+function geometryBounds(geometry) {
+  let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+  const visit = (value) => {
+    if (!Array.isArray(value)) return;
+    if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+      west = Math.min(west, value[0]);
+      south = Math.min(south, value[1]);
+      east = Math.max(east, value[0]);
+      north = Math.max(north, value[1]);
+      return;
+    }
+    for (const item of value) visit(item);
+  };
+  visit(geometry?.coordinates);
+  return Number.isFinite(west) ? [west, south, east, north] : null;
+}
+
+function overlaps(a, b) {
+  return a && a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 }
 
 function validateWgs84(coord) {
@@ -66,6 +85,7 @@ async function main() {
 
   const summaries = [];
   for (const item of cases) {
+    const bbox = item.bbox.split(",").map(Number);
     const query = new URLSearchParams({
       level: "parcel",
       source: item.source,
@@ -82,11 +102,16 @@ async function main() {
     if (!body || body.type !== "FeatureCollection" || !Array.isArray(body.features)) {
       throw new Error(item.source + " parcel API did not return a GeoJSON FeatureCollection.");
     }
+
     const polygonFeatures = body.features.filter((feature) =>
-      feature?.geometry &&
-      ["Polygon", "MultiPolygon"].includes(feature.geometry.type)
+      feature?.geometry && ["Polygon", "MultiPolygon"].includes(feature.geometry.type)
     );
     const coord = firstCoordinate(polygonFeatures[0]?.geometry);
+    const intersectingFeatures = polygonFeatures.filter((feature) =>
+      overlaps(geometryBounds(feature.geometry), bbox)
+    ).length;
+    const overlapRatio = polygonFeatures.length ? intersectingFeatures / polygonFeatures.length : 0;
+
     if (polygonFeatures.length === 0) {
       throw new Error(
         item.source + " parcel API returned zero polygon features for " + item.bbox +
@@ -99,14 +124,25 @@ async function main() {
         JSON.stringify(coord)
       );
     }
+    if (intersectingFeatures === 0 || overlapRatio < 0.8) {
+      throw new Error(
+        item.source + " parcel API appears to return features outside the requested viewport. " +
+        "Viewport overlap: " + intersectingFeatures + "/" + polygonFeatures.length +
+        " (bbox " + item.bbox + ")."
+      );
+    }
+
     summaries.push({
       source: item.source,
       label: item.label,
       httpStatus: response.status,
       featureCount: body.features.length,
       polygonCount: polygonFeatures.length,
+      polygonsIntersectingViewport: intersectingFeatures,
+      viewportOverlapRatio: Number(overlapRatio.toFixed(3)),
       firstCoordinate: coord,
       coordinateCheck: "valid WGS84 coordinate within Rwanda bounds",
+      viewportFilterCheck: "passed",
       dataSourceHeader: response.headers.get("x-data-source"),
       providerWarning: response.headers.get("x-parcel-provider-warning") ?? null
     });
