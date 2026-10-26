@@ -311,7 +311,7 @@ export default function DataSourcesPage() {
             <p className={styles.healthNotice}>{healthReport.notice}</p>
           </div>
         ) : (
-          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect the GIS sources and audit Cloudflare hosting/cache, Resend, Neon/PostgreSQL, and R2 configuration.</p>
+          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect four GIS services plus two official land-market source pages, and audit Cloudflare hosting/cache, Resend, Neon/PostgreSQL, and R2 configuration.</p>
         )}
       </section>
 
