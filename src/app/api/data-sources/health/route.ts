@@ -398,15 +398,21 @@ async function checkIntegrations(): Promise<IntegrationHealth[]> {
     : "not-configured";
   const r2Status: IntegrationHealthStatus =
     process.env.R2_BUCKET_NAME?.trim() ? "needs-setup" : "not-configured";
+  const isCloudflareWorker =
+    process.env.DEPLOYMENT_PLATFORM === "cloudflare-workers";
 
   return [
     {
       id: "cloudflare-workers",
       name: "Cloudflare Workers hosting",
       category: "hosting",
-      status: "needs-setup",
-      statusLabel: "Build passes · deployment permission blocked",
-      detail: "The vinext Worker build succeeds, but GitHub Actions cannot deploy with its current token. The token must have account-scoped Workers Scripts:Edit permissions. A successful build alone does not mean the site is live."
+      status: isCloudflareWorker ? "connected" : "needs-setup",
+      statusLabel: isCloudflareWorker
+        ? "Running in Cloudflare Workers"
+        : "Worker deployment not confirmed",
+      detail: isCloudflareWorker
+        ? "This health response is executing in the configured Cloudflare Worker runtime."
+        : "The Worker build succeeds, but this response is not running inside the configured Worker. Complete deployment and verify the live app before treating hosting as connected."
     },
     {
       id: "cloudflare-kv",
