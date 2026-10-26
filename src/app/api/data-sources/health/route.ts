@@ -265,9 +265,151 @@ async function checkSource(source: SourceProbe, checkedAt: string) {
   }
 }
 
+type IntegrationHealthStatus =
+  | "reachable"
+  | "unavailable"
+  | "not-configured"
+  | "invalid-credentials"
+  | "not-integrated"
+  | "needs-setup";
+
+type IntegrationHealth = {
+  id: string;
+  name: string;
+  category: "hosting" | "email" | "database" | "storage";
+  status: IntegrationHealthStatus;
+  statusLabel: string;
+  detail: string;
+};
+
+async function checkResendIntegration(): Promise<IntegrationHealth> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+  const toEmail = process.env.RESEND_TO_EMAIL?.trim();
+
+  if (!apiKey) {
+    return {
+      id: "resend",
+      name: "Resend email",
+      category: "email",
+      status: "not-configured",
+      statusLabel: "API key missing",
+      detail: "RESEND_API_KEY is not configured in the running environment. No email has been sent, and no contact-email feature is currently wired into the app."
+    };
+  }
+
+  try {
+    // Read-only API call: validates the key without sending a real email.
+    const response = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      return {
+        id: "resend",
+        name: "Resend email",
+        category: "email",
+        status: "invalid-credentials",
+        statusLabel: "Key rejected",
+        detail: "Resend rejected the configured API key. Replace it in the server-side secret store; the key itself is never returned by this check."
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        id: "resend",
+        name: "Resend email",
+        category: "email",
+        status: "unavailable",
+        statusLabel: `API HTTP ${response.status}`,
+        detail: "Resend could not complete the read-only domain check. No test email was sent."
+      };
+    }
+
+    const missing: string[] = [];
+    if (!fromEmail) missing.push("RESEND_FROM_EMAIL");
+    if (!toEmail) missing.push("RESEND_TO_EMAIL");
+
+    return {
+      id: "resend",
+      name: "Resend email",
+      category: "email",
+      status: "needs-setup",
+      statusLabel: "API key accepted · sending not wired",
+      detail: missing.length
+        ? `The API key was accepted. Configure ${missing.join(" and ")} and build the contact-email route before sending messages. This check does not send email or verify deliverability.`
+        : "The API key was accepted and sender/recipient settings are present. The app still needs an implemented sending route and an end-to-end test; this check does not send email or verify deliverability."
+    };
+  } catch (error) {
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    return {
+      id: "resend",
+      name: "Resend email",
+      category: "email",
+      status: "unavailable",
+      statusLabel: "API not reachable",
+      detail: timedOut
+        ? "Resend did not respond within five seconds. No email was sent."
+        : "Could not reach Resend from this runtime. No email was sent."
+    };
+  }
+}
+
+async function checkIntegrations(): Promise<IntegrationHealth[]> {
+  const resend = await checkResendIntegration();
+  const databaseStatus: IntegrationHealthStatus = process.env.DATABASE_URL?.trim()
+    ? "not-integrated"
+    : "not-configured";
+  const r2Status: IntegrationHealthStatus =
+    process.env.R2_BUCKET_NAME?.trim() ? "needs-setup" : "not-configured";
+
+  return [
+    {
+      id: "cloudflare-workers",
+      name: "Cloudflare Workers hosting",
+      category: "hosting",
+      status: "needs-setup",
+      statusLabel: "Build passes · deployment permission blocked",
+      detail: "The vinext Worker build succeeds, but GitHub Actions cannot deploy with its current token. The token must have account-scoped Workers Scripts:Edit permissions. A successful build alone does not mean the site is live."
+    },
+    {
+      id: "cloudflare-kv",
+      name: "Workers KV cache",
+      category: "storage",
+      status: "needs-setup",
+      statusLabel: "Binding declared",
+      detail: "The VINEXT_KV_CACHE namespace and Worker binding are configured. Live cache operation can only be confirmed after the Worker is deployed successfully."
+    },
+    resend,
+    {
+      id: "postgresql",
+      name: "Neon / PostgreSQL",
+      category: "database",
+      status: databaseStatus,
+      statusLabel: databaseStatus === "not-configured" ? "No connection string" : "URL present · driver/schema not integrated",
+      detail: databaseStatus === "not-configured"
+        ? "DATABASE_URL is not configured. The repository has no connected PostgreSQL client/schema workflow, so Neon is not currently used by the app."
+        : "DATABASE_URL is present, but this app still has no PostgreSQL client/schema integration. A connection string alone does not prove the database works."
+    },
+    {
+      id: "cloudflare-r2",
+      name: "Cloudflare R2 object storage",
+      category: "storage",
+      status: r2Status,
+      statusLabel: r2Status === "not-configured" ? "Not enabled / no bucket binding" : "Bucket name set · binding missing",
+      detail: "R2 was not enabled in the Cloudflare account during this audit, and the Worker configuration has no R2 bucket binding. Enabling R2 in the dashboard, creating a bucket and adding its binding are required before file storage can work."
+    }
+  ];
+}
+
 export async function GET() {
   const checkedAt = new Date().toISOString();
-  const results = await Promise.all(SOURCES.map((source) => checkSource(source, checkedAt)));
+  const [results, integrations] = await Promise.all([
+    Promise.all(SOURCES.map((source) => checkSource(source, checkedAt))),
+    checkIntegrations()
+  ]);
   const reachableCount = results.filter((result) => result.status === "reachable").length;
 
   return NextResponse.json(
@@ -276,6 +418,7 @@ export async function GET() {
       reachableCount,
       totalCount: results.length,
       results,
+      integrations,
       notice: "Reachability is not a licence approval, completeness assessment, survey validation, or proof of legal title."
     },
     {
