@@ -58,9 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --output /tmp/cloudflare-preflight.json --write-out '%{http_code}' \\
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \\
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts")"
+          status="$(curl --silent --show-error --output /tmp/cloudflare-preflight.json --write-out '%{http_code}' --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts")"
           if [[ "$status" != "200" ]]; then
             echo "::error::Cloudflare token cannot list Workers in CLOUDFLARE_ACCOUNT_ID (HTTP $status). Check that the token has Workers Scripts:Read and is scoped to this account."
             cat /tmp/cloudflare-preflight.json
