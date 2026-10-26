@@ -172,7 +172,7 @@ type AreaProperties = {
   metric_status?: string | null;
   metric_detail?: string | null;
   market_status?: PropertyMarketStatus | null;
-  market_status_source?: "source" | "demonstration" | null;
+  market_status_source?: "source" | null;
   listing_created_at?: string | number | null;
   is_selected?: boolean;
   is_new_listing?: boolean;
