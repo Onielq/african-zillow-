@@ -16,7 +16,7 @@ The linked Bugesera Masterplan service provides administrative boundaries and pl
 
 ## Local development
 
-Requirements: Node.js 20.9 or newer and npm.
+Requirements: Node.js 22 or newer and npm.
 
 ```bash
 npm install
@@ -46,6 +46,33 @@ docker compose up --build
 Open http://localhost:3000. Stop the app with `docker compose down`.
 
 Keep real credentials in your local `.env` file or the hosting provider's secret manager; never commit them. See [the free-first stack guide](docs/FREE_FIRST_STACK.md) for deployment choices and the status of optional managed services.
+
+## Cloudflare Workers deployment
+
+This project includes a separate Cloudflare Workers build using vinext. The existing Next.js development commands and Docker deployment remain available while the Workers path is validated. Workers is used instead of a static-only Pages build because the app depends on server-side geography and parcel API routes.
+
+### Automatic GitHub deployment
+
+The `.github/workflows/cloudflare-workers.yml` workflow runs a vinext compatibility check and production build on pull requests and pushes to `main`. After Cloudflare credentials are added, pushes to `main` deploy the Worker automatically.
+
+Add these repository secrets under **Settings → Secrets and variables → Actions**:
+
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with permission to deploy Workers.
+- `CLOUDFLARE_ACCOUNT_ID`: the account ID shown in the Cloudflare dashboard URL.
+
+The workflow deliberately skips deployment when these secrets are absent. Pull requests build and validate the Worker but never deploy it. A successful build does not mean Cloudflare is already connected or that a production URL has been issued.
+
+### Local Workers commands
+
+```bash
+npm install
+npm run check:vinext
+npm run build:vinext
+```
+
+To deploy manually after authenticating Cloudflare and verifying compatibility, run `npm run deploy:vinext`. This deployment path uses vinext, which is currently in beta. Validate the map, same-origin MapLibre worker files, parcel lookups, and all geography API routes in a preview before relying on it for production.
+
+See [the free-first stack guide](docs/FREE_FIRST_STACK.md) for service status, setup notes, and limits.
 
 ## Troubleshooting
 
