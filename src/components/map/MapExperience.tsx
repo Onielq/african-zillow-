@@ -33,8 +33,16 @@ import {
 } from "@/data/transaction-benchmarks";
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
-type FocusArea = "combined" | "kigali" | "bugesera";
 type WorkspaceMode = "areas" | "projects";
+
+function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
+  const code = zone.code?.trim();
+  const name = zone.name.trim();
+  return code && !name.toLowerCase().startsWith(code.toLowerCase())
+    ? code + " — " + name
+    : name;
+}
+
 type PropertyScope = "all" | "land" | "apartment" | "villa";
 type AnalysisPeriod = "3m" | "6m" | "12m";
 type DirectoryTab = "developers" | "agencies" | "agents";
@@ -433,32 +441,6 @@ const ANALYSIS_PERIODS: Array<{ value: AnalysisPeriod; label: string; shortLabel
   { value: "3m", label: "3 months", shortLabel: "3M" }
 ];
 
-const FOCUS_OPTIONS: Array<{
-  id: FocusArea;
-  label: string;
-  center: [number, number];
-  zoom: number;
-}> = [
-  {
-    id: "combined",
-    label: "Kigali + Bugesera",
-    center: [30.13, -2.1],
-    zoom: 8.35
-  },
-  {
-    id: "kigali",
-    label: "Kigali City",
-    center: [30.0619, -1.9441],
-    zoom: 9.35
-  },
-  {
-    id: "bugesera",
-    label: "Bugesera",
-    center: [30.18, -2.28],
-    zoom: 9.35
-  }
-];
-
 function BrandMark() {
   return (
     <svg
@@ -569,10 +551,8 @@ export function MapExperience() {
     useState<BasemapStatus>("loading");
   const [boundaryStatus, setBoundaryStatus] =
     useState<BoundaryStatus>("loading");
-  const [activeFocus, setActiveFocus] = useState<FocusArea>("combined");
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const focusRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
 
   const handleMapReady = useCallback(
@@ -918,7 +898,7 @@ export function MapExperience() {
 
     const context = gsap.context(() => {
       gsap.fromTo(
-        [toolbarRef.current, focusRef.current],
+        [toolbarRef.current],
         { y: -9, opacity: 0 },
         {
           y: 0,
@@ -965,48 +945,6 @@ export function MapExperience() {
 
     return () => context.revert();
   }, [selectedArea]);
-
-  const focusMap = (focus: FocusArea) => {
-    setActiveFocus(focus);
-
-    const option = FOCUS_OPTIONS.find((item) => item.id === focus);
-    if (!option || !mapInstance) return;
-
-    setSelectedArea(null);
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    mapInstance.flyTo({
-      center: option.center,
-      zoom: option.zoom,
-      duration: reduceMotion ? 0 : 680,
-      essential: false
-    });
-  };
-
-  const focusParcelBoundaries = (source: "kigali" | "bugesera") => {
-    setActiveFocus(source);
-    setSelectedArea(null);
-    if (!mapInstance) return;
-
-    // These positions were verified against the live cadastral API. Jumping to
-    // them lets users inspect actual parcel coverage without manually zooming
-    // through nine levels from the regional overview.
-    const target = source === "kigali"
-      ? { center: [29.9974, -2.0346] as [number, number], zoom: 19.2 }
-      : { center: [30.1328, -2.2830] as [number, number], zoom: 19.2 };
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    mapInstance.flyTo({
-      center: target.center,
-      zoom: target.zoom,
-      duration: reduceMotion ? 0 : 720,
-      essential: false
-    });
-  };
 
   return (
     <main className="app-shell">
@@ -1630,39 +1568,6 @@ export function MapExperience() {
           </aside>
         ) : null}
 
-        <div className="map-focus-panel" ref={focusRef}>
-          <span className="focus-eyebrow">EXPLORE AREA</span>
-          <div aria-label="Map focus" className="focus-options">
-            {FOCUS_OPTIONS.map((option) => (
-              <button
-                aria-pressed={activeFocus === option.id}
-                className={
-                  activeFocus === option.id
-                    ? "focus-button focus-button-active"
-                    : "focus-button"
-                }
-                key={option.id}
-                onClick={() => focusMap(option.id)}
-                type="button"
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <p className="focus-eyebrow">PARCEL BOUNDARIES</p>
-          <p className="metric-info-description">
-            Individual plot lines appear when you zoom in. Jump to a verified parcel area:
-          </p>
-          <div aria-label="Jump to individual parcel boundaries" className="focus-options">
-            <button className="focus-button" onClick={() => focusParcelBoundaries("kigali")} type="button">
-              Kigali parcels
-            </button>
-            <button className="focus-button" onClick={() => focusParcelBoundaries("bugesera")} type="button">
-              Bugesera parcels
-            </button>
-          </div>
-        </div>
-
         {selectedArea ? (
           <aside
             aria-label="Selected administrative area"
@@ -1744,28 +1649,39 @@ export function MapExperience() {
                 </div>
                 <div className="parcel-zoning-row">
                   <span>Zoning / planning designation</span>
-                  <strong>
-                    {!selectedArea.upi
-                      ? "Zoning lookup unavailable — parcel UPI is missing"
-                      : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus
-                        ? "Checking the official zoning layer…"
-                        : selectedArea.zoningStatus === "found"
-                        ? selectedArea.zoning?.length
-                          ? selectedArea.zoning.map((zone) => {
-                              const code = zone.code?.trim();
-                              const name = zone.name.trim();
-                              return code && !name.toLowerCase().startsWith(code.toLowerCase())
-                                ? code + " — " + name
-                                : name;
-                            }).join("; ")
-                          : "Mapped zone found, but the source has no classification label"
-                        : selectedArea.zoningStatus === "not-covered"
-                          ? "No zoning designation mapped for this parcel"
-                          : "Zoning data unavailable"}
-                  </strong>
-                  {selectedArea.zoningSource ? (
-                    <small className="parcel-zoning-source">Source: {selectedArea.zoningSource}</small>
-                  ) : null}
+                  {!selectedArea.upi ? (
+                    <strong>Zoning unavailable — parcel identifier is missing</strong>
+                  ) : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus ? (
+                    <strong>Checking mapped zoning…</strong>
+                  ) : selectedArea.zoningStatus === "found" ? (
+                    selectedArea.zoning?.length ? (
+                      selectedArea.zoning.length === 1 ? (
+                        <strong>{zoningEntryLabel(selectedArea.zoning[0])}</strong>
+                      ) : (
+                        <div className="parcel-zoning-results">
+                          <strong>Multiple mapped designations</strong>
+                          <ul className="parcel-zoning-list">
+                            {selectedArea.zoning.map((zone, index) => (
+                              <li key={(zone.code ?? zone.name) + "-" + index}>
+                                <span>{zoningEntryLabel(zone)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <small className="parcel-zoning-note">
+                            {selectedArea.zoning.some((zone) => zone.sourceListsMultipleCodes)
+                              ? "The source lists several codes in one record. Confirm which designation applies with the planning authority."
+                              : "This parcel intersects multiple zoning areas. The map cannot determine which rule takes precedence."}
+                          </small>
+                        </div>
+                      )
+                    ) : (
+                      <strong>Mapped area found, but no zoning label was supplied</strong>
+                    )
+                  ) : selectedArea.zoningStatus === "not-covered" ? (
+                    <strong>No zoning designation mapped for this parcel</strong>
+                  ) : (
+                    <strong>Zoning data unavailable</strong>
+                  )}
                 </div>
                 <div>
                   <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>
@@ -2111,6 +2027,13 @@ export function MapExperience() {
               </div>
             </div>
             <div className="source-register-item">
+              <span className="source-register-status source-register-connected" />
+              <div>
+                <strong>Planning and zoning</strong>
+                <p>Parcel zoning is looked up against the published Kigali proposed-zoning layer and Bugesera District Land Use Plan. A parcel can intersect more than one mapped designation; confirm interpretation with the relevant planning authority.</p>
+              </div>
+            </div>
+            <div className="source-register-item">
               <span className="source-register-status source-register-pending" />
               <div>
                 <strong>Land transaction summaries</strong>
@@ -2146,6 +2069,22 @@ export function MapExperience() {
                 <p>Developer and construction pipeline required</p>
               </div>
             </div>
+            <a
+              className="source-register-link"
+              href="https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer/117"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Kigali zoning layer ↗
+            </a>
+            <a
+              className="source-register-link"
+              href="https://geodata.rw/server/rest/services/masterplan/Bugesera_DLUP/FeatureServer/0"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Bugesera zoning layer ↗
+            </a>
             <a
               className="source-register-link"
               href="https://masterplan.kigalicity.gov.rw/portal/apps/webappviewer/index.html?id=fdd2e30cbc15401d9daee5f68982d755"
