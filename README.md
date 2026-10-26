@@ -1,6 +1,6 @@
 # Rwanda Land Intelligence Map
 
-A map-first land intelligence platform for Rwanda, initially focused on Kigali City and Bugesera District.
+A map-first land intelligence platform for Rwanda, initially focused on Kigali City and Bugesera District. The [free-first stack and deployment plan](docs/FREE_FIRST_STACK.md) documents the portable runtime and hosting strategy.
 
 ## Current stage
 
@@ -31,6 +31,21 @@ If an older `.env.local` still points to a style that will not load, the map wil
 ```text
 https://tiles.openfreemap.org/styles/liberty
 ```
+
+## Portable Docker run
+
+This project can be built as a production container. Docker packages the Node.js runtime and built app together, so the same image can run on a laptop or a compatible container host.
+
+Requirements: Docker Engine and Docker Compose.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Open http://localhost:3000. Stop the app with `docker compose down`.
+
+Keep real credentials in your local `.env` file or the hosting provider's secret manager; never commit them. See [the free-first stack guide](docs/FREE_FIRST_STACK.md) for deployment choices and the status of optional managed services.
 
 ## Troubleshooting
 
