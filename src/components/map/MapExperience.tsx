@@ -1044,6 +1044,9 @@ export function MapExperience() {
           <Link className="compare-control" href="/data-sources">
             Data sources
           </Link>
+          <Link className="compare-control" href="/contact">
+            Contact
+          </Link>
         </nav>
 
         <div aria-label="Application modes" className="topbar-actions">
