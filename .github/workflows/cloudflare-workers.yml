@@ -58,56 +58,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --output /tmp/cloudflare-preflight.json --write-out '%{http_code}' \
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+          status="$(curl --silent --show-error --output /tmp/cloudflare-preflight.json --write-out '%{http_code}' \\
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \\
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts")"
           if [[ "$status" != "200" ]]; then
-            echo "::error::Cloudflare token cannot list Workers in CLOUDFLARE_ACCOUNT_ID (HTTP $status). The token must be scoped to this account and include Workers Scripts:Read and Workers Scripts:Edit."
+            echo "::error::Cloudflare token cannot list Workers in CLOUDFLARE_ACCOUNT_ID (HTTP $status). Check that the token has Workers Scripts:Read and is scoped to this account."
             cat /tmp/cloudflare-preflight.json
             exit 1
           fi
           echo "Cloudflare token can access the selected account's Workers Scripts endpoint."
 
-      - name: Verify token can upload a Worker
-        if: ${{ steps.cloudflare.outputs.configured == 'true' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          probe_name="rli-permission-probe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          printf '%s' '{"main_module":"index.js","compatibility_date":"2026-10-26","compatibility_flags":["nodejs_compat"],"bindings":[]}' > /tmp/rli-worker-metadata.json
-          cat > /tmp/rli-worker-probe.js <<'EOF'
-          export default {
-            fetch() {
-              return new Response("temporary deployment permission check");
-            }
-          };
-          EOF
-
-          status="$(curl --silent --show-error --output /tmp/rli-worker-upload.json --write-out '%{http_code}' \
-            --request PUT \
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            --form 'metadata=@/tmp/rli-worker-metadata.json;type=application/json' \
-            --form 'index.js=@/tmp/rli-worker-probe.js;type=application/javascript+module' \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$probe_name")"
-
-          if ! jq -e '.success == true' /tmp/rli-worker-upload.json >/dev/null 2>&1; then
-            echo "::error::Cloudflare token can read Workers but cannot upload a temporary Worker. Update CLOUDFLARE_API_TOKEN with account-scoped Workers Scripts:Edit. API response (no credentials):"
-            jq '{success, errors}' /tmp/rli-worker-upload.json
-            exit 1
-          fi
-
-          delete_status="$(curl --silent --show-error --output /tmp/rli-worker-delete.json --write-out '%{http_code}' \
-            --request DELETE \
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$probe_name")"
-          if ! jq -e '.success == true' /tmp/rli-worker-delete.json >/dev/null 2>&1; then
-            echo "::warning::The temporary permission-check Worker was uploaded but could not be deleted (HTTP $delete_status). Remove $probe_name in the Cloudflare dashboard."
-          else
-            echo "Cloudflare Worker upload permission confirmed; temporary probe removed."
-          fi
+      # Do not test deployment by creating a temporary Worker here. The Cloudflare
+      # Workers Scripts:Edit role can update/deploy existing Workers, but cannot
+      # create or delete Workers. Deploy directly to the existing configured Worker.
 
       - name: Deploy to Cloudflare Workers
         if: ${{ steps.cloudflare.outputs.configured == 'true' }}
