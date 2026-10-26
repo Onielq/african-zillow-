@@ -25,7 +25,7 @@ try {
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
     return Boolean(map && map.isStyleLoaded());
-  }, { timeout: 90_000 });
+  }, undefined, { timeout: 90_000 });
 
   // Set the browser to a real Bugesera sample viewport that is inside the
   // parcel service's previously smoke-tested coverage.
@@ -41,7 +41,7 @@ try {
     if (map.getLayoutProperty("village-outline", "visibility") !== "visible") return false;
     if (map.getLayoutProperty("parcel-outline", "visibility") !== "visible") return false;
     return map.queryRenderedFeatures({ layers: ["parcel-outline"] }).length > 0;
-  }, { timeout: 60_000 });
+  }, undefined, { timeout: 60_000 });
 
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
