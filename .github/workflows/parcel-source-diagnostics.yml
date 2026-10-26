@@ -1,0 +1,27 @@
+name: Parcel source diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/diagnose-parcel-sources.mjs"
+      - ".github/workflows/parcel-source-diagnostics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-public-gis:
+    name: Inspect parcel service metadata and sample geometry
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe public parcel endpoints (read-only)
+        run: node scripts/diagnose-parcel-sources.mjs
