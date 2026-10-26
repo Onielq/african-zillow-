@@ -406,7 +406,7 @@ async function checkIntegrations(): Promise<IntegrationHealth[]> {
       id: "cloudflare-workers",
       name: "Cloudflare Workers hosting",
       category: "hosting",
-      status: isCloudflareWorker ? "connected" : "needs-setup",
+      status: isCloudflareWorker ? "reachable" : "needs-setup",
       statusLabel: isCloudflareWorker
         ? "Running in Cloudflare Workers"
         : "Worker deployment not confirmed",
