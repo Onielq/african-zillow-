@@ -30,3 +30,5 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Docker image build
+        run: docker build --tag rwanda-land-intelligence:test .
