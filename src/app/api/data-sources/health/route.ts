@@ -294,7 +294,7 @@ async function checkResendIntegration(): Promise<IntegrationHealth> {
       category: "email",
       status: "not-configured",
       statusLabel: "API key missing",
-      detail: "RESEND_API_KEY is not configured in the running environment. No email has been sent, and no contact-email feature is currently wired into the app."
+      detail: "RESEND_API_KEY is not configured in the running environment. The contact form and sending endpoint are implemented, but email sending stays disabled until server-side settings and a permitted sender are configured."
     };
   }
 
@@ -331,16 +331,50 @@ async function checkResendIntegration(): Promise<IntegrationHealth> {
     const missing: string[] = [];
     if (!fromEmail) missing.push("RESEND_FROM_EMAIL");
     if (!toEmail) missing.push("RESEND_TO_EMAIL");
+    if (missing.length) {
+      return {
+        id: "resend",
+        name: "Resend email",
+        category: "email",
+        status: "needs-setup",
+        statusLabel: "API key accepted · sender settings missing",
+        detail: `The API key is accepted. Configure ${missing.join(" and ")}. The contact endpoint is wired, but this check does not send a message or prove deliverability.`
+      };
+    }
+
+    // Verify the configured sender against Resend's current domain list; never
+    // treat a present API key as proof that the domain can send production mail.
+    const domainResponse = await response.json() as {
+      data?: Array<{ name?: string; status?: string }>;
+    };
+    const senderDomain = fromEmail.split("@").at(-1)?.toLowerCase() ?? "";
+    const verifiedDomain = (domainResponse.data ?? []).find((domain) => {
+      const name = domain.name?.toLowerCase();
+      return Boolean(name && (senderDomain === name || senderDomain.endsWith("." + name)) &&
+        domain.status?.toLowerCase() === "verified");
+    });
+
+    if (!verifiedDomain) {
+      const testSender = senderDomain === "resend.dev";
+      return {
+        id: "resend",
+        name: "Resend email",
+        category: "email",
+        status: "needs-setup",
+        statusLabel: testSender ? "Test sender only · delivery test pending" : "Sender domain not verified",
+        detail: testSender
+          ? "The API key is accepted, but resend.dev is a testing sender, not a production identity. Verify a domain you control before customer-facing delivery. No email was sent."
+          : "The API key is accepted, but the configured sender domain is not verified in Resend. Verify the domain and its DNS records before expecting email delivery. No email was sent."
+      };
+    }
 
     return {
       id: "resend",
       name: "Resend email",
       category: "email",
       status: "needs-setup",
-      statusLabel: "API key accepted · sending not wired",
-      detail: missing.length
-        ? `The API key was accepted. Configure ${missing.join(" and ")} and build the contact-email route before sending messages. This check does not send email or verify deliverability.`
-        : "The API key was accepted and sender/recipient settings are present. The app still needs an implemented sending route and an end-to-end test; this check does not send email or verify deliverability."
+      statusLabel: "Sender verified · delivery test pending",
+      detail: "The API key, recipient setting, and sender domain appear configured. Submit a controlled contact-form test and verify receipt before treating email as production-ready. This check does not send email."
     };
   } catch (error) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
