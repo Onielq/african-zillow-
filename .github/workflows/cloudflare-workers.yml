@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cloudflare-workers-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NEXT_PUBLIC_MAP_STYLE_URL: ${{ vars.NEXT_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty' }}
 
