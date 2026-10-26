@@ -655,7 +655,7 @@ const SECTOR_ZOOM = 12.0;
 const CELL_ZOOM = 15.1;
 // Keep every requested geography level visible in sequence before individual plots.
 const VILLAGE_ZOOM = 16.2;
-const PARCEL_ZOOM = 17.35;
+const PARCEL_ZOOM = 17.0;
 
 const AREA_LEVELS: AreaLevel[] = ["district", "sector", "cell", "village", "parcel"];
 
