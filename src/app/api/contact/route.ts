@@ -29,7 +29,11 @@ export async function POST(request: NextRequest) {
     if (new TextEncoder().encode(raw).byteLength > 12_000) {
       return NextResponse.json({ error: "Message is too large." }, { status: 413 });
     }
-    input = JSON.parse(raw) as ContactMessage;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Please submit a valid message." }, { status: 400 });
+    }
+    input = parsed as ContactMessage;
   } catch {
     return NextResponse.json({ error: "Please submit a valid message." }, { status: 400 });
   }
