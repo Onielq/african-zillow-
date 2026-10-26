@@ -985,6 +985,29 @@ export function MapExperience() {
     });
   };
 
+  const focusParcelBoundaries = (source: "kigali" | "bugesera") => {
+    setActiveFocus(source);
+    setSelectedArea(null);
+    if (!mapInstance) return;
+
+    // These positions were verified against the live cadastral API. Jumping to
+    // them lets users inspect actual parcel coverage without manually zooming
+    // through nine levels from the regional overview.
+    const target = source === "kigali"
+      ? { center: [29.9974, -2.0346] as [number, number], zoom: 19.2 }
+      : { center: [30.1328, -2.2830] as [number, number], zoom: 19.2 };
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    mapInstance.flyTo({
+      center: target.center,
+      zoom: target.zoom,
+      duration: reduceMotion ? 0 : 720,
+      essential: false
+    });
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -1622,6 +1645,18 @@ export function MapExperience() {
                 {option.label}
               </button>
             ))}
+          </div>
+          <p className="focus-eyebrow">PARCEL BOUNDARIES</p>
+          <p className="metric-info-description">
+            Individual plot lines appear when you zoom in. Jump to a verified parcel area:
+          </p>
+          <div aria-label="Jump to individual parcel boundaries" className="focus-options">
+            <button className="focus-button" onClick={() => focusParcelBoundaries("kigali")} type="button">
+              Kigali parcels
+            </button>
+            <button className="focus-button" onClick={() => focusParcelBoundaries("bugesera")} type="button">
+              Bugesera parcels
+            </button>
           </div>
         </div>
 
