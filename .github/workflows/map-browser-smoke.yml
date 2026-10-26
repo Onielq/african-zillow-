@@ -31,7 +31,7 @@ jobs:
         run: npm install --no-save --no-audit --no-fund playwright
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Verify live parcel outlines at village zoom
         env:
