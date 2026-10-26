@@ -1032,6 +1032,12 @@ export function MapView({
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
 
+    // Read-only browser smoke-test hook. It is enabled only for an explicit
+    // e2e query parameter and is removed when this map instance is disposed.
+    const e2eMapWindow = window as Window & { __RLI_E2E_MAP__?: MapLibreMapInstance };
+    const e2eEnabled = new URLSearchParams(window.location.search).get("rli_e2e") === "1";
+    if (e2eEnabled) e2eMapWindow.__RLI_E2E_MAP__ = map;
+
     const updateRwandaZoomFloor = () => {
       const mobile = window.matchMedia("(max-width: 720px)").matches;
       const camera = map.cameraForBounds(RWANDA_CAMERA_BOUNDS, {
@@ -2428,6 +2434,9 @@ export function MapView({
       resizeObserver?.disconnect();
       map.remove();
       mapRef.current = null;
+      if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {
+        delete e2eMapWindow.__RLI_E2E_MAP__;
+      }
       activeBasemapModeRef.current = "map";
       onMapReady(null);
     };
