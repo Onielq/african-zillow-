@@ -2,7 +2,7 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
   worker: defineWorker({
-    name: "rwanda-land-intelligence-map",
+    name: "rwanda-land-intelligence",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-26",
     compatibilityFlags: ["nodejs_compat", "nodejs_compat_populate_process_env"],
