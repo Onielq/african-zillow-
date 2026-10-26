@@ -190,6 +190,37 @@
   font-size: 10px;
 }
 
+.integrationAudit {
+  margin: 20px 0 24px;
+  padding: 18px;
+  border: 1px solid #dce4de;
+  border-radius: 15px;
+  background: #f8faf8;
+}
+
+.integrationAuditHeader {
+  margin-bottom: 14px;
+}
+
+.integrationAuditHeader h3 {
+  margin: 0;
+  color: #17231f;
+  font-size: 16px;
+  letter-spacing: -.025em;
+}
+
+.integrationAuditHeader p {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: #68766e;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.integrationAudit .healthGrid {
+  margin: 0;
+}
+
 .healthGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
