@@ -347,7 +347,7 @@ async function checkResendIntegration(): Promise<IntegrationHealth> {
     const domainResponse = await response.json() as {
       data?: Array<{ name?: string; status?: string }>;
     };
-    const senderDomain = fromEmail.split("@").at(-1)?.toLowerCase() ?? "";
+    const senderDomain = fromEmail?.split("@").at(-1)?.toLowerCase() ?? "";
     const verifiedDomain = (domainResponse.data ?? []).find((domain) => {
       const name = domain.name?.toLowerCase();
       return Boolean(name && (senderDomain === name || senderDomain.endsWith("." + name)) &&
