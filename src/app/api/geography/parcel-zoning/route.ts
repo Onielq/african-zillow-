@@ -34,6 +34,7 @@ type ParcelZoning = {
   condition: string | null;
   prohibited: string | null;
   buffer: string | null;
+  sourceListsMultipleCodes?: boolean;
 };
 
 function normaliseFieldName(value: string): string {
@@ -82,6 +83,20 @@ async function queryArcGis(
   return payload;
 }
 
+/**
+ * Some source records place several short zone codes in one text field (for
+ * example "R2, T"). Split only code-like tokens; do not split ordinary
+ * descriptive names that happen to contain commas.
+ */
+function splitSimpleZoneCodes(value: string | null): string[] | null {
+  if (!value) return null;
+  const parts = value.split(/[,;|]/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2 || !parts.every((part) => /^[A-Z][A-Z0-9_-]{0,15}$/i.test(part))) {
+    return null;
+  }
+  return [...new Set(parts)];
+}
+
 function normaliseZones(features: ArcGisFeature[]): ParcelZoning[] {
   const zones = new Map<string, ParcelZoning>();
   for (const feature of features) {
@@ -97,19 +112,35 @@ function normaliseZones(features: ArcGisFeature[]): ParcelZoning[] {
     const prohibited = readText(attributes, ["prohibited", "prohibited_uses", "prohibitions"]);
     const buffer = readText(attributes, ["buffer_zon", "buff_detai", "buffer_zone", "buffer_detail"]);
     const label = name ?? code ?? "Classification not supplied by source";
-    const key = normaliseValue(code ?? label);
-    const next: ParcelZoning = { code, name: label, condition, prohibited, buffer };
-    const previous = zones.get(key);
-    if (!previous) {
-      zones.set(key, next);
-    } else {
-      zones.set(key, {
-        code: previous.code ?? next.code,
-        name: previous.name || next.name,
-        condition: previous.condition ?? next.condition,
-        prohibited: previous.prohibited ?? next.prohibited,
-        buffer: previous.buffer ?? next.buffer
-      });
+    const nameParts = splitSimpleZoneCodes(name);
+    const codeParts = splitSimpleZoneCodes(code);
+    const combinedCodes = codeParts ?? nameParts;
+    const candidates: ParcelZoning[] = combinedCodes
+      ? combinedCodes.map((part) => ({
+          code: part,
+          name: nameParts ? part : name ?? part,
+          condition,
+          prohibited,
+          buffer,
+          sourceListsMultipleCodes: true
+        }))
+      : [{ code, name: label, condition, prohibited, buffer }];
+
+    for (const next of candidates) {
+      const key = normaliseValue(next.code ?? next.name);
+      const previous = zones.get(key);
+      if (!previous) {
+        zones.set(key, next);
+      } else {
+        zones.set(key, {
+          code: previous.code ?? next.code,
+          name: previous.name || next.name,
+          condition: previous.condition ?? next.condition,
+          prohibited: previous.prohibited ?? next.prohibited,
+          buffer: previous.buffer ?? next.buffer,
+          sourceListsMultipleCodes: previous.sourceListsMultipleCodes || next.sourceListsMultipleCodes
+        });
+      }
     }
   }
   return [...zones.values()].sort((a, b) =>
