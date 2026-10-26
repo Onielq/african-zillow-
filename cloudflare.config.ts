@@ -5,7 +5,7 @@ export default defineConfig({
     name: "rwanda-land-intelligence-map",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-26",
-    compatibilityFlags: ["nodejs_compat"],
+    compatibilityFlags: ["nodejs_compat", "nodejs_compat_populate_process_env"],
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",
