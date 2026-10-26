@@ -13,7 +13,7 @@ Prefer open source and free tiers while traffic and feature requirements are sma
 | Portable runtime | Multi-stage Docker image using Next.js standalone output | Configured |
 | Local container run | Docker Compose | Configured |
 | Database | Neon PostgreSQL via `DATABASE_URL` | Placeholder only; no database adapter/schema is wired yet |
-| Email | Resend via `RESEND_API_KEY` and `RESEND_FROM_EMAIL` | Placeholder only; no email workflow is wired yet |
+| Email | Resend via `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_TO_EMAIL` | Contact form and server endpoint are wired; sending remains disabled until credentials and a verified sender are configured and tested |
 | File storage | Cloudflare R2 | Placeholder only; no upload/storage feature is wired yet |
 | Cloud deployment | Cloudflare Workers via vinext | Pilot config and GitHub build/deploy workflow added; compatibility build and Cloudflare credentials are required before a live deployment |
 
@@ -56,7 +56,7 @@ The Docker image targets the standard Node.js runtime and is independent from th
 - Never prefix credentials with `NEXT_PUBLIC_`; Next.js exposes those values to browser code.
 - `NEXT_PUBLIC_MAP_STYLE_URL` is intentionally public and is provided as a Docker build argument because browser-side values are embedded during the build.
 - Keep `.env.example` limited to blank placeholders and non-secret defaults.
-- Do not connect Neon, Resend, or R2 just to match a stack diagram. Add them only when schema migrations, mail templates, access controls, and integration tests are ready.
+- Keep service credentials in provider-managed secrets. The Resend contact endpoint checks configuration before sending; a present API key alone does not prove that the sender domain is verified or that a message reached an inbox.
 
 ## Cost and custom domain
 
@@ -80,11 +80,11 @@ The map style URL is public configuration, not a secret. It can be set as a GitH
 
 ## Managed service readiness
 
-Neon, Resend, and Cloudflare R2 remain **optional placeholders**, not live product integrations. The codebase does not yet have a production database schema or a completed listing-persistence, transactional email, or file-upload feature that should use these services. Do not add real credentials to the repository.
+Neon and Cloudflare R2 remain **unwired placeholders**. Resend now has a contact form and server-side sending endpoint, but it is not production-ready until the API key is configured, the sender domain is verified, and a real test message is received. Do not add real credentials to the repository.
 
 When the matching application feature is implemented:
 - **Neon:** create the PostgreSQL project, add its pooled `DATABASE_URL` as a runtime secret, and commit tested schema migrations.
-- **Resend:** verify a sender domain/address, then add `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and the receiving `RESEND_TO_EMAIL` as runtime secrets/variables before enabling user email. The live check only validates API-key access; it does not send a test email.
+- **Resend:** verify a sender domain/address, then add `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and the receiving `RESEND_TO_EMAIL` as runtime secrets/variables. The contact page supports email replies and call-back requests; run a controlled form submission and verify receipt before launch. The health check reads the domain list but does not send a test email. Set `NEXT_PUBLIC_CONTACT_PHONE` only if a direct click-to-call number is to be shown.
 - **R2:** create a bucket and use a restricted bucket binding or S3 credentials for server-side uploads; never expose access keys in browser code.
 
 Use each provider's current free tier and monitor usage. Zero dollars per month is a target while usage stays within those allowances, not a promise of unlimited hosting, email, bandwidth, database compute, or storage.
