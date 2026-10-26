@@ -257,7 +257,6 @@ button:disabled {
 
 .map-status-card,
 .map-floating-toolbar,
-.map-focus-panel,
 .data-note {
   position: absolute;
   z-index: 3;
@@ -483,63 +482,6 @@ button:disabled {
   color: var(--brand);
 }
 
-.map-focus-panel {
-  top: 66px;
-  left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  max-width: calc(100% - 36px);
-}
-
-.focus-eyebrow {
-  margin-left: 5px;
-  color: #52635A;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-shadow: 0 1px 8px rgb(255 255 255 / 85%);
-}
-
-.focus-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.focus-button {
-  min-height: 34px;
-  padding: 0 11px;
-  border: 1px solid rgb(220 228 222 / 94%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 92%);
-  color: #425349;
-  box-shadow: 0 3px 12px rgb(23 35 31 / 5%);
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
-}
-
-.focus-button:hover {
-  border-color: #A8CEB7;
-  background: #FFFFFF;
-}
-
-.focus-button-active {
-  border-color: var(--brand);
-  background: var(--brand);
-  color: #FFFFFF;
-}
-
-.focus-button-active:hover {
-  border-color: var(--brand-hover);
-  background: var(--brand-hover);
-  color: #FFFFFF;
-}
-
 .data-note {
   right: 18px;
   bottom: 54px;
@@ -646,10 +588,38 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.parcel-zoning-source {
+.parcel-zoning-results {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parcel-zoning-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parcel-zoning-list li {
+  padding: 4px 7px;
+  border: 1px solid #D7E6DC;
+  border-radius: 7px;
+  background: #FFFFFF;
+  color: #243B30;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.parcel-zoning-note {
   color: #66766D;
   font-size: 10px;
-  line-height: 1.45;
+  font-weight: 500;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
@@ -1161,23 +1131,6 @@ button:disabled {
     font-size: 10px;
   }
 
-  .map-focus-panel {
-    top: 105px;
-    left: 12px;
-    gap: 6px;
-    max-width: calc(100% - 24px);
-  }
-
-  .focus-options {
-    gap: 4px;
-  }
-
-  .focus-button {
-    min-height: 31px;
-    padding: 0 9px;
-    font-size: 10px;
-  }
-
   .data-note {
     right: 12px;
     bottom: 48px;
@@ -1216,10 +1169,6 @@ button:disabled {
 
   .mode-chip {
     padding: 0 6px;
-  }
-
-  .map-focus-panel {
-    top: 102px;
   }
 
   .data-note {
