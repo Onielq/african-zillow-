@@ -1,0 +1,49 @@
+name: Live map browser smoke
+
+on:
+  workflow_run:
+    workflows: ["Cloudflare Workers"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright for this run
+        run: npm install --no-save --no-audit --no-fund playwright
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify live parcel outlines at village zoom
+        env:
+          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+        run: node scripts/e2e-map-parcels.mjs
+
+      - name: Upload village-level map screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: village-parcel-boundaries
+          path: artifacts/village-parcel-boundaries.png
+          if-no-files-found: warn
+          retention-days: 7
