@@ -122,8 +122,7 @@ async function main() {
     });
   }
 
-  const importsSharedModule =
-    /(?:from\\s*|import\\s*\\(\\s*)["']\\.\\/maplibre-gl-shared\\.mjs["']/.test(workerSource);
+  const importsSharedModule = workerSource.includes("maplibre-gl-shared.mjs");
   if (importsSharedModule && (sharedModuleBytes === null || sharedModuleBytes < 1000)) {
     throw new Error(
       "The MapLibre worker imports maplibre-gl-shared.mjs, but the served shared module is empty."
