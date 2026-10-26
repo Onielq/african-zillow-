@@ -1586,24 +1586,26 @@ export function MapExperience() {
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             <div className="selected-area-title-row">
               <h2>{selectedArea.name}</h2>
-              {selectedArea.level === "parcel" && selectedArea.parcelMarketStatus ? (
-                <span
-                  className={`parcel-market-status-inline parcel-market-status-inline-${selectedArea.parcelMarketStatus}`}
-                  title={
-                    selectedArea.parcelMarketStatusSource === "demonstration"
-                      ? "Illustrative status only; this parcel is not confirmed as listed."
-                      : "Status supplied by the connected listing source."
-                  }
-                  aria-label={`${
-                    selectedArea.parcelMarketStatus === "available" ? "Land for sale" : "Off the market"
-                  }${
-                    selectedArea.parcelMarketStatusSource === "demonstration"
-                      ? " — illustrative status, not a verified listing"
-                      : " — status supplied by the connected listing source"
-                  }`}
-                >
-                  ({selectedArea.parcelMarketStatus === "available" ? "Land for sale" : "Off the market"})
-                </span>
+              {selectedArea.level === "parcel" ? (
+                selectedArea.parcelMarketStatus ? (
+                  <span
+                    className={"parcel-market-status-inline parcel-market-status-inline-" + selectedArea.parcelMarketStatus}
+                    title="Status supplied by the connected listing source."
+                    aria-label={selectedArea.parcelMarketStatus === "available"
+                      ? "Land for sale — status supplied by the connected listing source"
+                      : "Off the market — status supplied by the connected listing source"}
+                  >
+                    {selectedArea.parcelMarketStatus === "available" ? "For sale" : "Off market"}
+                  </span>
+                ) : (
+                  <span
+                    className="parcel-market-status-inline parcel-market-status-inline-unverified"
+                    title="Cadastral parcel geometry does not establish whether land is listed for sale."
+                    aria-label="For-sale status unverified; this parcel is not a verified listing"
+                  >
+                    Availability unverified
+                  </span>
+                )
               ) : null}
             </div>
             {selectedArea.level === "parcel" ? (
