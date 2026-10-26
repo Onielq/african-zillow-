@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "scripts/diagnose-parcel-sources.mjs"
+      - "scripts/smoke-test-parcel-api.mjs"
+      - "src/app/api/geography/areas/route.ts"
+      - "src/components/map/MapView.tsx"
       - ".github/workflows/parcel-source-diagnostics.yml"
   workflow_dispatch:
 
@@ -13,9 +16,9 @@ permissions:
 
 jobs:
   inspect-public-gis:
-    name: Inspect parcel service metadata and sample geometry
+    name: Inspect parcel service metadata and production API
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 12
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -23,5 +26,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build production app
+        run: npm run build
+      - name: Smoke-test production parcel API
+        env:
+          APP_BASE_URL: http://127.0.0.1:3000
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/parcel-app.log 2>&1 &
+          sleep 4
+          node scripts/smoke-test-parcel-api.mjs
       - name: Probe public parcel endpoints (read-only)
         run: node scripts/diagnose-parcel-sources.mjs
