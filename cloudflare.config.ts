@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       ASSETS: bindings.assets(),
       VINEXT_KV_CACHE: bindings.kv({ id: "885404cf624a455083d92c958c06e1ab" }),
+      DEPLOYMENT_PLATFORM: bindings.text("cloudflare-workers"),
     },
   }),
 });
