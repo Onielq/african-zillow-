@@ -798,3 +798,27 @@ test("parcel detail zoning uses exact cadastral geometry and reports mapped clas
   assert.match(experience, /No zoning designation mapped for this parcel/);
   assert.match(experience, /parcel-zoning\?/);
 });
+
+
+test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const generated = await readProjectFile("src/data/land-price-transaction.generated.ts");
+  const generator = await readProjectFile("scripts/generate-land-price-index.mjs");
+
+  assert.doesNotMatch(route, /node:fs\/promises/);
+  assert.doesNotMatch(route, /readFile\(join\(process\.cwd\(\), "public"/);
+  assert.match(route, /LAND_PRICE_TRANSACTION_ROWS/);
+  assert.match(generated, /LAND_PRICE_TRANSACTION_ROWS/);
+  assert.match(generator, /public.*land-price-transaction\.tsv/);
+  assert.match(generator, /Generated/);
+});
+
+test("optional parcel casing is added only after required outline layers", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const outlineLoop = mapView.indexOf("if (map.getLayer(layer.outline)) continue;");
+  const casingAttempt = mapView.indexOf("Optional parcel outline casing unavailable; primary parcel outlines remain active.");
+
+  assert.ok(outlineLoop >= 0, "primary administrative and parcel outlines must be created");
+  assert.ok(casingAttempt > outlineLoop, "optional casing is initialized after the primary outline loop");
+  assert.match(mapView, /if \(!map\.getLayer\(PARCEL_OUTLINE_CASING_LAYER\) && map\.getLayer\(AREA_LAYERS\.parcel\.outline\)\)/);
+});

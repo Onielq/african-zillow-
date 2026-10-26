@@ -1438,33 +1438,6 @@ export function MapView({
         });
       }
 
-      // A dark casing is drawn beneath the fine parcel stroke. It preserves
-      // cadastral boundaries against satellite roofs, light map tiles and roads.
-      if (!map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
-        map.addLayer({
-          id: PARCEL_OUTLINE_CASING_LAYER,
-          type: "line",
-          source: AREA_LAYERS.parcel.source,
-          layout: { visibility: "none" },
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false], "#2563EB",
-              ["boolean", ["feature-state", "hover"], false], "#16734A",
-              "#1C2935"
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false], 5.2,
-              ["boolean", ["feature-state", "hover"], false], 4.2,
-              ["interpolate", ["linear"], ["zoom"], PARCEL_ZOOM, 2.4, PARCEL_ZOOM + 1.5, 2.8, PARCEL_ZOOM + 3.85, 3.2]
-            ],
-            "line-opacity": 0.98,
-            "line-blur": ["case", ["boolean", ["feature-state", "selected"], false], 1.25, 0]
-          }
-        });
-      }
-
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
         if (map.getLayer(layer.outline)) continue;
@@ -1520,6 +1493,31 @@ export function MapView({
             "line-opacity": level === "parcel" ? 0.98 : 0.94
           }
         });
+      }
+
+      // Optional contrast casing. Primary boundaries exist before this enhancement,
+      // so a casing-style failure cannot prevent village or parcel lines from loading.
+      if (!map.getLayer(PARCEL_OUTLINE_CASING_LAYER) && map.getLayer(AREA_LAYERS.parcel.outline)) {
+        try {
+          map.addLayer({
+            id: PARCEL_OUTLINE_CASING_LAYER,
+            type: "line",
+            source: AREA_LAYERS.parcel.source,
+            layout: { visibility: "none" },
+            paint: {
+              "line-color": "#1C2935",
+              "line-width": [
+                "interpolate", ["linear"], ["zoom"],
+                VILLAGE_ZOOM, 1.8,
+                PARCEL_ZOOM, 2.2,
+                PARCEL_ZOOM + 3.85, 3.2
+              ],
+              "line-opacity": 0.96
+            }
+          }, AREA_LAYERS.parcel.outline);
+        } catch (error) {
+          console.warn("Optional parcel outline casing unavailable; primary parcel outlines remain active.", error);
+        }
       }
 
       for (const level of AREA_LEVELS) {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { DISTRICT_LAND_PRICE_BENCHMARKS, LAND_PRICE_BENCHMARK_SOURCE } from "@/data/land-price-benchmarks";
+import { LAND_PRICE_TRANSACTION_ROWS } from "@/data/land-price-transaction.generated";
 
 export const runtime = "nodejs";
 
@@ -316,8 +315,10 @@ function sectorPriceKey(district: string, sector: string): string {
 
 async function getLandPriceIndex(): Promise<LandPriceIndex> {
   if (!landPriceIndexPromise) {
-    landPriceIndexPromise = (async () => {
-      const source = await readFile(join(process.cwd(), "public", "land-price-transaction.tsv"), "utf8");
+    // The TSV is converted into a bundled TypeScript module at install/build
+    // time. Reading public/ with node:fs at request time is not reliable in
+    // Workers because deployed static assets are not runtime filesystem files.
+    landPriceIndexPromise = Promise.resolve().then(() => {
       const groups = new Map<string, {
         district: string;
         sector: string;
@@ -325,17 +326,12 @@ async function getLandPriceIndex(): Promise<LandPriceIndex> {
         prices: Set<number>;
         sourceRows: number[];
       }>();
-      const lines = source.split(/\r?\n/);
-      for (let index = 1; index < lines.length; index += 1) {
-        const line = lines[index];
-        if (!line?.trim()) continue;
-        const fields = line.split("\t");
-        if (fields.length !== 5 || fields.slice(0, 4).some((field) => !field.trim())) continue;
-        const district = fields[1].trim();
-        const sector = fields[2].trim();
-        const cell = fields[3].trim();
-        const price = Number(fields[4].replace(/,/g, "").trim());
-        if (!Number.isFinite(price) || price <= 0) continue;
+      for (const row of LAND_PRICE_TRANSACTION_ROWS) {
+        const [, districtValue, sectorValue, cellValue, price, sourceRow] = row;
+        const district = districtValue.trim();
+        const sector = sectorValue.trim();
+        const cell = cellValue.trim();
+        if (!district || !sector || !cell || !Number.isFinite(price) || price <= 0) continue;
         const key = cellPriceKey(district, sector, cell);
         const group = groups.get(key) ?? {
           district,
@@ -345,7 +341,7 @@ async function getLandPriceIndex(): Promise<LandPriceIndex> {
           sourceRows: []
         };
         group.prices.add(price);
-        group.sourceRows.push(index + 1);
+        group.sourceRows.push(sourceRow);
         groups.set(key, group);
       }
 
@@ -373,14 +369,13 @@ async function getLandPriceIndex(): Promise<LandPriceIndex> {
         });
       }
       return { cells, sectors };
-    })().catch((error) => {
+    }).catch((error) => {
       landPriceIndexPromise = null;
       throw error;
     });
   }
   return landPriceIndexPromise;
 }
-
 function numberValue(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {

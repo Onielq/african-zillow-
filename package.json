@@ -18,11 +18,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "postinstall": "node scripts/copy-maplibre-worker.mjs",
-    "predev": "node scripts/copy-maplibre-worker.mjs",
-    "prebuild": "node scripts/copy-maplibre-worker.mjs",
-    "predev:vinext": "node scripts/copy-maplibre-worker.mjs",
-    "prebuild:vinext": "node scripts/copy-maplibre-worker.mjs"
+    "postinstall": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
+    "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
+    "predev:vinext": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
+    "prebuild:vinext": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs"
   },
   "dependencies": {
     "@vinext/cloudflare": "^1.2.1",

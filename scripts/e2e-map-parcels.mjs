@@ -58,6 +58,18 @@ try {
     throw new Error("App homepage failed: HTTP " + (response?.status() ?? "no response"));
   }
 
+  await page.waitForFunction(() => Boolean(window.__RLI_E2E_MAP__), undefined, { timeout: 30_000 });
+  await page.evaluate(() => {
+    const testWindow = window;
+    const map = window.__RLI_E2E_MAP__;
+    if (map) {
+      testWindow.__RLI_E2E_MAP_ERRORS__ = [];
+      map.on("error", (event) => {
+        const error = event?.error;
+        testWindow.__RLI_E2E_MAP_ERRORS__.push(error?.message ?? String(error ?? "MapLibre style error"));
+      });
+    }
+  });
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
     return Boolean(map && map.isStyleLoaded());
@@ -101,6 +113,13 @@ try {
         maxzoom: map.getLayer(layerId)?.maxzoom ?? null
       };
     };
+    const boundaryLayers = map.getStyle().layers
+      .filter((layer) => /^(district|sector|cell|village|parcel)-(fill|outline|label)$/.test(layer.id) || layer.id === "parcel-outline-casing")
+      .map((layer) => ({
+        id: layer.id,
+        type: layer.type,
+        visibility: map.getLayoutProperty(layer.id, "visibility") ?? "visible"
+      }));
     return {
       zoom: Number(map.getZoom().toFixed(2)),
       center: map.getCenter().toArray(),
@@ -113,7 +132,9 @@ try {
       renderedVillageOutlineFeatures: renderedCount("village-outline"),
       renderedParcelOutlineFeatures: renderedCount("parcel-outline"),
       renderedParcelFillFeatures: renderedCount("parcel-fill"),
-      renderedMapFeatureTotal: map.queryRenderedFeatures().length
+      renderedMapFeatureTotal: map.queryRenderedFeatures().length,
+      boundaryLayers,
+      mapLibreErrors: window.__RLI_E2E_MAP_ERRORS__ ?? []
     };
   });
 
