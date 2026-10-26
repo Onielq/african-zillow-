@@ -20,7 +20,9 @@
     "test": "node --test",
     "postinstall": "node scripts/copy-maplibre-worker.mjs",
     "predev": "node scripts/copy-maplibre-worker.mjs",
-    "prebuild": "node scripts/copy-maplibre-worker.mjs"
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
+    "predev:vinext": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild:vinext": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "@vinext/cloudflare": "^1.2.1",
