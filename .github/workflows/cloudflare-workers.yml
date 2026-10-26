@@ -50,24 +50,23 @@ jobs:
             echo "::notice::Worker build passed. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to repository Actions secrets to enable automatic deployment."
           fi
 
-      - name: Verify token can access the selected Cloudflare account
+      - name: Verify token can read Workers in the selected account
         if: ${{ steps.cloudflare.outputs.configured == 'true' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
-          set -o pipefail
-          output="$(npx wrangler whoami 2>&1)" || {
-            printf '%s\n' "$output"
-            echo "::error::Cloudflare authentication failed. Replace CLOUDFLARE_API_TOKEN with an API token that grants access to this account."
-            exit 1
-          }
-          printf '%s\n' "$output"
-          if ! grep -Fq "$CLOUDFLARE_ACCOUNT_ID" <<< "$output"; then
-            echo "::error::The configured Cloudflare API token does not show the account ID stored in CLOUDFLARE_ACCOUNT_ID."
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /tmp/cloudflare-preflight.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts")"
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Cloudflare token cannot list Workers in CLOUDFLARE_ACCOUNT_ID (HTTP $status). The token must be scoped to this account and include Workers Scripts:Read and Workers Scripts:Edit."
+            cat /tmp/cloudflare-preflight.json
             exit 1
           fi
+          echo "Cloudflare token can access the selected account's Workers Scripts endpoint."
 
       - name: Deploy to Cloudflare Workers
         if: ${{ steps.cloudflare.outputs.configured == 'true' }}
