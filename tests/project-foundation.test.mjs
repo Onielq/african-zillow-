@@ -639,7 +639,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\]/);
   assert.match(mapView, /PARCEL_ZOOM, 2\.4/);
   assert.match(mapView, /PARCEL_ZOOM, 3\.6/);
-  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0\.005 : AREA_FILL_OPACITY_EXPRESSION/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
   assert.match(mapView, /PARCEL_ZOOM,\s*0\.95/);
   assert.match(mapView, /PARCEL_ZOOM \+ 3\.85,\s*1\.9/);
@@ -773,7 +773,7 @@ test("parcel outlines keep a high-contrast casing above road and zoning overlays
   assert.match(mapView, /"line-color": \[/);
   assert.match(mapView, /"#1C2935"/);
   assert.match(mapView, /"line-blur": \["case", \["boolean", \["feature-state", "selected"\], false\], 1\.25, 0\]/);
-  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0\.005 : AREA_FILL_OPACITY_EXPRESSION/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
   assert.match(mapView, /map\.moveLayer\(layerId\)/);
   assert.match(mapView, /keepParcelBoundariesAndMarkersAboveContext\(\);/);
