@@ -15,7 +15,7 @@ Prefer open source and free tiers while traffic and feature requirements are sma
 | Database | Neon PostgreSQL via `DATABASE_URL` | Placeholder only; no database adapter/schema is wired yet |
 | Email | Resend via `RESEND_API_KEY` and `RESEND_FROM_EMAIL` | Placeholder only; no email workflow is wired yet |
 | File storage | Cloudflare R2 | Placeholder only; no upload/storage feature is wired yet |
-| Cloud deployment | Cloudflare Workers after compatibility validation | Planned; production cutover has not occurred |
+| Cloud deployment | Cloudflare Workers via vinext | Pilot config and GitHub build/deploy workflow added; compatibility build and Cloudflare credentials are required before a live deployment |
 
 An empty environment variable does not enable a service. Add an integration only alongside the product feature, validation, and tests that use it.
 
@@ -61,3 +61,30 @@ The Docker image targets the standard Node.js runtime and is independent from th
 ## Cost and custom domain
 
 The target is zero monthly infrastructure cost where current free-tier limits permit it—not a guarantee of unlimited service. Re-check usage, data retention, bandwidth, request, email and storage quotas before a project launches. A provider subdomain such as `workers.dev` or `pages.dev` can avoid buying a domain at the beginning; registering a custom domain generally has a separate cost.
+
+## Enable the Cloudflare Workers deployment
+
+The application uses Next.js server route handlers for geography and parcel data. A Pages static export would disable those server handlers, so the pilot uses Cloudflare Workers with vinext instead. Cloudflare currently recommends vinext for full-stack Next.js on Workers, but vinext is in beta; treat this as a preview until the project-specific compatibility check and end-to-end map/API checks pass.
+
+The repository now contains `vite.config.ts`, `cloudflare.config.ts`, and `.github/workflows/cloudflare-workers.yml`. The workflow runs the compatibility report and Worker build on pull requests and pushes to `main`. A push to `main` deploys only when both required repository Actions secrets exist:
+
+1. Open **Repository → Settings → Secrets and variables → Actions**.
+2. Add `CLOUDFLARE_API_TOKEN` with permission to deploy Workers.
+3. Add `CLOUDFLARE_ACCOUNT_ID` from the Cloudflare dashboard URL.
+4. Push a validated change to `main`, or manually run the **Cloudflare Workers** workflow.
+
+Without those secrets, the build still runs, while deployment is deliberately skipped. The first live deployment will use the free `workers.dev` hostname unless a custom domain is configured. Registering a custom domain usually costs money.
+
+The map style URL is public configuration, not a secret. It can be set as a GitHub Actions variable named `NEXT_PUBLIC_MAP_STYLE_URL`; otherwise the build uses the OpenFreeMap Liberty style default. Browser-visible `NEXT_PUBLIC_*` values are embedded in the client build and must not contain credentials.
+
+## Managed service readiness
+
+Neon, Resend, and Cloudflare R2 remain **optional placeholders**, not live product integrations. The codebase does not yet have a production database schema or a completed listing-persistence, transactional email, or file-upload feature that should use these services. Do not add real credentials to the repository.
+
+When the matching application feature is implemented:
+- **Neon:** create the PostgreSQL project, add its pooled `DATABASE_URL` as a runtime secret, and commit tested schema migrations.
+- **Resend:** verify a sender domain/address, then add `RESEND_API_KEY` and `RESEND_FROM_EMAIL` as runtime secrets/variables before sending user email.
+- **R2:** create a bucket and use a restricted bucket binding or S3 credentials for server-side uploads; never expose access keys in browser code.
+
+Use each provider's current free tier and monitor usage. Zero dollars per month is a target while usage stays within those allowances, not a promise of unlimited hosting, email, bandwidth, database compute, or storage.
+
