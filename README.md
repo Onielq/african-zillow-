@@ -14,6 +14,11 @@ The linked Bugesera Masterplan service provides administrative boundaries and pl
 
 **These layers are not proof of ownership or encumbrance status.** Buyers should verify title, ownership, restrictions, and current records with the competent land authority before a transaction. The source maps' version, access and reuse terms also need confirmation before commercial production.
 
+
+## Contact and email readiness
+
+The `/contact` page supports enquiries by email or a request for a call-back. The `/api/contact` endpoint sends through Resend only when `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (from a verified sender domain), and `RESEND_TO_EMAIL` are configured at runtime. These values are blank in `.env.example`; the page is not email-ready until a controlled message is received successfully. Set `NEXT_PUBLIC_CONTACT_PHONE` to show a direct call link. Never commit real keys or private phone numbers.
+
 ## Local development
 
 Requirements: Node.js 22 or newer and npm.
