@@ -1,5 +1,6 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import vinext from "vinext";
+import { kvDataAdapter } from "@vinext/cloudflare/cache/kv-data-adapter";
 import { defineConfig } from "vite";
 
 // The regular Next.js build needs standalone output for Docker. vinext
@@ -8,7 +9,11 @@ process.env.VINEXT_BUILD = "1";
 
 export default defineConfig({
   plugins: [
-    vinext(),
+    vinext({
+      cache: {
+        data: kvDataAdapter(),
+      },
+    }),
     cloudflare({
       viteEnvironment: {
         name: "rsc",
