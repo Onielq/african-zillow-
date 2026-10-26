@@ -40,7 +40,7 @@ try {
     if (!map || map.getZoom() < 16.2) return false;
     if (map.getLayoutProperty("village-outline", "visibility") !== "visible") return false;
     if (map.getLayoutProperty("parcel-outline", "visibility") !== "visible") return false;
-    return map.queryRenderedFeatures({ layers: ["parcel-outline"] }).length > 0;
+    return map.queryRenderedFeatures(undefined, { layers: ["parcel-outline"] }).length > 0;
   }, undefined, { timeout: 60_000 });
 
   const result = await page.evaluate(() => {
@@ -51,8 +51,8 @@ try {
       center: map.getCenter().toArray(),
       villageOutlineVisibility: map.getLayoutProperty("village-outline", "visibility"),
       parcelOutlineVisibility: map.getLayoutProperty("parcel-outline", "visibility"),
-      renderedParcelOutlineFeatures: map.queryRenderedFeatures({ layers: ["parcel-outline"] }).length,
-      renderedParcelFillFeatures: map.queryRenderedFeatures({ layers: ["parcel-fill"] }).length
+      renderedParcelOutlineFeatures: map.queryRenderedFeatures(undefined, { layers: ["parcel-outline"] }).length,
+      renderedParcelFillFeatures: map.queryRenderedFeatures(undefined, { layers: ["parcel-fill"] }).length
     };
   });
 
