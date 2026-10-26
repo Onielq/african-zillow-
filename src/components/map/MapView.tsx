@@ -735,7 +735,8 @@ function zoomForLevel(level: AreaLevel): number {
     case "cell":
       return 16.0;
     case "village":
-      return 17.0;
+      // Keep the village view below the parcel-layer activation threshold.
+      return 16.6;
     case "parcel":
       return 19.35;
   }
