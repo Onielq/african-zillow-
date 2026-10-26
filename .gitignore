@@ -23,3 +23,9 @@
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# vinext and Cloudflare Workers build outputs
+.vinext/
+.cloudflare/
+.wrangler/
+dist/

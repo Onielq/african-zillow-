@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  ...(process.env.VINEXT_BUILD === "1" ? {} : { output: "standalone" as const }),
   reactStrictMode: true
 };
 
