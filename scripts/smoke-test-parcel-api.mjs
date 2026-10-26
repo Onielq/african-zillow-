@@ -93,15 +93,26 @@ async function main() {
   // and the sibling shared module. This catches the past "Worker failed to
   // load" problem at the actual production server/static-asset layer.
   const mapWorkerAssets = [];
+  let workerSource = "";
+  let sharedModuleBytes = null;
   for (const fileName of ["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"]) {
     const url = baseUrl + "/vendor/maplibre-gl/" + maplibreVersion + "/" + fileName;
     const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     const body = await response.text();
-    if (!response.ok || body.length < 1000) {
+    if (!response.ok) {
       throw new Error(
-        "MapLibre worker asset failed: " + url + " returned HTTP " +
-        response.status + " and " + body.length + " bytes."
+        "MapLibre worker asset failed: " + url + " returned HTTP " + response.status + "."
       );
+    }
+    if (fileName === "maplibre-gl-worker.mjs") {
+      workerSource = body;
+      if (body.length < 1000) {
+        throw new Error("MapLibre worker entry point was empty or truncated: " + url);
+      }
+    } else {
+      // MapLibre 6.13+ ships an intentionally empty shared-module compatibility
+      // stub. That is safe only when the matching worker no longer imports it.
+      sharedModuleBytes = body.length;
     }
     mapWorkerAssets.push({
       file: fileName,
@@ -109,6 +120,14 @@ async function main() {
       bytes: body.length,
       status: "served"
     });
+  }
+
+  const importsSharedModule =
+    /(?:from\\s*|import\\s*\\(\\s*)["']\\.\\/maplibre-gl-shared\\.mjs["']/.test(workerSource);
+  if (importsSharedModule && (sharedModuleBytes === null || sharedModuleBytes < 1000)) {
+    throw new Error(
+      "The MapLibre worker imports maplibre-gl-shared.mjs, but the served shared module is empty."
+    );
   }
 
   const summaries = [];
@@ -181,6 +200,7 @@ async function main() {
     homePageStatus: home.status,
     maplibreVersion,
     mapWorkerAssets,
+    workerImportsSharedModule: importsSharedModule,
     parcelApiChecks: summaries
   }, null, 2));
 }
