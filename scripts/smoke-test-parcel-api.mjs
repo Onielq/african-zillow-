@@ -4,7 +4,13 @@
  * Requires the production server to be available at APP_BASE_URL.
  * No write requests or personal/owner fields are used.
  */
+import { readFile } from "node:fs/promises";
+
 const baseUrl = (process.env.APP_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
+const maplibrePackage = JSON.parse(
+  await readFile(new URL("../node_modules/maplibre-gl/package.json", import.meta.url), "utf8")
+);
+const maplibreVersion = maplibrePackage.version;
 const cases = [
   {
     source: "kigali",
@@ -83,6 +89,28 @@ async function main() {
   const home = await fetchWithRetry(baseUrl + "/");
   if (!home.ok) throw new Error("Home page failed with HTTP " + home.status);
 
+  // The browser must be able to load MapLibre's version-matched module worker
+  // and the sibling shared module. This catches the past "Worker failed to
+  // load" problem at the actual production server/static-asset layer.
+  const mapWorkerAssets = [];
+  for (const fileName of ["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"]) {
+    const url = baseUrl + "/vendor/maplibre-gl/" + maplibreVersion + "/" + fileName;
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const body = await response.text();
+    if (!response.ok || body.length < 1000) {
+      throw new Error(
+        "MapLibre worker asset failed: " + url + " returned HTTP " +
+        response.status + " and " + body.length + " bytes."
+      );
+    }
+    mapWorkerAssets.push({
+      file: fileName,
+      httpStatus: response.status,
+      bytes: body.length,
+      status: "served"
+    });
+  }
+
   const summaries = [];
   for (const item of cases) {
     const bbox = item.bbox.split(",").map(Number);
@@ -151,6 +179,8 @@ async function main() {
     checkedAt: new Date().toISOString(),
     productionServer: baseUrl,
     homePageStatus: home.status,
+    maplibreVersion,
+    mapWorkerAssets,
     parcelApiChecks: summaries
   }, null, 2));
 }
