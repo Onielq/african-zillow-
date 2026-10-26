@@ -3,7 +3,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
 FROM base AS deps
-COPY package.json ./
+COPY package*.json ./
 COPY scripts ./scripts
 RUN npm install --no-audit --no-fund
 
