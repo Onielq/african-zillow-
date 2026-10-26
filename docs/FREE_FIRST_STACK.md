@@ -69,11 +69,12 @@ The application uses Next.js server route handlers for geography and parcel data
 The repository now contains `vite.config.ts`, `cloudflare.config.ts`, and `.github/workflows/cloudflare-workers.yml`. The workflow runs the compatibility report and Worker build on pull requests and pushes to `main`. A push to `main` deploys only when both required repository Actions secrets exist:
 
 1. Open **Repository → Settings → Secrets and variables → Actions**.
-2. Add `CLOUDFLARE_API_TOKEN` with permission to deploy Workers.
-3. Add `CLOUDFLARE_ACCOUNT_ID` from the Cloudflare dashboard URL.
-4. Push a validated change to `main`, or manually run the **Cloudflare Workers** workflow.
+2. Create a scoped Cloudflare API token using the **Edit Cloudflare Workers** template. Scope it to the correct account; the token must be able to write/deploy Worker scripts and manage the KV namespace used by the cache. The token should not be pasted into source code or chat.
+3. Replace `CLOUDFLARE_API_TOKEN` under **Repository → Settings → Secrets and variables → Actions** with that token.
+4. Verify `CLOUDFLARE_ACCOUNT_ID` matches the same Cloudflare account.
+5. Push a validated change to `main`, or manually run the **Cloudflare Workers** workflow.
 
-Without those secrets, the build still runs, while deployment is deliberately skipped. The first live deployment will use the free `workers.dev` hostname unless a custom domain is configured. Registering a custom domain usually costs money.
+The workflow performs a read-access preflight, but only a successful deployment confirms write permissions. The first live deployment uses the free `taiseel.workers.dev` hostname unless a custom domain is configured. Registering a custom domain usually costs money.
 
 The map style URL is public configuration, not a secret. It can be set as a GitHub Actions variable named `NEXT_PUBLIC_MAP_STYLE_URL`; otherwise the build uses the OpenFreeMap Liberty style default. Browser-visible `NEXT_PUBLIC_*` values are embedded in the client build and must not contain credentials.
 
@@ -83,7 +84,7 @@ Neon, Resend, and Cloudflare R2 remain **optional placeholders**, not live produ
 
 When the matching application feature is implemented:
 - **Neon:** create the PostgreSQL project, add its pooled `DATABASE_URL` as a runtime secret, and commit tested schema migrations.
-- **Resend:** verify a sender domain/address, then add `RESEND_API_KEY` and `RESEND_FROM_EMAIL` as runtime secrets/variables before sending user email.
+- **Resend:** verify a sender domain/address, then add `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and the receiving `RESEND_TO_EMAIL` as runtime secrets/variables before enabling user email. The live check only validates API-key access; it does not send a test email.
 - **R2:** create a bucket and use a restricted bucket binding or S3 credentials for server-side uploads; never expose access keys in browser code.
 
 Use each provider's current free tier and monitor usage. Zero dollars per month is a target while usage stays within those allowances, not a promise of unlimited hosting, email, bandwidth, database compute, or storage.
