@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import "./contact.module.css";
+import styles from "./contact.module.css";
 
 type ReplyPreference = "email" | "call";
 
@@ -48,38 +48,38 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="contact-page">
-      <header className="contact-topbar">
-        <Link className="contact-brand" href="/" aria-label="Rwanda Land Intelligence home">
-          <span className="contact-brand-mark" aria-hidden="true">R</span>
+    <main className={styles["contact-page"]}>
+      <header className={styles["contact-topbar"]}>
+        <Link className={styles["contact-brand"]} href="/" aria-label="Rwanda Land Intelligence home">
+          <span className={styles["contact-brand-mark"]} aria-hidden="true">R</span>
           <span>Rwanda Land Intelligence</span>
         </Link>
-        <Link className="contact-back" href="/">Back to map <span aria-hidden="true">↗</span></Link>
+        <Link className={styles["contact-back"]} href="/">Back to map <span aria-hidden="true">↗</span></Link>
       </header>
 
-      <section className="contact-layout">
-        <div className="contact-intro">
-          <p className="contact-eyebrow">CONTACT</p>
+      <section className={styles["contact-layout"]}>
+        <div className={styles["contact-intro"]}>
+          <p className={styles["contact-eyebrow"]}>CONTACT</p>
           <h1>Let’s talk land.</h1>
-          <p className="contact-lede">
+          <p className={styles["contact-lede"]}>
             Ask about a location, report a data issue, or tell us what you are trying to find.
             Choose email or request a call-back.
           </p>
           {phone ? (
-            <a className="contact-call-link" href={"tel:" + phone.replace(/[^+\d]/g, "")}>
+            <a className={styles["contact-call-link"]} href={"tel:" + phone.replace(/[^+\d]/g, "")}>
               Call us <span aria-hidden="true">↗</span>
             </a>
           ) : (
-            <p className="contact-call-note">Prefer a call? Select “Call me” and leave your number.</p>
+            <p className={styles["contact-call-note"]}>Prefer a call? Select “Call me” and leave your number.</p>
           )}
-          <div className="contact-note">
-            <span className="contact-note-dot" aria-hidden="true" />
+          <div className={styles["contact-note"]}>
+            <span className={styles["contact-note-dot"]} aria-hidden="true" />
             <p>We don’t ask you to send passwords, payment details, or confidential land-owner records through this form.</p>
           </div>
         </div>
 
-        <form className="contact-form" onSubmit={submit}>
-          <div className="contact-form-heading">
+        <form className={styles["contact-form"]} onSubmit={submit}>
+          <div className={styles["contact-form-heading"]}>
             <h2>Send a message</h2>
             <p>We’ll use your details only to respond to this enquiry.</p>
           </div>
@@ -99,20 +99,20 @@ export default function ContactPage() {
             </select>
           </label>
           <label>
-            Phone number {preference === "call" ? <span className="contact-required">(required for a call)</span> : <span className="contact-optional">(optional)</span>}
+            Phone number {preference === "call" ? <span className={styles["contact-required"]}>(required for a call)</span> : <span className={styles["contact-optional"]}>(optional)</span>}
             <input name="phone" type="tel" autoComplete="tel" maxLength={40} required={preference === "call"} placeholder="+250 ..." />
           </label>
           <label>
             What can we help with?
             <textarea name="message" required minLength={10} maxLength={5000} rows={5} placeholder="Tell us what you need..." />
           </label>
-          <label className="contact-honeypot" aria-hidden="true">
+          <label className={styles["contact-honeypot"]} aria-hidden="true">
             Website
             <input name="website" tabIndex={-1} autoComplete="off" />
           </label>
-          {status ? <p className={"contact-status contact-status-" + status.kind} role="status">{status.message}</p> : null}
+          {status ? <p className={`${styles["contact-status"]} ${status.kind === "success" ? styles["contact-status-success"] : styles["contact-status-error"]}`} role="status">{status.message}</p> : null}
           <button type="submit" disabled={sending}>{sending ? "Sending…" : "Send message"} <span aria-hidden="true">↗</span></button>
-          <p className="contact-form-footnote">Email delivery depends on the inbox being configured and the sender domain being verified.</p>
+          <p className={styles["contact-form-footnote"]}>Email delivery depends on the inbox being configured and the sender domain being verified.</p>
         </form>
       </section>
     </main>
