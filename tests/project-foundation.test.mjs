@@ -63,6 +63,30 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
 });
 
+test("cadastral outlines and parcel geometry are active from village zoom", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(mapView, /if \(activeLevel === "village"\) requestedLevels\.push\("parcel"\)/);
+  assert.match(mapView, /const showParcelBoundaries = activeIndex >= villageIndex/);
+  assert.match(mapView, /level === "parcel" && showParcelBoundaries/);
+  assert.match(mapView, /requestedLevelSet = new Set\(requestedLevels\)/);
+  assert.match(mapView, /sourceListsMultipleCodes/);
+});
+
+test("zoning codes are separated when a source record combines short codes and sources live in the Sources panel", async () => {
+  const route = await readProjectFile("src/app/api/geography/parcel-zoning/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(route, /splitSimpleZoneCodes/);
+  assert.match(route, /sourceListsMultipleCodes: true/);
+  assert.match(experience, /Multiple mapped designations/);
+  assert.match(experience, /The source lists several codes in one record/);
+  assert.doesNotMatch(experience, /parcel-zoning-source/);
+  assert.match(experience, /Planning and zoning/);
+  assert.match(experience, /Open Kigali zoning layer/);
+  assert.match(experience, /Open Bugesera zoning layer/);
+});
+
 test("parcel boundary requests preserve source vertices and use a precise viewport envelope", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
@@ -212,11 +236,12 @@ test("hydration warning suppression is scoped to the body element", async () => 
   assert.match(layout, /<body suppressHydrationWarning>/);
 });
 
-test("the experience provides responsive focus controls and reduced-motion support", async () => {
+test("redundant map focus panels are removed while reduced-motion support remains", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const css = await readProjectFile("src/app/globals.css");
+  assert.doesNotMatch(experience, /map-focus-panel|EXPLORE AREA|PARCEL BOUNDARIES/);
+  assert.doesNotMatch(css, /map-focus-panel|focus-button|focus-options/);
   assert.match(experience, /prefers-reduced-motion/);
-  assert.match(experience, /flyTo/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
 });
 
