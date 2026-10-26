@@ -115,11 +115,21 @@ type SourceHealthResult = {
   checkedAt: string;
 };
 
+type IntegrationHealthResult = {
+  id: string;
+  name: string;
+  category: "hosting" | "email" | "database" | "storage";
+  status: "reachable" | "unavailable" | "not-configured" | "invalid-credentials" | "not-integrated" | "needs-setup";
+  statusLabel: string;
+  detail: string;
+};
+
 type SourceHealthReport = {
   checkedAt: string;
   reachableCount: number;
   totalCount: number;
   results: SourceHealthResult[];
+  integrations: IntegrationHealthResult[];
   notice: string;
 };
 
@@ -238,6 +248,31 @@ export default function DataSourcesPage() {
               <strong>{healthReport.reachableCount} / {healthReport.totalCount} endpoints reachable</strong>
               <span>Checked {new Date(healthReport.checkedAt).toLocaleString("en-RW")}</span>
             </div>
+            <section aria-label="Application integration audit" className={styles.integrationAudit}>
+              <div className={styles.integrationAuditHeader}>
+                <h3>Application integrations</h3>
+                <p>Credentials and code are checked separately. A configured variable does not mean a feature has been tested end to end.</p>
+              </div>
+              <div className={styles.healthGrid}>
+                {healthReport.integrations?.map((integration) => (
+                  <article className={styles.healthCard} key={integration.id}>
+                    <div className={styles.healthCardHeader}>
+                      <div>
+                        <p className={styles.healthCategory}>{integration.category.toUpperCase()}</p>
+                        <h3>{integration.name}</h3>
+                      </div>
+                      <span
+                        className={styles.healthStatus}
+                        data-status={integration.status === "reachable" ? "reachable" : integration.status === "unavailable" ? "unavailable" : "review"}
+                      >
+                        {integration.statusLabel}
+                      </span>
+                    </div>
+                    <p className={styles.healthDetail}>{integration.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
             <div className={styles.healthGrid}>
               {healthReport.results.map((result) => (
                 <article className={styles.healthCard} key={result.id}>
@@ -276,7 +311,7 @@ export default function DataSourcesPage() {
             <p className={styles.healthNotice}>{healthReport.notice}</p>
           </div>
         ) : (
-          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect four GIS services plus two official land-market source pages.</p>
+          <p className={styles.healthPrompt}>No check has been run in this session. Run it to inspect the GIS sources and audit Cloudflare hosting/cache, Resend, Neon/PostgreSQL, and R2 configuration.</p>
         )}
       </section>
 
