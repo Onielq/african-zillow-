@@ -1034,8 +1034,17 @@ export function MapView({
 
     // Read-only browser smoke-test hook. It is enabled only for an explicit
     // e2e query parameter and is removed when this map instance is disposed.
-    const e2eMapWindow = window as Window & { __RLI_E2E_MAP__?: MapLibreMapInstance };
+    const e2eMapWindow = window as Window & {
+      __RLI_E2E_MAP__?: MapLibreMapInstance;
+      __RLI_E2E_TRACE__?: Array<Record<string, unknown>>;
+    };
     const e2eEnabled = new URLSearchParams(window.location.search).get("rli_e2e") === "1";
+    const recordE2ETrace = (event: string, details: Record<string, unknown> = {}) => {
+      if (!e2eEnabled) return;
+      const trace = e2eMapWindow.__RLI_E2E_TRACE__ ?? [];
+      trace.push({ event, at: new Date().toISOString(), ...details });
+      e2eMapWindow.__RLI_E2E_TRACE__ = trace;
+    };
     if (e2eEnabled) e2eMapWindow.__RLI_E2E_MAP__ = map;
 
     const updateRwandaZoomFloor = () => {
@@ -1879,22 +1888,34 @@ export function MapView({
 
       const queryBounds = requestBoundsForArea(viewBounds, level);
       const bbox = queryBounds.join(",");
-      const response = await fetch(
-        `/api/geography/areas?level=${level}&source=${adminSource}&bbox=${encodeURIComponent(bbox)}`,
-        { signal }
-      );
+      const requestUrl = `/api/geography/areas?level=${level}&source=${adminSource}&bbox=${encodeURIComponent(bbox)}`;
+      recordE2ETrace("area-api-request", { level, adminSource, bbox, zoom: Number(map.getZoom().toFixed(2)) });
+      const response = await fetch(requestUrl, { signal });
 
       if (!response.ok) {
+        recordE2ETrace("area-api-failure", { level, adminSource, status: response.status });
         throw new Error(`Administrative boundary request failed (${response.status})`);
       }
 
       const data = (await response.json()) as MapFeatureCollection;
+      recordE2ETrace("area-api-response", { level, adminSource, status: response.status, featureCount: data.features?.length ?? 0 });
       if (!signal.aborted) areaCache.set(cacheKey, { bounds: queryBounds, data });
       return data;
     };
 
     const refreshAreas = async () => {
-      if (!map.isStyleLoaded() || !map.getSource("admin-districts")) return;
+      const styleLoaded = map.isStyleLoaded();
+      const districtSourceExists = Boolean(map.getSource("admin-districts"));
+      recordE2ETrace("area-refresh-attempt", {
+        styleLoaded,
+        districtSourceExists,
+        zoom: Number(map.getZoom().toFixed(2)),
+        activeLevel: activeAreaLevel(map.getZoom())
+      });
+      if (!styleLoaded || !districtSourceExists) {
+        recordE2ETrace("area-refresh-skipped", { styleLoaded, districtSourceExists });
+        return;
+      }
 
       const sequence = ++refreshSequence;
       activeController?.abort();
@@ -1916,6 +1937,13 @@ export function MapView({
       ];
       const requestSources = (Object.keys(ADMIN_SOURCE_EXTENTS) as AdminSourceId[])
         .filter((adminSource) => boundsIntersect(viewBounds, ADMIN_SOURCE_EXTENTS[adminSource]));
+      recordE2ETrace("area-refresh-plan", {
+        zoom: Number(map.getZoom().toFixed(2)),
+        activeLevel,
+        requestedLevels,
+        viewBounds,
+        requestSources
+      });
 
       const dataByLevel = new Map<AreaLevel, Map<AdminSourceId, MapFeatureCollection>>();
       const pendingTasks: Promise<void>[] = [];
@@ -2353,6 +2381,24 @@ export function MapView({
       onStatusChange("ready");
       void refreshAreas();
       attachInteractionHandlers();
+
+      // Style load can precede the first genuinely idle frame. Re-check the
+      // active data source at idle so a transient early return cannot leave the
+      // entire map showing administrative fills with empty outlines.
+      map.once("idle", () => {
+        const level = activeAreaLevel(map.getZoom());
+        const activeFeatures = areaDataRef.current[level]?.features.length ?? 0;
+        const parcelFeatures = areaDataRef.current.parcel?.features.length ?? 0;
+        const needsRefresh = activeFeatures === 0 || (level === "village" && parcelFeatures === 0);
+        recordE2ETrace("map-idle-area-check", {
+          zoom: Number(map.getZoom().toFixed(2)),
+          activeLevel: level,
+          activeFeatures,
+          parcelFeatures,
+          needsRefresh
+        });
+        if (needsRefresh) void refreshAreas();
+      });
 
       if (!viewportListenersAttached) {
         map.on("moveend", scheduleRefresh);
