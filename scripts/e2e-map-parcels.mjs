@@ -86,6 +86,26 @@ try {
   // behind a single 60-second timeout.
   await page.waitForTimeout(15_000);
 
+  // Probe the same public endpoint directly from the live site. This separates
+  // data/API failures from the map component not requesting or consuming data.
+  const directParcelApi = await page.evaluate(async () => {
+    const url = "/api/geography/areas?level=parcel&source=bugesera&bbox=" +
+      encodeURIComponent("30.12,-2.30,30.15,-2.26");
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      const body = await response.json().catch(() => null);
+      return {
+        url,
+        status: response.status,
+        type: body?.type ?? null,
+        featureCount: Array.isArray(body?.features) ? body.features.length : null,
+        error: body?.error ?? body?.message ?? null
+      };
+    } catch (error) {
+      return { url, fetchError: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Map was not available during diagnostics.");
@@ -133,6 +153,7 @@ try {
       renderedParcelOutlineFeatures: renderedCount("parcel-outline"),
       renderedParcelFillFeatures: renderedCount("parcel-fill"),
       renderedMapFeatureTotal: map.queryRenderedFeatures().length,
+      refreshTrace: window.__RLI_E2E_TRACE__ ?? [],
       boundaryLayers,
       mapLibreErrors: window.__RLI_E2E_MAP_ERRORS__ ?? []
     };
@@ -148,6 +169,7 @@ try {
     url: baseUrl,
     zoomLevel: "village",
     ...result,
+    directParcelApi,
     removedPanelCount,
     exploreAreaTextCount,
     parcelBoundariesTextCount,
