@@ -575,9 +575,19 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Esri World Imagery is provided as raster tiles. Keep its required attribution
-// attached to the source so MapLibre's attribution control can display it.
-const SATELLITE_STYLE: StyleSpecification = {
+// When a public ArcGIS Location Platform key is configured, use Esri's
+// official, usage-accounted Imagery Standard style. Its style response carries
+// the token through to its tile requests and exposes Esri attribution to MapLibre.
+const ESRI_API_KEY = process.env.NEXT_PUBLIC_ESRI_API_KEY?.trim();
+const ESRI_IMAGERY_STYLE_URL = ESRI_API_KEY
+  ? `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/imagery/standard?token=${encodeURIComponent(ESRI_API_KEY)}`
+  : null;
+
+// Keep the current image-only World Imagery layer as a compatibility fallback,
+// so local/test deployments do not suddenly lose satellite mode before a key is
+// configured. This fallback is not metered against the Location Platform
+// account's free-tile allowance; confirm its separate terms before production.
+const LEGACY_SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
@@ -602,6 +612,9 @@ const SATELLITE_STYLE: StyleSpecification = {
     }
   ]
 };
+
+const SATELLITE_STYLE: StyleSpecification | string =
+  ESRI_IMAGERY_STYLE_URL ?? LEGACY_SATELLITE_STYLE;
 
 // Administrative boundaries are real geographic polygons, not routes.
 // The thresholds reveal one progressively finer level at a time.
