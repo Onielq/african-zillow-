@@ -30,14 +30,17 @@ jobs:
         run: npm test
       - name: Production build
         env:
-          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          ESRI_API_KEY: ${{ secrets.ESRI_API_KEY || secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY || secrets.ESRI_API_KEY }}
         run: npm run build
       - name: Docker image build
         env:
           NEXT_PUBLIC_MAP_STYLE_URL: ${{ vars.NEXT_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty' }}
-          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          ESRI_API_KEY: ${{ secrets.ESRI_API_KEY || secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY || secrets.ESRI_API_KEY }}
         run: >-
           docker build
           --build-arg NEXT_PUBLIC_MAP_STYLE_URL="$NEXT_PUBLIC_MAP_STYLE_URL"
+          --build-arg ESRI_API_KEY="$ESRI_API_KEY"
           --build-arg NEXT_PUBLIC_ESRI_API_KEY="$NEXT_PUBLIC_ESRI_API_KEY"
           --tag rwanda-land-intelligence:test .
