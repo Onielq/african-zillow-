@@ -1040,7 +1040,7 @@ export function MapExperience() {
 
         <TalkToExpert areaName={selectedArea?.name ?? "Rwanda land market"} />
 
-        <div className="basemap-switcher" role="group" aria-label="Map view controls">
+        <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
             aria-pressed={basemapMode === "map"}
             className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
