@@ -1,6 +1,9 @@
 name: Live map browser smoke
 
 on:
+  # Also verify the interactive Vercel preview on test-branch changes.
+  push:
+    branches: [comb-test]
   workflow_run:
     workflows: ["Cloudflare Workers"]
     types: [completed]
@@ -34,7 +37,7 @@ jobs:
 
       - name: Verify live parcel outlines at village zoom
         env:
-          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+          APP_BASE_URL: ${{ (github.event_name == 'push' || github.event.workflow_run.head_branch == 'comb-test') && 'https://rwanda-land-intelligence-git-comb-test-onielqs-projects.vercel.app' || 'https://rwanda-land-intelligence.taiseel.workers.dev' }}
         run: node scripts/e2e-map-parcels.mjs
 
       - name: Upload village-level map screenshot
