@@ -1912,7 +1912,11 @@ export function MapView({
         zoom: Number(map.getZoom().toFixed(2)),
         activeLevel: activeAreaLevel(map.getZoom())
       });
-      if (!styleLoaded || !districtSourceExists) {
+      // This function is called from style.load after we create the GeoJSON
+      // sources. isStyleLoaded() can still be false while basemap tiles are
+      // loading, but that must not block independent administrative/cadastral
+      // API requests. Source existence is the relevant safety guard here.
+      if (!districtSourceExists) {
         recordE2ETrace("area-refresh-skipped", { styleLoaded, districtSourceExists });
         return;
       }
