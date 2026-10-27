@@ -114,13 +114,20 @@ The comparison panel can shortlist area names and levels. It shows the sourced d
 - Map panning is constrained to a padded longitude/latitude envelope around Rwanda.
 - This is a camera constraint using a geographic envelope, not a polygon mask that removes every pixel outside Rwanda's exact international border.
 
-## Satellite imagery source and licensing
+## Satellite imagery source, free tier and licensing
 
-The prototype's Satellite view uses the Esri World Imagery tile service and includes imagery attribution in MapLibre's attribution control. See [Esri's World Imagery attribution guidance](https://support.esri.com/en-us/knowledge-base/what-is-the-correct-way-to-cite-an-arcgis-online-basema-000012040) and [Esri's terms for websites and services](https://www.esri.com/en-us/legal/terms/web-site-service).
+The Satellite switch uses Esri imagery. When `NEXT_PUBLIC_ESRI_API_KEY` is configured, it selects Esri's official [ArcGIS Imagery Standard style](https://developers.arcgis.com/rest/basemap-styles/arcgis-imagery-standard-style-get/). The style's attribution is surfaced through MapLibre's attribution control. This routes tile consumption through the ArcGIS Location Platform account so usage can be monitored. The style provides global imagery, but detail varies by location; switching providers does not guarantee sharper imagery in every part of Kigali or Bugesera.
 
-Before public or commercial production, confirm that this access method and the service's imagery licenses permit the app's intended use. The imagery may contain third-party data with additional terms, and Esri can change service availability. For production, use a provider and plan whose terms explicitly cover the expected commercial usage, traffic, caching, and attribution.
+### Configure the free-first Esri route
 
-Satellite imagery helps people visually understand the ground. It does not prove legal ownership and must not be used to infer cadastral plot boundaries.
+1. Create an ArcGIS Location Platform developer credential with basemap access.
+2. Set `NEXT_PUBLIC_ESRI_API_KEY` in local `.env.local` and in the deployment environment used to build the app, then rebuild/redeploy.
+3. Restrict the key to Taiseel's allowed website referrers and the necessary basemap service privileges. This is a public browser key, not a secret; never use an administrator credential.
+4. In the Esri billing settings, leave pay-as-you-go disabled until usage has been reviewed. Esri currently lists 2 million basemap tiles free per month, then $0.15 per 1,000 additional tiles if pay-as-you-go is enabled. With pay-as-you-go off, going over the allowance can interrupt tile delivery instead of creating overage charges. Check [current pricing](https://location.arcgis.com/pricing/) and [billing guidance](https://location.arcgis.com/help/billing/) before launch.
+
+If the key is blank, the app retains its previous World Imagery raster layer as a compatibility fallback. That fallback is not counted against the Location Platform key's free-tile allowance, so do not treat the fallback itself as proof of an authorised free production setup. Confirm the applicable [World Imagery attribution guidance](https://support.esri.com/en-us/knowledge-base/what-is-the-correct-way-to-cite-an-arcgis-online-basema-000012040) and [Esri website/service terms](https://www.esri.com/en-us/legal/terms/web-site-service) before public or commercial use.
+
+Satellite imagery helps people visually understand the ground. It does not prove legal ownership and must not be used to infer cadastral plot boundaries. Administrative and cadastral polygons continue to come from their separate Rwanda government/institutional data services; each source's currency, completeness, accuracy and reuse permissions must be verified independently.
 
 ## Geographic hierarchy and source plan
 
