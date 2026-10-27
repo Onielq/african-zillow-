@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
+import { TalkToExpert } from "@/components/map/TalkToExpert";
 import type { Map as MapLibreMapInstance } from "maplibre-gl";
 import {
   MapView,
@@ -1028,6 +1029,8 @@ export function MapExperience() {
         />
 
         <div className="map-vignette" aria-hidden="true" />
+
+        <TalkToExpert areaName={selectedArea?.name ?? "Rwanda land market"} />
 
         <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
