@@ -1040,7 +1040,7 @@ export function MapExperience() {
 
         <TalkToExpert areaName={selectedArea?.name ?? "Rwanda land market"} />
 
-        <div className="basemap-switcher" role="group" aria-label="Basemap view">
+        <div className="basemap-switcher" role="group" aria-label="Map view controls">
           <button
             aria-pressed={basemapMode === "map"}
             className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
@@ -1065,6 +1065,25 @@ export function MapExperience() {
               <path d="m10 12.2 2.15 2.15L10 16.5l-2.15-2.15L10 12.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
             </svg>
             Satellite
+          </button>
+          <button
+            className="basemap-button"
+            disabled={!mapInstance}
+            onClick={() => {
+              mapInstance?.flyTo({
+                center: [30.133, -2.283],
+                zoom: 16.6,
+                duration: 850
+              });
+            }}
+            title="Zoom to the Bugesera pilot area to inspect cadastral parcel boundaries"
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+              <path d="M2.5 4.2 7.7 2.5l4.8 2.1 5-1.8v13l-5 1.7-4.8-2.1-5.2 1.8v-13Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+              <path d="M7.7 2.5v12.9m4.8-10.8v12.9M2.5 10.1l5.2-1.8 4.8 2.1 5-1.8" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
+            Parcels
           </button>
         </div>
         <div className="map-status-card">
