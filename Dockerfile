@@ -5,13 +5,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY package*.json ./
 COPY scripts ./scripts
+COPY public ./public
 RUN npm install --no-audit --no-fund
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
+ARG NEXT_PUBLIC_ESRI_API_KEY
 ENV NEXT_PUBLIC_MAP_STYLE_URL=${NEXT_PUBLIC_MAP_STYLE_URL}
+ENV NEXT_PUBLIC_ESRI_API_KEY=${NEXT_PUBLIC_ESRI_API_KEY}
 RUN npm run build
 
 FROM base AS runner
