@@ -2906,148 +2906,185 @@ button:disabled {
 }
 
 
-/* Reference-matched expert prompt */
-.expert-cta {
+/* Expert contact card — matched to the supplied reference */
+.expert-card {
   position: absolute;
-  z-index: 18;
-  right: 9px;
-  bottom: 10px;
-  width: 285px;
-  max-width: calc(100% - 24px);
-}
-
-.expert-cta-link {
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
   display: flex;
-  width: 100%;
-  height: 65px;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px 9px 10px;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 7%);
-  border-radius: 15px;
-  background: #000;
-  color: #fff;
-  text-decoration: none;
-  box-shadow: 0 9px 25px rgb(0 0 0 / 28%);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  gap: 13px;
+  width: auto;
+  min-width: 297px;
+  max-width: calc(100% - 48px);
+  padding: 11px 14px;
+  border-radius: 13px;
+  background: #141414;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  transition: transform 0.2s ease, opacity 0.25s ease;
 }
 
-.expert-cta-link:hover {
+.expert-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 29px rgb(0 0 0 / 35%);
 }
 
-.expert-cta-link:active {
-  transform: translateY(0);
+.expert-card.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
 }
 
-.expert-cta-link:focus-visible {
+.expert-card:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
 
-.expert-cta-icon {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  flex: 0 0 46px;
-  place-items: center;
-  border-radius: 50%;
-  background: #202020;
-  color: #fff;
-  transition: background 160ms ease;
-}
-
-.expert-cta-link:hover .expert-cta-icon {
-  background: #282828;
-}
-
-.expert-cta-icon svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-  stroke: currentColor;
-  stroke-width: 1.55;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.expert-cta-copy {
+.expert-icon {
   display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
+  width: 43px;
+  height: 43px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #1f1f1f;
 }
 
-.expert-cta-title {
+.expert-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.expert-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.expert-title {
+  margin-bottom: 2px;
   overflow: hidden;
   color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 15px;
-  letter-spacing: -0.01em;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.1px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.expert-cta-subtitle {
+.expert-subtitle {
   overflow: hidden;
-  color: #c6c6c6;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 14px;
+  color: #8a8a8e;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.expert-cta-close {
+.expert-subtitle strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.expert-close-btn {
   position: absolute;
-  z-index: 1;
   top: -8px;
-  right: -7px;
-  display: grid;
-  width: 21px;
-  height: 21px;
-  place-items: center;
-  padding: 0 0 1px;
-  border: 1px solid #d5d5d5;
+  right: -8px;
+  z-index: 2;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: #fff;
-  color: #282828;
-  font-family: Arial, sans-serif;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
   cursor: pointer;
-  box-shadow: 0 2px 7px rgb(0 0 0 / 16%);
-  transition: background 120ms ease, transform 120ms ease;
+  transition: transform 0.15s ease;
 }
 
-.expert-cta-close:hover {
-  transform: scale(1.05);
-  background: #f1f1f1;
+.expert-close-btn:hover {
+  transform: scale(1.1);
 }
 
-.expert-cta-close:focus-visible {
+.expert-close-btn:focus-visible,
+.expert-reopen-btn:focus-visible {
   outline: 2px solid #fff;
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+.expert-close-btn svg {
+  display: block;
+  width: 9px;
+  height: 9px;
+  stroke: #1a1a1c;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.expert-reopen-btn {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 13px;
+  background: #141414;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.25s ease;
+}
+
+.expert-reopen-btn:hover {
+  transform: translateY(-1px);
+}
+
+.expert-reopen-btn.visible {
+  display: flex;
+}
+
+.expert-reopen-btn svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 480px) {
-  .expert-cta {
-    right: 12px;
-    bottom: 12px;
-    width: min(285px, calc(100% - 24px));
-    max-width: calc(100% - 24px);
+  .expert-card {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    min-width: 250px;
+    max-width: none;
+  }
+
+  .expert-reopen-btn {
+    right: 16px;
+    bottom: 16px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .expert-cta-link,
-  .expert-cta-icon,
-  .expert-cta-close {
+  .expert-card,
+  .expert-close-btn,
+  .expert-reopen-btn {
     transition: none;
   }
 }
