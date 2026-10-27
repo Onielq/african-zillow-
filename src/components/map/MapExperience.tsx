@@ -36,6 +36,19 @@ import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
 type WorkspaceMode = "areas" | "projects";
 
+const BASEMAP_OPTIONS: Array<{
+  mode: BasemapMode;
+  label: string;
+  description: string;
+}> = [
+  { mode: "map", label: "Street", description: "Liberty road map" },
+  { mode: "bright", label: "Bright", description: "Colourful street map" },
+  { mode: "positron", label: "Minimal", description: "Quiet map for data overlays" },
+  { mode: "dark", label: "Dark", description: "Dark data view" },
+  { mode: "satellite", label: "Satellite", description: "Esri aerial imagery · licence review" },
+  { mode: "hybrid", label: "Hybrid", description: "Satellite with roads and labels" }
+];
+
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
   const code = zone.code?.trim();
   const name = zone.name.trim();
@@ -513,6 +526,7 @@ function getAreaParent(area: SelectedArea): string | null {
 
 export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
+  const [basemapGalleryOpen, setBasemapGalleryOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
   const [selectedMetric, setSelectedMetric] =
     useState<MarketMetric>("averageLandPricePerM2");
@@ -916,7 +930,7 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !basemapGalleryOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setCompareOpen(false);
@@ -926,11 +940,12 @@ export function MapExperience() {
         setProjectsOpen(false);
         setSourcesOpen(false);
         setShowOpen(false);
+        setBasemapGalleryOpen(false);
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, basemapGalleryOpen]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -1032,32 +1047,82 @@ export function MapExperience() {
 
         <TalkToExpert areaName={selectedArea?.name ?? "Rwanda land market"} />
 
-        <div className="basemap-switcher" role="group" aria-label="Basemap view">
+        <div className="basemap-gallery-control">
           <button
-            aria-pressed={basemapMode === "map"}
-            className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setBasemapMode("map")}
+            aria-expanded={basemapGalleryOpen}
+            aria-haspopup="dialog"
+            aria-label={`Choose basemap. Current style: ${BASEMAP_OPTIONS.find((option) => option.mode === basemapMode)?.label ?? "Street"}`}
+            className="basemap-gallery-trigger"
+            onClick={() => setBasemapGalleryOpen((open) => !open)}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="m2.5 5.2 5-2.1 5 2.1 5-2.1v11.7l-5 2.1-5-2.1-5 2.1V5.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="M7.5 3.3v11.6m5-9.7v11.6" stroke="currentColor" strokeWidth="1.2" />
+              <path d="m2.5 6 7.5-3.5L17.5 6 10 9.5 2.5 6Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="m2.5 10 7.5 3.5 7.5-3.5M2.5 14 10 17.5l7.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Map
-          </button>
-          <button
-            aria-pressed={basemapMode === "satellite"}
-            className={basemapMode === "satellite" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setBasemapMode("satellite")}
-            type="button"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="m10 2.2 2.15 2.15-2.15 2.15-2.15-2.15L10 2.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="m4.6 7.6 2.15 2.15L4.6 11.9 2.45 9.75 4.6 7.6Zm10.8 0 2.15 2.15-2.15 2.15-2.15-2.15 2.15-2.15Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="m10 12.2 2.15 2.15L10 16.5l-2.15-2.15L10 12.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+            <span>Basemaps</span>
+            <span className="basemap-gallery-current">{BASEMAP_OPTIONS.find((option) => option.mode === basemapMode)?.label ?? "Street"}</span>
+            <svg aria-hidden="true" className="basemap-gallery-chevron" viewBox="0 0 20 20" fill="none">
+              <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Satellite
           </button>
+
+          {basemapGalleryOpen ? (
+            <div aria-label="Basemap gallery" className="basemap-gallery-panel" role="dialog">
+              <div className="basemap-gallery-header">
+                <div>
+                  <strong>Basemap Gallery</strong>
+                  <span>Compare styles at the same zoom</span>
+                </div>
+                <button
+                  aria-label="Close basemap gallery"
+                  className="basemap-gallery-dismiss"
+                  onClick={() => setBasemapGalleryOpen(false)}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="basemap-gallery-grid">
+                {BASEMAP_OPTIONS.map((option) => (
+                  <button
+                    aria-pressed={basemapMode === option.mode}
+                    className={basemapMode === option.mode
+                      ? "basemap-gallery-option basemap-gallery-option-active"
+                      : "basemap-gallery-option"}
+                    key={option.mode}
+                    onClick={() => {
+                      setBasemapMode(option.mode);
+                      setBasemapGalleryOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className={`basemap-gallery-preview basemap-gallery-preview-${option.mode}`}>
+                      <span className="basemap-preview-road basemap-preview-road-one" />
+                      <span className="basemap-preview-road basemap-preview-road-two" />
+                      <span className="basemap-preview-block basemap-preview-block-one" />
+                      <span className="basemap-preview-block basemap-preview-block-two" />
+                    </span>
+                    <span className="basemap-gallery-option-copy">
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                    {basemapMode === option.mode ? (
+                      <svg aria-hidden="true" className="basemap-gallery-check" viewBox="0 0 20 20" fill="none">
+                        <path d="m4 10 4 4 8-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+
+              <p className="basemap-gallery-note">
+                Satellite and hybrid currently use Esri World Imagery; verify commercial imagery terms before production.
+                Street-level photos require a separate provider and coverage check.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="map-status-card">
