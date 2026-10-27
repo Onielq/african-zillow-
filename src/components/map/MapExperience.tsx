@@ -36,13 +36,6 @@ import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
 type WorkspaceMode = "areas" | "projects";
 
-// Google basemaps are intentionally exposed only on the experiment branch.
-// Keys must be restricted by HTTP referrer and the Map Tiles API must be enabled.
-const GOOGLE_MAPS_TILES_CONFIGURED = Boolean(
-  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
-);
-
-
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
   const code = zone.code?.trim();
   const name = zone.name.trim();
@@ -1073,44 +1066,7 @@ export function MapExperience() {
             </svg>
             Satellite
           </button>
-          <button
-            aria-pressed={basemapMode === "google-map"}
-            className={basemapMode === "google-map" ? "basemap-button basemap-button-active" : "basemap-button"}
-            disabled={!GOOGLE_MAPS_TILES_CONFIGURED}
-            onClick={() => setBasemapMode("google-map")}
-            title={GOOGLE_MAPS_TILES_CONFIGURED
-              ? "Experimental: Google Maps Roadmap via the official Map Tiles API"
-              : "Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for this Vercel preview to enable Google basemaps"}
-            type="button"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="M3 4.2h14v11.6H3zM3 8h14M8 4.2v11.6M13 8v7.8" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-            </svg>
-            Google Roadmap
-          </button>
-          <button
-            aria-pressed={basemapMode === "google-satellite"}
-            className={basemapMode === "google-satellite" ? "basemap-button basemap-button-active" : "basemap-button"}
-            disabled={!GOOGLE_MAPS_TILES_CONFIGURED}
-            onClick={() => setBasemapMode("google-satellite")}
-            title={GOOGLE_MAPS_TILES_CONFIGURED
-              ? "Experimental: Google satellite imagery via the official Map Tiles API"
-              : "Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for this Vercel preview to enable Google basemaps"}
-            type="button"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="M2.8 5.2 7.2 3l4.1 2.2L16.5 3v11.8l-5.2 2.2-4.1-2.2-4.4 2.2V5.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="M7.2 3v11.8m4.1-9.6v11.8" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-            Google Satellite
-          </button>
         </div>
-        {!GOOGLE_MAPS_TILES_CONFIGURED ? (
-          <div className="google-tiles-setup-note" role="note">
-            Google test needs a restricted Maps Platform API key on this preview.
-          </div>
-        ) : null}
-
         <div className="map-status-card">
           <span
             aria-hidden="true"
