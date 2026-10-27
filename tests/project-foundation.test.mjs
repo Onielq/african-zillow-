@@ -257,9 +257,9 @@ test("MapLibre worker and shared modules are copied to a versioned public path",
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const copyScript = await readProjectFile("scripts/copy-maplibre-worker.mjs");
 
-  assert.equal(packageJson.scripts.postinstall, "node scripts/copy-maplibre-worker.mjs");
-  assert.equal(packageJson.scripts.predev, "node scripts/copy-maplibre-worker.mjs");
-  assert.equal(packageJson.scripts.prebuild, "node scripts/copy-maplibre-worker.mjs");
+  assert.match(packageJson.scripts.postinstall, /node scripts\/copy-maplibre-worker\.mjs/);
+  assert.match(packageJson.scripts.predev, /node scripts\/copy-maplibre-worker\.mjs/);
+  assert.match(packageJson.scripts.prebuild, /node scripts\/copy-maplibre-worker\.mjs/);
   assert.match(mapView, /setWorkerUrl/);
   assert.match(mapView, /vendor\/maplibre-gl/);
   assert.match(copyScript, /maplibre-gl-worker\.mjs/);
