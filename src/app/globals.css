@@ -3088,3 +3088,235 @@ button:disabled {
     transition: none;
   }
 }
+
+
+/* Product polish pass: calmer materials, clearer hierarchy, easier controls. */
+:root {
+  --radius-control: 11px;
+  --radius-panel: 18px;
+  --shadow-floating: 0 12px 32px rgb(23 35 31 / 10%), 0 2px 6px rgb(23 35 31 / 5%);
+}
+
+.topbar {
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 1px 0 rgb(23 35 31 / 2%);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.compare-control,
+.mode-chip {
+  min-height: 40px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.compare-control:hover {
+  border-color: #c8d6cc;
+  background: #f8faf8;
+  box-shadow: 0 2px 7px rgb(23 35 31 / 5%);
+}
+
+.mode-chip:not(.mode-chip-active):hover {
+  border-color: #e0e8e2;
+  background: #f6f9f6;
+  color: var(--ink);
+}
+
+.mode-chip-active {
+  border-color: #b8d9c4;
+  background: #e8f4ec;
+}
+
+.map-status-card {
+  min-height: 38px;
+  padding-inline: 13px;
+  box-shadow: 0 5px 18px rgb(23 35 31 / 7%);
+  backdrop-filter: saturate(180%) blur(18px);
+}
+
+.map-toolbar {
+  gap: 4px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 12px 30px rgb(23 35 31 / 10%), 0 2px 5px rgb(23 35 31 / 5%);
+  backdrop-filter: saturate(180%) blur(18px);
+  scrollbar-width: none;
+}
+
+.map-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.investment-field {
+  min-height: 38px;
+  background: #f8faf8;
+}
+
+.investment-field > span {
+  font-size: 10px;
+}
+
+.toolbar-select {
+  font-size: 12px;
+}
+
+.toolbar-action {
+  min-height: 38px;
+  padding-inline: 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.toolbar-action:hover,
+.toolbar-action-active {
+  border-color: #b9d9c5;
+  background: #eaf5ee;
+  color: #176b50;
+}
+
+.basemap-switcher {
+  padding: 5px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 10px 28px rgb(23 35 31 / 11%), 0 2px 5px rgb(23 35 31 / 5%);
+  backdrop-filter: saturate(180%) blur(18px);
+}
+
+.basemap-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.basemap-button-active,
+.basemap-button-active:hover {
+  border-color: #b9d9c5;
+  background: #eaf5ee;
+  color: #176b50;
+}
+
+.selected-area-panel,
+.comparison-panel,
+.sources-panel,
+.metric-info-panel,
+.directory-drawer,
+.projects-drawer {
+  border-radius: 18px;
+  box-shadow: 0 16px 42px rgb(23 35 31 / 13%), 0 2px 8px rgb(23 35 31 / 4%);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.selected-area-panel {
+  padding: 22px 20px 20px;
+}
+
+.selected-area-panel h2 {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.panel-close {
+  width: 34px;
+  height: 34px;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.panel-close:hover {
+  border-color: #c9d5cc;
+  background: #edf3ee;
+  color: #1f513a;
+}
+
+.parcel-details {
+  gap: 12px;
+  padding: 14px;
+  border-radius: 13px;
+}
+
+.parcel-details span {
+  font-size: 11px;
+}
+
+.parcel-details strong {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.area-market-card {
+  min-height: 120px;
+  padding: 14px;
+  border-radius: 13px;
+}
+
+.area-market-card > span {
+  font-size: 10px;
+}
+
+.area-market-card > small {
+  font-size: 10px;
+}
+
+.comparison-search {
+  min-height: 46px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.comparison-search-result {
+  min-height: 46px;
+}
+
+button,
+a,
+select,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 720px) {
+  .compare-control,
+  .mode-chip {
+    min-height: 36px;
+  }
+
+  .map-status-card {
+    min-height: 34px;
+  }
+
+  .toolbar-action {
+    min-height: 36px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+
+  .investment-field {
+    min-height: 36px;
+  }
+
+  .basemap-button {
+    min-height: 32px;
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+
+  .selected-area-panel {
+    padding: 18px 16px;
+  }
+
+  .area-market-card {
+    min-height: 112px;
+    padding: 12px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-control,
+  .mode-chip,
+  .toolbar-action,
+  .basemap-button,
+  .panel-close {
+    transition: none;
+  }
+}
