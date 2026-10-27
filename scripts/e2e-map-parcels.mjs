@@ -159,6 +159,54 @@ try {
     };
   });
 
+  // Exercise the actual parcel click interaction, not just the visual line layer.
+  const parcelClickPoint = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    const width = map.getContainer().clientWidth;
+    const height = map.getContainer().clientHeight;
+    for (let y = Math.max(150, Math.floor(height * 0.24)); y < height - 100; y += 24) {
+      for (let x = Math.max(360, Math.floor(width * 0.28)); x < width - 30; x += 24) {
+        const hits = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] });
+        if (hits.length === 0) continue;
+        const element = document.elementFromPoint(rect.left + x, rect.top + y);
+        if (
+          !element ||
+          !(element.classList?.contains("maplibregl-canvas") ||
+            element.closest?.(".maplibregl-canvas-container"))
+        ) continue;
+        return { x: rect.left + x, y: rect.top + y };
+      }
+    }
+    return null;
+  });
+
+  let parcelInfoPopup = { visible: false, attempted: false, panelText: null };
+  if (parcelClickPoint) {
+    parcelInfoPopup.attempted = true;
+    await page.mouse.click(parcelClickPoint.x, parcelClickPoint.y);
+    try {
+      await page.waitForFunction(() => {
+        const panel = document.querySelector(".selected-area-panel");
+        const level = panel?.querySelector(".panel-eyebrow")?.textContent?.trim().toUpperCase();
+        return level === "PARCEL" && Boolean(panel?.querySelector(".parcel-details"));
+      }, undefined, { timeout: 8_000 });
+      parcelInfoPopup = await page.evaluate(() => {
+        const panel = document.querySelector(".selected-area-panel");
+        const level = panel?.querySelector(".panel-eyebrow")?.textContent?.trim().toUpperCase();
+        const details = panel?.querySelector(".parcel-details");
+        return {
+          visible: level === "PARCEL" && Boolean(details),
+          attempted: true,
+          panelText: panel?.innerText?.slice(0, 1_200) ?? null
+        };
+      });
+    } catch {
+      parcelInfoPopup.visible = false;
+    }
+  }
+
   const removedPanelCount = await page.locator(".map-focus-panel").count();
   const exploreAreaTextCount = await page.getByText("EXPLORE AREA", { exact: true }).count();
   const parcelBoundariesTextCount = await page.getByText("PARCEL BOUNDARIES", { exact: true }).count();
@@ -170,6 +218,7 @@ try {
     zoomLevel: "village",
     ...result,
     directParcelApi,
+    parcelInfoPopup,
     removedPanelCount,
     exploreAreaTextCount,
     parcelBoundariesTextCount,
@@ -183,6 +232,9 @@ try {
   }
   if (result.renderedParcelOutlineFeatures <= 0) {
     throw new Error("No cadastral parcel outlines rendered at village zoom. See map/source/network diagnostics above.");
+  }
+  if (!parcelInfoPopup.visible) {
+    throw new Error("A visible parcel polygon could not open its parcel information panel. See map/source/network diagnostics above.");
   }
   if (diagnostics.pageErrors.length > 0) {
     throw new Error("Browser runtime errors: " + diagnostics.pageErrors.join(" | "));
