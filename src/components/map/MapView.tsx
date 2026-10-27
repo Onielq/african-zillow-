@@ -24,7 +24,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
-export type BasemapMode = "map" | "satellite";
+export type BasemapMode = "map" | "bright" | "positron" | "dark" | "satellite" | "hybrid";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type ParcelPriceType =
@@ -567,6 +567,13 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
 
+const OPENFREEMAP_STYLE_URLS: Record<"map" | "bright" | "positron" | "dark", string> = {
+  map: NORMAL_STYLE_URL,
+  bright: "https://tiles.openfreemap.org/styles/bright",
+  positron: "https://tiles.openfreemap.org/styles/positron",
+  dark: "https://tiles.openfreemap.org/styles/dark"
+};
+
 // Approximate geographic envelope of Rwanda with a small safety margin.
 // maxBounds constrains panning; a viewport-derived min zoom prevents zooming
 // so far out that the full country extent no longer fits on screen.
@@ -602,6 +609,55 @@ const SATELLITE_STYLE: StyleSpecification = {
     }
   ]
 };
+
+// The hybrid style is composed at runtime from OpenFreeMap's Liberty vectors
+// and the satellite raster. Only transparent line/symbol layers are retained,
+// so the aerial imagery remains visible underneath roads and labels.
+async function createHybridStyle(): Promise<StyleSpecification> {
+  const response = await fetch("https://tiles.openfreemap.org/styles/liberty", {
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) {
+    throw new Error("Could not load the Liberty style for the hybrid basemap (" + response.status + ")");
+  }
+
+  const baseStyle = await response.json() as StyleSpecification;
+  const overlayLayers = baseStyle.layers.filter((layer) => {
+    if (layer.type === "symbol") return true;
+    if (layer.type === "line") {
+      return /road|transport|street|bridge|tunnel|boundary|waterway|rail|path|service/i.test(layer.id);
+    }
+    return false;
+  });
+
+  return {
+    ...baseStyle,
+    sources: {
+      ...baseStyle.sources,
+      "rli-hybrid-imagery": {
+        type: "raster",
+        tiles: [
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        ],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 19,
+        attribution:
+          "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+      }
+    },
+    layers: [
+      {
+        id: "rli-hybrid-imagery",
+        type: "raster",
+        source: "rli-hybrid-imagery",
+        minzoom: 0,
+        maxzoom: 19
+      },
+      ...overlayLayers
+    ]
+  };
+}
 
 // Administrative boundaries are real geographic polygons, not routes.
 // The thresholds reveal one progressively finer level at a time.
@@ -925,7 +981,28 @@ export function MapView({
 
     activeBasemapModeRef.current = basemapMode;
     onStatusChange("loading");
-    map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
+
+    if (basemapMode === "satellite") {
+      map.setStyle(SATELLITE_STYLE);
+      return;
+    }
+
+    if (basemapMode === "hybrid") {
+      void createHybridStyle()
+        .then((style) => {
+          // Ignore a stale network response if the user has selected another style.
+          if (mapRef.current !== map || activeBasemapModeRef.current !== "hybrid") return;
+          map.setStyle(style);
+        })
+        .catch((error: unknown) => {
+          if (mapRef.current !== map || activeBasemapModeRef.current !== "hybrid") return;
+          console.error("Hybrid basemap could not be loaded.", error);
+          onStatusChange("error");
+        });
+      return;
+    }
+
+    map.setStyle(OPENFREEMAP_STYLE_URLS[basemapMode]);
   }, [basemapMode, onStatusChange]);
 
   useEffect(() => {
