@@ -1,12 +1,9 @@
 name: Live map browser smoke
 
 on:
-  # Also verify the interactive Vercel preview on test-branch changes.
+  # Run the real browser test for the current test branch, without requiring Vercel preview login.
   push:
     branches: [comb-test]
-  workflow_run:
-    workflows: ["Cloudflare Workers"]
-    types: [completed]
 
 permissions:
   contents: read
@@ -14,12 +11,12 @@ permissions:
 jobs:
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - name: Check out the exact deployed commit
+      - name: Check out the exact test commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -35,9 +32,26 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
+      - name: Build production app with Esri preview configuration
+        env:
+          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+        run: npm run build
+
+      - name: Start production build
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/rli-map-smoke.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl --silent --fail http://127.0.0.1:3000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/rli-map-smoke.log
+          exit 1
+
       - name: Verify live parcel outlines at village zoom
         env:
-          APP_BASE_URL: ${{ (github.event_name == 'push' || github.event.workflow_run.head_branch == 'comb-test') && 'https://rwanda-land-intelligence-git-comb-test-onielqs-projects.vercel.app' || 'https://rwanda-land-intelligence.taiseel.workers.dev' }}
+          APP_BASE_URL: http://127.0.0.1:3000
         run: node scripts/e2e-map-parcels.mjs
 
       - name: Upload village-level map screenshot
