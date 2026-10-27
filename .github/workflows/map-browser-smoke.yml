@@ -34,7 +34,8 @@ jobs:
 
       - name: Build production app with Esri preview configuration
         env:
-          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          ESRI_API_KEY: ${{ secrets.ESRI_API_KEY || secrets.NEXT_PUBLIC_ESRI_API_KEY }}
+          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY || secrets.ESRI_API_KEY }}
         run: npm run build
 
       - name: Start production build
