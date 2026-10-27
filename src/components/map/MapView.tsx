@@ -594,7 +594,7 @@ const SATELLITE_STYLE: StyleSpecification = {
       ],
       tileSize: 256,
       minzoom: 0,
-      maxzoom: 19,
+      maxzoom: 23,
       attribution:
         "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     }
@@ -605,7 +605,7 @@ const SATELLITE_STYLE: StyleSpecification = {
       type: "raster",
       source: "world-imagery",
       minzoom: 0,
-      maxzoom: 19
+      maxzoom: 23
     }
   ]
 };
@@ -641,7 +641,7 @@ async function createHybridStyle(): Promise<StyleSpecification> {
         ],
         tileSize: 256,
         minzoom: 0,
-        maxzoom: 19,
+        maxzoom: 23,
         attribution:
           "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
       }
@@ -652,7 +652,7 @@ async function createHybridStyle(): Promise<StyleSpecification> {
         type: "raster",
         source: "rli-hybrid-imagery",
         minzoom: 0,
-        maxzoom: 19
+        maxzoom: 23
       },
       ...overlayLayers
     ]
@@ -1084,7 +1084,7 @@ export function MapView({
       center: [30.13, -2.1],
       zoom: 8.35,
       minZoom: 5,
-      maxZoom: 20,
+      maxZoom: 22,
       maxBounds: RWANDA_CAMERA_BOUNDS,
       pitch: 0,
       bearing: 0,
