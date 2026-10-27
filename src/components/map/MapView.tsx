@@ -2387,8 +2387,16 @@ export function MapView({
       });
     };
 
+    map.on("styledataloading", () => {
+      // A previously loaded road style must not mask errors from a later style switch.
+      styleLoaded = false;
+    });
+
     map.on("style.load", () => {
       styleLoaded = true;
+      // A successful style load completes the prior fallback attempt and lets
+      // future basemap switches receive their own error recovery.
+      fallbackAttempted = false;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       addAdministrativeLayers();
       addShowOverlayLayers();
@@ -2428,28 +2436,35 @@ export function MapView({
     });
 
     map.on("error", (event) => {
-      if (styleLoaded || !event.error) return;
+      // Use MapLibre's live loading state. The old style may have loaded before
+      // the user switched basemaps, so a stale boolean would hide new failures.
+      if (map.isStyleLoaded() || !event.error) return;
 
       if (!fallbackAttempted) {
         fallbackAttempted = true;
         onStatusChange("loading");
-        map.setStyle(FALLBACK_STYLE_URL);
+        // If Esri's authenticated style is rejected, keep satellite mode and
+        // retry with the image-only ArcGIS World Imagery raster style.
+        const fallbackStyle = activeBasemapModeRef.current === "satellite"
+          ? LEGACY_SATELLITE_STYLE
+          : FALLBACK_STYLE_URL;
+        map.setStyle(fallbackStyle);
 
         // Do not declare final failure during the brief style-switch window.
         if (fallbackTimer) clearTimeout(fallbackTimer);
         fallbackTimer = setTimeout(() => {
-          if (!styleLoaded) onStatusChange("error");
+          if (!map.isStyleLoaded()) onStatusChange("error");
         }, 12_000);
         return;
       }
 
       if (initialStyleUrl === FALLBACK_STYLE_URL) {
         onStatusChange("error");
-      } else if (fallbackAttempted && !styleLoaded) {
+      } else if (fallbackAttempted && !map.isStyleLoaded()) {
         // Wait for the fallback's style.load event before marking it failed.
         if (!fallbackTimer) {
           fallbackTimer = setTimeout(() => {
-            if (!styleLoaded) onStatusChange("error");
+            if (!map.isStyleLoaded()) onStatusChange("error");
           }, 12_000);
         }
       }
