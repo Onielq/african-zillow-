@@ -916,21 +916,29 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !selectedArea) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") return;
+
+      // Close the topmost interaction first, leaving the selected map area intact.
+      if (compareOpen) {
         setCompareOpen(false);
+        return;
+      }
+      if (metricInfoOpen || metricsOpen || developersOpen || projectsOpen || sourcesOpen || showOpen) {
         setMetricInfoOpen(false);
         setMetricsOpen(false);
         setDevelopersOpen(false);
         setProjectsOpen(false);
         setSourcesOpen(false);
         setShowOpen(false);
+        return;
       }
+      if (selectedArea) setSelectedArea(null);
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, selectedArea]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
