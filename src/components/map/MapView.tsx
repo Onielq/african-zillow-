@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import {
+  addProtocol,
   AttributionControl,
   Map as MapLibreMap,
   NavigationControl,
@@ -24,7 +25,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
-export type BasemapMode = "map" | "satellite";
+export type BasemapMode = "map" | "satellite" | "google-map" | "google-satellite";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type ParcelPriceType =
@@ -567,6 +568,116 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
 
+
+type GoogleTileMapType = "roadmap" | "satellite";
+
+type GoogleTileSession = {
+  mapType: GoogleTileMapType;
+  apiKey: string;
+  session: string;
+};
+
+type GoogleViewportInfo = {
+  copyright?: string;
+  maxZoomRects?: Array<{
+    maxZoom: number;
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }>;
+};
+
+let googleTileProtocolRegistered = false;
+
+function ensureGoogleTileProtocol() {
+  if (googleTileProtocolRegistered) return;
+
+  // Google tiles are requested only via the official Map Tiles API session.
+  // This custom protocol adapts Google's documented endpoint to MapLibre.
+  addProtocol("rli-google", async (params, abortController) => {
+    const url = new URL(params.url.replace(/^rli-google:/, "https:"));
+    const apiKey = url.searchParams.get("key");
+    const session = url.searchParams.get("session");
+    if (!apiKey || !session) {
+      throw new Error("Google Maps tiles require an API key and a valid tile session.");
+    }
+
+    const tileUrl = new URL("https://tile.googleapis.com/v1/2dtiles" + url.pathname);
+    tileUrl.searchParams.set("key", apiKey);
+    tileUrl.searchParams.set("session", session);
+
+    const response = await fetch(tileUrl.toString(), { signal: abortController.signal });
+    if (!response.ok) {
+      throw new Error("Google Maps tile request failed (" + response.status + ").");
+    }
+    return { data: await response.arrayBuffer() };
+  });
+
+  googleTileProtocolRegistered = true;
+}
+
+async function createGoogleTileSession(
+  mapType: GoogleTileMapType,
+  apiKey: string
+): Promise<string> {
+  const response = await fetch(
+    "https://tile.googleapis.com/v1/createSession?key=" + encodeURIComponent(apiKey),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mapType, language: "en-US", region: "RW" })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({})) as {
+    session?: string;
+    error?: { message?: string };
+  };
+
+  if (!response.ok || !payload.session) {
+    const details = payload.error?.message ? ": " + payload.error.message : "";
+    throw new Error("Google Maps session could not be created (" + response.status + ")" + details);
+  }
+  return payload.session;
+}
+
+function createGoogleTileStyle(
+  mapType: GoogleTileMapType,
+  apiKey: string,
+  session: string
+): StyleSpecification {
+  return {
+    version: 8,
+    sources: {
+      "google-basemap": {
+        type: "raster",
+        tiles: [
+          "rli-google://tiles/{z}/{x}/{y}?key=" +
+            encodeURIComponent(apiKey) +
+            "&session=" +
+            encodeURIComponent(session)
+        ],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 22,
+        attribution: "Google Maps"
+      }
+    },
+    layers: [
+      {
+        id: "google-basemap",
+        type: "raster",
+        source: "google-basemap",
+        minzoom: 0,
+        maxzoom: 22
+      }
+    ],
+    metadata: { "rli:googleMapType": mapType }
+  };
+}
+
+
 // Approximate geographic envelope of Rwanda with a small safety margin.
 // maxBounds constrains panning; a viewport-derived min zoom prevents zooming
 // so far out that the full country extent no longer fits on screen.
@@ -919,6 +1030,9 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
+  const googleTileSessionRef = useRef<GoogleTileSession | null>(null);
+  const googleAttributionElementRef = useRef<HTMLDivElement | null>(null);
+
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
   const selectedMetricRef = useRef<MapMetric>(selectedMetric);
   const metricBubbleValuesRef = useRef<MetricBubbleValue[]>([]);
@@ -930,8 +1044,8 @@ export function MapView({
   const refreshShowOverlaysRef = useRef<(() => void) | null>(null);
   const refreshZoningRef = useRef<(() => void) | null>(null);
 
-  // Change only the style, not the map instance. Camera position and the
-  // administrative zoom hierarchy therefore remain connected to the same map.
+  // Change only the basemap style, not the map instance or our parcel layers.
+  // Google roadmap/satellite are experimental and use the official Google Map Tiles API.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || activeBasemapModeRef.current === basemapMode) return;
@@ -939,7 +1053,137 @@ export function MapView({
     activeBasemapModeRef.current = basemapMode;
     onStatusChange("loading");
 
+    let cancelled = false;
+    let attributionRequest = 0;
+    let googleAttributionListener: (() => void) | null = null;
+    const attributionElement = googleAttributionElementRef.current;
+    if (attributionElement) {
+      attributionElement.hidden = true;
+      attributionElement.textContent = "";
+    }
+
+    const isGoogleBasemap = basemapMode === "google-map" || basemapMode === "google-satellite";
+    if (isGoogleBasemap) {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+      if (!apiKey) {
+        googleTileSessionRef.current = null;
+        onStatusChange("error");
+        console.error(
+          "Google basemaps are disabled until NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is set for this deployment."
+        );
+        return () => { cancelled = true; };
+      }
+
+      const mapType: GoogleTileMapType = basemapMode === "google-map" ? "roadmap" : "satellite";
+      ensureGoogleTileProtocol();
+      void createGoogleTileSession(mapType, apiKey)
+        .then((session) => {
+          if (cancelled || mapRef.current !== map || activeBasemapModeRef.current !== basemapMode) return;
+
+          googleTileSessionRef.current = { mapType, apiKey, session };
+          map.setMaxZoom(22);
+          map.setStyle(createGoogleTileStyle(mapType, apiKey, session));
+
+          const refreshGoogleAttribution = async () => {
+            const requestId = ++attributionRequest;
+            if (!attributionElement) return;
+
+            const bounds = map.getBounds();
+            const query = new URLSearchParams({
+              session,
+              key: apiKey,
+              zoom: String(Math.floor(map.getZoom())),
+              north: String(bounds.getNorth()),
+              south: String(bounds.getSouth()),
+              east: String(bounds.getEast()),
+              west: String(bounds.getWest())
+            });
+
+            try {
+              const response = await fetch("https://tile.googleapis.com/tile/v1/viewport?" + query.toString());
+              if (!response.ok) {
+                throw new Error("Google Maps viewport attribution request failed (" + response.status + ").");
+              }
+              const info = await response.json() as GoogleViewportInfo;
+              if (
+                cancelled ||
+                requestId !== attributionRequest ||
+                activeBasemapModeRef.current !== basemapMode
+              ) return;
+
+              // The viewport response provides the provider credits that Google
+              // requires alongside the visible "Google Maps" attribution.
+              attributionElement.textContent = "Google Maps · " + (info.copyright || "Map data attribution unavailable");
+              attributionElement.hidden = false;
+
+              const center = map.getCenter();
+              const matchingRects = (info.maxZoomRects ?? [])
+                .filter((rect) =>
+                  center.lat <= rect.north &&
+                  center.lat >= rect.south &&
+                  center.lng <= rect.east &&
+                  center.lng >= rect.west &&
+                  Number.isFinite(rect.maxZoom)
+                )
+                .sort((a, b) => b.maxZoom - a.maxZoom);
+              if (matchingRects.length) {
+                map.setMaxZoom(Math.min(22, Math.max(5, matchingRects[0].maxZoom)));
+              }
+            } catch (error) {
+              if (cancelled || requestId !== attributionRequest) return;
+              attributionElement.textContent = "Google Maps · Map data credits could not be loaded";
+              attributionElement.hidden = false;
+              console.error("Google Maps attribution could not be refreshed.", error);
+            }
+          };
+
+          googleAttributionListener = () => { void refreshGoogleAttribution(); };
+          map.on("moveend", googleAttributionListener);
+          map.on("zoomend", googleAttributionListener);
+          void refreshGoogleAttribution();
+        })
+        .catch((error: unknown) => {
+          if (cancelled || mapRef.current !== map || activeBasemapModeRef.current !== basemapMode) return;
+          googleTileSessionRef.current = null;
+          onStatusChange("error");
+          console.error("Google Maps basemap could not be loaded.", error);
+          if (attributionElement) {
+            attributionElement.textContent = "Google Maps · Could not load this basemap";
+            attributionElement.hidden = false;
+          }
+        });
+
+      return () => {
+        cancelled = true;
+        attributionRequest += 1;
+        if (googleAttributionListener) {
+          map.off("moveend", googleAttributionListener);
+          map.off("zoomend", googleAttributionListener);
+        }
+        if (googleTileSessionRef.current?.mapType === mapType) googleTileSessionRef.current = null;
+        if (attributionElement) {
+          attributionElement.hidden = true;
+          attributionElement.textContent = "";
+        }
+      };
+    }
+
+    googleTileSessionRef.current = null;
+    map.setMaxZoom(20);
     map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
+
+    return () => {
+      cancelled = true;
+      attributionRequest += 1;
+      if (googleAttributionListener) {
+        map.off("moveend", googleAttributionListener);
+        map.off("zoomend", googleAttributionListener);
+      }
+      if (attributionElement) {
+        attributionElement.hidden = true;
+        attributionElement.textContent = "";
+      }
+    };
   }, [basemapMode, onStatusChange]);
 
   useEffect(() => {
@@ -1014,6 +1258,15 @@ export function MapView({
     onBoundaryStatusChange("loading");
 
     const initialStyleUrl = NORMAL_STYLE_URL;
+
+    ensureGoogleTileProtocol();
+
+    const googleAttributionElement = document.createElement("div");
+    googleAttributionElement.className = "google-map-data-attribution";
+    googleAttributionElement.setAttribute("aria-label", "Google Maps attribution and imagery credits");
+    googleAttributionElement.hidden = true;
+    container.appendChild(googleAttributionElement);
+    googleAttributionElementRef.current = googleAttributionElement;
 
     const map = new MapLibreMap({
       container,
@@ -2477,6 +2730,9 @@ export function MapView({
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();
+      googleTileSessionRef.current = null;
+      googleAttributionElement.remove();
+      googleAttributionElementRef.current = null;
       map.remove();
       mapRef.current = null;
       if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {
