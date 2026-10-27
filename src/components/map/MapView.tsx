@@ -1460,35 +1460,16 @@ export function MapView({
                   ? "#A68A56"
                   : "#668878"
             ],
+            // Keep style expressions valid: feature-state logic must not wrap a
+            // zoom-interpolation expression in a "case" expression. The map uses
+            // crisp fixed-width strokes; selected/hovered boundaries get emphasis.
             "line-width": [
               "case",
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 2.5 : 3.0,
+              level === "parcel" ? 2.5 : 2.6,
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 2.6 : 2.5,
-              level === "parcel"
-                ? [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    PARCEL_ZOOM,
-                    0.95,
-                    PARCEL_ZOOM + 1.5,
-                    1.45,
-                    PARCEL_ZOOM + 3.85,
-                    1.9
-                  ]
-                : [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    layer.minZoom,
-                    0.75,
-                    layer.minZoom + 2,
-                    1.35,
-                    layer.minZoom + 4,
-                    2
-                  ]
+              level === "parcel" ? 2.8 : 2.5,
+              level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
           }
@@ -1571,11 +1552,13 @@ export function MapView({
             ]
           ],
           paint: {
+            // Use a simple data-driven radius. Nesting multiple zoom
+            // interpolations under "case" is rejected by MapLibre's style spec.
             "circle-radius": [
               "case",
               ["==", ["get", "show_dot"], true],
-              ["interpolate", ["linear"], ["zoom"], 5, 1.8, SECTOR_ZOOM, 2, CELL_ZOOM, 2.1, PARCEL_ZOOM, 2.4],
-              ["interpolate", ["linear"], ["zoom"], 5, 2.5, SECTOR_ZOOM, 3, CELL_ZOOM, 3.3, PARCEL_ZOOM, 3.6]
+              2.35,
+              3.2
             ],
             "circle-color": [
               "case",
