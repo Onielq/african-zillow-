@@ -29,6 +29,8 @@ jobs:
       - name: Baseline tests
         run: npm test
       - name: Production build
+        env:
+          NEXT_PUBLIC_ESRI_API_KEY: ${{ secrets.NEXT_PUBLIC_ESRI_API_KEY }}
         run: npm run build
       - name: Docker image build
         run: docker build --tag rwanda-land-intelligence:test .
