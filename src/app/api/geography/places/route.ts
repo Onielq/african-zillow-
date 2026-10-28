@@ -81,7 +81,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
 
   if (roadsOnly) {
     selections.push(
-      'way["highway"~"motorway|trunk|primary|secondary|tertiary"](' + box + ');'
+      'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
     );
     return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
   }
@@ -107,6 +107,9 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
   }
 
   if (categories.includes("transportation")) {
+    selections.push(
+      'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
+    );
     selections.push('node["highway"="bus_stop"](' + box + ");");
     selections.push('node["amenity"~"bus_station|bus_stop"](' + box + ");");
     selections.push('way["amenity"="bus_station"](' + box + ");");
@@ -123,7 +126,8 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
     }
   }
 
-  return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\nout center tags;";
+  const output = categories.includes("transportation") ? "out geom tags;" : "out center tags;";
+  return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\n" + output;
 }
 
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();

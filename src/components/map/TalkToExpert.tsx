@@ -1,19 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TalkToExpertProps = {
-  areaName?: string | null;
+  developerName: string;
+  parcelUpi?: string | null;
+  visible: boolean;
 };
 
-export function TalkToExpert({ areaName }: TalkToExpertProps) {
+export function TalkToExpert({ developerName, parcelUpi, visible }: TalkToExpertProps) {
   const router = useRouter();
   const [isHidden, setIsHidden] = useState(false);
   const [showReopen, setShowReopen] = useState(false);
-  const insightArea = areaName?.trim() || "Rwanda land market";
 
-  const openContact = () => router.push("/contact");
+  useEffect(() => {
+    if (!visible) return;
+    setIsHidden(false);
+    setShowReopen(false);
+  }, [visible, parcelUpi]);
+
+  const openContact = () => {
+    const params = new URLSearchParams({ developer: developerName });
+    if (parcelUpi) params.set("upi", parcelUpi);
+    router.push("/contact?" + params.toString());
+  };
 
   const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -33,10 +44,12 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
     setIsHidden(false);
   };
 
+  if (!visible) return null;
+
   return (
     <>
       <div
-        aria-label={`Talk to an expert about ${insightArea}`}
+        aria-label={`Talk to an expert about ${developerName}`}
         aria-hidden={isHidden ? true : undefined}
         className={isHidden ? "expert-card hidden" : "expert-card"}
         onClick={openContact}
@@ -63,7 +76,7 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
         <div className="expert-text">
           <div className="expert-title">Talk to an expert</div>
           <div className="expert-subtitle">
-            Get full insights on <strong>{insightArea}</strong>
+            <strong>{developerName}</strong>
           </div>
         </div>
         <button

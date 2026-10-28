@@ -24,7 +24,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
-export type BasemapMode = "map" | "satellite";
+export type BasemapMode = "map" | "satellite" | "hybrid";
 export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type ParcelPriceType =
@@ -575,50 +575,48 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Esri imagery plus the transparent World Transportation reference tiles.
-// Road strokes and available road names are layered over the photo. Cadastral
-// and administrative layers are added later and remain above the road overlay.
+// Esri imagery with subtle road references so roads remain distinguishable in satellite.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
       type: "raster",
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      ],
-      tileSize: 256,
-      minzoom: 0,
-      maxzoom: 19,
-      attribution:
-        "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, minzoom: 0, maxzoom: 19,
+      attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
     "world-transportation": {
       type: "raster",
-      tiles: [
-        "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-      ],
-      tileSize: 256,
-      minzoom: 0,
-      maxzoom: 19,
-      attribution:
-        "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, minzoom: 0, maxzoom: 19,
+      attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     }
   },
   layers: [
-    {
-      id: "world-imagery",
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 19 },
+    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 19, paint: { "raster-opacity": 0.48 } }
+  ]
+};
+
+const HYBRID_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    "world-imagery": {
       type: "raster",
-      source: "world-imagery",
-      minzoom: 0,
-      maxzoom: 19
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, minzoom: 0, maxzoom: 19,
+      attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
-    {
-      id: "world-transportation",
+    "world-transportation": {
       type: "raster",
-      source: "world-transportation",
-      minzoom: 0,
-      maxzoom: 19
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, minzoom: 0, maxzoom: 19,
+      attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     }
+  },
+  layers: [
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 19 },
+    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 19 }
   ]
 };
 
@@ -945,7 +943,11 @@ export function MapView({
     activeBasemapModeRef.current = basemapMode;
     onStatusChange("loading");
 
-    map.setStyle(basemapMode === "satellite" ? SATELLITE_STYLE : NORMAL_STYLE_URL);
+    map.setStyle(basemapMode === "map"
+          ? NORMAL_STYLE_URL
+          : basemapMode === "satellite"
+            ? SATELLITE_STYLE
+            : HYBRID_STYLE);
   }, [basemapMode, onStatusChange]);
 
   useEffect(() => {

@@ -678,6 +678,72 @@ type ParcelProvider = {
   extent: Bounds;
 };
 
+function splitBoundsIntoQuarters(bounds: Bounds): Bounds[] {
+  const [west, south, east, north] = bounds;
+  const midX = (west + east) / 2;
+  const midY = (south + north) / 2;
+  return [
+    [west, south, midX, midY],
+    [midX, south, east, midY],
+    [west, midY, midX, north],
+    [midX, midY, east, north]
+  ];
+}
+
+function uniqueUpiFeatures(features: UpstreamFeature[]): UpstreamFeature[] {
+  const unique = new Map<string, UpstreamFeature>();
+  for (const feature of features) {
+    const attributes = feature.attributes ?? feature.properties ?? {};
+    const upi = textValue(attributeValue(attributes, ["upi"]));
+    const key = upi ? "upi:" + upi : "feature:" + String(feature.id ?? unique.size);
+    if (!unique.has(key)) unique.set(key, feature);
+  }
+  return Array.from(unique.values());
+}
+
+async function queryParcelBounds(
+  provider: ParcelProvider,
+  bounds: Bounds,
+  depth = 0
+): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
+  if (!boundsIntersect(bounds, provider.extent)) return { features: [], failed: false };
+  const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
+  const splitForSize = area > 0.01 && depth < 2;
+
+  if (!splitForSize) {
+    try {
+      const features = await queryArcGisLayer(
+        provider.layerUrl, bounds, 2000, "upi IS NOT NULL",
+        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on", 180
+      );
+      if (features.length < 1900 || depth >= 4) return { features, failed: false };
+
+      const childResults = await Promise.all(
+        splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent))
+          .map((child) => queryParcelBounds(provider, child, depth + 1))
+      );
+      return {
+        features: uniqueUpiFeatures([...features, ...childResults.flatMap((child) => child.features)]),
+        failed: features.length === 0 && childResults.every((child) => child.failed)
+      };
+    } catch (error) {
+      if (depth >= 4) {
+        console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
+        return { features: [], failed: true };
+      }
+    }
+  }
+
+  const childResults = await Promise.all(
+    splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent))
+      .map((child) => queryParcelBounds(provider, child, depth + 1))
+  );
+  return {
+    features: uniqueUpiFeatures(childResults.flatMap((child) => child.features)),
+    failed: childResults.length > 0 && childResults.every((child) => child.failed)
+  };
+}
+
 async function getParcels(
   bounds: Bounds,
   sourceFilter?: "kigali" | "bugesera"
@@ -712,21 +778,8 @@ async function getParcels(
   }
 
   const results = await Promise.all(providers.map(async (provider) => {
-    try {
-      // Request only public identification fields. In Bugesera, query only
-      // UPI; do not fetch owner or other land-management attributes.
-      const upstreamFeatures = await queryArcGisLayer(
-        provider.layerUrl,
-        bounds,
-        2000,
-        "upi IS NOT NULL",
-        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on"
-      );
-      return { provider, upstreamFeatures, failed: false };
-    } catch (error) {
-      console.error(`Cadastral parcel GIS request failed for ${provider.id}.`, error);
-      return { provider, upstreamFeatures: [] as UpstreamFeature[], failed: true };
-    }
+    const result = await queryParcelBounds(provider, bounds);
+    return { provider, upstreamFeatures: result.features, failed: result.failed };
   }));
 
   if (results.every((result) => result.failed)) {

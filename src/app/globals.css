@@ -3322,154 +3322,69 @@ input {
 }
 
 
-/* UI/UX refinement: names and values first, secondary prose removed from the map drawer. */
-.directory-drawer {
-  width: min(500px, calc(100% - 28px));
-}
 
-.directory-tabs {
-  margin-top: 10px;
-  margin-bottom: 8px;
+/* Minimal refinement pass: restore original panel proportions. */
+.directory-drawer { width: min(414px, calc(100% - 28px)); }
+.directory-tabs { margin-top: 15px; margin-bottom: 10px; }
+.directory-tab { min-height: 32px; flex: 1 0 auto; padding-inline: 9px; font-size: 10px; }
+.directory-tab span { display: none; }
+.directory-search {
+  width: 100%; min-height: 36px; margin: 0 0 5px; padding: 0 11px;
+  border: 1px solid #dce4de; border-radius: 9px; background: #fff; color: var(--ink);
+  font-size: 12px; outline: none;
 }
-
-.directory-tab {
-  min-height: 36px;
-  flex: 1 0 auto;
-  padding-inline: 12px;
-  font-size: 12px;
+.directory-search:focus, .comparison-search:focus {
+  border-color: #97bba5; box-shadow: 0 0 0 3px rgb(23 107 80 / 9%);
 }
-
-.directory-tab span {
-  display: none;
-}
-
-.directory-record-list {
-  gap: 11px;
-  padding-top: 12px;
-}
-
+.directory-record-list { gap: 7px; padding: 10px 2px 12px 0; }
 .directory-record {
-  grid-template-columns: 58px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  min-height: 88px;
-  padding: 14px;
-  border-radius: 14px;
+  grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 10px;
+  min-height: 0; padding: 10px; border-radius: 12px;
 }
-
-.directory-monogram {
-  width: 58px;
-  height: 58px;
-  border-radius: 14px;
-  font-size: 16px;
+.directory-monogram { width: 42px; height: 42px; border-radius: 11px; font-size: 13px; }
+.directory-record-copy { gap: 0; }
+.directory-record-title { align-items: center; justify-content: flex-start; gap: 0; }
+.directory-record-title strong { flex: 1 1 auto; font-size: 11px; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+.sources-panel, .metric-info-panel {
+  left: auto; right: 18px; top: 118px; width: min(365px, calc(100% - 36px));
+  max-height: calc(100% - 176px); padding: 20px 18px 17px;
 }
-
-.directory-record-copy {
-  gap: 0;
+.metric-info-trigger > span {
+  display: block; width: auto; height: auto; border: 0; border-radius: 0;
+  font-family: Georgia, serif; font-size: 15px; font-style: italic; line-height: 1;
 }
-
-.directory-record-title {
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0;
-}
-
-.directory-record-title strong {
-  flex: 1 1 auto;
-  color: #25352b;
-  font-size: 15px;
-  font-weight: 790;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.info-panel-tabs {
-  display: flex;
-  gap: 4px;
-  margin: 12px 0 14px;
-  padding: 4px;
-  border: 1px solid #e2e9e4;
-  border-radius: 11px;
-  background: #f7faf8;
-}
-
-.info-panel-tab {
-  flex: 1;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #65756a;
-  font-size: 11px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.info-panel-tab-active {
-  border-color: #d3e4d9;
-  background: #e8f3eb;
-  color: #176b50;
-}
-
-.parcel-price-headline {
-  min-width: 0;
-  margin: 10px 0 14px;
-}
-
+.parcel-price-headline { min-width: 0; margin: 10px 0 12px; }
 .parcel-price-headline strong {
-  display: block;
-  color: #153f2c;
-  font-size: clamp(29px, 3.2vw, 37px);
-  font-weight: 880;
-  line-height: 1.12;
-  letter-spacing: -.045em;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  display: block; color: #165c3d; font-family: inherit; font-size: 30px; font-weight: 800;
+  line-height: 1.2; letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
-
-.parcel-valuation-comparison {
-  margin-top: 12px;
+.selected-area-panel { padding: 20px 18px 18px; }
+.selected-area-panel h2 { font-size: 23px; font-weight: 690; letter-spacing: -.045em; line-height: 1.15; }
+.parcel-details { gap: 10px; padding: 12px; border-radius: 12px; }
+.parcel-details span { font-size: 10px; }
+.parcel-details strong { font-size: 12px; line-height: 1.4; }
+.parcel-valuation-comparison { margin-top: 10px; }
+.expert-reopen-icon-btn { width: 48px; height: 48px; padding: 0; justify-content: center; gap: 0; border-radius: 14px; }
+.expert-reopen-icon-btn svg { width: 22px; height: 22px; }
+.comparison-load-more {
+  width: 100%; min-height: 34px; margin-top: 6px; border: 1px solid #d8e6dc;
+  border-radius: 9px; background: #f7faf8; color: #216147; font-size: 11px; font-weight: 700; cursor: pointer;
 }
-
-.expert-reopen-icon-btn {
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  justify-content: center;
-  gap: 0;
-  border-radius: 18px;
-}
-
-.expert-reopen-icon-btn svg {
-  width: 25px;
-  height: 25px;
-}
-
-@media (max-width: 720px) {
-  .directory-drawer {
-    width: calc(100% - 20px);
+.comparison-load-more:hover:not(:disabled) { background: #eaf4ed; }
+.comparison-load-more:disabled { opacity: .65; cursor: progress; }
+@media (max-width: 700px) {
+  .directory-drawer { width: calc(100% - 20px); }
+  .metric-info-panel, .sources-panel {
+    left: auto; right: 11px; width: calc(100% - 22px); top: 112px;
+    max-height: calc(100% - 130px); padding: 18px 15px 15px;
   }
-
-  .directory-record {
-    grid-template-columns: 52px minmax(0, 1fr);
-    min-height: 82px;
-    padding: 12px;
-    gap: 12px;
-  }
-
-  .directory-monogram {
-    width: 52px;
-    height: 52px;
-  }
-
-  .directory-record-title strong {
-    font-size: 14px;
-  }
-
-  .expert-reopen-icon-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 17px;
-  }
+  .selected-area-panel { padding: 18px 16px 16px; }
+  .selected-area-panel h2 { font-size: 20px; }
+  .parcel-details { gap: 10px; padding: 12px; }
+  .parcel-details strong { font-size: 12px; line-height: 1.4; }
+  .parcel-price-headline strong { font-size: 30px; }
+  .directory-record { grid-template-columns: 42px minmax(0, 1fr); min-height: 0; padding: 10px; gap: 10px; }
+  .directory-monogram { width: 42px; height: 42px; }
+  .directory-record-title strong { font-size: 11px; }
+  .expert-reopen-icon-btn { width: 46px; height: 46px; border-radius: 14px; }
 }

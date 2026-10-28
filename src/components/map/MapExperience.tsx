@@ -90,10 +90,12 @@ type ComparisonItem = SelectedArea & {
   comparisonKind?: "area" | "project";
   projectSourceUrl?: string | null;
   transactionEstimate?: TransactionEstimateResponse | null;
+  comparisonZoningStatus?: "loading" | "found" | "not-covered" | "error";
+  comparisonZoning?: Array<{ code: string | null; name: string }>;
 };
-
 type AreaSearchResult = SelectedArea & { id: string };
-type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string };
+type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string; browse?: boolean; nextOffset?: number; hasMore?: boolean };
+type ComparisonZoningResponse = { status?: "found" | "not-covered"; zones?: Array<{ code: string | null; name: string }>; error?: string };
 type TransactionEstimateResponse = {
   estimate: number | null;
   status: "reported-current-month-unverified" | "historical-monthly-baseline" | "parcel-share-model" | "unavailable";
@@ -526,6 +528,7 @@ export function MapExperience() {
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
+  const [directorySearch, setDirectorySearch] = useState("");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
@@ -536,6 +539,9 @@ export function MapExperience() {
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
+  const [compareBrowseOpen, setCompareBrowseOpen] = useState(false);
+  const [comparisonBrowseOffset, setComparisonBrowseOffset] = useState(0);
+  const [comparisonBrowseHasMore, setComparisonBrowseHasMore] = useState(false);
   const [comparisonSearchResults, setComparisonSearchResults] = useState<AreaSearchResult[]>([]);
   const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
@@ -590,21 +596,19 @@ export function MapExperience() {
   };
 
   const addAreaToComparison = (areaToAdd: SelectedArea) => {
-    const item: ComparisonItem = { ...areaToAdd, comparisonKind: "area", transactionEstimate: null };
+    const item: ComparisonItem = {
+      ...areaToAdd, comparisonKind: "area", transactionEstimate: null,
+      comparisonZoningStatus: areaToAdd.level === "parcel" ? "loading" : undefined
+    };
     const itemKey = comparisonItemKey(item);
     const exists = comparedAreas.some((area) => comparisonItemKey(area) === itemKey);
     if (exists) {
       setComparisonFeedback(areaToAdd.name + " is already on your comparison list.");
-      setSourcesOpen(false);
-      setMetricInfoOpen(false);
-      setCompareOpen(true);
-      return;
+      setSourcesOpen(false); setMetricInfoOpen(false); setCompareOpen(true); return;
     }
     setComparedAreas((areas) => [...areas, item]);
     setComparisonFeedback(areaToAdd.name + " added to comparison.");
-    setSourcesOpen(false);
-    setMetricInfoOpen(false);
-    setCompareOpen(true);
+    setSourcesOpen(false); setMetricInfoOpen(false); setCompareOpen(true);
     if (areaToAdd.level !== "parcel") {
       void fetchTransactionEstimate(areaToAdd).then((estimate) => {
         if (!estimate) return;
@@ -612,6 +616,21 @@ export function MapExperience() {
           comparisonItemKey(area) === itemKey ? { ...area, transactionEstimate: estimate } : area
         ));
       });
+    } else if (areaToAdd.upi) {
+      const params = new URLSearchParams({ district: areaToAdd.district, upi: areaToAdd.upi });
+      void fetch("/api/geography/parcel-zoning?" + params.toString())
+        .then(async (response) => {
+          const payload = await response.json() as ComparisonZoningResponse;
+          if (!response.ok) throw new Error(payload.error ?? "Parcel zoning is unavailable.");
+          setComparedAreas((areas) => areas.map((area) => comparisonItemKey(area) === itemKey
+            ? { ...area, comparisonZoningStatus: payload.status === "found" ? "found" : "not-covered", comparisonZoning: payload.zones ?? [] }
+            : area));
+        })
+        .catch(() => setComparedAreas((areas) => areas.map((area) => comparisonItemKey(area) === itemKey
+          ? { ...area, comparisonZoningStatus: "error", comparisonZoning: [] } : area)));
+    } else {
+      setComparedAreas((areas) => areas.map((area) => comparisonItemKey(area) === itemKey
+        ? { ...area, comparisonZoningStatus: "error", comparisonZoning: [] } : area));
     }
   };
 
@@ -673,6 +692,19 @@ export function MapExperience() {
       : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
+  const normalizedDirectorySearch = directorySearch.trim().toLocaleLowerCase();
+  const visibleDeveloperCandidates = [
+    { id: "taiseel-development", name: "Taiseel Development", logoUrl: undefined },
+    ...RWANDA_DEVELOPER_CANDIDATES
+  ].filter((candidate) => candidate.name.toLocaleLowerCase().includes(normalizedDirectorySearch));
+  const visibleAgencies = [
+    { id: "taiseel-resident", name: "Taiseel Resident" },
+    ...RWANDA_REAL_ESTATE_AGENCIES
+  ].filter((candidate) => candidate.name.toLocaleLowerCase().includes(normalizedDirectorySearch));
+  const visibleAgents = [
+    { id: "carissa-taiseel", name: "Carissa Taiseel" },
+    ...RWANDA_PUBLIC_AGENT_CANDIDATES
+  ].filter((candidate) => candidate.name.toLocaleLowerCase().includes(normalizedDirectorySearch));
   const activeTransactionEstimateKey = selectedArea ? transactionEstimateKeyForArea(selectedArea) : null;
   const transactionEstimateForSelected = activeTransactionEstimateKey === selectedTransactionEstimateKey
     ? selectedTransactionEstimate
@@ -687,6 +719,11 @@ export function MapExperience() {
     .filter(({ estimate }) => estimate.pricePerM2 !== null)
     .map(({ estimate }) => estimate.pricePerM2 as number);
   const highestComparisonPrice = comparisonPrices.length > 1 ? Math.max(...comparisonPrices) : null;
+  const comparisonParcelAreas = comparedAreas
+    .filter((area) => area.comparisonKind !== "project" && area.level === "parcel" &&
+      typeof area.parcelSizeM2 === "number" && Number.isFinite(area.parcelSizeM2) && area.parcelSizeM2 > 0)
+    .map((area) => area.parcelSizeM2 as number);
+  const largestComparisonParcelArea = comparisonParcelAreas.length > 1 ? Math.max(...comparisonParcelAreas) : null;
   const parcelUnitPriceEstimate = selectedArea?.level === "parcel"
     ? getUnitPriceEstimate(landPriceRows, selectedArea, true)
     : null;
@@ -751,32 +788,60 @@ export function MapExperience() {
 
   useEffect(() => {
     const query = compareSearch.trim();
-    if (query.length < 2) return;
-
+    const shouldBrowseParcels = compareBrowseOpen && query.length === 0;
+    if (query.length < 2 && !shouldBrowseParcels) {
+      setComparisonSearchResults([]);
+      setComparisonSearchStatus("idle");
+      setComparisonBrowseHasMore(false);
+      return;
+    }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setComparisonSearchStatus("loading");
       try {
-        const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(query), {
-          signal: controller.signal
-        });
+        const url = shouldBrowseParcels
+          ? "/api/geography/areas/search?browse=1&offset=0"
+          : "/api/geography/areas/search?q=" + encodeURIComponent(query);
+        const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("Area search failed (" + response.status + ")");
         const payload = await response.json() as AreaSearchResponse;
         if (controller.signal.aborted) return;
         setComparisonSearchResults(payload.areas ?? []);
         setComparisonSearchStatus("ready");
+        setComparisonBrowseOffset(payload.nextOffset ?? 25);
+        setComparisonBrowseHasMore(shouldBrowseParcels ? payload.hasMore ?? false : false);
       } catch {
         if (controller.signal.aborted) return;
         setComparisonSearchResults([]);
         setComparisonSearchStatus("error");
+        setComparisonBrowseHasMore(false);
       }
-    }, 220);
-
+    }, 180);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [compareSearch]);
+  }, [compareSearch, compareBrowseOpen]);
+
+  const loadMoreComparisonParcels = async () => {
+    if (!comparisonBrowseHasMore || comparisonSearchStatus === "loading" || compareSearch.trim()) return;
+    setComparisonSearchStatus("loading");
+    try {
+      const response = await fetch("/api/geography/areas/search?browse=1&offset=" + String(comparisonBrowseOffset));
+      if (!response.ok) throw new Error("Parcel browsing failed (" + response.status + ")");
+      const payload = await response.json() as AreaSearchResponse;
+      if (compareSearch.trim() || !compareBrowseOpen) return;
+      setComparisonSearchResults((current) => {
+        const known = new Set(current.map((area) => area.id));
+        return [...current, ...(payload.areas ?? []).filter((area) => !known.has(area.id))];
+      });
+      setComparisonBrowseOffset(payload.nextOffset ?? comparisonBrowseOffset + 25);
+      setComparisonBrowseHasMore(payload.hasMore ?? false);
+      setComparisonSearchStatus("ready");
+    } catch {
+      setComparisonSearchStatus("error");
+    }
+  };
 
   useEffect(() => {
     if (!selectedArea || selectedArea.level === "parcel") return;
@@ -1035,7 +1100,9 @@ export function MapExperience() {
 
         <div className="map-vignette" aria-hidden="true" />
 
-        <TalkToExpert areaName={selectedArea?.name ?? "Rwanda land market"} />
+        <TalkToExpert developerName="Taiseel Development"
+          parcelUpi={selectedArea?.level === "parcel" ? selectedArea.upi : null}
+          visible={selectedArea?.level === "parcel"} />
 
         <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
@@ -1062,6 +1129,15 @@ export function MapExperience() {
               <path d="m10 12.2 2.15 2.15L10 16.5l-2.15-2.15L10 12.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
             </svg>
             Satellite
+          </button>
+          <button aria-pressed={basemapMode === "hybrid"}
+            className={basemapMode === "hybrid" ? "basemap-button basemap-button-active" : "basemap-button"}
+            onClick={() => setBasemapMode("hybrid")} type="button">
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+              <path d="M2.5 5.4 10 2.2l7.5 3.2L10 8.6 2.5 5.4Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+              <path d="M2.5 10 10 13.2l7.5-3.2M2.5 14.5 10 17.7l7.5-3.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            </svg>
+            Hybrid
           </button>
         </div>
 
@@ -1172,10 +1248,7 @@ export function MapExperience() {
               }}
               type="button"
             >
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-                <path d="M1.8 10s3-5.2 8.2-5.2 8.2 5.2 8.2 5.2-3 5.2-8.2 5.2S1.8 10 1.8 10Z" stroke="currentColor" strokeWidth="1.45" strokeLinejoin="round" />
-                <circle cx="10" cy="10" r="2.35" stroke="currentColor" strokeWidth="1.45" />
-              </svg>
+              <span aria-hidden="true">i</span>
             </button>
           </div>
         </div>
@@ -1339,14 +1412,17 @@ export function MapExperience() {
               <button aria-label="Close developer directory" className="panel-close" onClick={() => setDevelopersOpen(false)} type="button">×</button>
             </div>
             <div aria-label="Directory category" className="directory-tabs" role="tablist">
-              <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("developers")} role="tab" type="button">Developers</button>
-              <button aria-selected={directoryTab === "agencies"} className={directoryTab === "agencies" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agencies")} role="tab" type="button">Agencies</button>
-              <button aria-selected={directoryTab === "agents"} className={directoryTab === "agents" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agents")} role="tab" type="button">Agents</button>
+              <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => { setDirectoryTab("developers"); setDirectorySearch(""); }} role="tab" type="button">Developers</button>
+              <button aria-selected={directoryTab === "agencies"} className={directoryTab === "agencies" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => { setDirectoryTab("agencies"); setDirectorySearch(""); }} role="tab" type="button">Agencies</button>
+              <button aria-selected={directoryTab === "agents"} className={directoryTab === "agents" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => { setDirectoryTab("agents"); setDirectorySearch(""); }} role="tab" type="button">Agents</button>
             </div>
+            <input aria-label={"Search " + directoryTab} className="directory-search"
+              onChange={(event) => setDirectorySearch(event.target.value)} placeholder="Search by name"
+              type="search" value={directorySearch} />
             {directoryTab === "developers" ? (
               <>
                 <div className="directory-record-list" role="tabpanel">
-                  {RWANDA_DEVELOPER_CANDIDATES.map((candidate) => (
+                  {visibleDeveloperCandidates.map((candidate) => (
                     <article className="directory-record" key={candidate.id}>
                       <div aria-label={candidate.logoUrl ? candidate.name + " logo" : "Organization initials"} className="directory-monogram">
                         <span className="directory-logo-fallback">{initialsForName(candidate.name)}</span>
@@ -1373,7 +1449,7 @@ export function MapExperience() {
             ) : null}
             {directoryTab === "agencies" ? (
               <div className="directory-record-list" role="tabpanel">
-                {RWANDA_REAL_ESTATE_AGENCIES.map((agency) => (
+                {visibleAgencies.map((agency) => (
                   <article className="directory-record" key={agency.id}>
                     <div aria-label="Agency initials" className="directory-monogram">{initialsForName(agency.name)}</div>
                     <div className="directory-record-copy">
@@ -1385,7 +1461,7 @@ export function MapExperience() {
             ) : null}
             {directoryTab === "agents" ? (
               <div className="directory-record-list" role="tabpanel">
-                {RWANDA_PUBLIC_AGENT_CANDIDATES.map((agent) => (
+                {visibleAgents.map((agent) => (
                   <article className="directory-record" key={agent.id}>
                     <div aria-label="Agent initials" className="directory-monogram">{initialsForName(agent.name)}</div>
                     <div className="directory-record-copy">
@@ -2148,58 +2224,57 @@ export function MapExperience() {
               </div>
               <span>{comparedAreas.length} selected</span>
             </div>
-            <label className="comparison-search-label" htmlFor="comparison-area-search">Find an area</label>
-            <input
-              autoComplete="off"
-              className="comparison-search"
-              id="comparison-area-search"
-              onChange={(event) => setCompareSearch(event.target.value)}
-              placeholder="Search district, sector, cell or village, UPI or parcel number"
-              type="search"
-              value={compareSearch}
-            />
-            {normalizedComparisonSearch.length >= 2 ? (
-              <div aria-label="Matching administrative areas" className="comparison-search-results" role="listbox">
-                {comparisonSearchStatus === "loading" ? (
-                  <p className="comparison-no-results" role="status">Searching the four pilot districts…</p>
-                ) : comparisonSearchStatus === "error" ? (
-                  <p className="comparison-no-results" role="status">Area search is temporarily unavailable. You can still select an area from the map.</p>
-                ) : comparisonSearchResults.length > 0 ? comparisonSearchResults.map((area) => {
-                  const candidate: ComparisonItem = { ...area, comparisonKind: "area" };
-                  const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
-                  return (
-                    <button
-                      aria-selected={isAdded}
-                      className="comparison-search-result"
-                      disabled={isAdded}
-                      key={area.id}
-                      onClick={() => {
-                        addAreaToComparison(area);
-                        if (!isAdded) setCompareSearch("");
-                      }}
-                      role="option"
-                      type="button"
-                    >
-                      <span className="comparison-search-dot" aria-hidden="true" />
-                      <span className="comparison-search-result-copy">
-                        <strong>{area.name}</strong>
-                        <small>
-                          {areaLevelLabel(area.level)} · {area.district}
-                          {area.sector ? " · " + area.sector : ""}
-                          {area.cell ? " · " + area.cell : ""}
-                          {area.village ? " · " + area.village : ""}
-                          {area.level === "parcel" ? " · " + (area.parcelNumber ? "Parcel " + area.parcelNumber : "Parcel") + " · UPI " + (area.upi ?? "not supplied") : ""}
-                        </small>
-                      </span>
-                      <span className="comparison-search-result-action">{isAdded ? "Added" : "Add"}</span>
-                    </button>
-                  );
-                }) : (
-                  <p className="comparison-no-results">
-                    {comparisonSearchStatus === "ready"
-                      ? "No matching district, sector, cell, village, UPI or parcel number found."
-                      : "Enter at least two characters to search."}
-                  </p>
+            <label className="comparison-search-label" htmlFor="comparison-area-search">Find an area or parcel</label>
+            <input autoComplete="off" className="comparison-search" id="comparison-area-search"
+              onFocus={() => { if (!compareSearch.trim()) { setCompareBrowseOpen(true); setComparisonBrowseOffset(0); } }}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCompareSearch(value);
+                setCompareBrowseOpen(value.trim().length === 0);
+                setComparisonBrowseOffset(0);
+                setComparisonBrowseHasMore(false);
+              }}
+              placeholder="District, sector, cell, village, UPI or parcel number" type="search" value={compareSearch} />
+            {compareBrowseOpen || normalizedComparisonSearch.length >= 2 ? (
+              <div aria-label="Matching areas and parcels" className="comparison-search-results" role="listbox">
+                {comparisonSearchStatus === "loading" && comparisonSearchResults.length === 0 ? (
+                  <p className="comparison-no-results" role="status">{compareBrowseOpen ? "Loading parcels…" : "Searching…"}</p>
+                ) : comparisonSearchStatus === "error" && comparisonSearchResults.length === 0 ? (
+                  <p className="comparison-no-results" role="status">Search is temporarily unavailable.</p>
+                ) : comparisonSearchResults.length > 0 ? (
+                  <>
+                    {comparisonSearchResults.map((area) => {
+                      const candidate: ComparisonItem = { ...area, comparisonKind: "area" };
+                      const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
+                      return (
+                        <button aria-selected={isAdded} className="comparison-search-result" disabled={isAdded} key={area.id}
+                          onClick={() => { addAreaToComparison(area); if (!isAdded) { setCompareSearch(""); setCompareBrowseOpen(false); } }}
+                          role="option" type="button">
+                          <span className="comparison-search-dot" aria-hidden="true" />
+                          <span className="comparison-search-result-copy">
+                            <strong>{area.name}</strong>
+                            <small>
+                              {areaLevelLabel(area.level)} · {area.district}
+                              {area.sector ? " · " + area.sector : ""}{area.cell ? " · " + area.cell : ""}
+                              {area.village ? " · " + area.village : ""}
+                              {area.level === "parcel" ? " · " + (area.parcelNumber ? "Parcel " + area.parcelNumber : "Parcel") + " · UPI " + (area.upi ?? "not supplied") : ""}
+                            </small>
+                          </span>
+                          <span className="comparison-search-result-action">{isAdded ? "Added" : "Add"}</span>
+                        </button>
+                      );
+                    })}
+                    {compareBrowseOpen && comparisonBrowseHasMore ? (
+                      <button className="comparison-load-more" disabled={comparisonSearchStatus === "loading"}
+                        onClick={() => void loadMoreComparisonParcels()} type="button">
+                        {comparisonSearchStatus === "loading" ? "Loading…" : "Load more parcels"}
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="comparison-no-results">{comparisonSearchStatus === "ready"
+                    ? (compareBrowseOpen ? "No more parcels in the connected sources." : "No matching area or parcel found.")
+                    : "Enter at least two characters to search."}</p>
                 )}
               </div>
             ) : null}
@@ -2287,6 +2362,42 @@ export function MapExperience() {
                       </tr>
                     </thead>
                     <tbody>
+                      {comparedAreas.some((area) => area.comparisonKind !== "project" && area.level === "parcel") ? (
+                        <>
+                          <tr key="parcel-area">
+                            <th scope="row">Parcel area (m²)</th>
+                            {comparedAreas.map((area) => {
+                              const size = area.comparisonKind !== "project" && area.level === "parcel" &&
+                                typeof area.parcelSizeM2 === "number" && Number.isFinite(area.parcelSizeM2)
+                                  ? area.parcelSizeM2 : null;
+                              const isLargest = size !== null && largestComparisonParcelArea !== null && size === largestComparisonParcelArea;
+                              return <td key={"parcel-area-" + comparisonItemKey(area)}>
+                                {size !== null ? <div className="comparison-price-cell">
+                                  <span>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(size)} m²</span>
+                                  {isLargest ? <span className="comparison-row-leader" aria-label="Largest compared parcel"><span aria-hidden="true">★</span> Largest area</span> : null}
+                                </div> : <span>{area.comparisonKind === "project" ? "No verified project data" : area.level === "parcel" ? "Area not supplied" : "Not a parcel"}</span>}
+                              </td>;
+                            })}
+                          </tr>
+                          <tr key="parcel-zoning">
+                            <th scope="row">Zoning</th>
+                            {comparedAreas.map((area) => {
+                              const zoningStatus = area.comparisonZoningStatus;
+                              const zones = area.comparisonZoning ?? [];
+                              return <td key={"parcel-zoning-" + comparisonItemKey(area)}>
+                                {area.comparisonKind === "project" ? <span>No verified project data</span>
+                                : area.level !== "parcel" ? <span>Not a parcel</span>
+                                : zoningStatus === "loading" ? <span>Loading…</span>
+                                : zoningStatus === "found" && zones.length > 0 ? <div className="comparison-price-cell">
+                                  <span>{zones.map((zone) => zone.code && !zone.name.toLowerCase().startsWith(zone.code.toLowerCase()) ? zone.code + " — " + zone.name : zone.name).join(", ")}</span>
+                                </div>
+                                : zoningStatus === "not-covered" ? <span>No mapped zoning</span>
+                                : <span>Zoning unavailable</span>}
+                              </td>;
+                            })}
+                          </tr>
+                        </>
+                      ) : null}
                       {MARKET_METRICS.map((metric) => (
                         <tr key={metric.id}>
                           <th scope="row">{metric.shortLabel}</th>

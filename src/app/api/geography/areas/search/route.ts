@@ -17,7 +17,11 @@ type AreaLevel = AdminAreaLevel | "parcel";
 type SourceId = "kigali" | "bugesera";
 type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
-type LayerQueryResponse = { features?: Array<{ attributes?: Record<string, unknown> }>; error?: { code?: number; message?: string } };
+type LayerQueryResponse = {
+  features?: Array<{ attributes?: Record<string, unknown> }>;
+  error?: { code?: number; message?: string };
+  exceededTransferLimit?: boolean;
+};
 
 type SearchArea = {
   id: string;
@@ -312,10 +316,91 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
     }];
   });
 }
+async function browseParcels(
+  source: SourceId,
+  layerUrl: string,
+  offset: number
+): Promise<{ areas: SearchArea[]; hasMore: boolean }> {
+  const metadata = await getLayerMetadata(layerUrl);
+  const fields = metadata.fields ?? [];
+  const upiField = chooseField(fields, ["upi", "unique_parcel_identifier", "uniqueparcelidentifier"]);
+  if (!upiField) return { areas: [], hasMore: false };
+  const fieldsToReturn = [
+    upiField,
+    chooseField(fields, ["province", "province_name"]),
+    chooseField(fields, ["district", "district_name"]),
+    chooseField(fields, ["sector", "sector_name"]),
+    chooseField(fields, ["cell", "cell_name"]),
+    chooseField(fields, ["village", "village_name"]),
+    chooseField(fields, ["parcel_number", "parcelnumber", "parcel_no", "parcelno"]),
+    chooseField(fields, ["size", "parcel_size_m2", "area"]),
+    chooseField(fields, ["last_updated_on", "lastupdatedon"])
+  ].filter((field): field is string => Boolean(field));
+  const params = new URLSearchParams({
+    where: upiField + " IS NOT NULL",
+    outFields: Array.from(new Set(fieldsToReturn)).join(","),
+    returnGeometry: "false",
+    resultRecordCount: "26",
+    resultOffset: String(Math.max(0, offset)),
+    orderByFields: upiField + " ASC",
+    f: "json"
+  });
+  const response = await fetch(layerUrl + "/query?" + params.toString(), {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error("Parcel browsing failed (" + response.status + ")");
+  const payload = await response.json() as LayerQueryResponse;
+  if (payload.error) throw new Error(payload.error.message ?? "Parcel browsing failed");
+  const features = payload.features ?? [];
+  const hasMore = features.length > 25 || payload.exceededTransferLimit === true;
+  const areas = features.slice(0, 25).flatMap((feature) => {
+    const attributes = feature.attributes ?? {};
+    const upi = value(attributes, ["upi", "unique_parcel_identifier", "uniqueparcelidentifier"]);
+    const district = value(attributes, ["district", "district_name"]);
+    const parcelNumber = value(attributes, ["parcel_number", "parcelnumber", "parcel_no", "parcelno"]);
+    if (!upi || !district || !PILOT_DISTRICTS.has(normalizeKey(district))) return [];
+    const sector = value(attributes, ["sector", "sector_name"]);
+    const cell = value(attributes, ["cell", "cell_name"]);
+    const village = value(attributes, ["village", "village_name"]);
+    const sizeRaw = value(attributes, ["size", "parcel_size_m2", "area"]);
+    const size = sizeRaw === null ? null : Number(sizeRaw);
+    const updatedRaw = value(attributes, ["last_updated_on", "lastupdatedon"]);
+    const updated = updatedRaw === null ? null : Number(updatedRaw);
+    return [{
+      id: "parcel-" + normalizeKey(upi),
+      level: "parcel" as const,
+      name: parcelNumber ? "Parcel " + parcelNumber : "Parcel " + upi,
+      province: value(attributes, ["province"]) ?? (source === "bugesera" ? "Eastern Province" : "Kigali City"),
+      district,
+      districtId: null,
+      sector,
+      sectorId: null,
+      cell,
+      cellId: null,
+      village,
+      villageId: null,
+      averageLandPricePerM2: null,
+      sourceLabel: source === "kigali"
+        ? "City of Kigali Master Plan · Kigali Parcels layer (1 June 2026)"
+        : "National Land Authority · LAIS Bugesera_Parcels FeatureServer (reuse permission pending)",
+      sourceType: "cadastral-parcel" as const,
+      upi,
+      parcelNumber,
+      parcelSizeM2: size !== null && Number.isFinite(size) ? size : null,
+      lastUpdatedOn: updated !== null && Number.isFinite(updated) ? updated : null,
+      bounds: null
+    }];
+  });
+  return { areas, hasMore };
+}
+
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-  if (rawQuery.length < 2) {
-    return NextResponse.json({ areas: [], message: "Enter at least two characters." }, {
+  const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
+  if (rawQuery.length < 2 && !browseMode) {
+    return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
       headers: { "Cache-Control": "public, max-age=30, s-maxage=60" }
     });
   }
@@ -325,6 +410,47 @@ export async function GET(request: NextRequest) {
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
     { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
   ];
+
+  if (browseMode) {
+    const offsetRaw = Number(request.nextUrl.searchParams.get("offset") ?? 0);
+    const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.min(1_000_000, Math.floor(offsetRaw))) : 0;
+    const pages = await Promise.all(sources.map(async (source) => {
+      try {
+        const page = await browseParcels(source.id, source.parcelUrl, offset);
+        return { ...page, failed: false };
+      } catch (error) {
+        console.error("Parcel browse failed for " + source.id + ".", error);
+        return { areas: [] as SearchArea[], hasMore: false, failed: true };
+      }
+    }));
+    const byUpi = new Map<string, SearchArea>();
+    for (const page of pages) for (const area of page.areas) {
+      const key = normalizeKey(area.upi ?? area.name);
+      if (!byUpi.has(key)) byUpi.set(key, area);
+    }
+    const areas = Array.from(byUpi.values()).sort((a, b) =>
+      (a.district + "|" + (a.sector ?? "") + "|" + (a.cell ?? "") + "|" + (a.upi ?? ""))
+        .localeCompare(b.district + "|" + (b.sector ?? "") + "|" + (b.cell ?? "") + "|" + (b.upi ?? ""))
+    );
+    if (pages.every((page) => page.failed)) {
+      return NextResponse.json({ error: "Parcel browsing services are temporarily unavailable." }, { status: 502 });
+    }
+    return NextResponse.json({
+      areas,
+      searched: "",
+      browse: true,
+      offset,
+      nextOffset: offset + 25,
+      hasMore: pages.some((page) => page.hasMore),
+      coverage: "Cadastral parcel records from the Kigali City and Bugesera pilot sources"
+    }, {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "X-Data-Source": "Kigali City Master Plan; National Land Authority LAIS Bugesera parcels"
+      }
+    });
+  }
+
   const tasks = [
     ...sources.flatMap((source) =>
       (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
