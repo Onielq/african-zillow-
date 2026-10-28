@@ -23,7 +23,8 @@ type ValhallaResponse = {
 
 const RWANDA = { west: 28.7, east: 31.05, south: -2.95, north: -1.0 };
 const OVERPASS_ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
-const VALHALLA_BASE = (process.env.VALHALLA_ROUTING_URL?.trim() || "https://valhalla1.openstreetmap.de").replace(/\\/+$/, "");
+const VALHALLA_BASE_RAW = process.env.VALHALLA_ROUTING_URL?.trim() || "https://valhalla1.openstreetmap.de";
+const VALHALLA_BASE = VALHALLA_BASE_RAW.endsWith("/") ? VALHALLA_BASE_RAW.slice(0, -1) : VALHALLA_BASE_RAW;
 const CACHE_MS = 5 * 60 * 1000;
 const responseCache = new Map<string, { expiresAt: number; value: { items: RouteResult[]; note: string } }>();
 const inFlight = new Map<string, Promise<{ items: RouteResult[]; note: string }>>();
