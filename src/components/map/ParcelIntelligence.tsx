@@ -39,6 +39,7 @@ type AccessState = {
   status: AccessStatus;
   places: Amenity[];
   message?: string;
+  provider?: "public-demo" | "configured";
 };
 
 type Props = {
@@ -280,6 +281,7 @@ export function ParcelIntelligenceInline({
         }
 
         let routingStatus: "ready" | "routing-unavailable" = "routing-unavailable";
+        let routingProvider: AccessState["provider"];
         let routedPlaces = nearestCandidates;
         try {
           const routeResponse = await fetch("/api/geography/nearby-access", {
@@ -299,6 +301,7 @@ export function ParcelIntelligenceInline({
           });
           const routePayload = await routeResponse.json() as {
             status?: string;
+            provider?: "public-demo" | "configured";
             results?: Array<{ id: string; distanceMeters: number | null; timeSeconds: number | null }>;
           };
           if (routeResponse.ok && routePayload.status === "ready") {
@@ -312,6 +315,7 @@ export function ParcelIntelligenceInline({
               };
             });
             routingStatus = "ready";
+            routingProvider = routePayload.provider;
           }
         } catch (error) {
           if (controller.signal.aborted) return;
@@ -321,7 +325,8 @@ export function ParcelIntelligenceInline({
         if (!active) return;
         setAccess({
           status: routingStatus,
-          places: nearestByCategory(routedPlaces, routingStatus === "ready")
+          places: nearestByCategory(routedPlaces, routingStatus === "ready"),
+          provider: routingProvider
         });
       } catch (error) {
         if (!active || controller.signal.aborted) return;
@@ -389,7 +394,11 @@ export function ParcelIntelligenceInline({
             <h3>Nearby road access</h3>
             <p>Schools, healthcare and public transport.</p>
           </div>
-          {access.status === "ready" ? <span className={styles.routeChip}>Road routes</span> : null}
+          {access.status === "ready" ? (
+            <span className={styles.routeChip}>
+              {access.provider === "public-demo" ? "Public demo" : "Road routes"}
+            </span>
+          ) : null}
         </div>
         {access.status === "loading" || access.status === "idle" ? (
           <p className={styles.accessMessage} role="status">Checking nearby mapped places and road routes…</p>
@@ -426,6 +435,9 @@ export function ParcelIntelligenceInline({
             ) : (
               <p className={styles.accessFootnote}>
                 Driving-model estimate over mapped roads, not live traffic. The route starts from the parcel extent midpoint, not a surveyed entrance. Place coverage may be incomplete.
+                {access.provider === "public-demo"
+                  ? " This uses a shared public demo service and may be rate-limited or unavailable; use an approved hosted instance for production traffic."
+                  : ""}
               </p>
             )}
           </>
