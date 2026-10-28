@@ -563,13 +563,19 @@ export function MapExperience() {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
 
-  const handleAddParcelToComparison = useCallback((item: ParcelComparisonItem) => {
+  const upsertParcelComparisonItem = useCallback((item: ParcelComparisonItem) => {
     setParcelComparisonItems((current) => {
-      if (current.some((saved) => saved.id === item.id) || current.length >= 4) return current;
+      const existing = current.some((saved) => saved.id === item.id);
+      if (existing) return current.map((saved) => saved.id === item.id ? item : saved);
+      if (current.length >= 4) return current;
       return [...current, item];
     });
-    setParcelCompareOpen(true);
   }, []);
+
+  const handleAddParcelToComparison = useCallback((item: ParcelComparisonItem) => {
+    upsertParcelComparisonItem(item);
+    setParcelCompareOpen(true);
+  }, [upsertParcelComparisonItem]);
 
   const handleRemoveParcelFromComparison = useCallback((id: string) => {
     setParcelComparisonItems((current) => current.filter((item) => item.id !== id));
@@ -1837,6 +1843,7 @@ export function MapExperience() {
                   }
                   comparisonItems={parcelComparisonItems}
                   onAddToComparison={handleAddParcelToComparison}
+                  onUpdateComparison={upsertParcelComparisonItem}
                 />
               </div>
             ) : (
