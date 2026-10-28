@@ -854,7 +854,7 @@ async function queryParcelBounds(
 
     // A very dense tile may still contain thousands of records. Subdivide it,
     // drop the oversized parent response, and keep only the smaller children.
-    if (features.length >= 280 && depth < 5 && splitBounds.length > 0) {
+    if (features.length >= 280 && depth < 3 && budget.remaining >= 64 && splitBounds.length > 0) {
       const splitResult = await queryParcelChildren(provider, splitBounds, depth + 1, budget);
       if (splitResult.features.length > 0 || !splitResult.failed) return splitResult;
 
@@ -868,7 +868,7 @@ async function queryParcelBounds(
     budget.remaining -= bounded.length;
     return { features: bounded, failed: false };
   } catch (error) {
-    if (depth >= 5) {
+    if (depth >= 2 || area <= 0.00002) {
       console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
       return { features: [], failed: true };
     }
