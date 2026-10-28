@@ -81,8 +81,9 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
       </div>
 
       <button
-        aria-label="Reopen talk to an expert"
-        className={showReopen ? "expert-reopen-btn visible" : "expert-reopen-btn"}
+        aria-label="Talk to an expert"
+        title="Talk to an expert"
+        className={showReopen ? "expert-reopen-btn expert-reopen-icon-btn visible" : "expert-reopen-btn expert-reopen-icon-btn"}
         onClick={reopenCard}
         type="button"
       >
@@ -99,7 +100,6 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
           <circle cx="9" cy="8" r="3.2" />
           <path d="M3.5 19c0-3 2.5-5.5 5.5-5.5s5.5 2.5 5.5 5.5" />
         </svg>
-        Talk to an expert
       </button>
     </>
   );

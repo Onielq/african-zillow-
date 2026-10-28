@@ -15,7 +15,7 @@ const BUGESERA_PARCELS =
 type AdminAreaLevel = "district" | "sector" | "cell" | "village";
 type AreaLevel = AdminAreaLevel | "parcel";
 type SourceId = "kigali" | "bugesera";
-type FieldMetadata = { name: string; alias?: string };
+type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
 type LayerQueryResponse = { features?: Array<{ attributes?: Record<string, unknown> }>; error?: { code?: number; message?: string } };
 
@@ -202,11 +202,64 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   });
 }
 
+function canonicalFullUpi(value: string): string | null {
+  const normalized = value.trim().replace(/\s*[/.-]\s*/g, "/");
+  return /^\d{1,2}(?:\/\d{1,2}){3}\/\d{1,7}$/.test(normalized) ? normalized : null;
+}
+
 async function searchParcels(source: SourceId, layerUrl: string, query: string): Promise<SearchArea[]> {
-  const escaped = query.replace(/'/g, "''");
+  const metadata = await getLayerMetadata(layerUrl);
+  const fields = metadata.fields ?? [];
+  const upiField = chooseField(fields, ["upi", "unique_parcel_identifier", "uniqueparcelidentifier"]);
+  const parcelNumberField = chooseField(fields, ["parcel_number", "parcelnumber", "parcel_no", "parcelno"]);
+  const parcelNumberMetadata = fields.find((field) => field.name === parcelNumberField);
+  const parcelNumberIsText = Boolean(parcelNumberMetadata?.type?.toLowerCase().includes("string"));
+  const fullUpi = canonicalFullUpi(query);
+  const normalizedQuery = query.trim().replace(/\s+/g, " ");
+  const escapedQuery = normalizedQuery.replace(/'/g, "''");
+  const conditions: string[] = [];
+
+  if (upiField) {
+    const upiLookup = (fullUpi ?? normalizedQuery).replace(/'/g, "''");
+    if (fullUpi) {
+      // Treat the complete five-part UPI as one parcel identity. Do not query
+      // the final segment as a parcel number, because parcel numbers can repeat by location.
+      conditions.push(upiField + " = '" + upiLookup + "'");
+      conditions.push(upiField + " LIKE '%" + upiLookup + "%'");
+    } else {
+      conditions.push(upiField + " LIKE '%" + escapedQuery + "%'");
+    }
+  }
+
+  // Official parcel layers may store parcel_number as numeric. SQL LIKE on a
+  // numeric field fails the whole ArcGIS query, even when UPI is also queried.
+  if (!fullUpi && parcelNumberField) {
+    if (parcelNumberIsText) {
+      conditions.push(parcelNumberField + " LIKE '%" + escapedQuery + "%'");
+    } else if (/^\d+(?:\.0+)?$/.test(normalizedQuery)) {
+      const numericParcelNumber = Number(normalizedQuery);
+      if (Number.isSafeInteger(numericParcelNumber)) {
+        conditions.push(parcelNumberField + " = " + String(numericParcelNumber));
+      }
+    }
+  }
+
+  if (!conditions.length) return [];
+
+  const fieldsToReturn = [
+    upiField,
+    chooseField(fields, ["province", "province_name"]),
+    chooseField(fields, ["district", "district_name"]),
+    chooseField(fields, ["sector", "sector_name"]),
+    chooseField(fields, ["cell", "cell_name"]),
+    chooseField(fields, ["village", "village_name"]),
+    parcelNumberField,
+    chooseField(fields, ["size", "parcel_size_m2", "area"]),
+    chooseField(fields, ["last_updated_on", "lastupdatedon"])
+  ].filter((field): field is string => Boolean(field));
   const params = new URLSearchParams({
-    where: "upi LIKE '%" + escaped + "%' OR parcel_number LIKE '%" + escaped + "%'",
-    outFields: "upi,province,district,sector,cell,village,parcel_number,size,last_updated_on",
+    where: "(" + conditions.join(" OR ") + ")",
+    outFields: Array.from(new Set(fieldsToReturn)).join(",") || "*",
     returnGeometry: "false",
     resultRecordCount: "25",
     f: "json"
@@ -222,9 +275,9 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
 
   return (payload.features ?? []).flatMap((feature, index) => {
     const attributes = feature.attributes ?? {};
-    const upi = value(attributes, ["upi"]);
+    const upi = value(attributes, ["upi", "unique_parcel_identifier", "uniqueparcelidentifier"]);
     const district = value(attributes, ["district", "district_name"]);
-    const parcelNumber = value(attributes, ["parcel_number", "parcelnumber"]);
+    const parcelNumber = value(attributes, ["parcel_number", "parcelnumber", "parcel_no", "parcelno"]);
     if (!upi || !district || !PILOT_DISTRICTS.has(normalizeKey(district))) return [];
     const sector = value(attributes, ["sector", "sector_name"]);
     const cell = value(attributes, ["cell", "cell_name"]);
@@ -259,7 +312,6 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
     }];
   });
 }
-
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (rawQuery.length < 2) {
@@ -268,6 +320,7 @@ export async function GET(request: NextRequest) {
     });
   }
   const query = rawQuery.slice(0, 80);
+  const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
     { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
@@ -293,7 +346,10 @@ export async function GET(request: NextRequest) {
     )
   ];
   const results = await Promise.all(tasks);
-  const areas = results.flatMap((result) => result.areas);
+  const allAreas = results.flatMap((result) => result.areas);
+  const areas = fullUpiQuery
+    ? allAreas.filter((area) => area.level === "parcel" && normalizeKey(area.upi ?? "") === normalizeKey(fullUpiQuery))
+    : allAreas;
   const deduplicated = new Map<string, SearchArea>();
   for (const area of areas) {
     const key = area.level === "parcel"

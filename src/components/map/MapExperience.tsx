@@ -988,9 +988,6 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
-          <Link className="compare-control" href="/data-sources">
-            Data sources
-          </Link>
           <Link className="compare-control" href="/contact">
             Contact
           </Link>
@@ -1068,20 +1065,24 @@ export function MapExperience() {
           </button>
         </div>
 
-        <div className="map-status-card">
+        <div className="map-status-card" aria-label="Map connection status">
           <span
-            aria-hidden="true"
+            aria-label={getBasemapLabel(basemapStatus)}
+            title={getBasemapLabel(basemapStatus)}
             className={`status-dot status-dot-${basemapStatus}`}
           />
-          <span aria-live="polite">{getBasemapLabel(basemapStatus)}</span>
-          <span className="status-divider" />
+          {basemapStatus !== "ready" ? (
+            <span aria-live="polite">{getBasemapLabel(basemapStatus)}</span>
+          ) : null}
+          <span className="status-divider" aria-hidden="true" />
           <span
-            aria-hidden="true"
+            aria-label={getBoundaryLabel(boundaryStatus)}
+            title={getBoundaryLabel(boundaryStatus)}
             className={`status-dot status-dot-${boundaryStatus}`}
           />
-          <span aria-live="polite" className="status-secondary">
-            {getBoundaryLabel(boundaryStatus)}
-          </span>
+          {boundaryStatus !== "ready" ? (
+            <span aria-live="polite" className="status-secondary">{getBoundaryLabel(boundaryStatus)}</span>
+          ) : null}
         </div>
 
         <div className="map-floating-toolbar" ref={toolbarRef}>
@@ -1152,35 +1153,29 @@ export function MapExperience() {
               Show <span aria-hidden="true">⌄</span>
             </button>
             <button
-              aria-expanded={sourcesOpen}
-              className={sourcesOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
+              aria-label="Sources and map information"
+              aria-expanded={sourcesOpen || metricInfoOpen}
+              title="Sources and map information"
+              className={sourcesOpen || metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
               onClick={() => {
                 setMetricsOpen(false);
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
-                setMetricInfoOpen(false);
                 setShowOpen(false);
-                setSourcesOpen((open) => !open);
+                if (sourcesOpen || metricInfoOpen) {
+                  setSourcesOpen(false);
+                  setMetricInfoOpen(false);
+                } else {
+                  setSourcesOpen(true);
+                  setMetricInfoOpen(false);
+                }
               }}
               type="button"
             >
-              Sources
-            </button>
-            <button
-              aria-label={workspaceMode === "projects" ? "Project mode information" : "Metric description for " + activeMetric.label}
-              aria-expanded={metricInfoOpen}
-              className={metricInfoOpen ? "toolbar-action toolbar-action-active metric-info-trigger" : "toolbar-action metric-info-trigger"}
-              onClick={() => {
-                setMetricsOpen(false);
-                setDevelopersOpen(false);
-                setProjectsOpen(false);
-                setSourcesOpen(false);
-                setShowOpen(false);
-                setMetricInfoOpen((open) => !open);
-              }}
-              type="button"
-            >
-              <span aria-hidden="true">i</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+                <path d="M1.8 10s3-5.2 8.2-5.2 8.2 5.2 8.2 5.2-3 5.2-8.2 5.2S1.8 10 1.8 10Z" stroke="currentColor" strokeWidth="1.45" strokeLinejoin="round" />
+                <circle cx="10" cy="10" r="2.35" stroke="currentColor" strokeWidth="1.45" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1340,101 +1335,65 @@ export function MapExperience() {
               <div>
                 <p className="panel-eyebrow">RWANDA REAL ESTATE DIRECTORY</p>
                 <h2>Developers &amp; agents</h2>
-                <p className="directory-drawer-subtitle">Public-source candidates to review — not a ranking or endorsement.</p>
               </div>
               <button aria-label="Close developer directory" className="panel-close" onClick={() => setDevelopersOpen(false)} type="button">×</button>
             </div>
             <div aria-label="Directory category" className="directory-tabs" role="tablist">
-              <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("developers")} role="tab" type="button">Developers <span>20</span></button>
-              <button aria-selected={directoryTab === "agencies"} className={directoryTab === "agencies" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agencies")} role="tab" type="button">Agencies <span>{RWANDA_REAL_ESTATE_AGENCIES.length}</span></button>
-              <button aria-selected={directoryTab === "agents"} className={directoryTab === "agents" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agents")} role="tab" type="button">Agents <span>{RWANDA_PUBLIC_AGENT_CANDIDATES.length}</span></button>
+              <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("developers")} role="tab" type="button">Developers</button>
+              <button aria-selected={directoryTab === "agencies"} className={directoryTab === "agencies" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agencies")} role="tab" type="button">Agencies</button>
+              <button aria-selected={directoryTab === "agents"} className={directoryTab === "agents" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => setDirectoryTab("agents")} role="tab" type="button">Agents</button>
             </div>
             {directoryTab === "developers" ? (
               <>
-                <div className="directory-summary">
-                  <strong>{RWANDA_DEVELOPER_CANDIDATES.length} organizations supplied</strong>
-                  <span>0 verified developer profiles</span>
-                </div>
                 <div className="directory-record-list" role="tabpanel">
-                  {RWANDA_DEVELOPER_CANDIDATES.map((candidate) => {
-                    const institutional = /Rwanda Housing Authority|Rwanda Social Security Board/.test(candidate.name);
-                    return (
-                      <article className="directory-record" key={candidate.id}>
-                        <div aria-label={candidate.logoUrl ? candidate.name + " logo" : "Organization initials; official logo not yet sourced"} className="directory-monogram">
-                          <span className="directory-logo-fallback">{initialsForName(candidate.name)}</span>
-                          {candidate.logoUrl ? (
-                            <img
-                              alt={candidate.name + " logo"}
-                              className="directory-logo-image"
-                              loading="lazy"
-                              onError={(event) => { event.currentTarget.style.display = "none"; }}
-                              src={candidate.logoUrl}
-                            />
-                          ) : null}
+                  {RWANDA_DEVELOPER_CANDIDATES.map((candidate) => (
+                    <article className="directory-record" key={candidate.id}>
+                      <div aria-label={candidate.logoUrl ? candidate.name + " logo" : "Organization initials"} className="directory-monogram">
+                        <span className="directory-logo-fallback">{initialsForName(candidate.name)}</span>
+                        {candidate.logoUrl ? (
+                          <img
+                            alt={candidate.name + " logo"}
+                            className="directory-logo-image"
+                            loading="lazy"
+                            onError={(event) => { event.currentTarget.style.display = "none"; }}
+                            src={candidate.logoUrl}
+                          />
+                        ) : null}
+                      </div>
+                      <div className="directory-record-copy">
+                        <div className="directory-record-title">
+                          <strong>{candidate.name}</strong>
                         </div>
-                        <div className="directory-record-copy">
-                          <div className="directory-record-title">
-                            <strong>{candidate.name}</strong>
-                            <span className="directory-status">{institutional ? "Public / institutional" : "Needs verification"}</span>
-                          </div>
-                          <p>{candidate.segment}</p>
-                          {candidate.website ? (
-                            <a href={candidate.website} rel="noreferrer" target="_blank">{candidate.website.replace(/^https?:\/\//, "").replace(/\/$/, "")} ↗</a>
-                          ) : (
-                            <span className="directory-no-source">Official website not yet sourced</span>
-                          )}
-                        </div>
-                      </article>
-                    );
-                  })}
+                      </div>
+                    </article>
+                  ))}
                 </div>
-                <p className="directory-disclaimer">Names and segments are retained from the supplied list. Public websites are discovery leads; affiliation, developer role, projects, logo rights and current contacts still need record-level verification.</p>
                 <Link className="directory-full-link" href="/developers">Open full developer directory ↗</Link>
               </>
             ) : null}
             {directoryTab === "agencies" ? (
-              <>
-                <div className="directory-summary">
-                  <strong>{RWANDA_REAL_ESTATE_AGENCIES.length} agency candidates found online</strong>
-                  <span>Source found · review pending</span>
-                </div>
-                <div className="directory-record-list" role="tabpanel">
-                  {RWANDA_REAL_ESTATE_AGENCIES.map((agency) => (
-                    <article className="directory-record" key={agency.id}>
-                      <div aria-label="Agency initials; official logo not yet checked" className="directory-monogram">{initialsForName(agency.name)}</div>
-                      <div className="directory-record-copy">
-                        <div className="directory-record-title"><strong>{agency.name}</strong><span className="directory-status">{agency.status}</span></div>
-                        <p>{agency.segment}</p>
-                        <a href={agency.website} rel="noreferrer" target="_blank">{agency.website.replace(/^https?:\/\//, "").replace(/\/$/, "")} ↗</a>
-                        <small>{agency.sourceLabel}</small>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <p className="directory-disclaimer">This is a sourced discovery list, not a quality ranking. Review current activity, registration, permissions and contact details before promoting an agency as verified.</p>
-              </>
+              <div className="directory-record-list" role="tabpanel">
+                {RWANDA_REAL_ESTATE_AGENCIES.map((agency) => (
+                  <article className="directory-record" key={agency.id}>
+                    <div aria-label="Agency initials" className="directory-monogram">{initialsForName(agency.name)}</div>
+                    <div className="directory-record-copy">
+                      <div className="directory-record-title"><strong>{agency.name}</strong></div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             ) : null}
             {directoryTab === "agents" ? (
-              <>
-                <div className="directory-summary">
-                  <strong>{RWANDA_PUBLIC_AGENT_CANDIDATES.length} publicly listed agent candidates</strong>
-                  <span>No “top agent” ranking published</span>
-                </div>
-                <div className="directory-record-list" role="tabpanel">
-                  {RWANDA_PUBLIC_AGENT_CANDIDATES.map((agent) => (
-                    <article className="directory-record" key={agent.id}>
-                      <div aria-label="Agent initials" className="directory-monogram">{initialsForName(agent.name)}</div>
-                      <div className="directory-record-copy">
-                        <div className="directory-record-title"><strong>{agent.name}</strong><span className="directory-status">{agent.status}</span></div>
-                        <p>{agent.segment} · {agent.agency}</p>
-                        <a href={agent.sourceUrl} rel="noreferrer" target="_blank">Open publishing agency profile ↗</a>
-                        <small>{agent.sourceLabel}</small>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <p className="directory-disclaimer">An agency page lists this person, but the current affiliation must be reconfirmed. The source does not provide a comparable performance ranking, so this directory does not call anyone “top.”</p>
-              </>
+              <div className="directory-record-list" role="tabpanel">
+                {RWANDA_PUBLIC_AGENT_CANDIDATES.map((agent) => (
+                  <article className="directory-record" key={agent.id}>
+                    <div aria-label="Agent initials" className="directory-monogram">{initialsForName(agent.name)}</div>
+                    <div className="directory-record-copy">
+                      <div className="directory-record-title"><strong>{agent.name}</strong></div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             ) : null}
           </aside>
         ) : null}
@@ -1475,6 +1434,10 @@ export function MapExperience() {
               {workspaceMode === "projects" ? "PROJECT MODE" : "METRIC DESCRIPTION"}
             </p>
             <h2>{workspaceMode === "projects" ? "Projects mode" : activeMetric.label}</h2>
+            <div className="info-panel-tabs" role="tablist" aria-label="Map information sections">
+              <button aria-selected={!metricInfoOpen} className={!metricInfoOpen ? "info-panel-tab info-panel-tab-active" : "info-panel-tab"} onClick={() => { setMetricInfoOpen(false); setSourcesOpen(true); }} role="tab" type="button">Sources</button>
+              <button aria-selected={metricInfoOpen} className={metricInfoOpen ? "info-panel-tab info-panel-tab-active" : "info-panel-tab"} onClick={() => { setSourcesOpen(false); setMetricInfoOpen(true); }} role="tab" type="button">Map info</button>
+            </div>
             <p className="metric-info-description">
               {workspaceMode === "projects"
                 ? "Project mode is ready for a verified project feed. This panel brings the map status and publication limits together in one place."
@@ -1620,6 +1583,15 @@ export function MapExperience() {
               ) : null}
             </div>
             {selectedArea.level === "parcel" ? (
+              <div className="parcel-price-headline" aria-label={displayedParcelPriceTypeLabel} title={displayedParcelPriceTypeLabel}>
+                <strong>
+                  {displayedParcelValue !== null
+                    ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(displayedParcelValue)
+                    : "Not available"}
+                </strong>
+              </div>
+            ) : null}
+            {selectedArea.level === "parcel" ? (
               <div className="parcel-details">
                 <div>
                   <span>Unique parcel identifier (UPI)</span>
@@ -1718,65 +1690,34 @@ export function MapExperience() {
                       : "Date not supplied"}
                   </strong>
                 </div>
-                <div className="parcel-estimate-card" aria-label={displayedParcelPriceTypeLabel}>
-                  <span>{displayedParcelPriceTypeLabel}</span>
+
+              </div>
+              <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
+                <div>
+                  <span>Average transaction price</span>
                   <strong>
-                    {displayedParcelValue !== null
-                      ? "RWF " + new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(displayedParcelValue)
+                    {parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined
+                      ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
                       : "Not available"}
                   </strong>
-                  {hasSourcedParcelPrice ? (
-                    <p>
-                      Source: {selectedArea.parcelPriceSource}
-                      {selectedArea.parcelPriceDate ? ` · Date: ${selectedArea.parcelPriceDate}` : ""}
-                    </p>
-                  ) : hasParcelUnitPriceOnly ? (
-                    <p>
-                      Parcel area is missing, so this shows the available average transaction price per m². Total asking price is parcel area × this rate.
-                    </p>
-                  ) : typeof selectedArea.parcelSizeM2 === "number" && parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined ? (
-                    <p>
-                      {selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. " : ""}{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m² × {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2)} RWF/m² average transaction-price snapshot
-                    </p>
-                  ) : null}
-                  {hasSourcedParcelPrice && selectedArea.parcelPriceNote ? (
-                    <p>{selectedArea.parcelPriceNote}</p>
-                  ) : null}
-                  <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
-                    <div>
-                      <span>Average transaction price</span>
-                      <strong>
-                        {parcelUnitPriceEstimate?.pricePerM2 !== null && parcelUnitPriceEstimate?.pricePerM2 !== undefined
-                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
-                          : "Not available"}
-                      </strong>
-                      <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used to calculate the parcel asking price."}</small>
-                    </div>
-                    <div>
-                      <span>Average reference price · district benchmark</span>
-                      <strong>
-                        {selectedDistrictPriceBenchmark
-                          ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedDistrictPriceBenchmark.averageReferencePricePerM2) + " RWF/m²"
-                          : "Not available"}
-                      </strong>
-                      <small>Separate official dashboard reference-price series.</small>
-                    </div>
-                    {estimatedReferenceBenchmark !== null ? (
-                      <div className="parcel-reference-total">
-                        <span>Reference-price benchmark for this area</span>
-                        <strong>RWF {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedReferenceBenchmark)}</strong>
-                        <small>Parcel area × district average reference price. Comparison only; it does not determine the headline estimate.</small>
-                      </div>
-                    ) : null}
-                  </div>
-                  <small>
-                    {hasSourcedParcelPrice
-                      ? "Shown as a " + displayedParcelPriceTypeLabel.toLowerCase() + " using the source recorded above."
-                      : hasParcelUnitPriceOnly
-                        ? (parcelUnitPriceEstimate?.explanation ?? "Using the currently connected average transaction-price snapshot.") + " The parcel total is calculated as parcel area × this price per m² when area is available."
-                        : (parcelUnitPriceEstimate?.explanation ?? "Uses the currently connected district transaction-price snapshot where finer-level data is missing.") + " Asking price is calculated as parcel area × the available average transaction price per m²."}
-                  </small>
+                  <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used to calculate the parcel asking price."}</small>
                 </div>
+                <div>
+                  <span>Average reference price · district benchmark</span>
+                  <strong>
+                    {selectedDistrictPriceBenchmark
+                      ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedDistrictPriceBenchmark.averageReferencePricePerM2) + " RWF/m²"
+                      : "Not available"}
+                  </strong>
+                  <small>Separate official dashboard reference-price series.</small>
+                </div>
+                {estimatedReferenceBenchmark !== null ? (
+                  <div className="parcel-reference-total">
+                    <span>Reference-price benchmark for this area</span>
+                    <strong>RWF {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(estimatedReferenceBenchmark)}</strong>
+                    <small>Parcel area × district average reference price. Comparison only; it does not determine the headline estimate.</small>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <>
@@ -2023,8 +1964,12 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">DATA REGISTER</p>
-            <h2>Market data sources</h2>
+            <p className="panel-eyebrow">MAP INFORMATION</p>
+            <h2>Sources &amp; map details</h2>
+            <div className="info-panel-tabs" role="tablist" aria-label="Map information sections">
+              <button aria-selected={!metricInfoOpen} className={!metricInfoOpen ? "info-panel-tab info-panel-tab-active" : "info-panel-tab"} onClick={() => { setMetricInfoOpen(false); setSourcesOpen(true); }} role="tab" type="button">Sources</button>
+              <button aria-selected={metricInfoOpen} className={metricInfoOpen ? "info-panel-tab info-panel-tab-active" : "info-panel-tab"} onClick={() => { setSourcesOpen(false); setMetricInfoOpen(true); }} role="tab" type="button">Map info</button>
+            </div>
             <div className="source-register-item">
               <span className="source-register-status source-register-connected" />
               <div>

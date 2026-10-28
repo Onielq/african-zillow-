@@ -575,8 +575,9 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Esri World Imagery is provided as raster tiles. Keep its required attribution
-// attached to the source so MapLibre's attribution control can display it.
+// Esri imagery plus the transparent World Transportation reference tiles.
+// Road strokes and available road names are layered over the photo. Cadastral
+// and administrative layers are added later and remain above the road overlay.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -590,6 +591,17 @@ const SATELLITE_STYLE: StyleSpecification = {
       maxzoom: 19,
       attribution:
         "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    },
+    "world-transportation": {
+      type: "raster",
+      tiles: [
+        "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+      ],
+      tileSize: 256,
+      minzoom: 0,
+      maxzoom: 19,
+      attribution:
+        "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     }
   },
   layers: [
@@ -597,6 +609,13 @@ const SATELLITE_STYLE: StyleSpecification = {
       id: "world-imagery",
       type: "raster",
       source: "world-imagery",
+      minzoom: 0,
+      maxzoom: 19
+    },
+    {
+      id: "world-transportation",
+      type: "raster",
+      source: "world-transportation",
       minzoom: 0,
       maxzoom: 19
     }

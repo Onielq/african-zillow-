@@ -3320,3 +3320,156 @@ input {
     transition: none;
   }
 }
+
+
+/* UI/UX refinement: names and values first, secondary prose removed from the map drawer. */
+.directory-drawer {
+  width: min(500px, calc(100% - 28px));
+}
+
+.directory-tabs {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.directory-tab {
+  min-height: 36px;
+  flex: 1 0 auto;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+.directory-tab span {
+  display: none;
+}
+
+.directory-record-list {
+  gap: 11px;
+  padding-top: 12px;
+}
+
+.directory-record {
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.directory-monogram {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+
+.directory-record-copy {
+  gap: 0;
+}
+
+.directory-record-title {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.directory-record-title strong {
+  flex: 1 1 auto;
+  color: #25352b;
+  font-size: 15px;
+  font-weight: 790;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.info-panel-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0 14px;
+  padding: 4px;
+  border: 1px solid #e2e9e4;
+  border-radius: 11px;
+  background: #f7faf8;
+}
+
+.info-panel-tab {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #65756a;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.info-panel-tab-active {
+  border-color: #d3e4d9;
+  background: #e8f3eb;
+  color: #176b50;
+}
+
+.parcel-price-headline {
+  min-width: 0;
+  margin: 10px 0 14px;
+}
+
+.parcel-price-headline strong {
+  display: block;
+  color: #153f2c;
+  font-size: clamp(29px, 3.2vw, 37px);
+  font-weight: 880;
+  line-height: 1.12;
+  letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.parcel-valuation-comparison {
+  margin-top: 12px;
+}
+
+.expert-reopen-icon-btn {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  border-radius: 18px;
+}
+
+.expert-reopen-icon-btn svg {
+  width: 25px;
+  height: 25px;
+}
+
+@media (max-width: 720px) {
+  .directory-drawer {
+    width: calc(100% - 20px);
+  }
+
+  .directory-record {
+    grid-template-columns: 52px minmax(0, 1fr);
+    min-height: 82px;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .directory-monogram {
+    width: 52px;
+    height: 52px;
+  }
+
+  .directory-record-title strong {
+    font-size: 14px;
+  }
+
+  .expert-reopen-icon-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+  }
+}
