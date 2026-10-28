@@ -704,44 +704,86 @@ function uniqueUpiFeatures(features: UpstreamFeature[]): UpstreamFeature[] {
 async function queryParcelBounds(
   provider: ParcelProvider,
   bounds: Bounds,
-  depth = 0
+  depth = 0,
+  budget: { remaining: number } = { remaining: 12_000 }
 ): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
-  if (!boundsIntersect(bounds, provider.extent)) return { features: [], failed: false };
-  const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
-  const splitForSize = area > 0.01 && depth < 2;
-
-  if (!splitForSize) {
-    try {
-      const features = await queryArcGisLayer(
-        provider.layerUrl, bounds, 2000, "upi IS NOT NULL",
-        "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on", 180
-      );
-      if (features.length < 1900 || depth >= 4) return { features, failed: false };
-
-      const childResults = await Promise.all(
-        splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent))
-          .map((child) => queryParcelBounds(provider, child, depth + 1))
-      );
-      return {
-        features: uniqueUpiFeatures([...features, ...childResults.flatMap((child) => child.features)]),
-        failed: features.length === 0 && childResults.every((child) => child.failed)
-      };
-    } catch (error) {
-      if (depth >= 4) {
-        console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
-        return { features: [], failed: true };
-      }
-    }
+  if (!boundsIntersect(bounds, provider.extent) || budget.remaining <= 0) {
+    return { features: [], failed: false };
   }
 
-  const childResults = await Promise.all(
-    splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent))
-      .map((child) => queryParcelBounds(provider, child, depth + 1))
-  );
-  return {
-    features: uniqueUpiFeatures(childResults.flatMap((child) => child.features)),
-    failed: childResults.length > 0 && childResults.every((child) => child.failed)
-  };
+  const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
+  const splitBounds = splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent));
+
+  // Do not load a whole-district parcel payload into one serverless request.
+  // Query smaller geographic tiles sequentially and stop after a bounded batch.
+  const splitBeforeQuery = area > 0.01 && depth < 2;
+  if (splitBeforeQuery) {
+    const collected: UpstreamFeature[] = [];
+    let allFailed = true;
+    for (const child of splitBounds) {
+      if (budget.remaining <= 0) break;
+      const result = await queryParcelBounds(provider, child, depth + 1, budget);
+      if (!result.failed) allFailed = false;
+      collected.push(...result.features);
+    }
+    return { features: uniqueUpiFeatures(collected), failed: allFailed && collected.length === 0 };
+  }
+
+  try {
+    const features = await queryArcGisLayer(
+      provider.layerUrl,
+      bounds,
+      2000,
+      "upi IS NOT NULL",
+      "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+      180
+    );
+
+    // A very dense tile may still contain thousands of records. Subdivide it,
+    // drop the oversized parent response, and keep only the smaller children.
+    if (features.length >= 1900 && depth < 4 && splitBounds.length > 0) {
+      const collected: UpstreamFeature[] = [];
+      let anyChildSucceeded = false;
+      for (const child of splitBounds) {
+        if (budget.remaining <= 0) break;
+        const result = await queryParcelBounds(provider, child, depth + 1, budget);
+        if (!result.failed) anyChildSucceeded = true;
+        collected.push(...result.features);
+      }
+
+      if (collected.length > 0 || anyChildSucceeded) {
+        return { features: uniqueUpiFeatures(collected), failed: false };
+      }
+
+      // If the source only answers the parent tile, retain a bounded fallback
+      // instead of losing all map lines.
+      const fallback = features.slice(0, budget.remaining);
+      budget.remaining -= fallback.length;
+      return { features: fallback, failed: fallback.length === 0 };
+    }
+
+    const bounded = features.slice(0, budget.remaining);
+    budget.remaining -= bounded.length;
+    return { features: bounded, failed: false };
+  } catch (error) {
+    if (depth >= 4) {
+      console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
+      return { features: [], failed: true };
+    }
+
+    let anyChildSucceeded = false;
+    const collected: UpstreamFeature[] = [];
+    for (const child of splitBounds) {
+      if (budget.remaining <= 0) break;
+      const result = await queryParcelBounds(provider, child, depth + 1, budget);
+      if (!result.failed) anyChildSucceeded = true;
+      collected.push(...result.features);
+    }
+    return {
+      features: uniqueUpiFeatures(collected),
+      failed: !anyChildSucceeded && collected.length === 0
+    };
+  }
 }
 
 async function getParcels(
@@ -777,10 +819,13 @@ async function getParcels(
     });
   }
 
-  const results = await Promise.all(providers.map(async (provider) => {
-    const result = await queryParcelBounds(provider, bounds);
-    return { provider, upstreamFeatures: result.features, failed: result.failed };
-  }));
+  const parcelBudget = { remaining: 12_000 };
+  const results = [];
+  for (const provider of providers) {
+    if (parcelBudget.remaining <= 0) break;
+    const result = await queryParcelBounds(provider, bounds, 0, parcelBudget);
+    results.push({ provider, upstreamFeatures: result.features, failed: result.failed });
+  }
 
   if (results.every((result) => result.failed)) {
     return NextResponse.json(
