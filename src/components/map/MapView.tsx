@@ -121,6 +121,8 @@ export type SelectedArea = {
   wetlandAreaM2?: number | null;
   lastUpdatedOn?: number | null;
   bounds?: [number, number, number, number] | null;
+  /** Bounding-box center used as a routing start point; the routing engine snaps to the road graph. */
+  center?: [number, number] | null;
   parcelMarketStatus?: PropertyMarketStatus | null;
   parcelMarketStatusSource?: "source" | null;
   zoning?: ParcelZoningEntry[] | null;
@@ -912,7 +914,11 @@ function featureToArea(
     parcelPriceNote: properties.parcel_price_note ?? null,
     wetlandAreaM2: properties.wetland_area_m2 ?? null,
     lastUpdatedOn: properties.last_updated_on ?? null,
-    bounds: featureBounds(feature)
+    bounds: featureBounds(feature),
+    center: (() => {
+      const box = featureBounds(feature);
+      return box ? [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2] as [number, number] : null;
+    })()
   };
 }
 

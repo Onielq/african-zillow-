@@ -96,6 +96,23 @@ type ComparisonItem = SelectedArea & {
 type AreaSearchResult = SelectedArea & { id: string };
 type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string; browse?: boolean; nextOffset?: number; hasMore?: boolean };
 type ComparisonZoningResponse = { status?: "found" | "not-covered"; zones?: Array<{ code: string | null; name: string }>; error?: string };
+type NearbyAccessCategory = "School" | "Clinic / hospital" | "Public transport";
+type NearbyAccessItem = {
+  id: string;
+  category: NearbyAccessCategory;
+  name: string;
+  distanceKm: number | null;
+  timeMinutes: number | null;
+  routeStatus: "routed" | "unavailable";
+};
+type NearbyAccessResponse = {
+  status: "ready" | "error";
+  items: NearbyAccessItem[];
+  source: string;
+  note: string;
+  message?: string;
+};
+type NearbyAccessState = NearbyAccessResponse | { status: "loading"; items: []; source: string; note: string } | null;
 type TransactionEstimateResponse = {
   estimate: number | null;
   status: "reported-current-month-unverified" | "historical-monthly-baseline" | "parcel-share-model" | "unavailable";
@@ -546,6 +563,7 @@ export function MapExperience() {
   const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
+  const [nearbyAccess, setNearbyAccess] = useState<NearbyAccessState>(null);
   const [compareProjectName, setCompareProjectName] = useState("");
   const [compareProjectUrl, setCompareProjectUrl] = useState("");
   const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
@@ -718,7 +736,28 @@ export function MapExperience() {
   const comparisonPrices = comparisonUnitPrices
     .filter(({ estimate }) => estimate.pricePerM2 !== null)
     .map(({ estimate }) => estimate.pricePerM2 as number);
-  const highestComparisonPrice = comparisonPrices.length > 1 ? Math.max(...comparisonPrices) : null;
+  const lowestComparisonPrice = comparisonPrices.length > 1 ? Math.min(...comparisonPrices) : null;
+  const comparisonParcelAskingPrices = comparedAreas.map((area) => {
+    if (area.comparisonKind === "project" || area.level !== "parcel") {
+      return { key: comparisonItemKey(area), area, askingPrice: null as number | null };
+    }
+    const suppliedPrice = isParcelPriceType(area.parcelPriceType) &&
+      typeof area.parcelPriceValue === "number" &&
+      Number.isFinite(area.parcelPriceValue) &&
+      area.parcelPriceValue > 0 &&
+      Boolean(area.parcelPriceSource?.trim());
+    const unitEstimate = getUnitPriceEstimate(landPriceRows, area, true);
+    const askingPrice = suppliedPrice
+      ? area.parcelPriceValue!
+      : calculateParcelAskingPrice(area.parcelSizeM2, unitEstimate.pricePerM2);
+    return { key: comparisonItemKey(area), area, askingPrice };
+  });
+  const comparableAskingPrices = comparisonParcelAskingPrices
+    .map((item) => item.askingPrice)
+    .filter((price): price is number => price !== null && Number.isFinite(price) && price > 0);
+  const lowestComparisonAskingPrice = comparableAskingPrices.length > 1
+    ? Math.min(...comparableAskingPrices)
+    : null;
   const comparisonParcelAreas = comparedAreas
     .filter((area) => area.comparisonKind !== "project" && area.level === "parcel" &&
       typeof area.parcelSizeM2 === "number" && Number.isFinite(area.parcelSizeM2) && area.parcelSizeM2 > 0)
@@ -765,6 +804,47 @@ export function MapExperience() {
     selectedDistrictPriceBenchmark
       ? Math.round(selectedArea.parcelSizeM2 * selectedDistrictPriceBenchmark.averageReferencePricePerM2)
       : null;
+
+  useEffect(() => {
+    const area = selectedArea;
+    if (!area || area.level !== "parcel" || !area.center) {
+      setNearbyAccess(null);
+      return;
+    }
+    const controller = new AbortController();
+    setNearbyAccess({
+      status: "loading",
+      items: [],
+      source: "Valhalla · OpenStreetMap road graph",
+      note: "Estimated road routes; not live traffic."
+    });
+    const params = new URLSearchParams({
+      lat: String(area.center[1]),
+      lon: String(area.center[0]),
+      district: area.district
+    });
+    fetch("/api/geography/nearby-access?" + params.toString(), { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json() as NearbyAccessResponse;
+        if (!response.ok) throw new Error(payload.message ?? "Road access estimates are unavailable.");
+        if (!controller.signal.aborted) setNearbyAccess(payload);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setNearbyAccess({
+          status: "error",
+          items: [],
+          source: "Valhalla · OpenStreetMap road graph",
+          note: "Road-route estimates are not available for this parcel right now."
+        });
+      });
+    return () => controller.abort();
+  }, [
+    selectedArea?.level,
+    selectedArea?.upi,
+    selectedArea?.center?.[0],
+    selectedArea?.center?.[1],
+    selectedArea?.district
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -1676,6 +1756,28 @@ export function MapExperience() {
               </div>
             ) : null}
             {selectedArea.level === "parcel" ? (
+              <div className="parcel-confidence-strip" aria-label="Parcel data confidence">
+                <span
+                  className={selectedArea.sourceType === "cadastral-parcel" && selectedArea.upi ? "confidence-chip confidence-chip-record" : "confidence-chip confidence-chip-missing"}
+                  title="A cadastral record match identifies this mapped parcel; it is not proof of current legal title or ownership."
+                >
+                  {selectedArea.sourceType === "cadastral-parcel" && selectedArea.upi ? "Cadastral match" : "Record incomplete"}
+                </span>
+                <span
+                  className={hasSourcedParcelPrice ? "confidence-chip confidence-chip-record" : displayedParcelValue !== null ? "confidence-chip confidence-chip-estimate" : "confidence-chip confidence-chip-missing"}
+                  title={hasSourcedParcelPrice ? "A named price source supplied this value." : displayedParcelValue !== null ? "This amount is calculated from parcel area and an available area-level price benchmark." : "No defensible parcel price can be calculated from available data."}
+                >
+                  {hasSourcedParcelPrice ? "Price sourced" : displayedParcelValue !== null ? "Price estimated" : hasParcelUnitPriceOnly ? "Rate only" : "Price missing"}
+                </span>
+                {selectedArea.sourceLabel?.toLowerCase().includes("reuse permission pending") ? (
+                  <span className="confidence-chip confidence-chip-unverified" title="The source's reuse terms, completeness and current survey accuracy have not been confirmed.">Coverage unverified</span>
+                ) : null}
+                {selectedArea.zoningStatus === "not-covered" ? (
+                  <span className="confidence-chip confidence-chip-missing">Zoning not mapped</span>
+                ) : null}
+              </div>
+            ) : null}
+            {selectedArea.level === "parcel" ? (
               <>
               <div className="parcel-details">
                 <div>
@@ -1804,6 +1906,36 @@ export function MapExperience() {
                   </div>
                 ) : null}
               </div>
+              <section className="parcel-access-panel" aria-label="Nearby road access">
+                <div className="parcel-access-heading">
+                  <strong>Location access</strong>
+                  <span>By road</span>
+                </div>
+                {nearbyAccess?.status === "loading" ? (
+                  <p className="parcel-access-message" role="status">Checking nearby schools, clinics and transport…</p>
+                ) : nearbyAccess?.status === "error" ? (
+                  <p className="parcel-access-message" role="status">Road travel estimates are unavailable right now.</p>
+                ) : nearbyAccess?.items.length ? (
+                  <ul className="parcel-access-list">
+                    {nearbyAccess.items.map((item) => (
+                      <li key={item.id}>
+                        <span className="parcel-access-category">{item.category}</span>
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.routeStatus === "routed" && item.distanceKm !== null && item.timeMinutes !== null
+                            ? `${item.distanceKm < 1 ? item.distanceKm.toFixed(2) : item.distanceKm.toFixed(1)} km · about ${Math.max(1, Math.round(item.timeMinutes))} min`
+                            : "Road route unavailable"}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="parcel-access-message" role="status">No mapped schools, clinics or transport stops found nearby.</p>
+                )}
+                <small className="parcel-access-note">
+                  {nearbyAccess?.note ?? "Estimated drive times · OSM amenity coverage may be incomplete."}
+                </small>
+              </section>
               </>
             ) : (
               <>
@@ -2372,6 +2504,25 @@ export function MapExperience() {
                     <tbody>
                       {comparedAreas.some((area) => area.comparisonKind !== "project" && area.level === "parcel") ? (
                         <>
+                          <tr key="parcel-asking-price">
+                            <th scope="row">Asking price</th>
+                            {comparedAreas.map((area) => {
+                              const item = comparisonParcelAskingPrices.find((entry) => entry.key === comparisonItemKey(area));
+                              const price = item?.askingPrice ?? null;
+                              const isLowestAsk = price !== null && lowestComparisonAskingPrice !== null && price === lowestComparisonAskingPrice;
+                              return <td key={"parcel-asking-price-" + comparisonItemKey(area)}>
+                                {area.comparisonKind === "project" ? <span>No verified project data</span>
+                                : area.level !== "parcel" ? <span>Not a parcel</span>
+                                : price !== null ? (
+                                  <div className="comparison-price-cell">
+                                    <span>RWF {new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(price)}</span>
+                                    {isLowestAsk ? <span className="comparison-row-leader" aria-label="Lowest comparable asking price"><span aria-hidden="true">★</span> Lowest ask</span> : null}
+                                    {item?.area.parcelPriceSource ? <small>Source-supplied price</small> : <small>Estimated from area × price/m²</small>}
+                                  </div>
+                                ) : <span>Price unavailable</span>}
+                              </td>;
+                            })}
+                          </tr>
                           <tr key="parcel-area">
                             <th scope="row">Parcel area (m²)</th>
                             {comparedAreas.map((area) => {
@@ -2414,7 +2565,7 @@ export function MapExperience() {
                             const unitPrice = area.comparisonKind === "project" ? null : getUnitPriceEstimate(landPriceRows, area);
                             const landPrice = metric.id === "averageLandPricePerM2" ? unitPrice?.pricePerM2 ?? null : null;
                             const transaction = area.transactionEstimate;
-                            const isPriceLeader = landPrice !== null && highestComparisonPrice !== null && landPrice === highestComparisonPrice;
+                            const isPriceLeader = landPrice !== null && lowestComparisonPrice !== null && landPrice === lowestComparisonPrice;
                             return (
                               <td key={metric.id + "-" + key}>
                                 {metric.id === "averageLandPricePerM2" ? (
@@ -2422,8 +2573,8 @@ export function MapExperience() {
                                     <div className="comparison-price-cell">
                                       <span>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(landPrice)} RWF/m²</span>
                                       {isPriceLeader ? (
-                                        <span className="comparison-row-leader" aria-label="Highest comparable supplied price">
-                                          <span aria-hidden="true">★</span> Highest supplied
+                                        <span className="comparison-row-leader" aria-label="Lowest comparable price per square metre">
+                                          <span aria-hidden="true">★</span> Lowest RWF/m²
                                         </span>
                                       ) : null}
                                       <small>{unitPrice?.explanation}</small>

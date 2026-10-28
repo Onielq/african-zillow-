@@ -3485,3 +3485,57 @@ input {
   font-weight: 700;
   line-height: 1;
 }
+
+
+/* Market-study details: compact confidence chips and road-based amenity estimates. */
+.parcel-confidence-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 1px 0 10px;
+}
+.confidence-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid #dce7df;
+  border-radius: 6px;
+  color: #53685a;
+  background: #f8faf8;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.confidence-chip-record { border-color: #d4e7da; color: #286548; background: #eff8f1; }
+.confidence-chip-estimate { border-color: #f0dfb2; color: #785d1e; background: #fff9e9; }
+.confidence-chip-missing { border-color: #ecd8d8; color: #93424a; background: #fff5f5; }
+.confidence-chip-unverified { border-color: #ecd9b5; color: #795822; background: #fff9ee; }
+.parcel-access-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid #e2e9e4;
+  border-radius: 11px;
+  background: #fbfcfb;
+}
+.parcel-access-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.parcel-access-heading strong { color: #293c30; font-size: 11px; font-weight: 800; }
+.parcel-access-heading > span { color: #728077; font-size: 9px; font-weight: 700; }
+.parcel-access-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.parcel-access-list li {
+  display: grid;
+  grid-template-columns: minmax(78px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.parcel-access-category { color: #758279; font-size: 9px; font-weight: 750; }
+.parcel-access-list li strong { min-width: 0; color: #34463a; font-size: 10px; font-weight: 700; overflow-wrap: anywhere; }
+.parcel-access-list li small { color: #286548; font-size: 9px; font-weight: 750; text-align: right; white-space: nowrap; }
+.parcel-access-message, .parcel-access-note { margin: 0; color: #78857c; font-size: 9px; line-height: 1.4; }
+@media (max-width: 460px) {
+  .parcel-access-list li { grid-template-columns: minmax(70px, auto) minmax(0, 1fr); }
+  .parcel-access-list li small { grid-column: 2; text-align: left; }
+}
