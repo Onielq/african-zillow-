@@ -5,6 +5,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY package*.json ./
 COPY scripts ./scripts
+# postinstall generates a runtime-safe snapshot from this source TSV.
+COPY public/land-price-transaction.tsv ./public/land-price-transaction.tsv
 RUN npm install --no-audit --no-fund
 
 FROM base AS builder
