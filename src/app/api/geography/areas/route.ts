@@ -633,17 +633,20 @@ async function queryAdministrativeLayerResilient(
   depth = 0
 ): Promise<UpstreamFeature[]> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // Only the original viewport gets a retry. Once subdivided, each child gets
+  // one bounded request; this caps a fully failed lookup at 22 GIS calls.
+  const maxAttempts = depth === 0 ? 2 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       return await queryArcGisLayer(layerUrl, bounds, undefined, "1=1", "*", 3_600, 8_000);
     } catch (error) {
       lastError = error;
-      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 150));
+      if (attempt + 1 < maxAttempts) await new Promise((resolve) => setTimeout(resolve, 150));
     }
   }
 
   const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
-  if (depth >= 3 || area <= 0.0005) {
+  if (depth >= 2 || area <= 0.00002) {
     throw lastError instanceof Error ? lastError : new Error("Administrative map data is temporarily unavailable.");
   }
 
