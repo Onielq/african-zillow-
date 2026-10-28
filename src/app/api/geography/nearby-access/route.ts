@@ -16,7 +16,7 @@ type NearbyCategory = "School" | "Clinic / hospital" | "Public transport";
 type Candidate = { id: string; name: string; category: NearbyCategory; lat: number; lon: number; straightKm: number };
 type RouteResult = { id: string; category: NearbyCategory; name: string; distanceKm: number | null; timeMinutes: number | null; routeStatus: "routed" | "unavailable" };
 type ValhallaResponse = {
-  trip?: { status?: number; status_message?: string; summary?: { length?: number; time?: number }; legs?: Array<{ summary?: { length?: number; time?: number }> } };
+  trip?: { status?: number; status_message?: string; summary?: { length?: number; time?: number }; legs?: Array<{ summary?: { length?: number; time?: number } }> };
   error?: string;
   error_code?: number;
 };
