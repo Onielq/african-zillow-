@@ -436,6 +436,7 @@ async function queryArcGisLayer(
   const params = new URLSearchParams({
     where,
     outFields,
+    outSR: "4326",
     returnGeometry: "true",
     f: "json"
   });
