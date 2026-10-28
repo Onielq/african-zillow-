@@ -108,6 +108,7 @@ export type SelectedArea = {
   averageLandPriceConflictingCells?: number | null;
   sourceLabel?: string | null;
   sourceType?: "administrative-boundary" | "cadastral-parcel";
+  developerName?: string | null;
   upi?: string | null;
   parcelNumber?: string | null;
   parcelSizeM2?: number | null;
@@ -143,6 +144,8 @@ type AreaProperties = {
   average_land_price_date_status?: string | null;
   source_label?: string | null;
   source_type?: string | null;
+  developer_name?: string | null;
+  developerName?: string | null;
   upi?: string | null;
   parcel_number?: string | null;
   parcel_size_m2?: number | null;
@@ -883,6 +886,7 @@ function featureToArea(
     sourceType: properties.source_type === "cadastral-parcel"
       ? "cadastral-parcel"
       : "administrative-boundary",
+    developerName: properties.developer_name ?? properties.developerName ?? null,
     upi: properties.upi ?? null,
     parcelNumber: properties.parcel_number ?? null,
     parcelSizeM2:
@@ -1916,6 +1920,15 @@ export function MapView({
 
       if (!response.ok) {
         recordE2ETrace("area-api-failure", { level, adminSource, status: response.status });
+        if (cached && boundsIntersect(cached.bounds, queryBounds)) {
+          recordE2ETrace("area-api-cache-fallback", {
+            level,
+            adminSource,
+            status: response.status,
+            cachedFeatureCount: cached.data.features?.length ?? 0
+          });
+          return cached.data;
+        }
         throw new Error(`Administrative boundary request failed (${response.status})`);
       }
 
