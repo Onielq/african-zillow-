@@ -1002,6 +1002,7 @@ export function MapExperience() {
             onClick={() => {
               setSourcesOpen(false);
               setMetricInfoOpen(false);
+              setParcelCompareOpen(false);
               setCompareOpen((open) => !open);
             }}
             type="button"
