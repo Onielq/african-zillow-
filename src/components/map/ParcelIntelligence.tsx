@@ -48,6 +48,7 @@ type Props = {
   priceStatus: PriceStatus;
   comparisonItems: ParcelComparisonItem[];
   onAddToComparison: (item: ParcelComparisonItem) => void;
+  onUpdateComparison: (item: ParcelComparisonItem) => void;
 };
 
 type OSMFeature = {
@@ -148,7 +149,8 @@ export function ParcelIntelligenceInline({
   pricePerM2,
   priceStatus,
   comparisonItems,
-  onAddToComparison
+  onAddToComparison,
+  onUpdateComparison
 }: Props) {
   const [access, setAccess] = useState<AccessState>({ status: "idle", places: [] });
   const identity = parcelIdentity(selectedArea);
@@ -184,6 +186,26 @@ export function ParcelIntelligenceInline({
     sourceLabel: selectedArea.sourceLabel ?? null,
     coverageStatus
   };
+
+  useEffect(() => {
+    if (alreadyAdded) onUpdateComparison(comparisonItem);
+  }, [
+    alreadyAdded,
+    comparisonItem.id,
+    comparisonItem.name,
+    comparisonItem.district,
+    comparisonItem.locationLabel,
+    comparisonItem.askingPrice,
+    comparisonItem.pricePerM2,
+    comparisonItem.areaM2,
+    comparisonItem.areaIsEstimate,
+    comparisonItem.zoning,
+    comparisonItem.zoningStatus,
+    comparisonItem.priceStatus,
+    comparisonItem.sourceLabel,
+    comparisonItem.coverageStatus,
+    onUpdateComparison
+  ]);
 
   const bounds = selectedArea.bounds;
   const latitude = bounds ? (bounds[1] + bounds[3]) / 2 : null;
