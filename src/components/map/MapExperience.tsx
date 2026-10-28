@@ -1592,6 +1592,7 @@ export function MapExperience() {
               </div>
             ) : null}
             {selectedArea.level === "parcel" ? (
+              <>
               <div className="parcel-details">
                 <div>
                   <span>Unique parcel identifier (UPI)</span>
@@ -1719,6 +1720,7 @@ export function MapExperience() {
                   </div>
                 ) : null}
               </div>
+              </>
             ) : (
               <>
                 <div aria-label="Selected area market metrics" className="area-market-grid">
