@@ -596,8 +596,10 @@ const SATELLITE_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 19 },
-    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 19, paint: { "raster-opacity": 0.48 } }
+    // Keep these layers visible at parcel zoom; MapLibre overzooms the source's
+    // z19 raster tiles at closer zoom levels rather than hiding them.
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
+    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24, paint: { "raster-opacity": 0.48 } }
   ]
 };
 
@@ -618,8 +620,10 @@ const HYBRID_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 19 },
-    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 19 }
+    // Keep hybrid imagery and road references visible above z19 by overzooming
+    // their last available raster tiles at individual-parcel scale.
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
+    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24 }
   ]
 };
 

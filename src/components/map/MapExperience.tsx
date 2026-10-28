@@ -1635,9 +1635,15 @@ export function MapExperience() {
             >
               ×
             </button>
-            <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
+            {selectedArea.level !== "parcel" ? (
+              <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
+            ) : null}
             <div className="selected-area-title-row">
-              <h2>{selectedArea.name}</h2>
+              {selectedArea.level === "parcel" ? (
+                <span className="parcel-asking-label">Asking price</span>
+              ) : (
+                <h2>{selectedArea.name}</h2>
+              )}
               {selectedArea.level === "parcel" ? (
                 selectedArea.parcelMarketStatus ? (
                   <span
