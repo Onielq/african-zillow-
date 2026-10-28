@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SelectedArea } from "@/components/map/MapView";
 import styles from "./ParcelIntelligence.module.css";
 
@@ -171,7 +171,7 @@ export function ParcelIntelligenceInline({
   if (areaM2 === null) missing.push("parcel area");
   if (zoning.status !== "mapped") missing.push("mapped zoning");
 
-  const comparisonItem: ParcelComparisonItem = {
+  const comparisonItem = useMemo<ParcelComparisonItem>(() => ({
     id: identity,
     name: selectedArea.name,
     district: selectedArea.district,
@@ -185,27 +185,25 @@ export function ParcelIntelligenceInline({
     priceStatus,
     sourceLabel: selectedArea.sourceLabel ?? null,
     coverageStatus
-  };
+  }), [
+    identity,
+    selectedArea.name,
+    selectedArea.district,
+    selectedArea.parcelSizeSource,
+    selectedArea.sourceLabel,
+    locationLabel,
+    askingPrice,
+    pricePerM2,
+    areaM2,
+    zoning.label,
+    zoning.status,
+    priceStatus,
+    coverageStatus
+  ]);
 
   useEffect(() => {
     if (alreadyAdded) onUpdateComparison(comparisonItem);
-  }, [
-    alreadyAdded,
-    comparisonItem.id,
-    comparisonItem.name,
-    comparisonItem.district,
-    comparisonItem.locationLabel,
-    comparisonItem.askingPrice,
-    comparisonItem.pricePerM2,
-    comparisonItem.areaM2,
-    comparisonItem.areaIsEstimate,
-    comparisonItem.zoning,
-    comparisonItem.zoningStatus,
-    comparisonItem.priceStatus,
-    comparisonItem.sourceLabel,
-    comparisonItem.coverageStatus,
-    onUpdateComparison
-  ]);
+  }, [alreadyAdded, comparisonItem, onUpdateComparison]);
 
   const bounds = selectedArea.bounds;
   const latitude = bounds ? (bounds[1] + bounds[3]) / 2 : null;
