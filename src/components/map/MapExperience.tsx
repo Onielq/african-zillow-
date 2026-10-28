@@ -1100,9 +1100,11 @@ export function MapExperience() {
 
         <div className="map-vignette" aria-hidden="true" />
 
-        <TalkToExpert developerName="Taiseel Development"
+        <TalkToExpert
+          developerName={selectedArea?.level === "parcel" ? selectedArea.developerName?.trim() || "Taiseel Development" : "Taiseel Development"}
           parcelUpi={selectedArea?.level === "parcel" ? selectedArea.upi : null}
-          visible={selectedArea?.level === "parcel"} />
+          visible={selectedArea?.level === "parcel"}
+        />
 
         <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
