@@ -33,6 +33,11 @@ import {
   TRANSACTION_DASHBOARD_SOURCE
 } from "@/data/transaction-benchmarks";
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
+import {
+  ParcelComparisonPanel,
+  ParcelIntelligenceInline,
+  type ParcelComparisonItem
+} from "@/components/map/ParcelIntelligence";
 
 type WorkspaceMode = "areas" | "projects";
 
@@ -539,6 +544,8 @@ export function MapExperience() {
   const [comparisonSearchResults, setComparisonSearchResults] = useState<AreaSearchResult[]>([]);
   const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
+  const [parcelComparisonItems, setParcelComparisonItems] = useState<ParcelComparisonItem[]>([]);
+  const [parcelCompareOpen, setParcelCompareOpen] = useState(false);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
   const [compareProjectName, setCompareProjectName] = useState("");
   const [compareProjectUrl, setCompareProjectUrl] = useState("");
@@ -555,6 +562,18 @@ export function MapExperience() {
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
+
+  const handleAddParcelToComparison = useCallback((item: ParcelComparisonItem) => {
+    setParcelComparisonItems((current) => {
+      if (current.some((saved) => saved.id === item.id) || current.length >= 4) return current;
+      return [...current, item];
+    });
+    setParcelCompareOpen(true);
+  }, []);
+
+  const handleRemoveParcelFromComparison = useCallback((id: string) => {
+    setParcelComparisonItems((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const handleMapReady = useCallback(
     (map: MapLibreMapInstance | null) => setMapInstance(map),
@@ -916,11 +935,15 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !selectedArea) return;
+    if (!compareOpen && !parcelCompareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !selectedArea) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
 
       // Close the topmost interaction first, leaving the selected map area intact.
+      if (parcelCompareOpen) {
+        setParcelCompareOpen(false);
+        return;
+      }
       if (compareOpen) {
         setCompareOpen(false);
         return;
@@ -938,7 +961,7 @@ export function MapExperience() {
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, selectedArea]);
+  }, [compareOpen, parcelCompareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, selectedArea]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -988,6 +1011,19 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
+          {parcelComparisonItems.length > 0 ? (
+            <button
+              aria-expanded={parcelCompareOpen}
+              className="compare-control"
+              onClick={() => {
+                setCompareOpen(false);
+                setParcelCompareOpen((open) => !open);
+              }}
+              type="button"
+            >
+              Parcels · {parcelComparisonItems.length}
+            </button>
+          ) : null}
           <Link className="compare-control" href="/data-sources">
             Data sources
           </Link>
@@ -1777,6 +1813,31 @@ export function MapExperience() {
                         : (parcelUnitPriceEstimate?.explanation ?? "Uses the currently connected district transaction-price snapshot where finer-level data is missing.") + " Asking price is calculated as parcel area × the available average transaction price per m²."}
                   </small>
                 </div>
+                <ParcelIntelligenceInline
+                  selectedArea={selectedArea}
+                  askingPrice={
+                    hasSourcedParcelPrice
+                      ? displayedParcelValue
+                      : calculatedParcelAskingPrice
+                  }
+                  pricePerM2={
+                    hasSourcedParcelPrice &&
+                    typeof selectedArea.parcelSizeM2 === "number" &&
+                    selectedArea.parcelSizeM2 > 0 &&
+                    displayedParcelValue !== null
+                      ? displayedParcelValue / selectedArea.parcelSizeM2
+                      : parcelUnitPriceEstimate?.pricePerM2 ?? null
+                  }
+                  priceStatus={
+                    hasSourcedParcelPrice
+                      ? "published"
+                      : calculatedParcelAskingPrice !== null
+                        ? "estimated"
+                        : "missing"
+                  }
+                  comparisonItems={parcelComparisonItems}
+                  onAddToComparison={handleAddParcelToComparison}
+                />
               </div>
             ) : (
               <>
@@ -2012,6 +2073,13 @@ export function MapExperience() {
             </div>
           </aside>
         ) : null}
+
+        <ParcelComparisonPanel
+          open={parcelCompareOpen}
+          items={parcelComparisonItems}
+          onClose={() => setParcelCompareOpen(false)}
+          onRemove={handleRemoveParcelFromComparison}
+        />
 
         {sourcesOpen ? (
           <aside aria-label="Market data sources" className="sources-panel">
