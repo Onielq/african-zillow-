@@ -426,7 +426,8 @@ async function queryArcGisLayer(
   resultRecordCount?: number,
   where = "1=1",
   outFields = "*",
-  revalidateSeconds = 300
+  revalidateSeconds = 300,
+  timeoutMs = 15_000
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
   // Request the provider's full polygon geometry. Do not set maxAllowableOffset
@@ -455,7 +456,7 @@ async function queryArcGisLayer(
   const response = await fetch(upstreamUrl, {
     headers: { Accept: "application/json" },
     next: { revalidate: revalidateSeconds },
-    signal: AbortSignal.timeout(15_000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) {
@@ -597,6 +598,72 @@ function normaliseAdministrativeFeature(
   };
 }
 
+function intersectionBounds(a: Bounds, b: Bounds): Bounds | null {
+  const clipped: Bounds = [
+    Math.max(a[0], b[0]),
+    Math.max(a[1], b[1]),
+    Math.min(a[2], b[2]),
+    Math.min(a[3], b[3])
+  ];
+  return clipped[0] < clipped[2] && clipped[1] < clipped[3] ? clipped : null;
+}
+
+function uniqueAdministrativeFeatures(features: UpstreamFeature[]): UpstreamFeature[] {
+  const unique = new Map<string, UpstreamFeature>();
+  for (const feature of features) {
+    const attributes = feature.attributes ?? feature.properties ?? {};
+    const suppliedId = textValue(attributeValue(attributes, ["objectid", "fid", "globalid", "id"]));
+    const hierarchy = ["district", "sector", "cell", "village", "name", "name_e"]
+      .map((field) => textValue(attributeValue(attributes, [field])) ?? "")
+      .join("|");
+    const key = suppliedId ?? (hierarchy !== "|||||" ? hierarchy : String(feature.id ?? unique.size));
+    if (!unique.has(key)) unique.set(key, feature);
+  }
+  return Array.from(unique.values());
+}
+
+/**
+ * MapServer can intermittently return HTTP 500 or time out on larger windows.
+ * Retry once, then split the viewport so one failed Bugesera query does not
+ * erase every administrative polygon from the map.
+ */
+async function queryAdministrativeLayerResilient(
+  layerUrl: string,
+  bounds: Bounds,
+  depth = 0
+): Promise<UpstreamFeature[]> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await queryArcGisLayer(layerUrl, bounds, undefined, "1=1", "*", 3_600, 8_000);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+
+  const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
+  if (depth >= 3 || area <= 0.0005) {
+    throw lastError instanceof Error ? lastError : new Error("Administrative map data is temporarily unavailable.");
+  }
+
+  const collected: UpstreamFeature[] = [];
+  let successfulChildren = 0;
+  for (const child of splitBoundsIntoQuarters(bounds)) {
+    const clippedChild = intersectionBounds(child, bounds);
+    if (!clippedChild) continue;
+    try {
+      const features = await queryAdministrativeLayerResilient(layerUrl, clippedChild, depth + 1);
+      successfulChildren += 1;
+      collected.push(...features);
+    } catch {
+      // Keep successful neighboring tiles when a single sub-window fails.
+    }
+  }
+  if (successfulChildren > 0) return uniqueAdministrativeFeatures(collected);
+  throw lastError instanceof Error ? lastError : new Error("Administrative map data is temporarily unavailable.");
+}
+
 async function getAdministrativeAreas(
   level: AreaLevel,
   bounds: Bounds,
@@ -622,13 +689,13 @@ async function getAdministrativeAreas(
 
   const results = await Promise.all(sources.map(async (source) => {
     try {
-      const upstreamFeatures = await queryArcGisLayer(
+      const sourceBounds = intersectionBounds(bounds, source.extent);
+      if (!sourceBounds) {
+        return { sourceId: source.id, features: [] as UpstreamFeature[], failed: false };
+      }
+      const upstreamFeatures = await queryAdministrativeLayerResilient(
         `${source.baseUrl}/${source.layerId}`,
-        bounds,
-        undefined,
-        "1=1",
-        "*",
-        86_400
+        sourceBounds
       );
       return {
         sourceId: source.id,
@@ -701,11 +768,32 @@ function uniqueUpiFeatures(features: UpstreamFeature[]): UpstreamFeature[] {
   return Array.from(unique.values());
 }
 
+async function queryParcelChildren(
+  provider: ParcelProvider,
+  children: Bounds[],
+  depth: number,
+  parentBudget: { remaining: number }
+): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
+  const collected: UpstreamFeature[] = [];
+  let succeeded = 0;
+  for (let index = 0; index < children.length; index += 1) {
+    if (parentBudget.remaining <= 0) break;
+    const childrenLeft = children.length - index;
+    const allocation = Math.max(1, Math.floor(parentBudget.remaining / childrenLeft));
+    const childBudget = { remaining: allocation };
+    const result = await queryParcelBounds(provider, children[index], depth, childBudget);
+    parentBudget.remaining -= allocation - childBudget.remaining;
+    if (!result.failed) succeeded += 1;
+    collected.push(...result.features);
+  }
+  return { features: uniqueUpiFeatures(collected), failed: succeeded === 0 && collected.length === 0 };
+}
+
 async function queryParcelBounds(
   provider: ParcelProvider,
   bounds: Bounds,
   depth = 0,
-  budget: { remaining: number } = { remaining: 12_000 }
+  budget: { remaining: number } = { remaining: 900 }
 ): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
   if (!boundsIntersect(bounds, provider.extent) || budget.remaining <= 0) {
     return { features: [], failed: false };
@@ -718,22 +806,14 @@ async function queryParcelBounds(
   // Query smaller geographic tiles sequentially and stop after a bounded batch.
   const splitBeforeQuery = area > 0.01 && depth < 2;
   if (splitBeforeQuery) {
-    const collected: UpstreamFeature[] = [];
-    let allFailed = true;
-    for (const child of splitBounds) {
-      if (budget.remaining <= 0) break;
-      const result = await queryParcelBounds(provider, child, depth + 1, budget);
-      if (!result.failed) allFailed = false;
-      collected.push(...result.features);
-    }
-    return { features: uniqueUpiFeatures(collected), failed: allFailed && collected.length === 0 };
+    return queryParcelChildren(provider, splitBounds, depth + 1, budget);
   }
 
   try {
     const features = await queryArcGisLayer(
       provider.layerUrl,
       bounds,
-      2000,
+      300,
       "upi IS NOT NULL",
       "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
       180
@@ -741,23 +821,12 @@ async function queryParcelBounds(
 
     // A very dense tile may still contain thousands of records. Subdivide it,
     // drop the oversized parent response, and keep only the smaller children.
-    if (features.length >= 1900 && depth < 4 && splitBounds.length > 0) {
-      const collected: UpstreamFeature[] = [];
-      let anyChildSucceeded = false;
-      for (const child of splitBounds) {
-        if (budget.remaining <= 0) break;
-        const result = await queryParcelBounds(provider, child, depth + 1, budget);
-        if (!result.failed) anyChildSucceeded = true;
-        collected.push(...result.features);
-      }
+    if (features.length >= 280 && depth < 5 && splitBounds.length > 0) {
+      const splitResult = await queryParcelChildren(provider, splitBounds, depth + 1, budget);
+      if (splitResult.features.length > 0 || !splitResult.failed) return splitResult;
 
-      if (collected.length > 0 || anyChildSucceeded) {
-        return { features: uniqueUpiFeatures(collected), failed: false };
-      }
-
-      // If the source only answers the parent tile, retain a bounded fallback
-      // instead of losing all map lines.
-      const fallback = features.slice(0, budget.remaining);
+      // Keep a small bounded fallback only when subdivision itself failed.
+      const fallback = features.slice(0, Math.min(budget.remaining, 80));
       budget.remaining -= fallback.length;
       return { features: fallback, failed: fallback.length === 0 };
     }
@@ -766,23 +835,12 @@ async function queryParcelBounds(
     budget.remaining -= bounded.length;
     return { features: bounded, failed: false };
   } catch (error) {
-    if (depth >= 4) {
+    if (depth >= 5) {
       console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
       return { features: [], failed: true };
     }
 
-    let anyChildSucceeded = false;
-    const collected: UpstreamFeature[] = [];
-    for (const child of splitBounds) {
-      if (budget.remaining <= 0) break;
-      const result = await queryParcelBounds(provider, child, depth + 1, budget);
-      if (!result.failed) anyChildSucceeded = true;
-      collected.push(...result.features);
-    }
-    return {
-      features: uniqueUpiFeatures(collected),
-      failed: !anyChildSucceeded && collected.length === 0
-    };
+    return queryParcelChildren(provider, splitBounds, depth + 1, budget);
   }
 }
 
@@ -819,7 +877,7 @@ async function getParcels(
     });
   }
 
-  const parcelBudget = { remaining: 12_000 };
+  const parcelBudget = { remaining: 900 };
   const results = [];
   for (const provider of providers) {
     if (parcelBudget.remaining <= 0) break;
@@ -925,7 +983,9 @@ async function getParcels(
         "X-Parcel-Provider-Warning": failedProviders.length
           ? `Some parcel source(s) unavailable: ${failedProviders.join(", ")}`
           : "Bugesera source reuse terms, completeness, and current survey accuracy still need confirmation",
-        "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed"
+        "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed",
+        "X-Parcel-Request-Budget": "900 full-geometry parcel records maximum per viewport request",
+        "X-Parcel-Request-Budget-Reached": parcelBudget.remaining <= 0 ? "true" : "false"
       }
     }
   );
