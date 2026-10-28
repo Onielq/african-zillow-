@@ -3355,14 +3355,15 @@ input {
 }
 .parcel-price-headline { min-width: 0; margin: 10px 0 12px; }
 .parcel-price-headline strong {
-  display: block; color: #165c3d; font-family: inherit; font-size: 30px; font-weight: 800;
-  line-height: 1.2; letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  display: block; color: #165c3d; font-family: inherit; font-size: 30px; font-weight: 820;
+  line-height: 1.15; letter-spacing: -.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
-.selected-area-panel { padding: 20px 18px 18px; }
-.selected-area-panel h2 { font-size: 23px; font-weight: 690; letter-spacing: -.045em; line-height: 1.15; }
-.parcel-details { gap: 10px; padding: 12px; border-radius: 12px; }
-.parcel-details span { font-size: 10px; }
-.parcel-details strong { font-size: 12px; line-height: 1.4; }
+/* Return parcel typography and detail spacing to the original map panel. */
+.selected-area-panel { padding: 22px 20px 20px; }
+.selected-area-panel h2 { font-size: 24px; font-weight: 690; letter-spacing: -.04em; line-height: 1.15; }
+.parcel-details { gap: 12px; padding: 14px; border-radius: 13px; }
+.parcel-details span { font-size: 11px; }
+.parcel-details strong { font-size: 13px; line-height: 1.5; }
 .parcel-valuation-comparison { margin-top: 10px; }
 .expert-reopen-icon-btn { width: 48px; height: 48px; padding: 0; justify-content: center; gap: 0; border-radius: 14px; }
 .expert-reopen-icon-btn svg { width: 22px; height: 22px; }
