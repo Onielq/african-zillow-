@@ -427,22 +427,25 @@ async function queryArcGisLayer(
   where = "1=1",
   outFields = "*",
   revalidateSeconds = 300,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
+  includeViewportGeometry = true
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
   // Request the provider's full polygon geometry. Do not set maxAllowableOffset
   // or geometryPrecision: either can generalize or round parcel boundary vertices.
   const params = new URLSearchParams({
     where,
-    geometry: bounds.join(","),
-    geometryType: "esriGeometryEnvelope",
-    inSR: "4326",
-    outSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
     outFields,
     returnGeometry: "true",
     f: "json"
   });
+  if (includeViewportGeometry) {
+    params.set("geometry", bounds.join(","));
+    params.set("geometryType", "esriGeometryEnvelope");
+    params.set("inSR", "4326");
+    params.set("outSR", "4326");
+    params.set("spatialRel", "esriSpatialRelIntersects");
+  }
 
   // Older MapServer layers reject resultRecordCount because they do not
   // support pagination. Leave that parameter off for admin boundaries, and
@@ -696,10 +699,36 @@ async function getAdministrativeAreas(
       if (!sourceBounds) {
         return { sourceId: source.id, features: [] as UpstreamFeature[], failed: false };
       }
-      const upstreamFeatures = await queryAdministrativeLayerResilient(
-        `${source.baseUrl}/${source.layerId}`,
-        sourceBounds
-      );
+      let upstreamFeatures: UpstreamFeature[];
+      if (source.id === "bugesera") {
+        // Bugesera's administrative layers are small (district, sector, cell,
+        // village) and its spatial-envelope requests have intermittently returned
+        // HTTP 500 for particular viewports. Read the full layer once from the
+        // upstream data cache, avoiding repeated map-pan query failures.
+        try {
+          upstreamFeatures = await queryArcGisLayer(
+            `${source.baseUrl}/${source.layerId}`,
+            sourceBounds,
+            undefined,
+            "1=1",
+            "*",
+            3_600,
+            8_000,
+            false
+          );
+        } catch {
+          // Keep a viewport-scoped retry as a fallback if the full layer fails.
+          upstreamFeatures = await queryAdministrativeLayerResilient(
+            `${source.baseUrl}/${source.layerId}`,
+            sourceBounds
+          );
+        }
+      } else {
+        upstreamFeatures = await queryAdministrativeLayerResilient(
+          `${source.baseUrl}/${source.layerId}`,
+          sourceBounds
+        );
+      }
       return {
         sourceId: source.id,
         features: upstreamFeatures,
