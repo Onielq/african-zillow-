@@ -80,13 +80,11 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const baseUrl = process.env.VALHALLA_BASE_URL?.trim();
-  if (!baseUrl) {
-    return NextResponse.json({
-      status: "not-configured",
-      message: "Valhalla route service is not configured. Road distance and travel time are withheld."
-    }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  }
+  const configuredBaseUrl = process.env.VALHALLA_BASE_URL?.trim();
+  // Public demo endpoint is for development and light testing only. Set
+  // VALHALLA_BASE_URL to an approved hosted/self-managed instance for production.
+  const baseUrl = configuredBaseUrl || "https://valhalla1.openstreetmap.de";
+  const usingPublicDemo = !configuredBaseUrl;
 
   const endpoint = safeUrl(baseUrl);
   if (!endpoint) {
@@ -110,7 +108,9 @@ export async function POST(request: NextRequest) {
         targets: targets.map((target) => ({ lat: target.latitude, lon: target.longitude })),
         costing: "auto",
         units: "kilometers",
-        verbose: false
+        // Verbose mode returns sources_to_targets as a matrix of {distance,time}
+        // objects; concise mode uses a different response shape.
+        verbose: true
       }),
       signal: AbortSignal.timeout(15000),
       cache: "no-store"
@@ -148,14 +148,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       status: "ready",
+      provider: usingPublicDemo ? "public-demo" : "configured",
       costing: "auto",
       units: "kilometers",
       results,
-      note: "Route estimates use mapped roads and do not include live traffic. The origin is the parcel extent midpoint, not a surveyed entrance."
+      note: usingPublicDemo
+        ? "Uses the public shared Valhalla demo service, which is subject to fair-use limits and rate limiting. Route estimates do not include live traffic. The origin is the parcel extent midpoint, not a surveyed entrance."
+        : "Route estimates use mapped roads and do not include live traffic. The origin is the parcel extent midpoint, not a surveyed entrance."
     }, {
       headers: {
         "Cache-Control": "private, max-age=0, no-store",
-        "X-Route-Provider": "Valhalla"
+        "X-Route-Provider": usingPublicDemo ? "Valhalla public demo" : "Valhalla configured"
       }
     });
   } catch (error) {
