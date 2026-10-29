@@ -13,13 +13,15 @@ flowchart TD
   CF --> UI
   UI --> API[Geography and parcel API routes]
   API --> GEO[Official geography and cadastral services]
+  API -- "Worker only, when all primary providers fail" --> VP[Vercel production parcel API]
+  VP --> GEO
   UI --> REF[Price snapshots and benchmark modules]
   UI --> ACCESS[Nearby access API]
   ACCESS --> OSM[OpenStreetMap Overpass amenities]
   ACCESS --> VAL[Valhalla road routing]
 ~~~
 
-Vercel and Cloudflare each serve a deployed application. The two routes must remain independently buildable. Do not assume that a success on one provider proves that the other is updated.
+Vercel and Cloudflare each serve a deployed application and remain independently buildable. If every primary parcel query fails inside Cloudflare, the Worker makes one bounded server-to-server request to the Vercel production parcel API and accepts only GeoJSON features marked as cadastral parcels with a UPI. The Vercel route does not use this fallback, preventing recursion. The response records the fallback source and primary-provider warning. If the fallback fails validation or times out, the Worker returns its explicit 502 rather than inventing parcel outlines.
 
 ## Parcel evidence path
 
