@@ -16,7 +16,7 @@
 .sectionHeading h3 {
   margin: 0;
   color: #243B30;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 780;
   line-height: 1.35;
 }
@@ -24,7 +24,7 @@
 .sectionHeading p {
   margin: 3px 0 0;
   color: #748078;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -36,7 +36,7 @@
   border-radius: 999px;
   background: #F4F8F5;
   color: #365E48;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 750;
   line-height: 1.2;
 }
@@ -56,13 +56,13 @@
 
 .confidenceRows span {
   color: #748078;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
 }
 
 .confidenceRows strong {
   color: #2B3D32;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -75,7 +75,7 @@
 .scorecardNote {
   margin: 0;
   color: #69776E;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -98,14 +98,14 @@
 }
 
 .addCompareButton {
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 36px;
+  padding: 8px 11px;
   border: 1px solid #CFDDD2;
   border-radius: 9px;
   background: #FFFFFF;
   color: #234D37;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 760;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
@@ -124,7 +124,7 @@
 
 .compareActionRow > span {
   color: #79847C;
-  font-size: 9px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -152,7 +152,7 @@
   flex: 0 0 76px;
   padding-top: 2px;
   color: #7B857E;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 750;
 }
 
@@ -166,7 +166,7 @@
 
 .nearbyName strong {
   color: #263B2F;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -174,7 +174,7 @@
 
 .nearbyName small {
   color: #537A60;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
 }
 
@@ -212,7 +212,7 @@
 .panelHeader p {
   margin: 0 0 5px;
   color: #6E7B72;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: .1em;
 }
@@ -230,7 +230,7 @@
   display: block;
   margin-top: 5px;
   color: #758078;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -265,7 +265,7 @@
 .emptyState p {
   margin: 5px 0 0;
   color: #768179;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -281,7 +281,7 @@
   min-width: 515px;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 10px;
+  font-size: 11px;
   text-align: left;
 }
 
@@ -321,14 +321,14 @@
 }
 
 .scorecard thead th strong {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
 }
 
 .scorecard thead th small {
   margin-top: 4px;
   color: #78847C;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
   line-height: 1.4;
 }
@@ -337,26 +337,26 @@
   min-width: 100px;
   background: #FBFCFB;
   color: #68756D;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 720;
 }
 
 .scorecard tbody td {
   color: #2D4133;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
 .removeButton {
   display: inline-flex;
   margin-top: 8px;
-  padding: 4px 7px;
+  padding: 5px 8px;
   border: 1px solid #DCE6DE;
   border-radius: 6px;
   background: #FFFFFF;
   color: #637168;
   font: inherit;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -373,12 +373,18 @@
   display: block;
   margin-top: 5px;
   color: #78847C;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
 }
 
 .scorecardNote {
   color: #758078;
+}
+
+.comparisonPanel button:focus-visible,
+.inlinePanel button:focus-visible {
+  outline: 2px solid #2F6B48;
+  outline-offset: 2px;
 }
 
 @media (max-width: 720px) {
