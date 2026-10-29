@@ -858,7 +858,11 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(route.includes("Promise.race([fetchPromise, timeoutPromise])"));
   assert.match(route, /ArcGIS layer request timed out after/);
   assert.ok(route.includes("Promise.race([fallbackPromise, timeoutPromise])"));
-  assert.ok(route.includes("20_000"));
+  assert.ok(route.includes("10_000"));
+  assert.match(route, /vercel-empty-feature-collection/);
+  assert.match(route, /const fastFallback = allowVercelFallback/);
+  assert.match(route, /if \(fastFallback\?\.response\) return fastFallback\.response/);
+  assert.ok(route.indexOf("const fastFallback = allowVercelFallback") < route.indexOf("const parcelBudget ="));
   assert.match(route, /"X-Parcel-Provider-Warning"/);
   assert.ok(route.includes("15_000"));
   assert.match(route, /requestHost\.endsWith\("\.workers\.dev"\)/);
