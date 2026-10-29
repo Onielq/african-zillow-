@@ -49,6 +49,8 @@ type SearchArea = {
   averageLandPricePerM2: number | null;
   sourceLabel: string;
   sourceType: "administrative-boundary" | "cadastral-parcel";
+  mapSourceId?: SourceId;
+  sourceObjectId?: string | null;
   upi?: string | null;
   parcelNumber?: string | null;
   parcelSizeM2?: number | null;
@@ -61,6 +63,19 @@ const PILOT_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]
 const SOURCE_DISTRICTS: Record<SourceId, string[]> = {
   kigali: ["Gasabo", "Kicukiro", "Nyarugenge"],
   bugesera: ["Bugesera"]
+};
+const ADMIN_MAP_SOURCES: Record<SourceId, {
+  baseUrl: string;
+  layers: Record<AdminAreaLevel, number>;
+}> = {
+  kigali: {
+    baseUrl: KIGALI_MAP_SERVER,
+    layers: { district: 4, sector: 5, cell: 6, village: 7 }
+  },
+  bugesera: {
+    baseUrl: BUGESERA_MAP_SERVER,
+    layers: { district: 2, sector: 4, cell: 3, village: 5 }
+  }
 };
 const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
   gasabo: 36103,
@@ -157,32 +172,6 @@ function centerFromBounds(bounds: [number, number, number, number] | null): [num
   return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
 }
 
-function centerFromGeometry(
-  geometry: unknown,
-  bounds: [number, number, number, number] | null
-): [number, number] | null {
-  if (geometry && typeof geometry === "object") {
-    const object = geometry as Record<string, unknown>;
-    if (
-      typeof object.x === "number" &&
-      typeof object.y === "number" &&
-      Number.isFinite(object.x) &&
-      Number.isFinite(object.y)
-    ) {
-      return [object.x, object.y];
-    }
-    if (
-      Array.isArray(object.coordinates) &&
-      typeof object.coordinates[0] === "number" &&
-      typeof object.coordinates[1] === "number" &&
-      Number.isFinite(object.coordinates[0]) &&
-      Number.isFinite(object.coordinates[1])
-    ) {
-      return [object.coordinates[0], object.coordinates[1]];
-    }
-  }
-  return centerFromBounds(bounds);
-}
 
 function chooseField(fields: FieldMetadata[], candidates: string[]): string | null {
   for (const candidate of candidates) {
@@ -259,6 +248,8 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
 
   const escaped = query.replace(/'/g, "''");
   const requestedFields = new Set<string>(nameFields);
+  const objectIdField = chooseField(fields, ["objectid", "objectid_1", "objectid_12", "fid", "id"]);
+  if (objectIdField) requestedFields.add(objectIdField);
   for (const field of chooseTextFields(fields, ["province", "province_name", "prov_name", "province_e"])) requestedFields.add(field);
   for (const key of ["district", "sector", "cell", "village"] as const) {
     for (const field of chooseTextFields(fields, candidate[key])) requestedFields.add(field);
@@ -268,12 +259,9 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
 
   const commonParams = {
     outFields: Array.from(requestedFields).join(","),
-    // Autocomplete needs a camera target, not the full polygon for every match.
-    // ArcGIS returns one centroid point per matched boundary instead of all
-    // polygon vertices; the map fetches its actual boundary after navigation.
-    returnGeometry: "true",
-    returnCentroid: "true",
-    outSR: "4326",
+    // Autocomplete returns names, hierarchy, and stable feature IDs only.
+    // Full polygon geometry is fetched only after the user selects a result.
+    returnGeometry: "false",
     f: "json"
   };
   const prefixWhere = "(" + nameFields.map((field) =>
@@ -328,12 +316,11 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const villageId = value(attributes, ids.village ?? []);
     const province = value(attributes, ["province", "province_name", "prov_name", "province_e"]) ??
       (normalizeDistrictKey(district) === "bugesera" ? "Eastern Province" : "Kigali City");
-    // Search responses contain centroids only. Full boundaries are fetched from
-    // the map source once the camera reaches the selected area.
-    const bounds = boundsFromGeometry(feature.geometry);
-    const center = centerFromGeometry(feature.geometry, bounds);
+    // The autocomplete query has no geometry. Keep the map feature ID so a
+    // single exact geometry lookup can run when the user selects this result.
+    const sourceObjectId = objectIdField ? value(attributes, [objectIdField]) : null;
     return [{
-      id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, index].filter(Boolean).join("-"),
+      id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, sourceObjectId ?? index].filter(Boolean).join("-"),
       level,
       name,
       province,
@@ -350,10 +337,52 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
         ? "Kigali City Master Plan administrative boundaries"
         : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
       sourceType: "administrative-boundary" as const,
-      bounds,
-      center
+      mapSourceId: source,
+      sourceObjectId,
+      bounds: null,
+      center: null
     }];
   });
+}
+
+async function resolveAdminAreaGeometry(
+  source: SourceId,
+  level: AdminAreaLevel,
+  objectId: string
+): Promise<{ bounds: [number, number, number, number]; center: [number, number] }> {
+  const sourceConfig = ADMIN_MAP_SOURCES[source];
+  const layerUrl = sourceConfig.baseUrl + "/" + sourceConfig.layers[level];
+  const metadata = await getLayerMetadata(layerUrl);
+  const fields = metadata.fields ?? [];
+  const objectIdField = chooseField(fields, ["objectid", "objectid_1", "objectid_12", "fid", "id"]);
+  if (!objectIdField) throw new Error("The mapped layer does not expose a feature ID.");
+
+  const objectIdMetadata = fields.find((field) => field.name === objectIdField);
+  const objectIdType = objectIdMetadata?.type?.toLowerCase() ?? "";
+  const numericObjectId = Number(objectId);
+  const numericIdField = objectIdType.includes("oid") || objectIdType.includes("integer") || objectIdType.includes("double");
+  const objectIdWhere = numericIdField && Number.isFinite(numericObjectId)
+    ? objectIdField + " = " + String(numericObjectId)
+    : objectIdField + " = '" + objectId.replace(/'/g, "''") + "'";
+  const params = new URLSearchParams({
+    where: objectIdWhere,
+    outFields: objectIdField,
+    returnGeometry: "true",
+    outSR: "4326",
+    f: "json"
+  });
+  const response = await fetch(layerUrl + "/query?" + params.toString(), {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error("Selected boundary lookup failed (" + response.status + ")");
+  const payload = await response.json() as LayerQueryResponse;
+  if (payload.error) throw new Error(payload.error.message ?? "Selected boundary lookup failed");
+  const feature = payload.features?.[0];
+  const bounds = boundsFromGeometry(feature?.geometry);
+  if (!feature || !bounds) throw new Error("The selected boundary geometry was not returned.");
+  return { bounds, center: centerFromBounds(bounds) as [number, number] };
 }
 
 type NominatimResult = {
@@ -604,6 +633,27 @@ async function browseParcels(
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const addressOnly = request.nextUrl.searchParams.get("addressOnly") === "1";
+  if (request.nextUrl.searchParams.get("resolveGeometry") === "1") {
+    const rawSource = request.nextUrl.searchParams.get("source");
+    const rawLevel = request.nextUrl.searchParams.get("level");
+    const objectId = request.nextUrl.searchParams.get("objectId")?.trim() ?? "";
+    if (
+      (rawSource !== "kigali" && rawSource !== "bugesera") ||
+      !["district", "sector", "cell", "village"].includes(rawLevel ?? "") ||
+      !objectId
+    ) {
+      return NextResponse.json({ error: "A mapped source, administrative level, and feature ID are required." }, { status: 400 });
+    }
+    try {
+      const resolved = await resolveAdminAreaGeometry(rawSource, rawLevel as AdminAreaLevel, objectId);
+      return NextResponse.json(resolved, {
+        headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800" }
+      });
+    } catch (error) {
+      console.error("Selected administrative boundary resolution failed.", error);
+      return NextResponse.json({ error: "The selected administrative boundary could not be resolved." }, { status: 502 });
+    }
+  }
   const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
   if (rawQuery.length < 2 && !browseMode) {
     return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
@@ -688,24 +738,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const adminSources = [
-    {
-      id: "kigali" as const,
-      baseUrl: KIGALI_MAP_SERVER,
-      layers: { district: 4, sector: 5, cell: 6, village: 7 }
-    },
-    {
-      id: "bugesera" as const,
-      baseUrl: BUGESERA_MAP_SERVER,
-      layers: { district: 2, sector: 4, cell: 3, village: 5 }
-    }
-  ];
-  const adminTasks = adminSources.flatMap((source) =>
+  const adminSources = Object.entries(ADMIN_MAP_SOURCES) as Array<[SourceId, typeof ADMIN_MAP_SOURCES[SourceId]]>;
+  const adminTasks = adminSources.flatMap(([sourceId, source]) =>
     (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
-      searchLayer(source.id, source.baseUrl, level, layerId, query)
+      searchLayer(sourceId, source.baseUrl, level, layerId, query)
         .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
         .catch((error) => {
-          console.error("Mapped administrative search failed for " + source.id + " " + level + ".", error);
+          console.error("Mapped administrative search failed for " + sourceId + " " + level + ".", error);
           return { areas: [] as SearchArea[], failed: true, kind: "administrative" as const };
         })
     )
@@ -757,11 +796,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     areas: sorted,
     searched: query,
-    coverage: "Government administrative hierarchy: Gasabo, Kicukiro, Nyarugenge and Bugesera; cadastral search from connected parcel sources"
+    coverage: "Mapped administrative layers: Kigali City Master Plan (Gasabo, Kicukiro and Nyarugenge) and Geodata Rwanda Bugesera Masterplan; cadastral search from connected parcel sources"
   }, {
     headers: {
       "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
-      "X-Data-Source": "Government administrative boundaries · 2022 census mapping; Kigali City and Bugesera cadastral sources"
+      "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan; cadastral sources"
     }
   });
 }
