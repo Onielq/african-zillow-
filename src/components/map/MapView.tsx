@@ -1105,6 +1105,7 @@ export function MapView({
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let activeController: AbortController | null = null;
+    let activeRefreshKey: string | null = null;
     let refreshSequence = 0;
     const areaCache = new Map<string, { bounds: ViewBounds; data: MapFeatureCollection }>();
     let hoveredFeature: { source: string; id: string | number } | null = null;
@@ -1966,10 +1967,6 @@ export function MapView({
         return;
       }
 
-      const sequence = ++refreshSequence;
-      activeController?.abort();
-      const controller = new AbortController();
-      activeController = controller;
       const activeLevel = activeAreaLevel(map.getZoom());
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const requestedLevels: AreaLevel[] = AREA_LEVELS.slice(0, activeIndex + 1);
@@ -1986,6 +1983,29 @@ export function MapView({
       ];
       const requestSources = (Object.keys(ADMIN_SOURCE_EXTENTS) as AdminSourceId[])
         .filter((adminSource) => boundsIntersect(viewBounds, ADMIN_SOURCE_EXTENTS[adminSource]));
+      const refreshKey = [
+        activeLevel,
+        ...viewBounds.map((value) => value.toFixed(6)),
+        ...requestSources
+      ].join("|");
+
+      // style.load, moveend/zoomend, and the one-time idle recovery can all
+      // request the same viewport. Reuse the in-flight request set instead of
+      // aborting its cadastral request and immediately starting a duplicate.
+      if (activeController && !activeController.signal.aborted && activeRefreshKey === refreshKey) {
+        recordE2ETrace("area-refresh-skipped-duplicate", {
+          zoom: Number(map.getZoom().toFixed(2)),
+          activeLevel,
+          refreshKey
+        });
+        return;
+      }
+
+      const sequence = ++refreshSequence;
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      activeRefreshKey = refreshKey;
       recordE2ETrace("area-refresh-plan", {
         zoom: Number(map.getZoom().toFixed(2)),
         activeLevel,
@@ -2174,6 +2194,11 @@ export function MapView({
         if (controller.signal.aborted) return;
         console.error("Administrative boundary loading failed.", error);
         onBoundaryStatusChange("error");
+      } finally {
+        if (activeController === controller) {
+          activeController = null;
+          activeRefreshKey = null;
+        }
       }
     };
 
