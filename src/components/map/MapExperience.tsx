@@ -1151,6 +1151,9 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
+          <Link className="compare-control" href="/data-sources">
+            Data sources
+          </Link>
           <Link className="compare-control" href="/contact">
             Contact
           </Link>
