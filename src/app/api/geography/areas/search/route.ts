@@ -316,7 +316,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const attributes = feature.attributes ?? {};
     const name = value(attributes, nameFields);
     const district = (level === "district" ? name : value(attributes, chooseTextFields(fields, candidate.district))) ??
-      (normalizeDistrictKey(name ?? "") === "bugesera" ? "Bugesera" : null);
+      (source === "bugesera" ? "Bugesera" : null);
     if (!name || !district || !PILOT_DISTRICTS.has(normalizeDistrictKey(district))) return [];
     const sector = level === "sector" ? name : value(attributes, chooseTextFields(fields, candidate.sector));
     const cell = level === "cell" ? name : value(attributes, chooseTextFields(fields, candidate.cell));
