@@ -30,16 +30,26 @@ page.on("requestfailed", (request) => {
 page.on("response", async (response) => {
   if (!response.url().includes("/api/geography/areas")) return;
   let summary = {};
+  const responseHeaders = response.headers();
   try {
     const body = await response.json();
     summary = {
       type: body?.type ?? null,
       featureCount: Array.isArray(body?.features) ? body.features.length : null,
       error: body?.error ?? body?.message ?? null,
-      providerWarning: body?.providerWarning ?? null
+      providerWarning: body?.providerWarning ?? null,
+      unavailableProviders: body?.unavailableProviders ?? null,
+      fallbackStatus: body?.fallbackStatus ?? responseHeaders["x-parcel-fallback-status"] ?? null,
+      fallbackReason: body?.fallbackReason ?? responseHeaders["x-parcel-fallback-reason"] ?? null,
+      fallbackSource: responseHeaders["x-parcel-fallback-source"] ?? null
     };
   } catch (error) {
-    summary = { parseError: error instanceof Error ? error.message : String(error) };
+    summary = {
+      parseError: error instanceof Error ? error.message : String(error),
+      fallbackStatus: responseHeaders["x-parcel-fallback-status"] ?? null,
+      fallbackReason: responseHeaders["x-parcel-fallback-reason"] ?? null,
+      fallbackSource: responseHeaders["x-parcel-fallback-source"] ?? null
+    };
   }
   diagnostics.areaApiResponses.push({
     url: response.url(),
@@ -127,7 +137,10 @@ try {
             type: body?.type ?? null,
             featureCount: Array.isArray(body?.features) ? body.features.length : null,
             error: body?.error ?? body?.message ?? null,
-            unavailableProviders: body?.unavailableProviders ?? null
+            unavailableProviders: body?.unavailableProviders ?? null,
+            fallbackStatus: body?.fallbackStatus ?? response.headers.get("x-parcel-fallback-status"),
+            fallbackReason: body?.fallbackReason ?? response.headers.get("x-parcel-fallback-reason"),
+            fallbackSource: response.headers.get("x-parcel-fallback-source")
           };
         } catch (error) {
           return { url, fetchError: error instanceof Error ? error.message : String(error) };
