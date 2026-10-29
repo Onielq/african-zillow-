@@ -969,4 +969,6 @@ test("place search is case-insensitive for administrative names and cell parcel 
   assert.match(cellParcelRoute, /UPPER\(sector\) =/);
   assert.match(cellParcelRoute, /UPPER\(cell\) =/);
   assert.match(areasRoute, /const splitBeforeQuery = area > 0\.0003 && depth < 1/);
+  assert.match(areasRoute, /queryArcGisLayer\(\s*provider\.layerUrl,\s*bounds,\s*80,/);
+  assert.match(areasRoute, /if \(features\.length >= 80 && depth < 3 && budget\.remaining >= 64/);
 });
