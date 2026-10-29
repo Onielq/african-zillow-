@@ -348,25 +348,76 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
 async function resolveAdminAreaGeometry(
   source: SourceId,
   level: AdminAreaLevel,
-  objectId: string
+  target: {
+    name: string;
+    district: string;
+    sector: string | null;
+    cell: string | null;
+    village: string | null;
+    districtId: string | null;
+    sectorId: string | null;
+    cellId: string | null;
+    villageId: string | null;
+  }
 ): Promise<{ bounds: [number, number, number, number]; center: [number, number] }> {
   const sourceConfig = ADMIN_MAP_SOURCES[source];
   const layerUrl = sourceConfig.baseUrl + "/" + sourceConfig.layers[level];
   const metadata = await getLayerMetadata(layerUrl);
   const fields = metadata.fields ?? [];
-  const objectIdField = chooseField(fields, ["objectid", "objectid_1", "objectid_12", "fid", "id"]);
-  if (!objectIdField) throw new Error("The mapped layer does not expose a feature ID.");
+  const candidates = CANDIDATES[level];
+  const conditions: string[] = [];
 
-  const objectIdMetadata = fields.find((field) => field.name === objectIdField);
-  const objectIdType = objectIdMetadata?.type?.toLowerCase() ?? "";
-  const numericObjectId = Number(objectId);
-  const numericIdField = objectIdType.includes("oid") || objectIdType.includes("integer") || objectIdType.includes("double");
-  const objectIdWhere = numericIdField && Number.isFinite(numericObjectId)
-    ? objectIdField + " = " + String(numericObjectId)
-    : objectIdField + " = '" + objectId.replace(/'/g, "''") + "'";
+  const quote = (raw: string) => "'" + raw.replace(/'/g, "''") + "'";
+  const conditionForValue = (fieldName: string, rawValue: string) => {
+    const field = fields.find((item) => item.name === fieldName);
+    const kind = field?.type?.toLowerCase() ?? "";
+    const numeric = kind.includes("oid") || kind.includes("integer") || kind.includes("double") || kind.includes("smallinteger");
+    const numberValue = Number(rawValue);
+    return numeric && Number.isFinite(numberValue)
+      ? fieldName + " = " + String(numberValue)
+      : fieldName + " = " + quote(rawValue);
+  };
+  const addTextCondition = (fieldCandidates: string[], rawValue: string | null) => {
+    if (!rawValue) return;
+    const field = chooseField(fields, fieldCandidates);
+    if (field) conditions.push(conditionForValue(field, rawValue));
+  };
+  const addIdentifierCondition = (key: AdminAreaLevel, rawValue: string | null) => {
+    if (!rawValue) return;
+    // Never use OBJECTID/FID as an administrative parent ID. Some public layers
+    // expose zero for every feature there; the real parent codes are separate fields.
+    const idCandidates = candidates.ids[key].filter((candidate) =>
+      !["objectid", "objectid1", "objectid12", "fid", "id"].includes(normalizeKey(candidate))
+    );
+    const field = chooseField(fields, idCandidates);
+    if (field) conditions.push(conditionForValue(field, rawValue));
+  };
+
+  addTextCondition(candidates.name, target.name);
+  if (level !== "district") {
+    addTextCondition(candidates.district, target.district);
+    addIdentifierCondition("district", target.districtId);
+  }
+  if (level === "cell" || level === "village") {
+    addTextCondition(candidates.sector, target.sector);
+    addIdentifierCondition("sector", target.sectorId);
+  }
+  if (level === "village") {
+    addTextCondition(candidates.cell, target.cell);
+    addIdentifierCondition("cell", target.cellId);
+  }
+  addIdentifierCondition(level, level === "district"
+    ? target.districtId
+    : level === "sector"
+      ? target.sectorId
+      : level === "cell"
+        ? target.cellId
+        : target.villageId);
+
+  if (conditions.length === 0) throw new Error("No usable name or parent fields exist for this layer.");
   const params = new URLSearchParams({
-    where: objectIdWhere,
-    outFields: objectIdField,
+    where: conditions.join(" AND "),
+    outFields: "*",
     returnGeometry: "true",
     outSR: "4326",
     f: "json"
@@ -379,9 +430,10 @@ async function resolveAdminAreaGeometry(
   if (!response.ok) throw new Error("Selected boundary lookup failed (" + response.status + ")");
   const payload = await response.json() as LayerQueryResponse;
   if (payload.error) throw new Error(payload.error.message ?? "Selected boundary lookup failed");
-  const feature = payload.features?.[0];
-  const bounds = boundsFromGeometry(feature?.geometry);
-  if (!feature || !bounds) throw new Error("The selected boundary geometry was not returned.");
+
+  const geometryFeature = (payload.features ?? []).find((feature) => boundsFromGeometry(feature.geometry) !== null);
+  const bounds = boundsFromGeometry(geometryFeature?.geometry);
+  if (!geometryFeature || !bounds) throw new Error("The selected boundary geometry was not returned.");
   return { bounds, center: centerFromBounds(bounds) as [number, number] };
 }
 
@@ -636,16 +688,26 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("resolveGeometry") === "1") {
     const rawSource = request.nextUrl.searchParams.get("source");
     const rawLevel = request.nextUrl.searchParams.get("level");
-    const objectId = request.nextUrl.searchParams.get("objectId")?.trim() ?? "";
+    const target = {
+      name: request.nextUrl.searchParams.get("name")?.trim() ?? "",
+      district: request.nextUrl.searchParams.get("district")?.trim() ?? "",
+      sector: request.nextUrl.searchParams.get("sector")?.trim() || null,
+      cell: request.nextUrl.searchParams.get("cell")?.trim() || null,
+      village: request.nextUrl.searchParams.get("village")?.trim() || null,
+      districtId: request.nextUrl.searchParams.get("districtId")?.trim() || null,
+      sectorId: request.nextUrl.searchParams.get("sectorId")?.trim() || null,
+      cellId: request.nextUrl.searchParams.get("cellId")?.trim() || null,
+      villageId: request.nextUrl.searchParams.get("villageId")?.trim() || null
+    };
     if (
       (rawSource !== "kigali" && rawSource !== "bugesera") ||
       !["district", "sector", "cell", "village"].includes(rawLevel ?? "") ||
-      !objectId
+      !target.name
     ) {
-      return NextResponse.json({ error: "A mapped source, administrative level, and feature ID are required." }, { status: 400 });
+      return NextResponse.json({ error: "A mapped source, administrative level, and area name are required." }, { status: 400 });
     }
     try {
-      const resolved = await resolveAdminAreaGeometry(rawSource, rawLevel as AdminAreaLevel, objectId);
+      const resolved = await resolveAdminAreaGeometry(rawSource, rawLevel as AdminAreaLevel, target);
       return NextResponse.json(resolved, {
         headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800" }
       });
