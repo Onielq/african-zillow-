@@ -823,6 +823,10 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(route.includes("isTransientUpstreamFailure"));
   assert.ok(route.includes("ArcGIS layer request failed \\((?:502|503|504)\\)"));
   assert.match(route, /isTransientUpstreamFailure \|\| depth >= 2/);
+  assert.match(route, /Promise\\.race\\(\\[fetchPromise, timeoutPromise\\]\\)/);
+  assert.match(route, /ArcGIS layer request timed out after/);
+  assert.match(route, /"X-Parcel-Provider-Warning"/);
+  assert.ok(route.includes("15_000"));
   assert.ok(e2e.includes("AbortSignal.timeout(25_000)"));
 });
 
