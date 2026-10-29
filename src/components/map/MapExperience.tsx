@@ -2413,10 +2413,14 @@ export function MapExperience() {
                           {item.routeStatus === "routed" && item.distanceKm !== null && item.timeMinutes !== null
                             ? `${item.distanceKm < 1 ? item.distanceKm.toFixed(2) : item.distanceKm.toFixed(1)} km by road · about ${Math.max(1, Math.round(item.timeMinutes))} min`
                             : item.routeStatus === "straight-line" && item.distanceKm !== null
-                              ? item.distanceKm < 1
-                                ? `~${Math.round(item.distanceKm * 1000)} m straight-line to mapped road`
-                                : `~${item.distanceKm.toFixed(1)} km straight-line to mapped road`
-                              : "Road route unavailable"}
+                              ? item.category === "Main road"
+                                ? item.distanceKm < 1
+                                  ? `~${Math.round(item.distanceKm * 1000)} m straight-line to mapped road`
+                                  : `~${item.distanceKm.toFixed(1)} km straight-line to mapped road`
+                                : item.distanceKm < 1
+                                  ? `~${Math.round(item.distanceKm * 1000)} m straight-line · driving route unavailable`
+                                  : `~${item.distanceKm.toFixed(1)} km straight-line · driving route unavailable`
+                              : "Distance unavailable"}
                         </small>
                       </li>
                     ))}
