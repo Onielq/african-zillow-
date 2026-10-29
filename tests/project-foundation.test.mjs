@@ -557,6 +557,34 @@ test("comparison searches every pilot administrative level and accepts any mixed
   assert.match(experience, /comparisonKind: "project"/);
   assert.match(experience, /No verified project data/);
   assert.match(experience, /placeholder="District, sector, cell, village, UPI or parcel number"/);
+  assert.match(experience, /comparison-level-filter/);
+  assert.match(experience, /visibleComparisonSearchResults/);
+  assert.match(experience, /comparisonLevelFilter === "all" \|\| area\.level === comparisonLevelFilter/);
+  assert.match(experience, /<option value="all">All levels<\/option>/);
+  assert.match(experience, /All levels allows mixed comparisons/);
+});
+
+test("parcel location access covers main-road proximity, schools, hospitals, transport, landmarks and local offices", async () => {
+  const route = await readProjectFile("src/app/api/geography/nearby-access/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(route, /type NearbyCategory = "Main road" \| "School" \| "Clinic \/ hospital" \| "Public transport" \| "Landmark" \| "Village office"/);
+  assert.match(route, /type NearbyAmenityCategory = Exclude<NearbyCategory, "Main road">/);
+  assert.match(route, /function buildRoadQuery/);
+  assert.match(route, /trunk\|primary\|secondary\|tertiary/);
+  assert.match(route, /function distanceToRoadSegmentKm/);
+  assert.match(route, /routeStatus: "straight-line"/);
+  assert.match(route, /amenity === "townhall"/);
+  assert.match(route, /government === "administrative"/);
+  assert.match(route, /natural.*lake\|peak\|waterfall/);
+  assert.match(route, /tourism.*attraction\|viewpoint\|museum/);
+  assert.match(route, /OpenStreetMap may have incomplete or outdated facility and landmark coverage/);
+  assert.match(experience, /Checking road, school, hospital, transport and landmark access/);
+  assert.match(experience, /straight-line to mapped road/);
+  assert.match(experience, /No mapped main roads, schools, hospitals, transport stops, landmarks or local offices found nearby/);
+  assert.match(css, /\.comparison-search-filter-row/);
+  assert.match(css, /\.comparison-level-filter:focus-visible/);
 });
 
 test("transaction indicators distinguish NISR 2023 baselines from the unverified Bugesera month-to-date observation", async () => {
