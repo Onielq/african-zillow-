@@ -249,13 +249,15 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     ? "1=1"
     : "(" + districtFields.map((field) =>
         "(" + allowedDistrictValues.map((districtName) =>
-          field + " = '" + districtName.replace(/'/g, "''") + "'"
+          "UPPER(" + field + ") = '" + districtName.toLocaleUpperCase("en").replace(/'/g, "''") + "'"
         ).join(" OR ") + ")"
       ).join(" OR ") + ")";
   const scopeToMappedDistricts = (where: string) =>
     "(" + districtScopeWhere + ") AND (" + where + ")";
 
-  const escaped = query.replace(/'/g, "''");
+  // ArcGIS SQL comparison can be case-sensitive on these published layers.
+  // Normalise both sides in SQL so lowercase, uppercase, and mixed-case input behave alike.
+  const escapedUpper = query.toLocaleUpperCase("en").replace(/'/g, "''");
   const requestedFields = new Set<string>(nameFields);
   const objectIdField = chooseField(fields, ["objectid", "objectid_1", "objectid_12", "fid", "id"]);
   if (objectIdField) requestedFields.add(objectIdField);
@@ -274,10 +276,10 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     f: "json"
   };
   const prefixWhere = "(" + nameFields.map((field) =>
-    "(" + field + " = '" + escaped + "' OR " + field + " LIKE '" + escaped + "%')"
+    "(UPPER(" + field + ") = '" + escapedUpper + "' OR UPPER(" + field + ") LIKE '" + escapedUpper + "%')"
   ).join(" OR ") + ")";
   const containsWhere = "(" + nameFields.map((field) =>
-    field + " LIKE '%" + escaped + "%'"
+    "UPPER(" + field + ") LIKE '%" + escapedUpper + "%'"
   ).join(" OR ") + ")";
 
   const queryLayer = async (where: string): Promise<LayerQueryResponse> => {
