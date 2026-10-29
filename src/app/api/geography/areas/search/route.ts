@@ -504,7 +504,7 @@ async function browseParcels(
 
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-  const includeAddresses = request.nextUrl.searchParams.get("addresses") === "1";
+  const addressOnly = request.nextUrl.searchParams.get("addressOnly") === "1";
   const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
   if (rawQuery.length < 2 && !browseMode) {
     return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
@@ -517,6 +517,27 @@ export async function GET(request: NextRequest) {
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
     { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
   ];
+
+  // Public geocoding is explicit on submit, not called on every autocomplete
+  // keystroke. This respects shared geocoder capacity and avoids noisy traffic.
+  if (addressOnly) {
+    if (query.length < 4) {
+      return NextResponse.json({ addresses: [], searched: query, message: "Enter a longer address." }, {
+        headers: { "Cache-Control": "public, max-age=0, s-maxage=300" }
+      });
+    }
+    const addresses = await searchAddresses(query);
+    return NextResponse.json({
+      addresses,
+      searched: query,
+      sourceLabel: "OpenStreetMap Nominatim geocoding"
+    }, {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "X-Data-Source": "OpenStreetMap Nominatim geocoding"
+      }
+    });
+  }
 
   if (browseMode) {
     const offsetRaw = Number(request.nextUrl.searchParams.get("offset") ?? 0);
