@@ -108,6 +108,16 @@ function normalizeDistrictKey(value: string): string {
   return normalizeKey(value).replace(/district$/, "");
 }
 
+function chooseTextFields(fields: FieldMetadata[], candidates: string[]): string[] {
+  return Array.from(new Set(candidates.flatMap((candidate) => {
+    const field = fields.find((item) =>
+      normalizeKey(item.name) === normalizeKey(candidate) &&
+      (!item.type || item.type.toLocaleLowerCase("en").includes("string"))
+    );
+    return field ? [field.name] : [];
+  })));
+}
+
 function collectCoordinates(value: unknown, output: Array<[number, number]>): void {
   if (!Array.isArray(value)) return;
   if (
@@ -193,19 +203,15 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   // as "district", while another publishes it as "name" or "name_e". Query
   // every recognised label field so a valid place is not hidden by the first
   // field existing but containing nulls or identifiers.
-  const nameFields = candidate.name
-    .map((candidateName) => fields.find((field) => normalizeKey(field.name) === normalizeKey(candidateName))?.name)
-    .filter((field): field is string => Boolean(field));
-  const nameField = nameFields[0];
-  if (!nameField) return [];
+  const nameFields = chooseTextFields(fields, candidate.name);
+  if (nameFields.length === 0) return [];
 
   const escaped = query.replace(/'/g, "''");
   // Query only fields needed to label and distinguish matching areas. This
   // keeps administrative search payloads small while preserving hierarchy IDs.
   const requestedFields = new Set<string>(nameFields);
   for (const key of ["district", "sector", "cell", "village"] as const) {
-    const field = chooseField(fields, candidate[key]);
-    if (field) requestedFields.add(field);
+    for (const field of chooseTextFields(fields, candidate[key])) requestedFields.add(field);
     const idField = chooseField(fields, candidate.ids[key]);
     if (idField) requestedFields.add(idField);
   }
@@ -228,13 +234,13 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
 
   return (payload.features ?? []).flatMap((feature, index) => {
     const attributes = feature.attributes ?? {};
-    const name = value(attributes, candidate.name);
-    const district = (level === "district" ? name : value(attributes, candidate.district)) ??
+    const name = value(attributes, nameFields);
+    const district = (level === "district" ? name : value(attributes, chooseTextFields(fields, candidate.district))) ??
       (source === "bugesera" ? "Bugesera" : null);
     if (!name || !district || !PILOT_DISTRICTS.has(normalizeDistrictKey(district))) return [];
-    const sector = level === "sector" ? name : value(attributes, candidate.sector);
-    const cell = level === "cell" ? name : value(attributes, candidate.cell);
-    const village = level === "village" ? name : value(attributes, candidate.village);
+    const sector = level === "sector" ? name : value(attributes, chooseTextFields(fields, candidate.sector));
+    const cell = level === "cell" ? name : value(attributes, chooseTextFields(fields, candidate.cell));
+    const village = level === "village" ? name : value(attributes, chooseTextFields(fields, candidate.village));
     const ids = candidate.ids;
     const districtId = value(attributes, ids.district ?? []);
     const sectorId = value(attributes, ids.sector ?? []);
