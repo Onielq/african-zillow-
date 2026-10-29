@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TalkToExpertProps = {
@@ -11,11 +11,33 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
   const router = useRouter();
   const [isHidden, setIsHidden] = useState(false);
   const [showReopen, setShowReopen] = useState(false);
+  const [shouldRestoreCardFocus, setShouldRestoreCardFocus] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const reopenButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const insightArea = areaName?.trim() || "Rwanda land market";
+
+  useEffect(() => {
+    if (showReopen) reopenButtonRef.current?.focus();
+  }, [showReopen]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (shouldRestoreCardFocus && !isHidden && !showReopen) {
+      cardRef.current?.focus();
+      setShouldRestoreCardFocus(false);
+    }
+  }, [shouldRestoreCardFocus, isHidden, showReopen]);
 
   const openContact = () => router.push("/contact");
 
   const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // Only activate the card when the card itself has focus. A key press on
+    // the nested close button must not also navigate to the contact page.
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       openContact();
@@ -25,17 +47,23 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
   const closeCard = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     setIsHidden(true);
-    window.setTimeout(() => setShowReopen(true), 250);
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setShowReopen(true);
+    }, 250);
   };
 
   const reopenCard = () => {
     setShowReopen(false);
     setIsHidden(false);
+    setShouldRestoreCardFocus(true);
   };
 
   return (
     <>
       <div
+        ref={cardRef}
         aria-label={`Talk to an expert about ${insightArea}`}
         aria-hidden={isHidden ? true : undefined}
         className={isHidden ? "expert-card hidden" : "expert-card"}
@@ -81,6 +109,7 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
       </div>
 
       <button
+        ref={reopenButtonRef}
         aria-label="Reopen talk to an expert"
         className={showReopen ? "expert-reopen-btn visible" : "expert-reopen-btn"}
         onClick={reopenCard}
