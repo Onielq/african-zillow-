@@ -575,13 +575,15 @@ test("parcel location access covers main-road proximity, schools, hospitals, tra
   assert.match(route, /trunk\|primary\|secondary\|tertiary/);
   assert.match(route, /function distanceToRoadSegmentKm/);
   assert.match(route, /routeStatus: "straight-line"/);
+  assert.match(route, /Math\.round\(destination\.straightKm \* 100\) \/ 100/);
   assert.match(route, /amenity === "townhall"/);
   assert.match(route, /government === "administrative"/);
-  assert.match(route, /natural.*lake\|peak\|waterfall/);
-  assert.match(route, /tourism.*attraction\|viewpoint\|museum/);
+  assert.ok(route.includes('["natural", "lake", "peak", "waterfall", "spring"]'));
+  assert.ok(route.includes('["attraction", "viewpoint", "museum", "zoo", "theme_park"]'));
   assert.match(route, /OpenStreetMap may have incomplete or outdated facility and landmark coverage/);
   assert.match(experience, /Checking road, school, hospital, transport and landmark access/);
   assert.match(experience, /straight-line to mapped road/);
+  assert.match(experience, /straight-line · driving route unavailable/);
   assert.match(experience, /No mapped main roads, schools, hospitals, transport stops, landmarks or local offices found nearby/);
   assert.match(css, /\.comparison-search-filter-row/);
   assert.match(css, /\.comparison-level-filter:focus-visible/);
