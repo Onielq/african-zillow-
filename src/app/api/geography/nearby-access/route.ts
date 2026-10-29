@@ -192,7 +192,21 @@ async function calculateNearbyRoutes(lat: number, lon: number): Promise<{ items:
     Math.min(RWANDA.north, lat + radius),
     Math.min(RWANDA.east, lon + radius)
   );
-  const elements = await getOsmElements(query);
+  const roadRadius = 0.035;
+  const roadQuery = buildRoadQuery(
+    Math.max(RWANDA.south, lat - roadRadius),
+    Math.max(RWANDA.west, lon - roadRadius),
+    Math.min(RWANDA.north, lat + roadRadius),
+    Math.min(RWANDA.east, lon + roadRadius)
+  );
+  const [elements, roadElements] = await Promise.all([
+    getOsmElements(query),
+    getOsmElements(roadQuery).catch((error) => {
+      console.warn("Main-road geometry unavailable for nearby-access lookup.", error);
+      return [] as OsmElement[];
+    })
+  ]);
+
   const unique = new Map<string, Candidate>();
   for (const element of elements) {
     const tags = element.tags ?? {};
@@ -210,19 +224,53 @@ async function calculateNearbyRoutes(lat: number, lon: number): Promise<{ items:
     });
   }
 
-  // Route the nearest mapped candidate in each category, limiting each parcel
-  // click to a small, cached set of independent Valhalla route requests.
-  const categories: NearbyCategory[] = ["School", "Clinic / hospital", "Public transport"];
+  // Measure the shortest distance from the parcel-area center to a mapped
+  // trunk/primary/secondary/tertiary road segment. This is straight-line
+  // proximity, not a driving route or a legal driveway-access determination.
+  let nearestRoad: RouteResult | null = null;
+  let nearestRoadDistanceKm = Number.POSITIVE_INFINITY;
+  for (const road of roadElements) {
+    const points = road.geometry ?? [];
+    if (points.length < 2) continue;
+    for (let index = 1; index < points.length; index += 1) {
+      const distanceKm = distanceToRoadSegmentKm({ lat, lon }, points[index - 1], points[index]);
+      if (distanceKm < nearestRoadDistanceKm) {
+        nearestRoadDistanceKm = distanceKm;
+        const tags = road.tags ?? {};
+        const highway = (tags.highway ?? "main").replace(/_/g, " ");
+        nearestRoad = {
+          id: "osm-road-" + road.id,
+          category: "Main road",
+          name: tags.name?.trim() || tags["name:en"]?.trim() || highway.charAt(0).toUpperCase() + highway.slice(1) + " road",
+          distanceKm: Math.round(distanceKm * 1000) / 1000,
+          timeMinutes: null,
+          routeStatus: "straight-line"
+        };
+      }
+    }
+  }
+
+  // Fetch road-route estimates for the nearest mapped facility in each category.
+  // Calls are limited to one candidate per category and cached by parcel center.
+  const categories: NearbyAmenityCategory[] = [
+    "School", "Clinic / hospital", "Public transport", "Landmark", "Village office"
+  ];
   const nearest = categories.map((category) => Array.from(unique.values())
     .filter((candidate) => candidate.category === category)
     .sort((a, b) => a.straightKm - b.straightKm)[0])
     .filter((candidate): candidate is Candidate => Boolean(candidate));
-  const items = await Promise.all(nearest.map((candidate) => getRoadRoute({ lat, lon }, candidate)));
-  items.sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
-  return {
-    items,
-    note: "Estimated driving routes from the parcel-area center; no live traffic. Amenity coverage from OpenStreetMap may be incomplete."
-  };
+  const routedItems = await Promise.all(nearest.map((candidate) => getRoadRoute({ lat, lon }, candidate)));
+  const items: RouteResult[] = [
+    ...(nearestRoad ? [nearestRoad] : []),
+    ...routedItems
+  ];
+  const noteParts = [
+    "Facility distances and driving times are estimated from the parcel-area center; road routes do not include live traffic.",
+    "Main-road distance is straight-line proximity to the nearest mapped trunk, primary, secondary or tertiary road, not proof of a driveway or legal access.",
+    "OpenStreetMap may have incomplete or outdated facility and landmark coverage."
+  ];
+  if (!nearestRoad) noteParts.push("No nearby main-road geometry was returned by the map source for this request.");
+  return { items, note: noteParts.join(" ") };
 }
 
 export async function GET(request: NextRequest) {
