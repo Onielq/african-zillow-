@@ -1093,7 +1093,7 @@ export function MapExperience() {
         setGlobalSearchResults([]);
         setGlobalSearchStatus("error");
       }
-    }, 260);
+    }, 140);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -1125,7 +1125,7 @@ export function MapExperience() {
         setComparisonSearchResults([]);
         setComparisonSearchStatus("error");
       }
-    }, 180);
+    }, 140);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -1325,6 +1325,9 @@ export function MapExperience() {
             aria-expanded={compareOpen}
             className="compare-control"
             onClick={() => {
+              setGlobalSearchOpen(false);
+              setGlobalSearchResults([]);
+              setGlobalSearchStatus("idle");
               setSourcesOpen(false);
               setMetricInfoOpen(false);
               setCompareOpen((open) => !open);
@@ -1448,7 +1451,7 @@ export function MapExperience() {
           ) : null}
         </div>
 
-        <div className="map-floating-toolbar" ref={toolbarRef}>
+        <div className={compareOpen ? "map-floating-toolbar map-floating-toolbar-hidden" : "map-floating-toolbar"} ref={toolbarRef}>
           <div aria-label="Investment map actions" className="map-toolbar investment-toolbar">
             <div className="global-area-search">
               <div className="global-area-search-field">
@@ -1466,16 +1469,15 @@ export function MapExperience() {
                     const value = event.target.value;
                     setGlobalSearch(value);
                     setGlobalSearchOpen(true);
-                    if (value.trim().length < 2) {
-                      setGlobalSearchResults([]);
-                      setGlobalSearchStatus("idle");
-                    }
+                    setGlobalSearchResults([]);
+                    setGlobalSearchStatus(value.trim().length < 2 ? "idle" : "loading");
                   }}
                   onFocus={() => setGlobalSearchOpen(true)}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") setGlobalSearchOpen(false);
                     if (event.key === "Enter") {
                       event.preventDefault();
+                      if (globalSearchStatus === "loading") return;
                       const query = globalSearch.trim();
                       const isFullUpi = /^\d{1,2}(?:[/.\-\s]\d{1,2}){3}[/.\-\s]\d{1,7}$/.test(query);
                       const looksLikeAddress = !isFullUpi && (
@@ -2051,55 +2053,56 @@ export function MapExperience() {
               ×
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
-            <div className="selected-area-title-row">
-              {selectedArea.level === "parcel" ? (
-                <span className="parcel-asking-label">Asking price</span>
-              ) : (
+            {selectedArea.level !== "parcel" ? (
+              <div className="selected-area-title-row">
                 <h2>{selectedArea.name}</h2>
-              )}
-              {selectedArea.level === "parcel" ? (
-                selectedArea.parcelMarketStatus ? (
-                  <span
-                    className={"parcel-market-status-inline parcel-market-status-inline-" + selectedArea.parcelMarketStatus}
-                    title="Status supplied by the connected listing source."
-                    aria-label={selectedArea.parcelMarketStatus === "available"
-                      ? "Land for sale — status supplied by the connected listing source"
-                      : "Off the market — status supplied by the connected listing source"}
-                  >
-                    {selectedArea.parcelMarketStatus === "available" ? "For sale" : "Off market"}
-                  </span>
-                ) : (
-                  <span
-                    className="parcel-market-status-inline parcel-market-status-inline-unverified"
-                    title="Cadastral parcel geometry does not establish whether land is listed for sale."
-                    aria-label="For-sale status unverified; this parcel is not a verified listing"
-                  >
-                    Availability unverified
-                  </span>
-                )
-              ) : null}
-            </div>
-            {selectedArea.level === "parcel" ? (
-              <div className="parcel-price-headline" aria-label={displayedParcelPriceTypeLabel}>
-                <button
-                  aria-label={isCompactParcelPrice ? "Show full parcel asking price" : "Show rounded parcel asking price"}
-                  className="parcel-price-value-button"
-                  onClick={() => {
-                    if (!parcelPriceIdentity) return;
-                    setCompactParcelPriceKey(isCompactParcelPrice ? null : parcelPriceIdentity);
-                  }}
-                  title={isCompactParcelPrice ? "Click to show the full amount" : "Click to round the amount"}
-                  type="button"
-                >
-                  <strong className="parcel-price-value parcel-price-value-animate" key={isCompactParcelPrice ? "compact" : "exact"}>
-                    {displayedParcelValue !== null
-                      ? "RWF " + (isCompactParcelPrice
-                        ? formatShortMoney(displayedParcelValue)
-                        : new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(displayedParcelValue))
-                      : "Not available"}
-                  </strong>
-                </button>
               </div>
+            ) : null}
+            {selectedArea.level === "parcel" ? (
+              <section className="parcel-price-kpi" aria-label="Parcel asking price">
+                <div className="parcel-price-kpi-header">
+                  <span className="parcel-asking-label">Asking price</span>
+                  {selectedArea.parcelMarketStatus ? (
+                    <span
+                      className={"parcel-market-status-inline parcel-market-status-inline-" + selectedArea.parcelMarketStatus}
+                      title="Status supplied by the connected listing source."
+                      aria-label={selectedArea.parcelMarketStatus === "available"
+                        ? "Land for sale — status supplied by the connected listing source"
+                        : "Off the market — status supplied by the connected listing source"}
+                    >
+                      {selectedArea.parcelMarketStatus === "available" ? "For sale" : "Off market"}
+                    </span>
+                  ) : (
+                    <span
+                      className="parcel-market-status-inline parcel-market-status-inline-unverified"
+                      title="Cadastral parcel geometry does not establish whether land is listed for sale."
+                      aria-label="For-sale status unverified; this parcel is not a verified listing"
+                    >
+                      Availability unverified
+                    </span>
+                  )}
+                </div>
+                <div className="parcel-price-headline" aria-label={displayedParcelPriceTypeLabel}>
+                  <button
+                    aria-label={isCompactParcelPrice ? "Show full parcel asking price" : "Show rounded parcel asking price"}
+                    className="parcel-price-value-button"
+                    onClick={() => {
+                      if (!parcelPriceIdentity) return;
+                      setCompactParcelPriceKey(isCompactParcelPrice ? null : parcelPriceIdentity);
+                    }}
+                    title={isCompactParcelPrice ? "Click to show the full amount" : "Click to round the amount"}
+                    type="button"
+                  >
+                    <strong className="parcel-price-value parcel-price-value-animate" key={isCompactParcelPrice ? "compact" : "exact"}>
+                      {displayedParcelValue !== null
+                        ? "RWF " + (isCompactParcelPrice
+                          ? formatShortMoney(displayedParcelValue)
+                          : new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(displayedParcelValue))
+                        : "Not available"}
+                    </strong>
+                  </button>
+                </div>
+              </section>
             ) : null}
             {selectedArea.level === "parcel" && hasSourcedParcelPrice && selectedArea.parcelPriceSource ? (
               <p className="parcel-price-source">Source: {selectedArea.parcelPriceSource}</p>
@@ -2705,10 +2708,8 @@ export function MapExperience() {
               onChange={(event) => {
                 const value = event.target.value;
                 setCompareSearch(value);
-                if (value.trim().length < 2) {
-                  setComparisonSearchResults([]);
-                  setComparisonSearchStatus("idle");
-                }
+                setComparisonSearchResults([]);
+                setComparisonSearchStatus(value.trim().length < 2 ? "idle" : "loading");
               }}
               placeholder="District, sector, cell, village, parcel number or UPI" type="search" value={compareSearch} />
             <p className="comparison-search-help">Search across all levels. Add any mix of districts, sectors, cells, villages and parcels to one comparison.</p>

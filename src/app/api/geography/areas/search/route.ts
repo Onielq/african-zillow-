@@ -7,6 +7,8 @@ const KIGALI_MAP_SERVER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer";
 const BUGESERA_MAP_SERVER =
   "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
+const NATIONAL_ADMIN_SERVER =
+  "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
 const KIGALI_PARCELS =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
 const BUGESERA_PARCELS =
@@ -14,7 +16,7 @@ const BUGESERA_PARCELS =
 
 type AdminAreaLevel = "district" | "sector" | "cell" | "village";
 type AreaLevel = AdminAreaLevel | "parcel";
-type SourceId = "kigali" | "bugesera";
+type SourceId = "kigali" | "bugesera" | "national";
 type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
 type LayerQueryResponse = {
@@ -199,44 +201,63 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   const metadata = await getLayerMetadata(layerUrl);
   const fields = metadata.fields ?? [];
   const candidate = CANDIDATES[level];
-  // Published GIS schemas are not consistent: one level can expose its label
-  // as "district", while another publishes it as "name" or "name_e". Query
-  // every recognised label field so a valid place is not hidden by the first
-  // field existing but containing nulls or identifiers.
   const nameFields = chooseTextFields(fields, candidate.name);
   if (nameFields.length === 0) return [];
 
   const escaped = query.replace(/'/g, "''");
-  // Query only fields needed to label and distinguish matching areas. This
-  // keeps administrative search payloads small while preserving hierarchy IDs.
   const requestedFields = new Set<string>(nameFields);
+  for (const field of chooseTextFields(fields, ["province", "province_name", "prov_name", "province_e"])) requestedFields.add(field);
   for (const key of ["district", "sector", "cell", "village"] as const) {
     for (const field of chooseTextFields(fields, candidate[key])) requestedFields.add(field);
     const idField = chooseField(fields, candidate.ids[key]);
     if (idField) requestedFields.add(idField);
   }
-  const params = new URLSearchParams({
-    where: "(" + nameFields.map((field) => field + " LIKE " + "'%" + escaped + "%'").join(" OR ") + ")",
+
+  const commonParams = {
     outFields: Array.from(requestedFields).join(","),
     returnGeometry: "true",
     outSR: "4326",
-    resultRecordCount: "25",
     f: "json"
-  });
-  const response = await fetch(layerUrl + "/query?" + params.toString(), {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 300 },
-    signal: AbortSignal.timeout(10_000)
-  });
-  if (!response.ok) throw new Error("Administrative search failed (" + response.status + ")");
-  const payload = await response.json() as LayerQueryResponse;
-  if (payload.error) throw new Error(payload.error.message ?? "Administrative search query failed");
+  };
+  const prefixWhere = "(" + nameFields.map((field) =>
+    "(" + field + " = '" + escaped + "' OR " + field + " LIKE '" + escaped + "%')"
+  ).join(" OR ") + ")";
+  const containsWhere = "(" + nameFields.map((field) =>
+    field + " LIKE '%" + escaped + "%'"
+  ).join(" OR ") + ")";
 
-  return (payload.features ?? []).flatMap((feature, index) => {
+  const queryLayer = async (where: string, limit: number): Promise<LayerQueryResponse> => {
+    const params = new URLSearchParams({
+      ...commonParams,
+      where,
+      resultRecordCount: String(limit),
+      orderByFields: nameFields[0] + " ASC"
+    });
+    const response = await fetch(layerUrl + "/query?" + params.toString(), {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!response.ok) throw new Error("Administrative search failed (" + response.status + ")");
+    const payload = await response.json() as LayerQueryResponse;
+    if (payload.error) throw new Error(payload.error.message ?? "Administrative search query failed");
+    return payload;
+  };
+
+  // Run prefix/exact matching alongside substring matching. This puts the
+  // exact administrative name ahead of similarly named villages and prevents
+  // common short prefixes from hiding the place the user actually typed.
+  const [prefixPayload, containsPayload] = await Promise.all([
+    queryLayer(prefixWhere, 50),
+    queryLayer(containsWhere, 50)
+  ]);
+  const features = [...(prefixPayload.features ?? []), ...(containsPayload.features ?? [])];
+
+  return features.flatMap((feature, index) => {
     const attributes = feature.attributes ?? {};
     const name = value(attributes, nameFields);
     const district = (level === "district" ? name : value(attributes, chooseTextFields(fields, candidate.district))) ??
-      (source === "bugesera" ? "Bugesera" : null);
+      (normalizeDistrictKey(name ?? "") === "bugesera" ? "Bugesera" : null);
     if (!name || !district || !PILOT_DISTRICTS.has(normalizeDistrictKey(district))) return [];
     const sector = level === "sector" ? name : value(attributes, chooseTextFields(fields, candidate.sector));
     const cell = level === "cell" ? name : value(attributes, chooseTextFields(fields, candidate.cell));
@@ -246,9 +267,8 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const sectorId = value(attributes, ids.sector ?? []);
     const cellId = value(attributes, ids.cell ?? []);
     const villageId = value(attributes, ids.village ?? []);
-    const province = source === "bugesera"
-      ? "Eastern Province"
-      : value(attributes, ["province", "prov_name", "province_name", "province_e"]) ?? "Kigali City";
+    const province = value(attributes, ["province", "province_name", "prov_name", "province_e"]) ??
+      (normalizeDistrictKey(district) === "bugesera" ? "Eastern Province" : "Kigali City");
     const bounds = boundsFromGeometry(feature.geometry);
     return [{
       id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, index].filter(Boolean).join("-"),
@@ -264,9 +284,11 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
       village,
       villageId,
       averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[normalizeDistrictKey(district)] ?? null : null,
-      sourceLabel: source === "kigali"
-        ? "Kigali City Master Plan administrative boundaries"
-        : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
+      sourceLabel: source === "national"
+        ? "Government administrative boundaries · 2022 census mapping"
+        : source === "kigali"
+          ? "Kigali City Master Plan administrative boundaries"
+          : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
       sourceType: "administrative-boundary" as const,
       bounds,
       center: centerFromBounds(bounds)
@@ -528,7 +550,17 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "public, max-age=30, s-maxage=60" }
     });
   }
-  const query = rawQuery.slice(0, 80).replace(/\s+(?:district|sector|cell|village)$/i, "").trim();
+  const cleanedQuery = rawQuery.slice(0, 80)
+    .replace(/^\s*(?:district|sector|cell|village)\s*[:=-]?\s+/i, "")
+    .replace(/\s+(?:district|sector|cell|village)$/i, "")
+    .trim();
+  const cleanedKey = normalizeKey(cleanedQuery);
+  // Accept common spoken/spelling variants; display the government spelling.
+  const bugeseraAliases = ["wijesera", "wugesera", "wujezera"];
+  const isBugeseraAlias = cleanedKey.length >= 4 && bugeseraAliases.some(
+    (alias) => alias.startsWith(cleanedKey) || cleanedKey.startsWith(alias)
+  );
+  const query = isBugeseraAlias ? "Bugesera" : cleanedQuery;
   const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
@@ -596,27 +628,31 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const tasks = [
-    ...sources.flatMap((source) =>
-      (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
-        searchLayer(source.id, source.baseUrl, level, layerId, query)
-          .then((areas) => ({ areas, failed: false }))
+  const adminTasks = (Object.entries({ district: 0, sector: 1, cell: 2, village: 3 }) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
+    searchLayer("national", NATIONAL_ADMIN_SERVER, level, layerId, query)
+      .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
+      .catch((error) => {
+        console.error("Official administrative search failed for " + level + ".", error);
+        return { areas: [] as SearchArea[], failed: true, kind: "administrative" as const };
+      })
+  );
+  const shouldSearchParcels = /\d/.test(query) || fullUpiQuery !== null;
+  const parcelTasks = shouldSearchParcels
+    ? sources.map((source) =>
+        searchParcels(source.id, source.parcelUrl, query)
+          .then((areas) => ({ areas, failed: false, kind: "parcel" as const }))
           .catch((error) => {
-            console.error("Comparison area search failed for " + source.id + " " + level + ".", error);
-            return { areas: [] as SearchArea[], failed: true };
+            console.error("Parcel identifier search failed for " + source.id + ".", error);
+            return { areas: [] as SearchArea[], failed: true, kind: "parcel" as const };
           })
       )
-    ),
-    ...sources.map((source) =>
-      searchParcels(source.id, source.parcelUrl, query)
-        .then((areas) => ({ areas, failed: false }))
-        .catch((error) => {
-          console.error("Parcel identifier search failed for " + source.id + ".", error);
-          return { areas: [] as SearchArea[], failed: true };
-        })
-    )
-  ];
+    : [];
+  const tasks = [...adminTasks, ...parcelTasks];
   const results = await Promise.all(tasks);
+  const administrativeResults = results.filter((result) => result.kind === "administrative");
+  if (administrativeResults.length === 0 || administrativeResults.every((result) => result.failed)) {
+    return NextResponse.json({ error: "The official administrative search service is temporarily unavailable." }, { status: 502 });
+  }
   const allAreas = results.flatMap((result) => result.areas);
   const areas = fullUpiQuery
     ? allAreas.filter((area) => area.level === "parcel" && normalizeKey(area.upi ?? "") === normalizeKey(fullUpiQuery))
@@ -628,25 +664,30 @@ export async function GET(request: NextRequest) {
       : [area.level, normalizeKey(area.district), normalizeKey(area.sector ?? ""), normalizeKey(area.cell ?? ""), normalizeKey(area.village ?? ""), normalizeKey(area.name)].join("|");
     if (!deduplicated.has(key)) deduplicated.set(key, area);
   }
+  const normalizedQuery = normalizeKey(query);
+  const matchRank = (area: SearchArea) => {
+    const labels = [area.name, area.upi, area.parcelNumber].filter((value): value is string => Boolean(value)).map(normalizeKey);
+    if (labels.some((value) => value === normalizedQuery)) return 0;
+    if (labels.some((value) => value.startsWith(normalizedQuery))) return 1;
+    if (labels.some((value) => value.includes(normalizedQuery))) return 2;
+    return 3;
+  };
+  const order: Record<AreaLevel, number> = { district: 0, sector: 1, cell: 2, village: 3, parcel: 4 };
   const sorted = Array.from(deduplicated.values()).sort((a, b) => {
-    const aExact = [a.name, a.upi, a.parcelNumber].some((value) => normalizeKey(value ?? "") === normalizeKey(query)) ? 0 : 1;
-    const bExact = [b.name, b.upi, b.parcelNumber].some((value) => normalizeKey(value ?? "") === normalizeKey(query)) ? 0 : 1;
-    if (aExact !== bExact) return aExact - bExact;
-    const order: Record<AreaLevel, number> = { district: 0, sector: 1, cell: 2, village: 3, parcel: 4 };
-    return order[a.level] - order[b.level] || a.name.localeCompare(b.name);
+    const relevanceDifference = matchRank(a) - matchRank(b);
+    if (relevanceDifference !== 0) return relevanceDifference;
+    return order[a.level] - order[b.level] || a.name.localeCompare(b.name) ||
+      a.district.localeCompare(b.district) || (a.sector ?? "").localeCompare(b.sector ?? "");
   }).slice(0, 80);
 
-  if (results.every((result) => result.failed)) {
-    return NextResponse.json({ error: "The administrative search services are unavailable." }, { status: 502 });
-  }
   return NextResponse.json({
     areas: sorted,
     searched: query,
-    coverage: "Pilot administrative hierarchy: Gasabo, Kicukiro, Nyarugenge and Bugesera"
+    coverage: "Government administrative hierarchy: Gasabo, Kicukiro, Nyarugenge and Bugesera; cadastral search from connected parcel sources"
   }, {
     headers: {
       "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
-      "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan"
+      "X-Data-Source": "Government administrative boundaries · 2022 census mapping; Kigali City and Bugesera cadastral sources"
     }
   });
 }
