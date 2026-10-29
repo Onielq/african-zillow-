@@ -916,21 +916,35 @@ type ParcelGeoJsonFeatureCollection = {
   }>;
 };
 
+type ParcelFallbackOutcome = {
+  response: NextResponse | null;
+  status: "used" | "skipped" | "failed";
+  reason?: string;
+};
+
 async function fetchVercelParcelFallback(
   bounds: Bounds,
   sourceFilter: "kigali" | "bugesera" | undefined,
-  unavailableProviders: string[]
-): Promise<NextResponse | null> {
+  unavailableProviders: string[],
+  allowFallback: boolean
+): Promise<ParcelFallbackOutcome> {
   // Cloudflare's Worker runtime can fail to reach the public ArcGIS endpoints
   // even when the same query succeeds in Vercel's runtime. Use Vercel only as
   // a server-to-server failover after every primary provider has failed.
   // Vercel does not use this fallback, so this cannot recurse back into itself.
-  if (process.env.DEPLOYMENT_PLATFORM !== "cloudflare-workers") return null;
+  if (!allowFallback) {
+    return { response: null, status: "skipped", reason: "not-cloudflare-runtime" };
+  }
 
   const fallbackOrigin = (
     process.env.TAISEEL_GIS_FALLBACK_ORIGIN || "https://rwanda-land-intelligence.vercel.app"
   ).replace(/\/+$/, "");
-  const url = new URL("/api/geography/areas", fallbackOrigin);
+  let url: URL;
+  try {
+    url = new URL("/api/geography/areas", fallbackOrigin);
+  } catch {
+    return { response: null, status: "failed", reason: "invalid-fallback-origin" };
+  }
   url.searchParams.set("level", "parcel");
   if (sourceFilter) url.searchParams.set("source", sourceFilter);
   url.searchParams.set("bbox", bounds.join(","));
@@ -960,7 +974,14 @@ async function fetchVercelParcelFallback(
     payload = await Promise.race([fallbackPromise, timeoutPromise]);
   } catch (error) {
     console.error("Vercel parcel fallback failed.", error);
-    return null;
+    const message = error instanceof Error ? error.message : String(error);
+    const httpStatus = message.match(/returned HTTP (\d{3})/);
+    const reason = /timed out/i.test(message)
+      ? "vercel-timeout"
+      : httpStatus
+        ? "vercel-http-" + httpStatus[1]
+        : "vercel-fetch-or-parse-error";
+    return { response: null, status: "failed", reason };
   } finally {
     if (timeoutHandle !== null) clearTimeout(timeoutHandle);
   }
@@ -974,7 +995,7 @@ async function fetchVercelParcelFallback(
     !Array.isArray(payload.features)
   ) {
     console.error("Vercel parcel fallback returned an invalid FeatureCollection.");
-    return null;
+    return { response: null, status: "failed", reason: "invalid-feature-collection" };
   }
 
   const collection = payload as ParcelGeoJsonFeatureCollection;
@@ -988,7 +1009,7 @@ async function fetchVercelParcelFallback(
   );
   if (containsUnverifiedGeometry) {
     console.error("Vercel parcel fallback returned a feature without cadastral geometry and UPI.");
-    return null;
+    return { response: null, status: "failed", reason: "invalid-cadastral-feature" };
   }
 
   console.warn(
@@ -996,20 +1017,25 @@ async function fetchVercelParcelFallback(
     unavailableProviders.join(", ")
   );
 
-  return NextResponse.json(collection, {
-    headers: {
-      "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
-      "X-Data-Source": "City of Kigali Master Plan parcels; National Land Authority LAIS Bugesera_Parcels",
-      "X-Parcel-Coverage": "Cadastral parcel polygons queried for this viewport by the Vercel fallback API",
-      "X-Parcel-Fallback-Source": "Vercel production parcel API",
-      "X-Parcel-Provider-Warning": "Primary GIS provider(s) unavailable in Cloudflare: " + unavailableProviders.join(", ")
-    }
-  });
+  return {
+    response: NextResponse.json(collection, {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
+        "X-Data-Source": "City of Kigali Master Plan parcels; National Land Authority LAIS Bugesera_Parcels",
+        "X-Parcel-Coverage": "Cadastral parcel polygons queried for this viewport by the Vercel fallback API",
+        "X-Parcel-Fallback-Source": "Vercel production parcel API",
+        "X-Parcel-Fallback-Status": "used",
+        "X-Parcel-Provider-Warning": "Primary GIS provider(s) unavailable in Cloudflare: " + unavailableProviders.join(", ")
+      }
+    }),
+    status: "used"
+  };
 }
 
 async function getParcels(
   bounds: Bounds,
-  sourceFilter?: "kigali" | "bugesera"
+  sourceFilter: "kigali" | "bugesera" | undefined,
+  allowVercelFallback: boolean
 ): Promise<NextResponse> {
   // These providers publish individual parcel polygons. Do not replace a
   // missing cadastral polygon with a road edge, image trace, or zoning polygon.
@@ -1050,19 +1076,28 @@ async function getParcels(
 
   if (results.every((result) => result.failed)) {
     const unavailableProviders = results.map((result) => result.provider.id);
-    const fallback = await fetchVercelParcelFallback(bounds, sourceFilter, unavailableProviders);
-    if (fallback) return fallback;
+    const fallback = await fetchVercelParcelFallback(
+      bounds,
+      sourceFilter,
+      unavailableProviders,
+      allowVercelFallback
+    );
+    if (fallback.response) return fallback.response;
 
     return NextResponse.json(
       {
         error: "The cadastral parcel boundary sources are temporarily unavailable.",
-        unavailableProviders
+        unavailableProviders,
+        fallbackStatus: fallback.status,
+        fallbackReason: fallback.reason ?? null
       },
       {
         status: 502,
         headers: {
           "Cache-Control": "no-store",
-          "X-Parcel-Provider-Warning": "Unavailable provider(s): " + unavailableProviders.join(", ")
+          "X-Parcel-Provider-Warning": "Unavailable provider(s): " + unavailableProviders.join(", "),
+          "X-Parcel-Fallback-Status": fallback.status,
+          "X-Parcel-Fallback-Reason": fallback.reason ?? "none"
         }
       }
     );
@@ -1206,6 +1241,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (level === "parcel") return getParcels(bounds, sourceFilter ?? undefined);
+  const requestHost = request.nextUrl.hostname.toLowerCase();
+  const allowVercelParcelFallback =
+    process.env.DEPLOYMENT_PLATFORM === "cloudflare-workers" ||
+    requestHost.endsWith(".workers.dev");
+
+  if (level === "parcel") {
+    return getParcels(bounds, sourceFilter ?? undefined, allowVercelParcelFallback);
+  }
   return getAdministrativeAreas(level, bounds, sourceFilter ?? undefined);
 }
