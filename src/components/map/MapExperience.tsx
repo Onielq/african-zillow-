@@ -1462,6 +1462,7 @@ export function MapExperience() {
                     }
                   }}
                   placeholder="Search address, area, UPI…"
+                  aria-autocomplete="list"
                   role="combobox"
                   type="search"
                   value={globalSearch}
