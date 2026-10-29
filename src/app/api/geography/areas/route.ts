@@ -849,7 +849,8 @@ async function queryParcelBounds(
       300,
       "upi IS NOT NULL",
       "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
-      180
+      180,
+      8_000
     );
 
     // A very dense tile may still contain thousands of records. Subdivide it,
@@ -868,7 +869,14 @@ async function queryParcelBounds(
     budget.remaining -= bounded.length;
     return { features: bounded, failed: false };
   } catch (error) {
-    if (depth >= 2 || area <= 0.00002) {
+    // Splitting a query can recover from an oversized spatial window, but it
+    // cannot recover from an upstream gateway outage or a timed-out small tile.
+    // Stop here so one unavailable provider cannot hold the map open for minutes.
+    const isTransientUpstreamFailure = error instanceof Error && (
+      /ArcGIS layer request failed \((?:502|503|504)\)/.test(error.message) ||
+      /timeout|timed out|fetch failed|ECONNRESET|EAI_AGAIN/i.test(error.name + " " + error.message)
+    );
+    if (isTransientUpstreamFailure || depth >= 2 || area <= 0.00002) {
       console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
       return { features: [], failed: true };
     }
