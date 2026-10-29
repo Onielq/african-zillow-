@@ -825,9 +825,18 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.match(route, /isTransientUpstreamFailure \|\| depth >= 2/);
   assert.ok(route.includes("Promise.race([fetchPromise, timeoutPromise])"));
   assert.match(route, /ArcGIS layer request timed out after/);
+  assert.ok(route.includes("Promise.race([fallbackPromise, timeoutPromise])"));
+  assert.ok(route.includes("20_000"));
   assert.match(route, /"X-Parcel-Provider-Warning"/);
   assert.ok(route.includes("15_000"));
+  assert.match(route, /process\.env\.DEPLOYMENT_PLATFORM !== "cloudflare-workers"/);
+  assert.ok(route.includes("https://rwanda-land-intelligence.vercel.app"));
+  assert.match(route, /if \(fallback\) return fallback/);
+  assert.match(route, /"X-Parcel-Fallback-Source"/);
+  assert.match(route, /source_type !== "cadastral-parcel"/);
   assert.ok(e2e.includes("AbortSignal.timeout(25_000)"));
+  assert.ok(e2e.includes('querySourceFeatures("land-parcels")'));
+  assert.ok(e2e.includes("avoiding a duplicate GIS request"));
 });
 
 test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {
