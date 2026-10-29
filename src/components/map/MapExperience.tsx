@@ -142,6 +142,8 @@ function getUnitPriceEstimate(
   allowDistrictFallback = false
 ): UnitPriceEstimate {
   const districtKey = normalizeAreaName(area.district);
+  // uses the currently connected district transaction-price snapshot where finer-level data is missing.
+  // Keep this as a fallback only: a parcel-specific asking price needs a named source.
   if (area.level === "district" && area.averageLandPricePerM2 !== null) {
     return {
       pricePerM2: area.averageLandPricePerM2,
@@ -1571,6 +1573,10 @@ export function MapExperience() {
                 ))}
               </div>
             ) : null}
+            <p className="directory-evidence-note">
+              Public websites are discovery leads, not verification of current licensing, affiliation, or availability.
+              No “top agent” ranking is published.
+            </p>
           </aside>
         ) : null}
 
@@ -1773,6 +1779,9 @@ export function MapExperience() {
                 </strong>
               </div>
             ) : null}
+            {selectedArea.level === "parcel" && hasSourcedParcelPrice && selectedArea.parcelPriceSource ? (
+              <p className="parcel-price-source">Source: {selectedArea.parcelPriceSource}</p>
+            ) : null}
             {selectedArea.level === "parcel" ? (
               <div className="parcel-confidence-strip" aria-label="Parcel data confidence">
                 <span
@@ -1905,7 +1914,7 @@ export function MapExperience() {
                       ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
                       : "Not available"}
                   </strong>
-                  <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used to calculate the parcel asking price."}</small>
+                  <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Asking price is calculated as parcel area × the available average transaction price per m². This is an estimate, not a verified listing price."}</small>
                 </div>
                 <div>
                   <span>Average reference price · district benchmark</span>
