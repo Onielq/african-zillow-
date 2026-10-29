@@ -9,12 +9,14 @@ type OsmElement = {
   lat?: number;
   lon?: number;
   center?: { lat?: number; lon?: number };
+  geometry?: Array<{ lat: number; lon: number }>;
   tags?: Record<string, string | undefined>;
 };
 type OsmResponse = { elements?: OsmElement[]; remark?: string };
-type NearbyCategory = "School" | "Clinic / hospital" | "Public transport";
-type Candidate = { id: string; name: string; category: NearbyCategory; lat: number; lon: number; straightKm: number };
-type RouteResult = { id: string; category: NearbyCategory; name: string; distanceKm: number | null; timeMinutes: number | null; routeStatus: "routed" | "unavailable" };
+type NearbyCategory = "Main road" | "School" | "Clinic / hospital" | "Public transport" | "Landmark" | "Village office";
+type NearbyAmenityCategory = Exclude<NearbyCategory, "Main road">;
+type Candidate = { id: string; name: string; category: NearbyAmenityCategory; lat: number; lon: number; straightKm: number };
+type RouteResult = { id: string; category: NearbyCategory; name: string; distanceKm: number | null; timeMinutes: number | null; routeStatus: "routed" | "straight-line" | "unavailable" };
 type ValhallaResponse = {
   trip?: { status?: number; status_message?: string; summary?: { length?: number; time?: number }; legs?: Array<{ summary?: { length?: number; time?: number } }> };
   error?: string;
@@ -38,30 +40,89 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
   return 6371.0088 * 2 * Math.asin(Math.sqrt(Math.min(1, term)));
 }
 
-function classify(tags: Record<string, string | undefined>): NearbyCategory | null {
+function classify(tags: Record<string, string | undefined>): NearbyAmenityCategory | null {
   const amenity = (tags.amenity ?? "").toLowerCase();
   const healthcare = (tags.healthcare ?? "").toLowerCase();
+  const office = (tags.office ?? "").toLowerCase();
+  const government = (tags.government ?? "").toLowerCase();
+  const tourism = (tags.tourism ?? "").toLowerCase();
+  const leisure = (tags.leisure ?? "").toLowerCase();
+  const natural = (tags.natural ?? "").toLowerCase();
+  const waterway = (tags.waterway ?? "").toLowerCase();
+  const historic = (tags.historic ?? "").toLowerCase();
+
   if (["school", "university", "college", "kindergarten"].includes(amenity)) return "School";
   if (["hospital", "clinic", "doctors", "pharmacy"].includes(amenity) ||
       ["hospital", "clinic", "doctor", "pharmacy"].includes(healthcare)) return "Clinic / hospital";
   if (tags.highway === "bus_stop" || ["bus_stop", "bus_station"].includes(amenity)) return "Public transport";
+  if (amenity === "townhall" || ["government", "administrative"].includes(office) ||
+      government === "administrative") return "Village office";
+  if (["attraction", "viewpoint", "museum", "zoo", "theme_park"].includes(tourism) ||
+      ["park", "nature_reserve"].includes(leisure) ||
+      ["lake", "peak", "waterfall", "spring"].includes(natural) ||
+      ["river", "waterfall"].includes(waterway) ||
+      ["monument", "memorial", "castle", "ruins"].includes(historic)) return "Landmark";
   return null;
 }
 
-function categoryName(category: NearbyCategory): string {
-  return category === "School" ? "Unnamed school" :
-    category === "Clinic / hospital" ? "Unnamed medical facility" : "Unnamed transport stop";
+function categoryName(category: NearbyAmenityCategory): string {
+  switch (category) {
+    case "School": return "Unnamed school";
+    case "Clinic / hospital": return "Unnamed medical facility";
+    case "Public transport": return "Unnamed transport stop";
+    case "Landmark": return "Unnamed landmark";
+    case "Village office": return "Unnamed local office";
+  }
 }
 
 function buildQuery(south: number, west: number, north: number, east: number): string {
   const box = [south, west, north, east].map((value) => value.toFixed(6)).join(",");
   return [
     "[out:json][timeout:8];", "(",
-    'nwr["amenity"~"school|university|college|kindergarten|hospital|clinic|doctors|pharmacy|bus_station|bus_stop"](' + box + ");",
+    'nwr["amenity"~"school|university|college|kindergarten|hospital|clinic|doctors|pharmacy|bus_station|bus_stop|townhall"](' + box + ");",
     'nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");",
+    'nwr["office"~"government|administrative"](' + box + ");",
+    'nwr["government"="administrative"](' + box + ");",
+    'nwr["tourism"~"attraction|viewpoint|museum|zoo|theme_park"](' + box + ");",
+    'nwr["leisure"~"park|nature_reserve"](' + box + ");",
+    'nwr["natural"~"lake|peak|waterfall|spring"](' + box + ");",
+    'nwr["waterway"~"river|waterfall"](' + box + ");",
+    'nwr["historic"~"monument|memorial|castle|ruins"](' + box + ");",
     'node["highway"="bus_stop"](' + box + ");",
     ");", "out center tags;"
   ].join("\n");
+}
+
+function buildRoadQuery(south: number, west: number, north: number, east: number): string {
+  const box = [south, west, north, east].map((value) => value.toFixed(6)).join(",");
+  return [
+    "[out:json][timeout:8];",
+    'way["highway"~"^(trunk|primary|secondary|tertiary)$"](' + box + ");",
+    "out geom tags;"
+  ].join("\n");
+}
+
+function distanceToRoadSegmentKm(
+  origin: { lat: number; lon: number },
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number }
+): number {
+  // A local equirectangular projection is accurate enough over this short
+  // distance, and avoids confusing straight-line proximity with a road route.
+  const radians = origin.lat * Math.PI / 180;
+  const metersPerDegreeLatitude = 111_320;
+  const metersPerDegreeLongitude = 111_320 * Math.cos(radians);
+  const ax = (a.lon - origin.lon) * metersPerDegreeLongitude;
+  const ay = (a.lat - origin.lat) * metersPerDegreeLatitude;
+  const bx = (b.lon - origin.lon) * metersPerDegreeLongitude;
+  const by = (b.lat - origin.lat) * metersPerDegreeLatitude;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared));
+  const nearestX = ax + t * dx;
+  const nearestY = ay + t * dy;
+  return Math.sqrt(nearestX * nearestX + nearestY * nearestY) / 1000;
 }
 
 async function getOsmElements(query: string): Promise<OsmElement[]> {
