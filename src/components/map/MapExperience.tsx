@@ -1149,11 +1149,7 @@ export function MapExperience() {
 
   useEffect(() => {
     const query = compareSearch.trim();
-    if (query.length < 2) {
-      setComparisonSearchResults([]);
-      setComparisonSearchStatus("idle");
-      return;
-    }
+    if (query.length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setComparisonSearchStatus("loading");
