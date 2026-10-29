@@ -825,18 +825,23 @@ async function queryParcelChildren(
   depth: number,
   parentBudget: { remaining: number }
 ): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
-  const collected: UpstreamFeature[] = [];
-  let succeeded = 0;
-  for (let index = 0; index < children.length; index += 1) {
-    if (parentBudget.remaining <= 0) break;
-    const childrenLeft = children.length - index;
-    const allocation = Math.max(1, Math.floor(parentBudget.remaining / childrenLeft));
+  // Query neighbouring tiles concurrently. Serial tile requests caused dense
+  // Bugesera viewports to wait for several GIS timeouts before the map could draw.
+  const initialBudget = parentBudget.remaining;
+  const baseAllocation = Math.floor(initialBudget / children.length);
+  const remainder = initialBudget % children.length;
+  const results = await Promise.all(children.map(async (child, index) => {
+    const allocation = baseAllocation + (index < remainder ? 1 : 0);
     const childBudget = { remaining: allocation };
-    const result = await queryParcelBounds(provider, children[index], depth, childBudget);
-    parentBudget.remaining -= allocation - childBudget.remaining;
-    if (!result.failed) succeeded += 1;
-    collected.push(...result.features);
-  }
+    const result = await queryParcelBounds(provider, child, depth, childBudget);
+    return {
+      result,
+      used: allocation - childBudget.remaining
+    };
+  }));
+  parentBudget.remaining = Math.max(0, initialBudget - results.reduce((sum, item) => sum + item.used, 0));
+  const succeeded = results.filter((item) => !item.result.failed).length;
+  const collected = results.flatMap((item) => item.result.features);
   return { features: uniqueUpiFeatures(collected), failed: succeeded === 0 && collected.length === 0 };
 }
 
@@ -853,9 +858,11 @@ async function queryParcelBounds(
   const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
   const splitBounds = splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent));
 
-  // Do not load a whole-district parcel payload into one serverless request.
-  // Query smaller geographic tiles sequentially and stop after a bounded batch.
-  const splitBeforeQuery = area > 0.01 && depth < 2;
+  // Pre-split neighborhood-scale viewports before asking for full polygon
+  // geometries. A single 300-feature response from Bugesera can be slow, and
+  // splitting only after that response adds another full GIS round trip.
+  // The 0.0003-degree² threshold covers a typical village-level viewport.
+  const splitBeforeQuery = area > 0.0003 && depth < 1;
   if (splitBeforeQuery) {
     return queryParcelChildren(provider, splitBounds, depth + 1, budget);
   }
@@ -1071,15 +1078,12 @@ async function getParcels(
     });
   }
 
-  // On Cloudflare, try the Vercel parcel API first. The Worker runtime can
-  // spend 15 seconds waiting for primary GIS calls before the old fallback
-  // even starts; that can leave the map without parcel outlines on a normal
-  // viewport refresh. The Vercel route does not call this fallback, and the
-  // response must pass the cadastral geometry/UPI validation above.
-  const fastFallback = allowVercelFallback
-    ? await fetchVercelParcelFallback(bounds, sourceFilter, [], true)
-    : null;
-  if (fastFallback?.response) return fastFallback.response;
+  // Start the server-to-server fallback in parallel with the cadastral source.
+  // Waiting for the Vercel fallback and then starting GIS queries serially added
+  // two separate timeout windows and left Bugesera with no outlines at close zoom.
+  const fastFallbackPromise = allowVercelFallback
+    ? fetchVercelParcelFallback(bounds, sourceFilter, [], true)
+    : Promise.resolve<ParcelFallbackOutcome | null>(null);
 
   const parcelBudget = { remaining: 900 };
   const results = [];
@@ -1091,7 +1095,7 @@ async function getParcels(
 
   if (results.every((result) => result.failed)) {
     const unavailableProviders = results.map((result) => result.provider.id);
-    const fallback = fastFallback ?? await fetchVercelParcelFallback(
+    const fallback = await fastFallbackPromise ?? await fetchVercelParcelFallback(
       bounds,
       sourceFilter,
       unavailableProviders,
@@ -1127,7 +1131,14 @@ async function getParcels(
 
       if (provider.id === "bugesera") {
         const district = textValue(attributeValue(attributes, ["district"]));
-        if (!district || district.toUpperCase() !== "BUGESERA") return null;
+        const districtKey = (district ?? "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLocaleLowerCase("en")
+          .replace(/\s+district$/, "");
+        if (districtKey !== "bugesera") return null;
 
         const locationIds = bugeseraLocationIdsFromUpi(upi);
         const rawProvince = textValue(attributeValue(attributes, ["province"]));
@@ -1199,6 +1210,10 @@ async function getParcels(
   );
 
   const failedProviders = results.filter((result) => result.failed).map((result) => result.provider.id);
+  if (features.length === 0 && fastFallbackPromise) {
+    const fallback = await fastFallbackPromise;
+    if (fallback?.response) return fallback.response;
+  }
   return NextResponse.json(
     { type: "FeatureCollection", features },
     {
