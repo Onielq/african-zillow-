@@ -455,10 +455,19 @@ type ComparisonPanelProps = {
 };
 
 function bestMetricIds(items: ParcelComparisonItem[], key: "askingPrice" | "pricePerM2" | "areaM2", direction: "min" | "max"): Set<string> {
-  const values = items
-    .filter((item) => typeof item[key] === "number" && Number.isFinite(item[key]) && (item[key] as number) > 0)
-    .map((item) => ({ id: item.id, value: item[key] as number }));
-  if (values.length < 2) return new Set();
+  const available = items.filter((item) =>
+    typeof item[key] === "number" && Number.isFinite(item[key]) && (item[key] as number) > 0
+  );
+  if (available.length < 2) return new Set();
+
+  // Do not rank unlike data: a published price should not beat an estimate,
+  // and a recorded area should not beat an estimated area.
+  const bases = key === "areaM2"
+    ? new Set(available.map((item) => item.areaIsEstimate ? "estimated-area" : "recorded-area"))
+    : new Set(available.map((item) => item.priceStatus));
+  if (bases.size !== 1) return new Set();
+
+  const values = available.map((item) => ({ id: item.id, value: item[key] as number }));
   const best = direction === "min"
     ? Math.min(...values.map((entry) => entry.value))
     : Math.max(...values.map((entry) => entry.value));
@@ -582,7 +591,7 @@ export function ParcelComparisonPanel({ open, items, onClose, onRemove }: Compar
             </table>
           </div>
           <p className={styles.scorecardNote}>
-            ★ marks the lowest asking price, lowest price per m², or largest area among available values. Ties can share a star. Zoning is not ranked because suitability depends on the intended use. Missing values are not scored as poor results.
+            ★ marks the lowest asking price, lowest price per m², or largest area only when the compared values share the same basis. Mixed published/estimated prices or recorded/estimated areas are left unranked. Ties can share a star. Zoning is not ranked because suitability depends on intended use, and missing values are not treated as poor results.
           </p>
         </>
       )}
