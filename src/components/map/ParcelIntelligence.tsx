@@ -430,7 +430,7 @@ export function ParcelIntelligenceInline({
             </div>
             {access.status === "routing-unavailable" ? (
               <p className={styles.accessMessage}>
-                Route distance and travel time are withheld because Valhalla is not configured or did not respond. Nearby place names alone do not confirm access.
+                Route distance and travel time are withheld because Valhalla did not return a usable driving route. Nearby place names alone do not confirm access.
               </p>
             ) : (
               <p className={styles.accessFootnote}>
@@ -525,7 +525,12 @@ export function ParcelComparisonPanel({ open, items, onClose, onRemove }: Compar
                     <th key={item.id} scope="col">
                       <strong>{item.name}</strong>
                       <small>{item.locationLabel || item.district}</small>
-                      <button className={styles.removeButton} onClick={() => onRemove(item.id)} type="button">
+                      <button
+                        aria-label={`Remove ${item.name} from comparison`}
+                        className={styles.removeButton}
+                        onClick={() => onRemove(item.id)}
+                        type="button"
+                      >
                         Remove
                       </button>
                     </th>
