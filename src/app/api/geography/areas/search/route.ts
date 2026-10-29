@@ -123,6 +123,15 @@ function normalizeKey(value: string): string {
   return value.toLocaleLowerCase("en").replace(/[^a-z0-9]/g, "");
 }
 
+function officialIdCandidates(candidates: string[]): string[] {
+  // OBJECTID/FID identifies a row in a source layer, not the administrative
+  // entity. Excluding it prevents layers with repeated OBJECTID=0 from
+  // producing false parent IDs or collapsing distinct villages.
+  return candidates.filter((candidate) =>
+    !["objectid", "objectid1", "objectid12", "fid", "id"].includes(normalizeKey(candidate))
+  );
+}
+
 function normalizeDistrictKey(value: string): string {
   return normalizeKey(value).replace(/district$/, "");
 }
@@ -310,10 +319,10 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const cell = level === "cell" ? name : value(attributes, chooseTextFields(fields, candidate.cell));
     const village = level === "village" ? name : value(attributes, chooseTextFields(fields, candidate.village));
     const ids = candidate.ids;
-    const districtId = value(attributes, ids.district ?? []);
-    const sectorId = value(attributes, ids.sector ?? []);
-    const cellId = value(attributes, ids.cell ?? []);
-    const villageId = value(attributes, ids.village ?? []);
+    const districtId = value(attributes, officialIdCandidates(ids.district ?? []));
+    const sectorId = value(attributes, officialIdCandidates(ids.sector ?? []));
+    const cellId = value(attributes, officialIdCandidates(ids.cell ?? []));
+    const villageId = value(attributes, officialIdCandidates(ids.village ?? []));
     const province = value(attributes, ["province", "province_name", "prov_name", "province_e"]) ??
       (normalizeDistrictKey(district) === "bugesera" ? "Eastern Province" : "Kigali City");
     // The autocomplete query has no geometry. Keep the map feature ID so a
@@ -843,9 +852,35 @@ export async function GET(request: NextRequest) {
     : allAreas;
   const deduplicated = new Map<string, SearchArea>();
   for (const area of areas) {
-    const key = area.level === "parcel"
-      ? "parcel|" + normalizeKey(area.upi ?? area.parcelNumber ?? area.name)
-      : [area.level, normalizeKey(area.district), normalizeKey(area.sector ?? ""), normalizeKey(area.cell ?? ""), normalizeKey(area.village ?? ""), normalizeKey(area.name)].join("|");
+    if (area.level === "parcel") {
+      const key = "parcel|" + normalizeKey(area.upi ?? area.parcelNumber ?? area.name);
+      if (!deduplicated.has(key)) deduplicated.set(key, area);
+      continue;
+    }
+
+    // Prefer the official administrative ID, namespaced by source and level.
+    // Bugesera's village layer can omit the cell name, and multiple villages
+    // may share the same displayed name inside a sector. Name-only dedupe
+    // silently removed valid records; their official village IDs keep them.
+    const source = area.mapSourceId ?? normalizeKey(area.sourceLabel);
+    const officialId = area.level === "district"
+      ? area.districtId
+      : area.level === "sector"
+        ? area.sectorId
+        : area.level === "cell"
+          ? area.cellId
+          : area.villageId;
+    const key = officialId
+      ? [source, area.level, "id", normalizeKey(officialId)].join("|")
+      : [
+          source,
+          area.level,
+          normalizeKey(area.district),
+          normalizeKey(area.sector ?? ""),
+          normalizeKey(area.cell ?? ""),
+          normalizeKey(area.village ?? ""),
+          normalizeKey(area.name)
+        ].join("|");
     if (!deduplicated.has(key)) deduplicated.set(key, area);
   }
   const normalizedQuery = normalizeKey(query);
