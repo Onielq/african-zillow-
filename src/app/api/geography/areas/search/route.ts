@@ -204,6 +204,28 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   const nameFields = chooseTextFields(fields, candidate.name);
   if (nameFields.length === 0) return [];
 
+  // Scope the GIS query to the four pilot districts BEFORE ArcGIS applies
+  // resultRecordCount. Filtering after the server-side limit silently discarded
+  // valid Gasabo/Kicukiro/Nyarugenge/Bugesera records whenever country-wide
+  // matches filled the first page.
+  const districtFields = level === "district"
+    ? nameFields
+    : chooseTextFields(fields, candidate.district);
+  if (districtFields.length === 0) return [];
+  const pilotDistrictValues = [
+    "Gasabo", "Gasabo District",
+    "Kicukiro", "Kicukiro District",
+    "Nyarugenge", "Nyarugenge District",
+    "Bugesera", "Bugesera District"
+  ];
+  const pilotDistrictWhere = "(" + districtFields.map((field) =>
+    "(" + pilotDistrictValues.map((districtName) =>
+      field + " = '" + districtName.replace(/'/g, "''") + "'"
+    ).join(" OR ") + ")"
+  ).join(" OR ") + ")";
+  const scopeToPilotDistricts = (where: string) =>
+    "(" + pilotDistrictWhere + ") AND (" + where + ")";
+
   const escaped = query.replace(/'/g, "''");
   const requestedFields = new Set<string>(nameFields);
   for (const field of chooseTextFields(fields, ["province", "province_name", "prov_name", "province_e"])) requestedFields.add(field);
@@ -248,8 +270,10 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   // exact administrative name ahead of similarly named villages and prevents
   // common short prefixes from hiding the place the user actually typed.
   const [prefixPayload, containsPayload] = await Promise.all([
-    queryLayer(prefixWhere, 50),
-    queryLayer(containsWhere, 50)
+    // Preserve enough precise/prefix candidates, but keep fuzzy substring
+    // geometry payloads small enough for Vercel's 2 MB data-cache limit.
+    queryLayer(scopeToPilotDistricts(prefixWhere), 20),
+    queryLayer(scopeToPilotDistricts(containsWhere), 15)
   ]);
   const features = [...(prefixPayload.features ?? []), ...(containsPayload.features ?? [])];
 
