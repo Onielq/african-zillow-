@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TalkToExpertProps = {
   developerName: string;
   parcelUpi?: string | null;
-  visible: boolean;
 };
 
-export function TalkToExpert({ developerName, parcelUpi, visible }: TalkToExpertProps) {
+export function TalkToExpert({ developerName, parcelUpi }: TalkToExpertProps) {
   const router = useRouter();
   const [isHidden, setIsHidden] = useState(false);
   const [showReopen, setShowReopen] = useState(false);
-
-  useEffect(() => {
-    if (!visible) return;
-    setIsHidden(false);
-    setShowReopen(false);
-  }, [visible, parcelUpi]);
 
   const openContact = () => {
     const params = new URLSearchParams({ developer: developerName });
@@ -43,8 +36,6 @@ export function TalkToExpert({ developerName, parcelUpi, visible }: TalkToExpert
     setShowReopen(false);
     setIsHidden(false);
   };
-
-  if (!visible) return null;
 
   return (
     <>
