@@ -534,8 +534,8 @@ const LAND_PRICE_RAMP = [
 function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel = false) {
   return [
     "case",
-    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#67E8F9" : "#FFE3A1",
+    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     showPrice
       ? [
           "case",
@@ -549,8 +549,8 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
-  ["boolean", ["feature-state", "hover"], false], 0.74,
   ["boolean", ["feature-state", "selected"], false], 0.42,
+  ["boolean", ["feature-state", "hover"], false], 0.74,
   0.23
 ] as never;
 
@@ -1524,8 +1524,8 @@ export function MapView({
             "fill-opacity": level === "parcel"
               ? [
                   "case",
-                  ["boolean", ["feature-state", "hover"], false], 0.16,
                   ["boolean", ["feature-state", "selected"], false], 0.38,
+                  ["boolean", ["feature-state", "hover"], false], 0.16,
                   0.008
                 ]
               : AREA_FILL_OPACITY_EXPRESSION
@@ -1545,10 +1545,10 @@ export function MapView({
           paint: {
             "line-color": [
               "case",
-              ["boolean", ["feature-state", "hover"], false],
-              "#06492E",
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? "#00E5FF" : "#126347",
+              ["boolean", ["feature-state", "hover"], false],
+              "#06492E",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
@@ -1560,10 +1560,10 @@ export function MapView({
             // crisp fixed-width strokes; selected/hovered boundaries get emphasis.
             "line-width": [
               "case",
-              ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 2.5 : 2.6,
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? 3.2 : 2.5,
+              ["boolean", ["feature-state", "hover"], false],
+              level === "parcel" ? 2.5 : 2.6,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
