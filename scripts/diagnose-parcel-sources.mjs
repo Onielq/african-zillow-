@@ -33,18 +33,20 @@ const KIGALI_BBOX = [29.85, -2.10, 30.28, -1.48];
 const BUGESERA_BBOX = [29.82, -2.62, 30.56, -1.92];
 
 async function readJson(url) {
+  const startedAt = Date.now();
   const response = await fetch(url, {
     headers: REQUEST_HEADERS,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
   const body = await response.text();
+  const elapsedMs = Date.now() - startedAt;
   let data;
   try {
     data = JSON.parse(body);
   } catch {
-    return { httpStatus: response.status, ok: response.ok, parseError: true, sample: body.slice(0, 180) };
+    return { httpStatus: response.status, ok: response.ok, elapsedMs, bytes: body.length, parseError: true, sample: body.slice(0, 180) };
   }
-  return { httpStatus: response.status, ok: response.ok, data };
+  return { httpStatus: response.status, ok: response.ok, elapsedMs, bytes: body.length, data };
 }
 
 function firstCoordinate(geometry) {
@@ -145,8 +147,57 @@ async function inspectSource(source) {
   }
 }
 
+async function inspectBugeseraViewportLoads() {
+  const sourceUrl = SOURCES.find((source) => source.id === "bugesera-lais").url;
+  const bbox = [30.12, -2.30, 30.15, -2.26];
+  const resultCounts = [25, 80, 300];
+  const tests = [];
+
+  // Use the same viewport and full geometry fields as the app. Run serially to
+  // avoid hammering the public service while comparing the payload sizes.
+  for (const resultRecordCount of resultCounts) {
+    const params = new URLSearchParams({
+      where: "upi IS NOT NULL",
+      geometry: bbox.join(","),
+      geometryType: "esriGeometryEnvelope",
+      inSR: "4326",
+      outSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      outFields: "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+      returnGeometry: "true",
+      resultRecordCount: String(resultRecordCount),
+      f: "json"
+    });
+    try {
+      const response = await readJson(sourceUrl + "/query?" + params);
+      const data = response.data ?? {};
+      tests.push({
+        resultRecordCount,
+        httpStatus: response.httpStatus,
+        elapsedMs: response.elapsedMs,
+        bytes: response.bytes,
+        returnedFeatures: data.features?.length ?? null,
+        error: data.error ?? response.sample ?? null,
+        firstFeatureHasGeometry: Boolean(data.features?.[0]?.geometry),
+        firstFeatureUPI: data.features?.[0]?.attributes?.upi ?? null
+      });
+    } catch (error) {
+      tests.push({
+        resultRecordCount,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  return { bbox, tests };
+}
+
 const results = await Promise.all(SOURCES.map(inspectSource));
-console.log(JSON.stringify({ checkedAt: new Date().toISOString(), results }, null, 2));
+const bugeseraViewportLoadTest = await inspectBugeseraViewportLoads();
+console.log(JSON.stringify({
+  checkedAt: new Date().toISOString(),
+  results,
+  bugeseraViewportLoadTest
+}, null, 2));
 if (results.every((result) => !result.metadata && !result.error)) {
   process.exitCode = 1;
 }
