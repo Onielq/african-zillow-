@@ -4038,14 +4038,34 @@ input {
   }
 
   .map-toolbar {
-    width: max-content;
+    width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
+    justify-content: space-between;
     flex-wrap: nowrap;
     overflow: visible;
   }
 
+  .global-area-search {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
   .global-area-search-field {
-    width: min(200px, 48vw);
+    width: min(150px, 38vw);
+    min-width: 120px;
+  }
+
+  .toolbar-action {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-inline: 5px;
+    font-size: 9px;
+  }
+
+  .toolbar-count,
+  .metrics-trigger-value,
+  .metric-info-trigger {
+    display: none;
   }
 
   .parcel-price-kpi {
