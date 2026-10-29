@@ -1071,6 +1071,16 @@ async function getParcels(
     });
   }
 
+  // On Cloudflare, try the Vercel parcel API first. The Worker runtime can
+  // spend 15 seconds waiting for primary GIS calls before the old fallback
+  // even starts; that can leave the map without parcel outlines on a normal
+  // viewport refresh. The Vercel route does not call this fallback, and the
+  // response must pass the cadastral geometry/UPI validation above.
+  const fastFallback = allowVercelFallback
+    ? await fetchVercelParcelFallback(bounds, sourceFilter, [], true)
+    : null;
+  if (fastFallback?.response) return fastFallback.response;
+
   const parcelBudget = { remaining: 900 };
   const results = [];
   for (const provider of providers) {
@@ -1081,7 +1091,7 @@ async function getParcels(
 
   if (results.every((result) => result.failed)) {
     const unavailableProviders = results.map((result) => result.provider.id);
-    const fallback = await fetchVercelParcelFallback(
+    const fallback = fastFallback ?? await fetchVercelParcelFallback(
       bounds,
       sourceFilter,
       unavailableProviders,
