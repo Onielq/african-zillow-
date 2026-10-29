@@ -812,6 +812,16 @@ test("parcel detail zoning uses exact cadastral geometry and reports mapped clas
 });
 
 
+test("parcel API fails fast on upstream gateway outages and bounds the browser probe", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const e2e = await readProjectFile("scripts/e2e-map-parcels.mjs");
+
+  assert.ok(route.includes("isTransientUpstreamFailure"));
+  assert.ok(route.includes("ArcGIS layer request failed \\((?:502|503|504)\\)"));
+  assert.match(route, /isTransientUpstreamFailure \|\| depth >= 2/);
+  assert.ok(e2e.includes("AbortSignal.timeout(25_000)"));
+});
+
 test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   const generated = await readProjectFile("src/data/land-price-transaction.generated.ts");
