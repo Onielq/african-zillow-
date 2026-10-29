@@ -2,7 +2,7 @@
 
 ## Runtime overview
 
-The application is a MapLibre-based Next.js interface. The same repository has two production deployment paths: Vercel and a Cloudflare Worker using the Vinext build. They are separate deployments of the same source revision, not a network hop from one host to the other.
+The application is a MapLibre-based Next.js interface. The same repository has two production deployment paths: Vercel and a Cloudflare Worker using the Vinext build. They are separate deployments of the same source revision. The Cloudflare parcel API also has a guarded server-to-server failover to the Vercel production parcel API when every primary parcel GIS provider fails inside the Worker runtime; the Vercel API does not use that failover, so the request cannot loop.
 
 ~~~mermaid
 flowchart TD
