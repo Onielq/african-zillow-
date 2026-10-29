@@ -563,7 +563,7 @@ export function MapExperience() {
   const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
-  const [nearbyAccess, setNearbyAccess] = useState<NearbyAccessState>(null);
+  const [nearbyAccessSnapshot, setNearbyAccessSnapshot] = useState<{ key: string; value: Exclude<NearbyAccessState, null> } | null>(null);
   const [compareProjectName, setCompareProjectName] = useState("");
   const [compareProjectUrl, setCompareProjectUrl] = useState("");
   const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
@@ -577,6 +577,27 @@ export function MapExperience() {
   const [boundaryStatus, setBoundaryStatus] =
     useState<BoundaryStatus>("loading");
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
+  const nearbyAreaLevel = selectedArea?.level ?? null;
+  const nearbyAreaLongitude = selectedArea?.center?.[0] ?? null;
+  const nearbyAreaLatitude = selectedArea?.center?.[1] ?? null;
+  const nearbyAreaDistrict = selectedArea?.district ?? null;
+  const nearbyAreaUpi = selectedArea?.upi ?? null;
+  const nearbyAreaName = selectedArea?.name ?? null;
+  const nearbyAccessKey = nearbyAreaLevel === "parcel" &&
+    nearbyAreaLongitude !== null &&
+    nearbyAreaLatitude !== null
+      ? [nearbyAreaUpi ?? nearbyAreaName ?? "", nearbyAreaLongitude, nearbyAreaLatitude, nearbyAreaDistrict ?? ""].join("|")
+      : null;
+  const nearbyAccess: NearbyAccessState = nearbyAccessKey === null
+    ? null
+    : nearbyAccessSnapshot?.key === nearbyAccessKey
+      ? nearbyAccessSnapshot.value
+      : {
+          status: "loading",
+          items: [],
+          source: "Valhalla · OpenStreetMap road graph",
+          note: "Estimated road routes; not live traffic."
+        };
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
 
@@ -806,44 +827,43 @@ export function MapExperience() {
       : null;
 
   useEffect(() => {
-    const area = selectedArea;
-    if (!area || area.level !== "parcel" || !area.center) {
+    if (
+      nearbyAccessKey === null ||
+      nearbyAreaLongitude === null ||
+      nearbyAreaLatitude === null ||
+      nearbyAreaDistrict === null
+    ) {
       return;
     }
     const controller = new AbortController();
-    setNearbyAccess({
-      status: "loading",
-      items: [],
-      source: "Valhalla · OpenStreetMap road graph",
-      note: "Estimated road routes; not live traffic."
-    });
     const params = new URLSearchParams({
-      lat: String(area.center[1]),
-      lon: String(area.center[0]),
-      district: area.district
+      lat: String(nearbyAreaLatitude),
+      lon: String(nearbyAreaLongitude),
+      district: nearbyAreaDistrict
     });
     fetch("/api/geography/nearby-access?" + params.toString(), { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as NearbyAccessResponse;
         if (!response.ok) throw new Error(payload.message ?? "Road access estimates are unavailable.");
-        if (!controller.signal.aborted) setNearbyAccess(payload);
+        if (!controller.signal.aborted) {
+          setNearbyAccessSnapshot({ key: nearbyAccessKey, value: payload });
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setNearbyAccess({
-          status: "error",
-          items: [],
-          source: "Valhalla · OpenStreetMap road graph",
-          note: "Road-route estimates are not available for this parcel right now."
-        });
+        if (!controller.signal.aborted) {
+          setNearbyAccessSnapshot({
+            key: nearbyAccessKey,
+            value: {
+              status: "error",
+              items: [],
+              source: "Valhalla · OpenStreetMap road graph",
+              note: "Road-route estimates are not available for this parcel right now."
+            }
+          });
+        }
       });
     return () => controller.abort();
-  }, [
-    selectedArea?.level,
-    selectedArea?.upi,
-    selectedArea?.center?.[0],
-    selectedArea?.center?.[1],
-    selectedArea?.district
-  ]);
+  }, [nearbyAccessKey, nearbyAreaLongitude, nearbyAreaLatitude, nearbyAreaDistrict]);
 
   useEffect(() => {
     let active = true;
