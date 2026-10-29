@@ -637,7 +637,12 @@ export function MapExperience() {
     []
   );
   const handleAreaSelected = useCallback(
-    (area: SelectedArea | null) => setSelectedArea(area),
+    (area: SelectedArea | null) => {
+      globalSearchMarkerRef.current?.remove();
+      globalSearchMarkerRef.current = null;
+      setGlobalSearchOpen(false);
+      setSelectedArea(area);
+    },
     []
   );
   const handleBasemapStatus = useCallback(
