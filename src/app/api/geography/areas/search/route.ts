@@ -550,7 +550,17 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "public, max-age=30, s-maxage=60" }
     });
   }
-  const query = rawQuery.slice(0, 80).replace(/^\s*(?:district|sector|cell|village)\s*[:=-]?\s+/i, "").replace(/\s+(?:district|sector|cell|village)$/i, "").trim();
+  const cleanedQuery = rawQuery.slice(0, 80)
+    .replace(/^\s*(?:district|sector|cell|village)\s*[:=-]?\s+/i, "")
+    .replace(/\s+(?:district|sector|cell|village)$/i, "")
+    .trim();
+  const cleanedKey = normalizeKey(cleanedQuery);
+  // Accept common spoken/spelling variants; display the government spelling.
+  const bugeseraAliases = ["wijesera", "wugesera", "wujezera"];
+  const isBugeseraAlias = cleanedKey.length >= 4 && bugeseraAliases.some(
+    (alias) => alias.startsWith(cleanedKey) || cleanedKey.startsWith(alias)
+  );
+  const query = isBugeseraAlias ? "Bugesera" : cleanedQuery;
   const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
