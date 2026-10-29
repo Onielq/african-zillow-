@@ -11,6 +11,7 @@ export type ParcelComparisonItem = {
   locationLabel: string;
   askingPrice: number | null;
   pricePerM2: number | null;
+  unitPriceBasis: UnitPriceBasis;
   areaM2: number | null;
   areaIsEstimate: boolean;
   zoning: string;
@@ -21,6 +22,15 @@ export type ParcelComparisonItem = {
 };
 
 type PriceStatus = ParcelComparisonItem["priceStatus"];
+
+export type UnitPriceBasis =
+  | "published-recorded-area"
+  | "published-estimated-area"
+  | "cell-transaction-price-snapshot"
+  | "derived-sector-mean"
+  | "district-transaction-price-snapshot"
+  | "unavailable"
+  | "conflicting";
 
 type Amenity = {
   id: string;
@@ -46,6 +56,7 @@ type Props = {
   selectedArea: SelectedArea;
   askingPrice: number | null;
   pricePerM2: number | null;
+  unitPriceBasis: UnitPriceBasis;
   priceStatus: PriceStatus;
   comparisonItems: ParcelComparisonItem[];
   onAddToComparison: (item: ParcelComparisonItem) => void;
@@ -144,10 +155,30 @@ function formatDriveTime(value: number | null): string {
   return "about " + minutes + " min drive";
 }
 
+function unitPriceBasisLabel(basis: UnitPriceBasis): string {
+  switch (basis) {
+    case "published-recorded-area":
+      return "Published price ÷ recorded area";
+    case "published-estimated-area":
+      return "Published price ÷ estimated area";
+    case "cell-transaction-price-snapshot":
+      return "Cell transaction-price reference";
+    case "derived-sector-mean":
+      return "Derived sector reference";
+    case "district-transaction-price-snapshot":
+      return "District transaction-price reference";
+    case "conflicting":
+      return "Conflicting reference values";
+    default:
+      return "No comparable unit-price basis";
+  }
+}
+
 export function ParcelIntelligenceInline({
   selectedArea,
   askingPrice,
   pricePerM2,
+  unitPriceBasis,
   priceStatus,
   comparisonItems,
   onAddToComparison,
@@ -179,6 +210,7 @@ export function ParcelIntelligenceInline({
     locationLabel,
     askingPrice,
     pricePerM2,
+    unitPriceBasis,
     areaM2,
     areaIsEstimate: selectedArea.parcelSizeSource === "geometry-estimate",
     zoning: zoning.label,
@@ -195,6 +227,7 @@ export function ParcelIntelligenceInline({
     locationLabel,
     askingPrice,
     pricePerM2,
+    unitPriceBasis,
     areaM2,
     zoning.label,
     zoning.status,
@@ -464,7 +497,9 @@ function bestMetricIds(items: ParcelComparisonItem[], key: "askingPrice" | "pric
   // and a recorded area should not beat an estimated area.
   const bases = key === "areaM2"
     ? new Set(available.map((item) => item.areaIsEstimate ? "estimated-area" : "recorded-area"))
-    : new Set(available.map((item) => item.priceStatus));
+    : key === "pricePerM2"
+      ? new Set(available.map((item) => item.unitPriceBasis))
+      : new Set(available.map((item) => item.priceStatus));
   if (bases.size !== 1) return new Set();
 
   const values = available.map((item) => ({ id: item.id, value: item[key] as number }));
@@ -580,7 +615,10 @@ export function ParcelComparisonPanel({ open, items, onClose, onRemove }: Compar
                 <tr>
                   <th scope="row">Price basis</th>
                   {items.map((item) => (
-                    <td key={item.id}>{item.priceStatus === "published" ? "Published" : item.priceStatus === "estimated" ? "Estimated" : "Missing"}</td>
+                    <td key={item.id}>
+                      <span>Asking price: {item.priceStatus === "published" ? "Published" : item.priceStatus === "estimated" ? "Estimated" : "Missing"}</span>
+                      <small className={styles.sourceText}>Unit rate: {unitPriceBasisLabel(item.unitPriceBasis)}</small>
+                    </td>
                   ))}
                 </tr>
                 <tr>
@@ -596,7 +634,7 @@ export function ParcelComparisonPanel({ open, items, onClose, onRemove }: Compar
             </table>
           </div>
           <p className={styles.scorecardNote}>
-            ★ marks the lowest asking price, lowest price per m², or largest area only when the compared values share the same basis. Mixed published/estimated prices or recorded/estimated areas are left unranked. Ties can share a star. Zoning is not ranked because suitability depends on intended use, and missing values are not treated as poor results.
+            ★ marks the lowest asking price, lowest unit rate, or largest area only when the compared values share the same basis. Unit rates calculated from a published total are not ranked against transaction-price reference rates, and estimated-area rates are kept separate from recorded-area rates. Ties can share a star. Zoning is not ranked because suitability depends on intended use, and missing values are not treated as poor results.
           </p>
         </>
       )}
