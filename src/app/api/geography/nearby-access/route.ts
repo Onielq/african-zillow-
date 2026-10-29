@@ -9,12 +9,14 @@ type OsmElement = {
   lat?: number;
   lon?: number;
   center?: { lat?: number; lon?: number };
+  geometry?: Array<{ lat: number; lon: number }>;
   tags?: Record<string, string | undefined>;
 };
 type OsmResponse = { elements?: OsmElement[]; remark?: string };
-type NearbyCategory = "School" | "Clinic / hospital" | "Public transport";
-type Candidate = { id: string; name: string; category: NearbyCategory; lat: number; lon: number; straightKm: number };
-type RouteResult = { id: string; category: NearbyCategory; name: string; distanceKm: number | null; timeMinutes: number | null; routeStatus: "routed" | "unavailable" };
+type NearbyCategory = "Main road" | "School" | "Clinic / hospital" | "Public transport" | "Landmark" | "Village office";
+type NearbyAmenityCategory = Exclude<NearbyCategory, "Main road">;
+type Candidate = { id: string; name: string; category: NearbyAmenityCategory; lat: number; lon: number; straightKm: number };
+type RouteResult = { id: string; category: NearbyCategory; name: string; distanceKm: number | null; timeMinutes: number | null; routeStatus: "routed" | "straight-line" | "unavailable" };
 type ValhallaResponse = {
   trip?: { status?: number; status_message?: string; summary?: { length?: number; time?: number }; legs?: Array<{ summary?: { length?: number; time?: number } }> };
   error?: string;
@@ -38,30 +40,89 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
   return 6371.0088 * 2 * Math.asin(Math.sqrt(Math.min(1, term)));
 }
 
-function classify(tags: Record<string, string | undefined>): NearbyCategory | null {
+function classify(tags: Record<string, string | undefined>): NearbyAmenityCategory | null {
   const amenity = (tags.amenity ?? "").toLowerCase();
   const healthcare = (tags.healthcare ?? "").toLowerCase();
+  const office = (tags.office ?? "").toLowerCase();
+  const government = (tags.government ?? "").toLowerCase();
+  const tourism = (tags.tourism ?? "").toLowerCase();
+  const leisure = (tags.leisure ?? "").toLowerCase();
+  const natural = (tags.natural ?? "").toLowerCase();
+  const waterway = (tags.waterway ?? "").toLowerCase();
+  const historic = (tags.historic ?? "").toLowerCase();
+
   if (["school", "university", "college", "kindergarten"].includes(amenity)) return "School";
   if (["hospital", "clinic", "doctors", "pharmacy"].includes(amenity) ||
       ["hospital", "clinic", "doctor", "pharmacy"].includes(healthcare)) return "Clinic / hospital";
   if (tags.highway === "bus_stop" || ["bus_stop", "bus_station"].includes(amenity)) return "Public transport";
+  if (amenity === "townhall" || ["government", "administrative"].includes(office) ||
+      government === "administrative") return "Village office";
+  if (["attraction", "viewpoint", "museum", "zoo", "theme_park"].includes(tourism) ||
+      ["park", "nature_reserve"].includes(leisure) ||
+      ["lake", "peak", "waterfall", "spring"].includes(natural) ||
+      ["river", "waterfall"].includes(waterway) ||
+      ["monument", "memorial", "castle", "ruins"].includes(historic)) return "Landmark";
   return null;
 }
 
-function categoryName(category: NearbyCategory): string {
-  return category === "School" ? "Unnamed school" :
-    category === "Clinic / hospital" ? "Unnamed medical facility" : "Unnamed transport stop";
+function categoryName(category: NearbyAmenityCategory): string {
+  switch (category) {
+    case "School": return "Unnamed school";
+    case "Clinic / hospital": return "Unnamed medical facility";
+    case "Public transport": return "Unnamed transport stop";
+    case "Landmark": return "Unnamed landmark";
+    case "Village office": return "Unnamed local office";
+  }
 }
 
 function buildQuery(south: number, west: number, north: number, east: number): string {
   const box = [south, west, north, east].map((value) => value.toFixed(6)).join(",");
   return [
     "[out:json][timeout:8];", "(",
-    'nwr["amenity"~"school|university|college|kindergarten|hospital|clinic|doctors|pharmacy|bus_station|bus_stop"](' + box + ");",
+    'nwr["amenity"~"school|university|college|kindergarten|hospital|clinic|doctors|pharmacy|bus_station|bus_stop|townhall"](' + box + ");",
     'nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");",
+    'nwr["office"~"government|administrative"](' + box + ");",
+    'nwr["government"="administrative"](' + box + ");",
+    'nwr["tourism"~"attraction|viewpoint|museum|zoo|theme_park"](' + box + ");",
+    'nwr["leisure"~"park|nature_reserve"](' + box + ");",
+    'nwr["natural"~"lake|peak|waterfall|spring"](' + box + ");",
+    'nwr["waterway"~"river|waterfall"](' + box + ");",
+    'nwr["historic"~"monument|memorial|castle|ruins"](' + box + ");",
     'node["highway"="bus_stop"](' + box + ");",
     ");", "out center tags;"
   ].join("\n");
+}
+
+function buildRoadQuery(south: number, west: number, north: number, east: number): string {
+  const box = [south, west, north, east].map((value) => value.toFixed(6)).join(",");
+  return [
+    "[out:json][timeout:8];",
+    'way["highway"~"^(trunk|primary|secondary|tertiary)$"](' + box + ");",
+    "out geom tags;"
+  ].join("\n");
+}
+
+function distanceToRoadSegmentKm(
+  origin: { lat: number; lon: number },
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number }
+): number {
+  // A local equirectangular projection is accurate enough over this short
+  // distance, and avoids confusing straight-line proximity with a road route.
+  const radians = origin.lat * Math.PI / 180;
+  const metersPerDegreeLatitude = 111_320;
+  const metersPerDegreeLongitude = 111_320 * Math.cos(radians);
+  const ax = (a.lon - origin.lon) * metersPerDegreeLongitude;
+  const ay = (a.lat - origin.lat) * metersPerDegreeLatitude;
+  const bx = (b.lon - origin.lon) * metersPerDegreeLongitude;
+  const by = (b.lat - origin.lat) * metersPerDegreeLatitude;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared));
+  const nearestX = ax + t * dx;
+  const nearestY = ay + t * dy;
+  return Math.sqrt(nearestX * nearestX + nearestY * nearestY) / 1000;
 }
 
 async function getOsmElements(query: string): Promise<OsmElement[]> {
@@ -119,7 +180,16 @@ async function getRoadRoute(origin: { lat: number; lon: number }, destination: C
       routeStatus: "routed"
     };
   } catch {
-    return { id: destination.id, category: destination.category, name: destination.name, distanceKm: null, timeMinutes: null, routeStatus: "unavailable" };
+    // Preserve useful proximity when the shared routing service is unavailable.
+    // This is a straight-line distance, never presented as a driving distance.
+    return {
+      id: destination.id,
+      category: destination.category,
+      name: destination.name,
+      distanceKm: Math.round(destination.straightKm * 100) / 100,
+      timeMinutes: null,
+      routeStatus: "straight-line"
+    };
   }
 }
 
@@ -131,7 +201,21 @@ async function calculateNearbyRoutes(lat: number, lon: number): Promise<{ items:
     Math.min(RWANDA.north, lat + radius),
     Math.min(RWANDA.east, lon + radius)
   );
-  const elements = await getOsmElements(query);
+  const roadRadius = 0.035;
+  const roadQuery = buildRoadQuery(
+    Math.max(RWANDA.south, lat - roadRadius),
+    Math.max(RWANDA.west, lon - roadRadius),
+    Math.min(RWANDA.north, lat + roadRadius),
+    Math.min(RWANDA.east, lon + roadRadius)
+  );
+  const [elements, roadElements] = await Promise.all([
+    getOsmElements(query),
+    getOsmElements(roadQuery).catch((error) => {
+      console.warn("Main-road geometry unavailable for nearby-access lookup.", error);
+      return [] as OsmElement[];
+    })
+  ]);
+
   const unique = new Map<string, Candidate>();
   for (const element of elements) {
     const tags = element.tags ?? {};
@@ -149,19 +233,53 @@ async function calculateNearbyRoutes(lat: number, lon: number): Promise<{ items:
     });
   }
 
-  // Route the nearest mapped candidate in each category, limiting each parcel
-  // click to a small, cached set of independent Valhalla route requests.
-  const categories: NearbyCategory[] = ["School", "Clinic / hospital", "Public transport"];
+  // Measure the shortest distance from the parcel-area center to a mapped
+  // trunk/primary/secondary/tertiary road segment. This is straight-line
+  // proximity, not a driving route or a legal driveway-access determination.
+  let nearestRoad: RouteResult | null = null;
+  let nearestRoadDistanceKm = Number.POSITIVE_INFINITY;
+  for (const road of roadElements) {
+    const points = road.geometry ?? [];
+    if (points.length < 2) continue;
+    for (let index = 1; index < points.length; index += 1) {
+      const distanceKm = distanceToRoadSegmentKm({ lat, lon }, points[index - 1], points[index]);
+      if (distanceKm < nearestRoadDistanceKm) {
+        nearestRoadDistanceKm = distanceKm;
+        const tags = road.tags ?? {};
+        const highway = (tags.highway ?? "main").replace(/_/g, " ");
+        nearestRoad = {
+          id: "osm-road-" + road.id,
+          category: "Main road",
+          name: tags.name?.trim() || tags["name:en"]?.trim() || highway.charAt(0).toUpperCase() + highway.slice(1) + " road",
+          distanceKm: Math.round(distanceKm * 1000) / 1000,
+          timeMinutes: null,
+          routeStatus: "straight-line"
+        };
+      }
+    }
+  }
+
+  // Fetch road-route estimates for the nearest mapped facility in each category.
+  // Calls are limited to one candidate per category and cached by parcel center.
+  const categories: NearbyAmenityCategory[] = [
+    "School", "Clinic / hospital", "Public transport", "Landmark", "Village office"
+  ];
   const nearest = categories.map((category) => Array.from(unique.values())
     .filter((candidate) => candidate.category === category)
     .sort((a, b) => a.straightKm - b.straightKm)[0])
     .filter((candidate): candidate is Candidate => Boolean(candidate));
-  const items = await Promise.all(nearest.map((candidate) => getRoadRoute({ lat, lon }, candidate)));
-  items.sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
-  return {
-    items,
-    note: "Estimated driving routes from the parcel-area center; no live traffic. Amenity coverage from OpenStreetMap may be incomplete."
-  };
+  const routedItems = await Promise.all(nearest.map((candidate) => getRoadRoute({ lat, lon }, candidate)));
+  const items: RouteResult[] = [
+    ...(nearestRoad ? [nearestRoad] : []),
+    ...routedItems
+  ];
+  const noteParts = [
+    "Facility distances and driving times are estimated from the parcel-area center; road routes do not include live traffic.",
+    "Main-road distance is straight-line proximity to the nearest mapped trunk, primary, secondary or tertiary road, not proof of a driveway or legal access.",
+    "OpenStreetMap may have incomplete or outdated facility and landmark coverage."
+  ];
+  if (!nearestRoad) noteParts.push("No nearby main-road geometry was returned by the map source for this request.");
+  return { items, note: noteParts.join(" ") };
 }
 
 export async function GET(request: NextRequest) {

@@ -159,14 +159,14 @@ type AreaSearchResponse = {
   hasMore?: boolean;
 };
 type ComparisonZoningResponse = { status?: "found" | "not-covered"; zones?: Array<{ code: string | null; name: string }>; error?: string };
-type NearbyAccessCategory = "School" | "Clinic / hospital" | "Public transport";
+type NearbyAccessCategory = "Main road" | "School" | "Clinic / hospital" | "Public transport" | "Landmark" | "Village office";
 type NearbyAccessItem = {
   id: string;
   category: NearbyAccessCategory;
   name: string;
   distanceKm: number | null;
   timeMinutes: number | null;
-  routeStatus: "routed" | "unavailable";
+  routeStatus: "routed" | "straight-line" | "unavailable";
 };
 type NearbyAccessResponse = {
   status: "ready" | "error";
@@ -625,6 +625,7 @@ export function MapExperience() {
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
+  const [comparisonLevelFilter, setComparisonLevelFilter] = useState<"all" | SelectedArea["level"]>("all");
   const [compareBrowseOpen, setCompareBrowseOpen] = useState(false);
   const [comparisonBrowseOffset, setComparisonBrowseOffset] = useState(0);
   const [comparisonBrowseHasMore, setComparisonBrowseHasMore] = useState(false);
@@ -1035,6 +1036,9 @@ export function MapExperience() {
       : "idle";
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
+  const visibleComparisonSearchResults = comparisonSearchResults.filter((area) =>
+    comparisonLevelFilter === "all" || area.level === comparisonLevelFilter
+  );
   const normalizedDirectorySearch = directorySearch.trim().toLocaleLowerCase();
   const visibleDeveloperCandidates = [
     { id: "taiseel-development", name: "Taiseel Development", logoUrl: undefined },
@@ -2396,9 +2400,9 @@ export function MapExperience() {
                   <span>By road</span>
                 </div>
                 {nearbyAccess?.status === "loading" ? (
-                  <p className="parcel-access-message" role="status">Checking nearby schools, clinics and transport…</p>
+                  <p className="parcel-access-message" role="status">Checking road, school, hospital, transport and landmark access…</p>
                 ) : nearbyAccess?.status === "error" ? (
-                  <p className="parcel-access-message" role="status">Road travel estimates are unavailable right now.</p>
+                  <p className="parcel-access-message" role="status">Nearby road and place information is unavailable right now.</p>
                 ) : nearbyAccess?.items.length ? (
                   <ul className="parcel-access-list">
                     {nearbyAccess.items.map((item) => (
@@ -2407,17 +2411,25 @@ export function MapExperience() {
                         <strong>{item.name}</strong>
                         <small>
                           {item.routeStatus === "routed" && item.distanceKm !== null && item.timeMinutes !== null
-                            ? `${item.distanceKm < 1 ? item.distanceKm.toFixed(2) : item.distanceKm.toFixed(1)} km · about ${Math.max(1, Math.round(item.timeMinutes))} min`
-                            : "Road route unavailable"}
+                            ? `${item.distanceKm < 1 ? item.distanceKm.toFixed(2) : item.distanceKm.toFixed(1)} km by road · about ${Math.max(1, Math.round(item.timeMinutes))} min`
+                            : item.routeStatus === "straight-line" && item.distanceKm !== null
+                              ? item.category === "Main road"
+                                ? item.distanceKm < 1
+                                  ? `~${Math.round(item.distanceKm * 1000)} m straight-line to mapped road`
+                                  : `~${item.distanceKm.toFixed(1)} km straight-line to mapped road`
+                                : item.distanceKm < 1
+                                  ? `~${Math.round(item.distanceKm * 1000)} m straight-line · driving route unavailable`
+                                  : `~${item.distanceKm.toFixed(1)} km straight-line · driving route unavailable`
+                              : "Distance unavailable"}
                         </small>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="parcel-access-message" role="status">No mapped schools, clinics or transport stops found nearby.</p>
+                  <p className="parcel-access-message" role="status">No mapped main roads, schools, hospitals, transport stops, landmarks or local offices found nearby.</p>
                 )}
                 <small className="parcel-access-note">
-                  {nearbyAccess?.note ?? "Estimated drive times · OSM amenity coverage may be incomplete."}
+                  {nearbyAccess?.note ?? "Road distances are estimates. OpenStreetMap coverage may be incomplete; routes do not include live traffic."}
                 </small>
               </section>
               </>
@@ -2864,15 +2876,33 @@ export function MapExperience() {
                 }
               }}
               placeholder="District, sector, cell, village, UPI or parcel number" type="search" value={compareSearch} />
+            <div className="comparison-search-filter-row">
+              <label htmlFor="comparison-level-filter">Type</label>
+              <select
+                aria-label="Filter comparison search by area type"
+                className="comparison-level-filter"
+                id="comparison-level-filter"
+                onChange={(event) => setComparisonLevelFilter(event.target.value as typeof comparisonLevelFilter)}
+                value={comparisonLevelFilter}
+              >
+                <option value="all">All levels</option>
+                <option value="district">Districts</option>
+                <option value="sector">Sectors</option>
+                <option value="cell">Cells</option>
+                <option value="village">Villages</option>
+                <option value="parcel">Parcels</option>
+              </select>
+              <small>All levels allows mixed comparisons, such as a district against a village.</small>
+            </div>
             {compareBrowseOpen || normalizedComparisonSearch.length >= 2 ? (
               <div aria-label="Matching areas and parcels" className="comparison-search-results" role="listbox">
                 {comparisonSearchStatus === "loading" && comparisonSearchResults.length === 0 ? (
                   <p className="comparison-no-results" role="status">{compareBrowseOpen ? "Loading parcels…" : "Searching…"}</p>
                 ) : comparisonSearchStatus === "error" && comparisonSearchResults.length === 0 ? (
                   <p className="comparison-no-results" role="status">Search is temporarily unavailable.</p>
-                ) : comparisonSearchResults.length > 0 ? (
+                ) : visibleComparisonSearchResults.length > 0 ? (
                   <>
-                    {comparisonSearchResults.map((area) => {
+                    {visibleComparisonSearchResults.map((area) => {
                       const candidate: ComparisonItem = { ...area, comparisonKind: "area" };
                       const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
                       return (
@@ -2911,7 +2941,13 @@ export function MapExperience() {
                   </>
                 ) : (
                   <p className="comparison-no-results">{comparisonSearchStatus === "ready"
-                    ? (compareBrowseOpen ? "No more parcels in the connected sources." : "No matching area or parcel found.")
+                    ? compareBrowseOpen
+                      ? comparisonLevelFilter === "all" || comparisonLevelFilter === "parcel"
+                        ? "No more parcels in the connected sources."
+                        : "Browse mode lists parcels. Search a name to find districts, sectors, cells or villages."
+                      : comparisonSearchResults.length > 0 && comparisonLevelFilter !== "all"
+                        ? "No " + areaLevelLabel(comparisonLevelFilter).toLowerCase() + " in these results. Choose All levels to mix different area types."
+                        : "No matching area or parcel found."
                     : "Enter at least two characters to search."}</p>
                 )}
               </div>
