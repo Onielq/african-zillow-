@@ -1578,7 +1578,7 @@ export function MapExperience() {
             ) : null}
             <p className="directory-evidence-note">
               Public websites are discovery leads, not verification of current licensing, affiliation, or availability.
-              No “top agent” ranking is published.
+              No “top agent” ranking published.
             </p>
           </aside>
         ) : null}
