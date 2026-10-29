@@ -81,33 +81,58 @@ try {
     map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
   });
 
-  // Allow moveend to fire, then record real layer/source/network state even
-  // when the visible-layer assertion fails. This avoids hiding the root cause
-  // behind a single 60-second timeout.
-  await page.waitForTimeout(15_000);
-
-  // Probe the same public endpoint directly from the live site. This separates
-  // data/API failures from the map component not requesting or consuming data.
-  const directParcelApi = await page.evaluate(async () => {
-    const url = "/api/geography/areas?level=parcel&source=bugesera&bbox=" +
-      encodeURIComponent("30.12,-2.30,30.15,-2.26");
+  // Cloudflare may need one bounded GIS request plus the Vercel fallback.
+  // Wait for real parcel source features, not just an arbitrary short delay.
+  // Keep the timeout bounded so a broken source still produces diagnostics.
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return false;
     try {
-      const response = await fetch(url, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(25_000)
-      });
-      const body = await response.json().catch(() => null);
-      return {
-        url,
-        status: response.status,
-        type: body?.type ?? null,
-        featureCount: Array.isArray(body?.features) ? body.features.length : null,
-        error: body?.error ?? body?.message ?? null
-      };
-    } catch (error) {
-      return { url, fetchError: error instanceof Error ? error.message : String(error) };
+      return map.querySourceFeatures("land-parcels").length > 0;
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: 40_000 }).catch(() => {});
+
+  // Only issue a second direct API request if the map did not load parcels.
+  // Avoid duplicating a slow GIS/fallback request when the visible map already
+  // proves that the API supplied cadastral features.
+  const parcelSourceCountBeforeProbe = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return 0;
+    try {
+      return map.querySourceFeatures("land-parcels").length;
+    } catch {
+      return 0;
     }
   });
+  const directParcelApi = parcelSourceCountBeforeProbe > 0
+    ? {
+        skipped: true,
+        reason: "Map already loaded cadastral features; avoiding a duplicate GIS request.",
+        featureCount: parcelSourceCountBeforeProbe
+      }
+    : await page.evaluate(async () => {
+        const url = "/api/geography/areas?level=parcel&source=bugesera&bbox=" +
+          encodeURIComponent("30.12,-2.30,30.15,-2.26");
+        try {
+          const response = await fetch(url, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(25_000)
+          });
+          const body = await response.json().catch(() => null);
+          return {
+            url,
+            status: response.status,
+            type: body?.type ?? null,
+            featureCount: Array.isArray(body?.features) ? body.features.length : null,
+            error: body?.error ?? body?.message ?? null,
+            unavailableProviders: body?.unavailableProviders ?? null
+          };
+        } catch (error) {
+          return { url, fetchError: error instanceof Error ? error.message : String(error) };
+        }
+      });
 
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
