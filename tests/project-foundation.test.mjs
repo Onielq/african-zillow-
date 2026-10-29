@@ -79,6 +79,10 @@ test("the map idle fallback does not race the queued viewport refresh and abort 
 
   assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
   assert.match(idleFallback, /if \(needsRefresh\) \{[\s\S]*?clearTimeout\(refreshTimer\);[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+  assert.match(mapView, /const refreshKey = \[/);
+  assert.match(mapView, /activeRefreshKey === refreshKey/);
+  assert.match(mapView, /area-refresh-skipped-duplicate/);
+  assert.match(mapView, /if \(activeController === controller\) \{[\s\S]*?activeController = null;[\s\S]*?activeRefreshKey = null;/);
 });
 
 test("zoning codes are separated when a source record combines short codes and sources live in the Sources panel", async () => {
