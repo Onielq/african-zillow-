@@ -11,7 +11,6 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
   const router = useRouter();
   const [isHidden, setIsHidden] = useState(false);
   const [showReopen, setShowReopen] = useState(false);
-  const [shouldRestoreCardFocus, setShouldRestoreCardFocus] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const reopenButtonRef = useRef<HTMLButtonElement>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -24,13 +23,6 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
   useEffect(() => () => {
     if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    if (shouldRestoreCardFocus && !isHidden && !showReopen) {
-      cardRef.current?.focus();
-      setShouldRestoreCardFocus(false);
-    }
-  }, [shouldRestoreCardFocus, isHidden, showReopen]);
 
   const openContact = () => router.push("/contact");
 
@@ -57,7 +49,8 @@ export function TalkToExpert({ areaName }: TalkToExpertProps) {
   const reopenCard = () => {
     setShowReopen(false);
     setIsHidden(false);
-    setShouldRestoreCardFocus(true);
+    // Restore focus after React makes the card visible and focusable again.
+    window.setTimeout(() => cardRef.current?.focus(), 0);
   };
 
   return (
