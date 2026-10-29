@@ -602,6 +602,7 @@ export function MapExperience() {
     useState<BoundaryStatus>("loading");
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
   const globalSearchMarkerRef = useRef<Marker | null>(null);
+  const globalSearchSequenceRef = useRef(0);
   const nearbyAreaLevel = selectedArea?.level ?? null;
   const nearbyAreaLongitude = selectedArea?.center?.[0] ?? null;
   const nearbyAreaLatitude = selectedArea?.center?.[1] ?? null;
@@ -655,6 +656,7 @@ export function MapExperience() {
   );
 
   const searchGlobalAddress = async (query: string) => {
+    const requestId = ++globalSearchSequenceRef.current;
     if (query.trim().length < 4) {
       setGlobalSearchStatus("ready");
       return;
@@ -666,6 +668,7 @@ export function MapExperience() {
       );
       if (!response.ok) throw new Error("Address search failed (" + response.status + ")");
       const payload = await response.json() as AreaSearchResponse;
+      if (requestId !== globalSearchSequenceRef.current) return;
       const addresses = payload.addresses ?? [];
       setGlobalSearchResults((current) => [
         ...current.filter((item) => !("kind" in item && item.kind === "address")),
@@ -1008,6 +1011,7 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
+    const requestId = ++globalSearchSequenceRef.current;
     const query = globalSearch.trim();
     if (query.length < 2) {
       setGlobalSearchResults([]);
@@ -1022,12 +1026,12 @@ export function MapExperience() {
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("Place search failed (" + response.status + ")");
         const payload = await response.json() as AreaSearchResponse;
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestId !== globalSearchSequenceRef.current) return;
         const results: GlobalSearchResult[] = [...(payload.areas ?? [])];
         setGlobalSearchResults(results);
         setGlobalSearchStatus("ready");
       } catch {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestId !== globalSearchSequenceRef.current) return;
         setGlobalSearchResults([]);
         setGlobalSearchStatus("error");
       }
