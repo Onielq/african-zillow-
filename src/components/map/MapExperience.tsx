@@ -86,13 +86,58 @@ type CellParcelResponse = {
   parcels: CellParcelRecord[];
 };
 
+type ProjectParcelRecord = {
+  upi: string;
+  lookupStatus: "checking" | "found" | "not-found" | "unavailable";
+  district?: string | null;
+  sector?: string | null;
+  cell?: string | null;
+  village?: string | null;
+  parcelNumber?: string | null;
+  areaM2?: number | null;
+  zoningStatus: "idle" | "loading" | "found" | "not-covered" | "error";
+  zones: Array<{ code: string | null; name: string }>;
+};
+
 type ComparisonItem = SelectedArea & {
   comparisonKind?: "area" | "project";
   projectSourceUrl?: string | null;
+  projectParcelUpis?: string[];
+  projectParcelRecords?: ProjectParcelRecord[];
+  projectParcelLinkStatus?: "user-supplied-unverified" | "source-verified";
   transactionEstimate?: TransactionEstimateResponse | null;
   comparisonZoningStatus?: "loading" | "found" | "not-covered" | "error";
   comparisonZoning?: Array<{ code: string | null; name: string }>;
 };
+
+const PROJECT_NAME_SUGGESTIONS = [
+  "Gisa",
+  "Ururawo",
+  "Nzavumo",
+  "Kigali Heights",
+  "Brilliant Tower",
+  "Ramba Hills"
+] as const;
+
+function parseProjectUpis(value: string): { upis: string[]; invalid: string[] } {
+  const upis = new Map<string, string>();
+  const invalid: string[] = [];
+  for (const raw of value.split(/[\n,;]+/)) {
+    const upi = raw.trim().replace(/^UPI\s*[:=]\s*/i, "").replace(/\s+/g, "");
+    if (!upi) continue;
+    if (!/^\d{1,2}(?:[/.\-]\d{1,2}){3}[/.\-]\d{1,7}$/.test(upi)) {
+      invalid.push(raw.trim());
+      continue;
+    }
+    const key = upi.replace(/\D/g, "");
+    if (!upis.has(key)) upis.set(key, upi);
+  }
+  return { upis: Array.from(upis.values()), invalid };
+}
+
+function projectUpiIdentity(value: string): string {
+  return value.replace(/\D/g, "");
+}
 type AreaSearchResult = SelectedArea & { id: string };
 type AddressSearchResult = {
   id: string;
@@ -590,6 +635,7 @@ export function MapExperience() {
   const [nearbyAccessSnapshot, setNearbyAccessSnapshot] = useState<{ key: string; value: Exclude<NearbyAccessState, null> } | null>(null);
   const [compareProjectName, setCompareProjectName] = useState("");
   const [compareProjectUrl, setCompareProjectUrl] = useState("");
+  const [compareProjectUpis, setCompareProjectUpis] = useState("");
   const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
   const [selectedTransactionEstimateKey, setSelectedTransactionEstimateKey] = useState<string | null>(null);
   const [selectedTransactionEstimateStatus, setSelectedTransactionEstimateStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -798,9 +844,99 @@ export function MapExperience() {
     }
   };
 
+  const updateProjectParcelRecord = (
+    itemKey: string,
+    upi: string,
+    patch: Partial<ProjectParcelRecord>
+  ) => {
+    const upiKey = projectUpiIdentity(upi);
+    setComparedAreas((areas) => areas.map((area) => {
+      if (comparisonItemKey(area) !== itemKey || area.comparisonKind !== "project") return area;
+      return {
+        ...area,
+        projectParcelRecords: (area.projectParcelRecords ?? []).map((record) =>
+          projectUpiIdentity(record.upi) === upiKey ? { ...record, ...patch } : record
+        )
+      };
+    }));
+  };
+
+  const resolveProjectParcel = async (itemKey: string, upi: string) => {
+    try {
+      const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(upi));
+      if (!response.ok) throw new Error("Parcel lookup returned HTTP " + response.status);
+      const payload = await response.json() as AreaSearchResponse;
+      const match = (payload.areas ?? []).find((area) =>
+        area.level === "parcel" &&
+        Boolean(area.upi) &&
+        projectUpiIdentity(area.upi ?? "") === projectUpiIdentity(upi)
+      );
+      if (!match) {
+        updateProjectParcelRecord(itemKey, upi, {
+          lookupStatus: "not-found",
+          zoningStatus: "idle",
+          zones: []
+        });
+        return;
+      }
+
+      updateProjectParcelRecord(itemKey, upi, {
+        lookupStatus: "found",
+        district: match.district,
+        sector: match.sector,
+        cell: match.cell,
+        village: match.village,
+        parcelNumber: match.parcelNumber ?? null,
+        areaM2: typeof match.parcelSizeM2 === "number" && Number.isFinite(match.parcelSizeM2)
+          ? match.parcelSizeM2 : null,
+        zoningStatus: "loading",
+        zones: []
+      });
+
+      try {
+        const zoningParams = new URLSearchParams({
+          district: match.district,
+          upi: match.upi ?? upi
+        });
+        const zoningResponse = await fetch("/api/geography/parcel-zoning?" + zoningParams.toString());
+        const zoningPayload = await zoningResponse.json() as ComparisonZoningResponse;
+        if (!zoningResponse.ok) throw new Error(zoningPayload.error ?? "Parcel zoning is unavailable.");
+        updateProjectParcelRecord(itemKey, upi, {
+          zoningStatus: zoningPayload.status === "found" ? "found" : "not-covered",
+          zones: zoningPayload.zones ?? []
+        });
+      } catch {
+        // Preserve the fact that the cadastral UPI matched even if zoning lookup fails.
+        updateProjectParcelRecord(itemKey, upi, {
+          zoningStatus: "error",
+          zones: []
+        });
+      }
+    } catch {
+      updateProjectParcelRecord(itemKey, upi, {
+        lookupStatus: "unavailable",
+        zoningStatus: "error",
+        zones: []
+      });
+    }
+  };
+
   const addManualProjectToComparison = () => {
     const name = compareProjectName.trim();
     if (!name) { setComparisonFeedback("Enter a project name first."); return; }
+
+    const parsedUpis = parseProjectUpis(compareProjectUpis);
+    if (parsedUpis.invalid.length > 0) {
+      setComparisonFeedback("Check these UPI(s): " + parsedUpis.invalid.slice(0, 3).join(", ") +
+        (parsedUpis.invalid.length > 3 ? " and " + (parsedUpis.invalid.length - 3) + " more." : ".") +
+        " Use the full format, for example 5/07/08/01/3346.");
+      return;
+    }
+    if (parsedUpis.upis.length > 20) {
+      setComparisonFeedback("Add up to 20 parcel UPIs per project in this round.");
+      return;
+    }
+
     let sourceUrl: string | null = null;
     if (compareProjectUrl.trim()) {
       try {
@@ -812,21 +948,64 @@ export function MapExperience() {
         return;
       }
     }
+
     const item: ComparisonItem = {
       level: "district", name, province: null, district: "Project", districtId: null, sector: null, sectorId: null,
       cell: null, cellId: null, village: null, villageId: null, averageLandPricePerM2: null,
-      sourceLabel: "Manually added project. A permitted, verified project data feed is not connected.",
-      comparisonKind: "project", projectSourceUrl: sourceUrl, transactionEstimate: null
+      sourceLabel: "Manually added project. UPI-to-project relationships remain user supplied until verified by an authoritative source.",
+      comparisonKind: "project",
+      projectSourceUrl: sourceUrl,
+      projectParcelUpis: [],
+      projectParcelRecords: [],
+      projectParcelLinkStatus: "user-supplied-unverified",
+      transactionEstimate: null
     };
     const itemKey = comparisonItemKey(item);
-    if (comparedAreas.some((area) => comparisonItemKey(area) === itemKey)) {
-      setComparisonFeedback(name + " is already on your comparison list.");
-      return;
+    const existing = comparedAreas.find((area) => comparisonItemKey(area) === itemKey);
+    const existingUpis = existing?.projectParcelUpis ?? [];
+    const existingKeys = new Set(existingUpis.map(projectUpiIdentity));
+    const newUpis = parsedUpis.upis.filter((upi) => !existingKeys.has(projectUpiIdentity(upi)));
+
+    if (existing) {
+      if (newUpis.length === 0) {
+        setComparisonFeedback(name + " is already on your comparison list; no new UPIs were supplied.");
+        return;
+      }
+      setComparedAreas((areas) => areas.map((area) => comparisonItemKey(area) !== itemKey ? area : {
+        ...area,
+        projectParcelUpis: [...(area.projectParcelUpis ?? []), ...newUpis],
+        projectParcelRecords: [
+          ...(area.projectParcelRecords ?? []),
+          ...newUpis.map((upi): ProjectParcelRecord => ({
+            upi,
+            lookupStatus: "checking",
+            zoningStatus: "idle",
+            zones: []
+          }))
+        ],
+        projectParcelLinkStatus: "user-supplied-unverified"
+      }));
+      setComparisonFeedback("Added " + newUpis.length + " parcel UPI(s) to " + name +
+        ". The cadastral records and zoning will be checked, but the project-to-parcel relationship remains unverified.");
+      for (const upi of newUpis) void resolveProjectParcel(itemKey, upi);
+    } else {
+      setComparedAreas((areas) => [...areas, {
+        ...item,
+        projectParcelUpis: parsedUpis.upis,
+        projectParcelRecords: parsedUpis.upis.map((upi): ProjectParcelRecord => ({
+          upi,
+          lookupStatus: "checking",
+          zoningStatus: "idle",
+          zones: []
+        }))
+      }]);
+      setComparisonFeedback(name + " added with " + parsedUpis.upis.length + " parcel UPI(s). The cadastral records and zoning will be checked; project links remain unverified.");
+      for (const upi of parsedUpis.upis) void resolveProjectParcel(itemKey, upi);
     }
-    setComparedAreas((areas) => [...areas, item]);
+
     setCompareProjectName("");
     setCompareProjectUrl("");
-    setComparisonFeedback(name + " added. Project metrics remain blank until a verified source is connected.");
+    setCompareProjectUpis("");
   };
 
   const addSelectedAreaToComparison = () => {
@@ -2743,11 +2922,17 @@ export function MapExperience() {
                 aria-label="Project name"
                 autoComplete="off"
                 className="comparison-search"
+                list="comparison-project-name-candidates"
                 onChange={(event) => setCompareProjectName(event.target.value)}
                 placeholder="Project name"
                 type="text"
                 value={compareProjectName}
               />
+              <datalist id="comparison-project-name-candidates">
+                {PROJECT_NAME_SUGGESTIONS.map((projectName) => (
+                  <option key={projectName} value={projectName} />
+                ))}
+              </datalist>
               <input
                 aria-label="Project source URL (optional)"
                 autoComplete="url"
@@ -2757,10 +2942,25 @@ export function MapExperience() {
                 type="url"
                 value={compareProjectUrl}
               />
+              <label className="comparison-project-upis-label" htmlFor="comparison-project-upis">
+                Parcel UPIs — one per line
+              </label>
+              <textarea
+                aria-label="Parcel UPIs, one per line"
+                className="comparison-project-upis"
+                id="comparison-project-upis"
+                onChange={(event) => setCompareProjectUpis(event.target.value)}
+                placeholder={"5/07/08/01/3346\n5/07/08/01/3347"}
+                rows={3}
+                value={compareProjectUpis}
+              />
               <button className="comparison-project-add-button" onClick={addManualProjectToComparison} type="button">
-                Add project
+                Add project / update UPIs
               </button>
-              <small>Project metrics remain unpopulated until a verified, permitted feed is connected.</small>
+              <small>
+                Projects can span multiple parcels and zoning types. UPIs are checked against connected land records;
+                this does not verify that those parcels legally belong to the named project.
+              </small>
             </div>
             {comparisonFeedback ? (
               <p aria-live="polite" className="comparison-feedback">{comparisonFeedback}</p>
@@ -2815,12 +3015,62 @@ export function MapExperience() {
                             key={comparisonItemKey(area)}
                           >
                             <span>{area.comparisonKind === "project" ? area.name : area.name}</span>
-                            <small>{area.comparisonKind === "project" ? "Project · no verified feed" : areaLevelLabel(area.level) + " · " + area.district}</small>
+                            <small>{area.comparisonKind === "project"
+                              ? "Project · " + (area.projectParcelUpis?.length ?? 0) + " linked UPI(s) · relationship unverified"
+                              : areaLevelLabel(area.level) + " · " + area.district}</small>
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
+                      <tr key="project-parcel-upis">
+                        <th scope="row">Project parcel UPIs / zoning</th>
+                        {comparedAreas.map((area) => {
+                          if (area.comparisonKind !== "project") {
+                            return <td key={"project-upis-" + comparisonItemKey(area)}><span>Not a project</span></td>;
+                          }
+                          const records = area.projectParcelRecords ?? [];
+                          return (
+                            <td key={"project-upis-" + comparisonItemKey(area)}>
+                              <div className="project-parcel-link-list">
+                                <small className="project-parcel-link-warning">
+                                  Project-to-parcel link: user supplied · unverified
+                                </small>
+                                {records.length === 0 ? (
+                                  <span>No parcel UPIs supplied</span>
+                                ) : records.map((record) => (
+                                  <div className="project-parcel-link-item" key={projectUpiIdentity(record.upi)}>
+                                    <strong>UPI {record.upi}</strong>
+                                    <small>
+                                      {record.lookupStatus === "checking" ? "Checking cadastral record…"
+                                        : record.lookupStatus === "found"
+                                          ? [record.district, record.sector, record.cell, record.village].filter(Boolean).join(" · ")
+                                          : record.lookupStatus === "not-found"
+                                            ? "No exact UPI match in connected pilot layers"
+                                            : "Cadastral lookup unavailable"}
+                                    </small>
+                                    {record.areaM2 !== null && record.areaM2 !== undefined ? (
+                                      <small>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(record.areaM2)} m²</small>
+                                    ) : null}
+                                    {record.zoningStatus === "loading" ? <small>Checking parcel zoning…</small>
+                                      : record.zoningStatus === "found" && record.zones.length > 0 ? (
+                                        <span className="project-parcel-zones">
+                                          {record.zones.map((zone) => (
+                                            <small key={(zone.code ?? "") + "|" + zone.name}>
+                                              {zone.code ? zone.code + " · " : ""}{zone.name}
+                                            </small>
+                                          ))}
+                                        </span>
+                                      ) : record.zoningStatus === "not-covered" ? <small>No mapped zoning for this parcel</small>
+                                        : record.zoningStatus === "error" ? <small>Parcel zoning unavailable</small>
+                                          : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
                       {comparedAreas.some((area) => area.comparisonKind !== "project" && area.level === "parcel") ? (
                         <>
                           <tr key="parcel-asking-price">

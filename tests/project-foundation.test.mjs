@@ -895,3 +895,28 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(css.includes(".global-area-search-field"));
   assert.ok(css.includes(".global-area-search-results"));
 });
+
+
+test("projects can group multiple UPIs while preserving unverified links and per-parcel zoning", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.match(experience, /type ProjectParcelRecord =/);
+  assert.match(experience, /projectParcelUpis\?: string\[\]/);
+  assert.match(experience, /projectParcelLinkStatus\?: "user-supplied-unverified" \| "source-verified"/);
+  assert.match(experience, /function parseProjectUpis/);
+  assert.match(experience, /\^\\d\{1,2\}\(\?:\[\/.\\-\]\\d\{1,2\}\)\{3\}/);
+  assert.match(experience, /upis\.length > 20/);
+  assert.match(experience, /resolveProjectParcel/);
+  assert.match(experience, /\/api\/geography\/areas\/search\?q=/);
+  assert.match(experience, /\/api\/geography\/parcel-zoning\?/);
+  assert.match(experience, /projectParcelRecords/);
+  assert.match(experience, /Project-to-parcel link: user supplied · unverified/);
+  assert.match(experience, /Project parcel UPIs \/ zoning/);
+  assert.match(experience, /PROJECT_NAME_SUGGESTIONS/);
+  assert.match(experience, /"Gisa"/);
+  assert.match(experience, /"Kigali Heights"/);
+  assert.match(css, /\.comparison-project-upis/);
+  assert.match(css, /\.project-parcel-link-item/);
+  assert.match(css, /\.project-parcel-zones/);
+});
