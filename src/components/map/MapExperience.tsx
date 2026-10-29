@@ -759,8 +759,16 @@ export function MapExperience() {
         resolveGeometry: "1",
         source: area.mapSourceId,
         level: area.level,
-        objectId: area.sourceObjectId
+        name: area.name,
+        district: area.district
       });
+      if (area.sector) params.set("sector", area.sector);
+      if (area.cell) params.set("cell", area.cell);
+      if (area.village) params.set("village", area.village);
+      if (area.districtId) params.set("districtId", area.districtId);
+      if (area.sectorId) params.set("sectorId", area.sectorId);
+      if (area.cellId) params.set("cellId", area.cellId);
+      if (area.villageId) params.set("villageId", area.villageId);
       try {
         const response = await fetch("/api/geography/areas/search?" + params.toString());
         if (!response.ok) throw new Error("Selected boundary could not be loaded.");
