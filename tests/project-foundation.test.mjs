@@ -556,7 +556,7 @@ test("comparison searches every pilot administrative level and accepts any mixed
   assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
   assert.match(experience, /comparisonKind: "project"/);
   assert.match(experience, /No verified project data/);
-  assert.match(experience, /placeholder="District, sector, cell, village, UPI or parcel number"/);
+  assert.match(experience, /placeholder="District, sector, cell, village, parcel number or UPI"/);
   assert.match(experience, /comparison-level-filter/);
   assert.match(experience, /visibleComparisonSearchResults/);
   assert.match(experience, /comparisonLevelFilter === "all" \|\| area\.level === comparisonLevelFilter/);
@@ -646,7 +646,8 @@ test("comparison search includes cadastral UPI and parcel number", async () => {
   assert.match(search, /const upiField = chooseField\(fields, \["upi", "unique_parcel_identifier", "uniqueparcelidentifier"\]\)/);
   assert.match(search, /const parcelNumberField = chooseField\(fields, \["parcel_number", "parcelnumber", "parcel_no", "parcelno"\]\)/);
   assert.match(search, /outFields: Array.from\(new Set\(fieldsToReturn\)\)\.join\(","\) \|\| "\*"/);
-  assert.match(experience, /UPI or parcel number/);
+  assert.match(experience, /Find an area, parcel or UPI/);
+  assert.match(experience, /parcel number or UPI/);
   assert.match(experience, /area\.upi/);
   assert.match(experience, /normalizeAreaName\(area\.parcelNumber\)/);
 });
@@ -860,9 +861,11 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(route.includes("Promise.race([fallbackPromise, timeoutPromise])"));
   assert.ok(route.includes("10_000"));
   assert.match(route, /vercel-empty-feature-collection/);
-  assert.match(route, /const fastFallback = allowVercelFallback/);
-  assert.match(route, /if \(fastFallback\?\.response\) return fastFallback\.response/);
-  assert.ok(route.indexOf("const fastFallback = allowVercelFallback") < route.indexOf("const parcelBudget ="));
+  assert.match(route, /const fastFallbackPromise = allowVercelFallback/);
+  assert.ok(route.indexOf("const fastFallbackPromise = allowVercelFallback") < route.indexOf("const parcelBudget ="));
+  assert.match(route, /const fallback = await fastFallbackPromise/);
+  assert.match(route, /if \(features\.length === 0 && fastFallbackPromise\)/);
+  assert.match(route, /const splitBeforeQuery = area > 0\.0003 && depth < 1/);
   assert.match(route, /"X-Parcel-Provider-Warning"/);
   assert.ok(route.includes("15_000"));
   assert.match(route, /requestHost\.endsWith\("\.workers\.dev"\)/);
@@ -912,7 +915,7 @@ test("global search returns navigable areas, resolves addresses on submit and hi
 
   assert.ok(search.includes("addressOnly"));
   assert.ok(search.includes("OpenStreetMap Nominatim geocoding"));
-  assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeKey(district))"));
+  assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeDistrictKey(district))"));
   assert.ok(search.includes("boundsFromGeometry"));
   assert.ok(search.includes("centerFromBounds"));
   assert.ok(search.includes('returnGeometry: "true"'));
@@ -931,26 +934,31 @@ test("global search returns navigable areas, resolves addresses on submit and hi
 });
 
 
-test("projects can group multiple UPIs while preserving unverified links and per-parcel zoning", async () => {
+test("comparison projects retain user-supplied names and optional project page URLs", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const css = await readProjectFile("src/app/globals.css");
 
-  assert.match(experience, /type ProjectParcelRecord =/);
-  assert.match(experience, /projectParcelUpis\?: string\[\]/);
-  assert.match(experience, /projectParcelLinkStatus\?: "user-supplied-unverified" \| "source-verified"/);
-  assert.match(experience, /function parseProjectUpis/);
-  assert.match(experience, /\^\\d\{1,2\}\(\?:\[\/.\\-\]\\d\{1,2\}\)\{3\}/);
-  assert.match(experience, /upis\.length > 20/);
-  assert.match(experience, /resolveProjectParcel/);
-  assert.match(experience, /\/api\/geography\/areas\/search\?q=/);
-  assert.match(experience, /\/api\/geography\/parcel-zoning\?/);
-  assert.match(experience, /projectParcelRecords/);
-  assert.match(experience, /Project-to-parcel link: user supplied · unverified/);
-  assert.match(experience, /Project parcel UPIs \/ zoning/);
+  assert.match(experience, /compareProjectName/);
+  assert.match(experience, /compareProjectUrl/);
+  assert.match(experience, /Add a project/);
+  assert.match(experience, /Project page URL \(optional\)/);
+  assert.match(experience, /No verified project data/);
   assert.match(experience, /PROJECT_NAME_SUGGESTIONS/);
-  assert.match(experience, /"Gisa"/);
-  assert.match(experience, /"Kigali Heights"/);
-  assert.match(css, /\.comparison-project-upis/);
-  assert.match(css, /\.project-parcel-link-item/);
-  assert.match(css, /\.project-parcel-zones/);
+  assert.match(css, /\.comparison-project-add/);
+});
+
+
+test("place search is case-insensitive for administrative names and cell parcel lookups", async () => {
+  const searchRoute = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+  const cellParcelRoute = await readProjectFile("src/app/api/geography/cell-parcels/route.ts");
+  const areasRoute = await readProjectFile("src/app/api/geography/areas/route.ts");
+
+  assert.match(searchRoute, /districtName\.toLocaleUpperCase\("en"\)/);
+  assert.match(searchRoute, /const escapedUpper = query\.toLocaleUpperCase\("en"\)/);
+  assert.match(searchRoute, /UPPER\(" \+ field \+ "\) =/);
+  assert.match(searchRoute, /UPPER\(" \+ field \+ "\) LIKE/);
+  assert.match(cellParcelRoute, /UPPER\(district\) =/);
+  assert.match(cellParcelRoute, /UPPER\(sector\) =/);
+  assert.match(cellParcelRoute, /UPPER\(cell\) =/);
+  assert.match(areasRoute, /const splitBeforeQuery = area > 0\.0003 && depth < 1/);
 });
