@@ -965,8 +965,8 @@ async function fetchVercelParcelFallback(
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timeoutHandle = setTimeout(() => {
       controller.abort();
-      reject(new Error("Vercel parcel fallback timed out after 20 seconds"));
-    }, 20_000);
+      reject(new Error("Vercel parcel fallback timed out after 10 seconds"));
+    }, 10_000);
   });
 
   let payload: unknown;
@@ -999,6 +999,10 @@ async function fetchVercelParcelFallback(
   }
 
   const collection = payload as ParcelGeoJsonFeatureCollection;
+  if (collection.features.length === 0) {
+    console.error("Vercel parcel fallback returned no cadastral parcel features.");
+    return { response: null, status: "failed", reason: "vercel-empty-feature-collection" };
+  }
   const containsUnverifiedGeometry = collection.features.some((feature) =>
     !feature ||
     feature.type !== "Feature" ||
@@ -1012,20 +1016,21 @@ async function fetchVercelParcelFallback(
     return { response: null, status: "failed", reason: "invalid-cadastral-feature" };
   }
 
-  console.warn(
-    "Parcel geometry served by Vercel fallback after Cloudflare GIS provider failures: " +
-    unavailableProviders.join(", ")
-  );
+  console.warn(unavailableProviders.length
+    ? "Parcel geometry served by Vercel fallback after Cloudflare GIS provider failures: " + unavailableProviders.join(", ")
+    : "Parcel geometry served by the Vercel fast path on Cloudflare.");
 
   return {
     response: NextResponse.json(collection, {
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
         "X-Data-Source": "City of Kigali Master Plan parcels; National Land Authority LAIS Bugesera_Parcels",
-        "X-Parcel-Coverage": "Cadastral parcel polygons queried for this viewport by the Vercel fallback API",
+        "X-Parcel-Coverage": "Cadastral parcel polygons queried for this viewport by the Vercel parcel API",
         "X-Parcel-Fallback-Source": "Vercel production parcel API",
         "X-Parcel-Fallback-Status": "used",
-        "X-Parcel-Provider-Warning": "Primary GIS provider(s) unavailable in Cloudflare: " + unavailableProviders.join(", ")
+        "X-Parcel-Provider-Warning": unavailableProviders.length
+          ? "Primary GIS provider(s) unavailable in Cloudflare: " + unavailableProviders.join(", ")
+          : "Vercel parcel fast path selected for the Cloudflare Worker."
       }
     }),
     status: "used"
