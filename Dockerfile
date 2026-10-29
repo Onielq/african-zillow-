@@ -5,6 +5,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY package*.json ./
 COPY scripts ./scripts
+# The postinstall land-price index generator reads this source before the full app is copied.
+COPY public/land-price-transaction.tsv ./public/land-price-transaction.tsv
 RUN npm install --no-audit --no-fund
 
 FROM base AS builder
