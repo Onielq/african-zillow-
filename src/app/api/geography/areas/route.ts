@@ -952,9 +952,11 @@ async function fetchVercelParcelFallback(
   const controller = new AbortController();
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   const fallbackPromise = (async () => {
+    // Do not bypass Vercel's edge cache: the same viewport is a stable GIS
+    // query and the production route publishes a short shared-cache lifetime.
+    // This lets Cloudflare consume the already-warmed cadastral response.
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      cache: "no-store",
       signal: controller.signal
     });
     if (!response.ok) {
@@ -965,8 +967,8 @@ async function fetchVercelParcelFallback(
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timeoutHandle = setTimeout(() => {
       controller.abort();
-      reject(new Error("Vercel parcel fallback timed out after 10 seconds"));
-    }, 10_000);
+      reject(new Error("Vercel parcel fallback timed out after 15 seconds"));
+    }, 15_000);
   });
 
   let payload: unknown;
