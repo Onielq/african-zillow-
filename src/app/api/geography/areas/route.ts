@@ -906,6 +906,107 @@ async function queryParcelBounds(
   }
 }
 
+type ParcelGeoJsonFeatureCollection = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown };
+    properties: { source_type?: string; upi?: string; [key: string]: unknown };
+    [key: string]: unknown;
+  }>;
+};
+
+async function fetchVercelParcelFallback(
+  bounds: Bounds,
+  sourceFilter: "kigali" | "bugesera" | undefined,
+  unavailableProviders: string[]
+): Promise<NextResponse | null> {
+  // Cloudflare's Worker runtime can fail to reach the public ArcGIS endpoints
+  // even when the same query succeeds in Vercel's runtime. Use Vercel only as
+  // a server-to-server failover after every primary provider has failed.
+  // Vercel does not use this fallback, so this cannot recurse back into itself.
+  if (process.env.DEPLOYMENT_PLATFORM !== "cloudflare-workers") return null;
+
+  const fallbackOrigin = (
+    process.env.TAISEEL_GIS_FALLBACK_ORIGIN || "https://rwanda-land-intelligence.vercel.app"
+  ).replace(/\/+$/, "");
+  const url = new URL("/api/geography/areas", fallbackOrigin);
+  url.searchParams.set("level", "parcel");
+  if (sourceFilter) url.searchParams.set("source", sourceFilter);
+  url.searchParams.set("bbox", bounds.join(","));
+
+  const controller = new AbortController();
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const fallbackPromise = (async () => {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error("Vercel parcel fallback returned HTTP " + response.status);
+    }
+    return await response.json() as unknown;
+  })();
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Vercel parcel fallback timed out after 20 seconds"));
+    }, 20_000);
+  });
+
+  let payload: unknown;
+  try {
+    payload = await Promise.race([fallbackPromise, timeoutPromise]);
+  } catch (error) {
+    console.error("Vercel parcel fallback failed.", error);
+    return null;
+  } finally {
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+  }
+
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !("type" in payload) ||
+    payload.type !== "FeatureCollection" ||
+    !("features" in payload) ||
+    !Array.isArray(payload.features)
+  ) {
+    console.error("Vercel parcel fallback returned an invalid FeatureCollection.");
+    return null;
+  }
+
+  const collection = payload as ParcelGeoJsonFeatureCollection;
+  const containsUnverifiedGeometry = collection.features.some((feature) =>
+    !feature ||
+    feature.type !== "Feature" ||
+    !feature.geometry ||
+    !["Polygon", "MultiPolygon"].includes(feature.geometry.type) ||
+    feature.properties?.source_type !== "cadastral-parcel" ||
+    typeof feature.properties?.upi !== "string"
+  );
+  if (containsUnverifiedGeometry) {
+    console.error("Vercel parcel fallback returned a feature without cadastral geometry and UPI.");
+    return null;
+  }
+
+  console.warn(
+    "Parcel geometry served by Vercel fallback after Cloudflare GIS provider failures: " +
+    unavailableProviders.join(", ")
+  );
+
+  return NextResponse.json(collection, {
+    headers: {
+      "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
+      "X-Data-Source": "City of Kigali Master Plan parcels; National Land Authority LAIS Bugesera_Parcels",
+      "X-Parcel-Coverage": "Cadastral parcel polygons queried for this viewport by the Vercel fallback API",
+      "X-Parcel-Fallback-Source": "Vercel production parcel API",
+      "X-Parcel-Provider-Warning": "Primary GIS provider(s) unavailable in Cloudflare: " + unavailableProviders.join(", ")
+    }
+  });
+}
+
 async function getParcels(
   bounds: Bounds,
   sourceFilter?: "kigali" | "bugesera"
