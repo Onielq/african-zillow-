@@ -180,7 +180,16 @@ async function getRoadRoute(origin: { lat: number; lon: number }, destination: C
       routeStatus: "routed"
     };
   } catch {
-    return { id: destination.id, category: destination.category, name: destination.name, distanceKm: null, timeMinutes: null, routeStatus: "unavailable" };
+    // Preserve useful proximity when the shared routing service is unavailable.
+    // This is a straight-line distance, never presented as a driving distance.
+    return {
+      id: destination.id,
+      category: destination.category,
+      name: destination.name,
+      distanceKm: Math.round(destination.straightKm * 100) / 100,
+      timeMinutes: null,
+      routeStatus: "straight-line"
+    };
   }
 }
 
