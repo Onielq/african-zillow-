@@ -649,6 +649,29 @@ export function MapExperience() {
     []
   );
 
+  const searchGlobalAddress = async (query: string) => {
+    if (query.trim().length < 4) {
+      setGlobalSearchStatus("ready");
+      return;
+    }
+    setGlobalSearchStatus("loading");
+    try {
+      const response = await fetch(
+        "/api/geography/areas/search?addressOnly=1&q=" + encodeURIComponent(query.trim())
+      );
+      if (!response.ok) throw new Error("Address search failed (" + response.status + ")");
+      const payload = await response.json() as AreaSearchResponse;
+      const addresses = payload.addresses ?? [];
+      setGlobalSearchResults((current) => [
+        ...current.filter((item) => !("kind" in item && item.kind === "address")),
+        ...addresses
+      ]);
+      setGlobalSearchStatus("ready");
+    } catch {
+      setGlobalSearchStatus("error");
+    }
+  };
+
   const selectGlobalSearchResult = (result: GlobalSearchResult) => {
     setWorkspaceMode("areas");
     setGlobalSearchOpen(false);
@@ -990,15 +1013,12 @@ export function MapExperience() {
     const timer = window.setTimeout(async () => {
       setGlobalSearchStatus("loading");
       try {
-        const url = "/api/geography/areas/search?q=" + encodeURIComponent(query) + "&addresses=1";
+        const url = "/api/geography/areas/search?q=" + encodeURIComponent(query);
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("Place search failed (" + response.status + ")");
         const payload = await response.json() as AreaSearchResponse;
         if (controller.signal.aborted) return;
-        const results: GlobalSearchResult[] = [
-          ...(payload.areas ?? []),
-          ...(payload.addresses ?? [])
-        ];
+        const results: GlobalSearchResult[] = [...(payload.areas ?? [])];
         setGlobalSearchResults(results);
         setGlobalSearchStatus("ready");
       } catch {
@@ -1411,9 +1431,25 @@ export function MapExperience() {
                   onFocus={() => setGlobalSearchOpen(true)}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") setGlobalSearchOpen(false);
-                    if (event.key === "Enter" && globalSearchResults.length > 0) {
+                    if (event.key === "Enter") {
                       event.preventDefault();
-                      selectGlobalSearchResult(globalSearchResults[0]);
+                      const query = globalSearch.trim();
+                      const isFullUpi = /^\d{1,2}(?:[/.\-\s]\d{1,2}){3}[/.\-\s]\d{1,7}$/.test(query);
+                      const looksLikeAddress = !isFullUpi && (
+                        query.includes(",") ||
+                        /\b(?:road|street|avenue|drive|close|lane|boulevard|rd|st|ave)\b/i.test(query) ||
+                        /^(?:kn|kg|kk)\s*[- ]?\s*\d+/i.test(query)
+                      );
+                      const addressResult = globalSearchResults.find(
+                        (result) => "kind" in result && result.kind === "address"
+                      );
+                      if (looksLikeAddress && addressResult) {
+                        selectGlobalSearchResult(addressResult);
+                      } else if (looksLikeAddress || globalSearchResults.length === 0) {
+                        void searchGlobalAddress(query);
+                      } else {
+                        selectGlobalSearchResult(globalSearchResults[0]);
+                      }
                     }
                   }}
                   placeholder="Search address, area, UPI…"
@@ -1484,7 +1520,11 @@ export function MapExperience() {
                       );
                     })
                   ) : (
-                    <p className="global-area-search-message">No matching place found. Try a shorter name or paste the full UPI.</p>
+                    <p className="global-area-search-message">
+                      {globalSearchStatus === "ready"
+                        ? "No matching area. Press Enter to search this as an address."
+                        : "No matching place found. Try a shorter name or paste the full UPI."}
+                    </p>
                   )}
                 </div>
               ) : null}
