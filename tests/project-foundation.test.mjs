@@ -549,7 +549,9 @@ test("comparison searches every pilot administrative level and accepts any mixed
 
   assert.match(search, /layers: \{ district: 4, sector: 5, cell: 6, village: 7 \}/);
   assert.match(search, /layers: \{ district: 2, sector: 4, cell: 3, village: 5 \}/);
-  assert.match(search, /returnGeometry: "false"/);
+  assert.match(search, /returnGeometry: "true"/);
+  assert.match(search, /boundsFromGeometry/);
+  assert.match(search, /centerFromBounds/);
   assert.match(experience, /setComparedAreas\(\(areas\) => \[\.\.\.areas, item\]\)/);
   assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
   assert.match(experience, /comparisonKind: "project"/);
@@ -652,7 +654,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /id: "metric-bubbles-circle"/);
   assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\],\s*2\.35,\s*3\.2\s*\]/);
   assert.doesNotMatch(mapView, /"circle-radius": \[\s*"case"[\s\S]{0,200}\["interpolate", \["linear"\], \["zoom"\]/);
-  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0\.005 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*\[/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
   assert.match(mapView, /"line-width": \[\s*"case",\s*\["boolean", \["feature-state", "hover"\], false\]/);
   assert.match(mapView, /level === "parcel" \? 1\.25 : level === "village" \? 1\.35 : 1\.05/);
@@ -789,7 +791,7 @@ test("parcel outlines keep a high-contrast casing above road and zoning overlays
   assert.match(mapView, /"line-width": \[/);
   assert.match(mapView, /VILLAGE_ZOOM, 1\.8/);
   assert.match(mapView, /PARCEL_ZOOM \+ 3\.85, 3\.2/);
-  assert.match(mapView, /"fill-opacity": level === "parcel" \? 0\.005 : AREA_FILL_OPACITY_EXPRESSION/);
+  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*\[/);
   assert.doesNotMatch(mapView, /"line-width": \[\s*"case"[\s\S]{0,500}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
   assert.match(mapView, /map\.moveLayer\(layerId\)/);
@@ -866,4 +868,30 @@ test("optional parcel casing is added only after required outline layers", async
   assert.ok(outlineLoop >= 0, "primary administrative and parcel outlines must be created");
   assert.ok(casingAttempt > outlineLoop, "optional casing is initialized after the primary outline loop");
   assert.match(mapView, /if \(!map\.getLayer\(PARCEL_OUTLINE_CASING_LAYER\) && map\.getLayer\(AREA_LAYERS\.parcel\.outline\)\)/);
+});
+
+test("global search returns navigable areas, resolves addresses on submit and highlights selected parcels cyan", async () => {
+  const search = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+
+  assert.ok(search.includes("addressOnly"));
+  assert.ok(search.includes("OpenStreetMap Nominatim geocoding"));
+  assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeKey(district))"));
+  assert.ok(search.includes("boundsFromGeometry"));
+  assert.ok(search.includes("centerFromBounds"));
+  assert.ok(search.includes('returnGeometry: "true"'));
+  assert.ok(experience.includes("global-area-search-input"));
+  assert.ok(experience.includes("/api/geography/areas/search?q="));
+  assert.ok(experience.includes("/api/geography/areas/search?addressOnly=1"));
+  assert.ok(experience.includes("mapInstance.fitBounds"));
+  assert.ok(experience.includes("mapInstance.flyTo"));
+  assert.ok(experience.includes("selectedArea={selectedArea}"));
+  assert.ok(!experience.includes('href="/contact"'));
+  assert.ok(mapView.includes('"#00E5FF"'));
+  assert.ok(mapView.includes('"#67E8F9"'));
+  assert.ok(mapView.includes("selectionSyncRef.current?.(selectedAreaRef.current)"));
+  assert.ok(css.includes(".global-area-search-field"));
+  assert.ok(css.includes(".global-area-search-results"));
 });
