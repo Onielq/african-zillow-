@@ -858,9 +858,11 @@ async function queryParcelBounds(
   const area = Math.max(0, bounds[2] - bounds[0]) * Math.max(0, bounds[3] - bounds[1]);
   const splitBounds = splitBoundsIntoQuarters(bounds).filter((child) => boundsIntersect(child, provider.extent));
 
-  // Do not load a whole-district parcel payload into one serverless request.
-  // Query smaller geographic tiles sequentially and stop after a bounded batch.
-  const splitBeforeQuery = area > 0.01 && depth < 2;
+  // Pre-split neighborhood-scale viewports before asking for full polygon
+  // geometries. A single 300-feature response from Bugesera can be slow, and
+  // splitting only after that response adds another full GIS round trip.
+  // The 0.0003-degree² threshold covers a typical village-level viewport.
+  const splitBeforeQuery = area > 0.0003 && depth < 1;
   if (splitBeforeQuery) {
     return queryParcelChildren(provider, splitBounds, depth + 1, budget);
   }
