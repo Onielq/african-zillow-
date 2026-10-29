@@ -832,7 +832,7 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.match(route, /requestHost\.endsWith\("\.workers\.dev"\)/);
   assert.match(route, /process\.env\.DEPLOYMENT_PLATFORM === "cloudflare-workers"/);
   assert.ok(route.includes("https://rwanda-land-intelligence.vercel.app"));
-  assert.match(route, /if \(fallback\) return fallback/);
+  assert.match(route, /if \(fallback\.response\) return fallback\.response/);
   assert.match(route, /"X-Parcel-Fallback-Source"/);
   assert.match(route, /"X-Parcel-Fallback-Status"/);
   assert.match(route, /"X-Parcel-Fallback-Reason"/);
