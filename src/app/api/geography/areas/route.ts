@@ -1131,11 +1131,11 @@ async function getParcels(
         const district = textValue(attributeValue(attributes, ["district"]));
         const districtKey = (district ?? "")
           .normalize("NFD")
-          .replace(/[\\u0300-\\u036f]/g, "")
+          .replace(/[\u0300-\u036f]/g, "")
           .trim()
-          .replace(/\\s+/g, " ")
+          .replace(/\s+/g, " ")
           .toLocaleLowerCase("en")
-          .replace(/\\s+district$/, "");
+          .replace(/\s+district$/, "");
         if (districtKey !== "bugesera") return null;
 
         const locationIds = bugeseraLocationIdsFromUpi(upi);
