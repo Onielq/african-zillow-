@@ -1050,6 +1050,9 @@ async function getParcels(
 
   if (results.every((result) => result.failed)) {
     const unavailableProviders = results.map((result) => result.provider.id);
+    const fallback = await fetchVercelParcelFallback(bounds, sourceFilter, unavailableProviders);
+    if (fallback) return fallback;
+
     return NextResponse.json(
       {
         error: "The cadastral parcel boundary sources are temporarily unavailable.",
