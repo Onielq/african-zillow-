@@ -36,7 +36,8 @@ import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 import {
   ParcelComparisonPanel,
   ParcelIntelligenceInline,
-  type ParcelComparisonItem
+  type ParcelComparisonItem,
+  type UnitPriceBasis
 } from "@/components/map/ParcelIntelligence";
 
 type WorkspaceMode = "areas" | "projects";
@@ -1835,6 +1836,16 @@ export function MapExperience() {
                       ? displayedParcelValue / selectedArea.parcelSizeM2
                       : parcelUnitPriceEstimate?.pricePerM2 ?? null
                   }
+                  unitPriceBasis={(
+                    hasSourcedParcelPrice &&
+                    typeof selectedArea.parcelSizeM2 === "number" &&
+                    selectedArea.parcelSizeM2 > 0 &&
+                    displayedParcelValue !== null
+                  )
+                    ? selectedArea.parcelSizeSource === "geometry-estimate"
+                      ? "published-estimated-area"
+                      : "published-recorded-area"
+                    : parcelUnitPriceEstimate?.kind ?? "unavailable"}
                   priceStatus={
                     hasSourcedParcelPrice
                       ? "published"
