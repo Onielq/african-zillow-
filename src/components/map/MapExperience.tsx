@@ -536,7 +536,7 @@ export function MapExperience() {
   const [selectedMetric, setSelectedMetric] =
     useState<MarketMetric>("averageLandPricePerM2");
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
-  const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
+  const analysisPeriod: AnalysisPeriod = "12m";
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
@@ -808,7 +808,6 @@ export function MapExperience() {
   useEffect(() => {
     const area = selectedArea;
     if (!area || area.level !== "parcel" || !area.center) {
-      setNearbyAccess(null);
       return;
     }
     const controller = new AbortController();
@@ -870,9 +869,6 @@ export function MapExperience() {
     const query = compareSearch.trim();
     const shouldBrowseParcels = compareBrowseOpen && query.length === 0;
     if (query.length < 2 && !shouldBrowseParcels) {
-      setComparisonSearchResults([]);
-      setComparisonSearchStatus("idle");
-      setComparisonBrowseHasMore(false);
       return;
     }
     const controller = new AbortController();
@@ -2370,9 +2366,14 @@ export function MapExperience() {
               onChange={(event) => {
                 const value = event.target.value;
                 setCompareSearch(value);
-                setCompareBrowseOpen(value.trim().length === 0);
+                const normalizedQuery = value.trim();
+                setCompareBrowseOpen(normalizedQuery.length === 0);
                 setComparisonBrowseOffset(0);
                 setComparisonBrowseHasMore(false);
+                if (normalizedQuery.length > 0 && normalizedQuery.length < 2) {
+                  setComparisonSearchResults([]);
+                  setComparisonSearchStatus("idle");
+                }
               }}
               placeholder="District, sector, cell, village, UPI or parcel number" type="search" value={compareSearch} />
             {compareBrowseOpen || normalizedComparisonSearch.length >= 2 ? (
@@ -2388,7 +2389,16 @@ export function MapExperience() {
                       const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
                       return (
                         <button aria-selected={isAdded} className="comparison-search-result" disabled={isAdded} key={area.id}
-                          onClick={() => { addAreaToComparison(area); if (!isAdded) { setCompareSearch(""); setCompareBrowseOpen(false); } }}
+                          onClick={() => {
+                            addAreaToComparison(area);
+                            if (!isAdded) {
+                              setCompareSearch("");
+                              setCompareBrowseOpen(false);
+                              setComparisonSearchResults([]);
+                              setComparisonSearchStatus("idle");
+                              setComparisonBrowseHasMore(false);
+                            }
+                          }}
                           role="option" type="button">
                           <span className="comparison-search-dot" aria-hidden="true" />
                           <span className="comparison-search-result-copy">
