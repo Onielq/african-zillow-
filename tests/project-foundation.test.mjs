@@ -72,6 +72,15 @@ test("cadastral outlines and parcel geometry are active from village zoom", asyn
   assert.match(mapView, /sourceListsMultipleCodes/);
 });
 
+test("the map idle fallback does not race the queued viewport refresh and abort cadastral requests", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+  const scheduledRefresh = mapView.slice(mapView.indexOf("const scheduleRefresh = () =>"), mapView.indexOf("const setHover = (", mapView.indexOf("const scheduleRefresh = () =>"));
+  const idleFallback = mapView.slice(mapView.indexOf('map.once("idle", () =>'), mapView.indexOf('if (!viewportListenersAttached)', mapView.indexOf('map.once("idle", () =>')));
+
+  assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+  assert.match(idleFallback, /if \(needsRefresh\) \{[\s\S]*?clearTimeout\(refreshTimer\);[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+});
+
 test("zoning codes are separated when a source record combines short codes and sources live in the Sources panel", async () => {
   const route = await readProjectFile("src/app/api/geography/parcel-zoning/route.ts");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
