@@ -534,7 +534,7 @@ export function ParcelComparisonPanel({ open, items, onClose, onRemove }: Compar
   const largestArea = bestMetricIds(items, "areaM2", "max");
 
   return (
-    <aside aria-label="Parcel comparison scorecard" aria-modal="false" className={styles.comparisonPanel}>
+    <aside aria-label="Parcel comparison scorecard" className={styles.comparisonPanel}>
       <div className={styles.panelHeader}>
         <div>
           <p>LAND INTELLIGENCE</p>
