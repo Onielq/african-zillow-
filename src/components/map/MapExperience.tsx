@@ -1013,11 +1013,7 @@ export function MapExperience() {
   useEffect(() => {
     const requestId = ++globalSearchSequenceRef.current;
     const query = globalSearch.trim();
-    if (query.length < 2) {
-      setGlobalSearchResults([]);
-      setGlobalSearchStatus("idle");
-      return;
-    }
+    if (query.length < 2) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setGlobalSearchStatus("loading");
@@ -1434,8 +1430,13 @@ export function MapExperience() {
                   autoComplete="off"
                   className="global-area-search-input"
                   onChange={(event) => {
-                    setGlobalSearch(event.target.value);
+                    const value = event.target.value;
+                    setGlobalSearch(value);
                     setGlobalSearchOpen(true);
+                    if (value.trim().length < 2) {
+                      setGlobalSearchResults([]);
+                      setGlobalSearchStatus("idle");
+                    }
                   }}
                   onFocus={() => setGlobalSearchOpen(true)}
                   onKeyDown={(event) => {
@@ -1473,6 +1474,8 @@ export function MapExperience() {
                     className="global-area-search-clear"
                     onClick={() => {
                       setGlobalSearch("");
+                      setGlobalSearchResults([]);
+                      setGlobalSearchStatus("idle");
                       setGlobalSearchOpen(true);
                     }}
                     type="button"
@@ -1497,6 +1500,7 @@ export function MapExperience() {
                       return (
                         <button
                           aria-label={isAddress ? "Find address " + result.name : "Find " + level + " " + result.name}
+                          aria-selected={false}
                           className="global-area-search-result"
                           key={result.id}
                           onClick={() => selectGlobalSearchResult(result)}
