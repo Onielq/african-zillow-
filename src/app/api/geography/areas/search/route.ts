@@ -23,6 +23,16 @@ type LayerQueryResponse = {
   exceededTransferLimit?: boolean;
 };
 
+type SearchAddress = {
+  id: string;
+  kind: "address";
+  name: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  sourceLabel: string;
+};
+
 type SearchArea = {
   id: string;
   level: AreaLevel;
@@ -247,6 +257,58 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   });
 }
 
+type NominatimResult = {
+  osm_type?: string;
+  osm_id?: number;
+  display_name?: string;
+  lat?: string;
+  lon?: string;
+};
+
+async function searchAddresses(query: string): Promise<SearchAddress[]> {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("countrycodes", "rw");
+  url.searchParams.set("viewbox", "28.7,-1.0,31.05,-2.95");
+  url.searchParams.set("bounded", "1");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "6");
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "RwandaLandIntelligence/1.0 (address search)"
+      },
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!response.ok) throw new Error("Address search returned HTTP " + response.status);
+    const results = await response.json() as NominatimResult[];
+    return results.flatMap((item) => {
+      const latitude = Number(item.lat);
+      const longitude = Number(item.lon);
+      const displayName = item.display_name?.trim();
+      if (!displayName || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+      if (longitude < 28.7 || longitude > 31.05 || latitude < -2.95 || latitude > -1.0) return [];
+      const name = displayName.split(",")[0]?.trim() || displayName;
+      return [{
+        id: "address-" + (item.osm_type ?? "place") + "-" + String(item.osm_id ?? displayName),
+        kind: "address" as const,
+        name,
+        displayName,
+        latitude,
+        longitude,
+        sourceLabel: "OpenStreetMap Nominatim geocoding"
+      }];
+    });
+  } catch (error) {
+    console.warn("Rwanda address geocoding is temporarily unavailable.", error);
+    return [];
+  }
+}
+
 function canonicalFullUpi(value: string): string | null {
   const normalized = value.trim().replace(/\s*[/.-]\s*/g, "/");
   return /^\d{1,2}(?:\/\d{1,2}){3}\/\d{1,7}$/.test(normalized) ? normalized : null;
@@ -442,6 +504,7 @@ async function browseParcels(
 
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const includeAddresses = request.nextUrl.searchParams.get("addresses") === "1";
   const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
   if (rawQuery.length < 2 && !browseMode) {
     return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
