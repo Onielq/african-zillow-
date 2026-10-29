@@ -514,6 +514,7 @@ type MapViewProps = {
   showLayers: MapOverlayCategory[];
   showZoning: boolean;
   showScope: ShowScope;
+  selectedArea: SelectedArea | null;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -530,11 +531,11 @@ const LAND_PRICE_RAMP = [
   65000, "#B7444B"
 ] as const;
 
-function areaFillColorExpression(showPrice: boolean, baseColor: string) {
+function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel = false) {
   return [
     "case",
     ["boolean", ["feature-state", "hover"], false], "#65D5A1",
-    ["boolean", ["feature-state", "selected"], false], "#FFE3A1",
+    ["boolean", ["feature-state", "selected"], false], isParcel ? "#67E8F9" : "#FFE3A1",
     showPrice
       ? [
           "case",
@@ -932,7 +933,8 @@ export function MapView({
   onBoundaryStatusChange,
   onAreaSelected,
   showLayers,
-  showScope
+  showScope,
+  selectedArea
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
@@ -941,6 +943,8 @@ export function MapView({
   const selectedMetricRef = useRef<MapMetric>(selectedMetric);
   const metricBubbleValuesRef = useRef<MetricBubbleValue[]>([]);
   const areaDataRef = useRef<Partial<Record<AreaLevel, MapFeatureCollection>>>({});
+  const selectedAreaRef = useRef<SelectedArea | null>(selectedArea);
+  const selectionSyncRef = useRef<((area: SelectedArea | null) => void) | null>(null);
   const refreshMetricBubblesRef = useRef<(() => void) | null>(null);
   const showLayersRef = useRef(showLayers);
   const showScopeRef = useRef(showScope);
@@ -1001,6 +1005,11 @@ export function MapView({
     refreshMetricBubblesRef.current?.();
     return () => { active = false; };
   }, [selectedMetric]);
+
+  useEffect(() => {
+    selectedAreaRef.current = selectedArea;
+    selectionSyncRef.current?.(selectedArea);
+  }, [selectedArea]);
 
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
@@ -1445,6 +1454,38 @@ export function MapView({
       refreshMetricBubblesRef.current?.();
     };
 
+    const syncSelectedArea = (area: SelectedArea | null) => {
+      if (!area) {
+        selectFeatureState(null);
+        return;
+      }
+      const features = areaDataRef.current[area.level]?.features ?? [];
+      const normalize = (value: unknown) => String(value ?? "")
+        .trim()
+        .replace(/\\s+/g, " ")
+        .toLocaleLowerCase("en");
+      const match = features.find((feature) => {
+        const properties = feature.properties ?? {};
+        if (area.level === "parcel") {
+          return Boolean(area.upi) && normalize(properties.upi) === normalize(area.upi);
+        }
+        if (normalize(properties[area.level]) !== normalize(area.name)) return false;
+        if (area.level !== "district" && normalize(properties.district) !== normalize(area.district)) return false;
+        if ((area.level === "cell" || area.level === "village") &&
+            normalize(properties.sector) !== normalize(area.sector)) return false;
+        if (area.level === "village" && normalize(properties.cell) !== normalize(area.cell)) return false;
+        return true;
+      });
+      const id = match?.id;
+      if (match && (typeof id === "string" || typeof id === "number")) {
+        selectFeatureState({ source: AREA_LAYERS[area.level].source, id });
+      } else {
+        selectFeatureState(null);
+      }
+    };
+    selectionSyncRef.current = syncSelectedArea;
+
+
     const addAdministrativeLayers = () => {
       const empty = emptyFeatureCollection();
 
@@ -1475,11 +1516,19 @@ export function MapView({
             "fill-color": areaFillColorExpression(
               showLandPriceHeatmapRef.current &&
                 (level === "district" || level === "sector" || level === "cell"),
-              layer.color
+              layer.color,
+              level === "parcel"
             ),
-            // Parcels remain visually outline-only. The nearly transparent fill stays queryable,
-            // allowing a parcel to be selected when parcel outlines appear at village zoom.
-            "fill-opacity": level === "parcel" ? 0.005 : AREA_FILL_OPACITY_EXPRESSION
+            // Keep parcels almost transparent until selected. A selected parcel
+            // gets a cyan wash as well as a bright outline so the chosen plot is obvious.
+            "fill-opacity": level === "parcel"
+              ? [
+                  "case",
+                  ["boolean", ["feature-state", "hover"], false], 0.16,
+                  ["boolean", ["feature-state", "selected"], false], 0.38,
+                  0.008
+                ]
+              : AREA_FILL_OPACITY_EXPRESSION
           }
         });
       }
@@ -1499,7 +1548,7 @@ export function MapView({
               ["boolean", ["feature-state", "hover"], false],
               "#06492E",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#2563EB" : "#126347",
+              level === "parcel" ? "#00E5FF" : "#126347",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
@@ -1514,7 +1563,7 @@ export function MapView({
               ["boolean", ["feature-state", "hover"], false],
               level === "parcel" ? 2.5 : 2.6,
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 2.8 : 2.5,
+              level === "parcel" ? 3.2 : 2.5,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
@@ -2029,6 +2078,7 @@ export function MapView({
         const merged = mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []);
         areaDataRef.current[level] = merged;
         source.setData(merged);
+        selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
@@ -2179,6 +2229,7 @@ export function MapView({
           areaDataRef.current[level] = emptyData;
           source.setData(emptyData);
         }
+        selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
 
         updateLayerVisibility();
