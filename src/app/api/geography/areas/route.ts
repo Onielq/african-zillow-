@@ -457,11 +457,29 @@ async function queryArcGisLayer(
 
   upstreamUrl.search = params.toString();
 
-  const response = await fetch(upstreamUrl, {
+  // Some serverless runtimes do not consistently terminate a hung outbound
+  // fetch when AbortSignal.timeout fires. Race the request against an explicit
+  // deadline as well, and abort the network request when the deadline expires.
+  const controller = new AbortController();
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const fetchPromise = fetch(upstreamUrl, {
     headers: { Accept: "application/json" },
     next: { revalidate: revalidateSeconds },
-    signal: AbortSignal.timeout(timeoutMs)
+    signal: controller.signal
   });
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`ArcGIS layer request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  let response: Response;
+  try {
+    response = await Promise.race([fetchPromise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+  }
 
   if (!response.ok) {
     throw new Error(`ArcGIS layer request failed (${response.status})`);
@@ -850,7 +868,7 @@ async function queryParcelBounds(
       "upi IS NOT NULL",
       "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
       180,
-      8_000
+      15_000
     );
 
     // A very dense tile may still contain thousands of records. Subdivide it,
@@ -872,10 +890,13 @@ async function queryParcelBounds(
     // Splitting a query can recover from an oversized spatial window, but it
     // cannot recover from an upstream gateway outage or a timed-out small tile.
     // Stop here so one unavailable provider cannot hold the map open for minutes.
-    const isTransientUpstreamFailure = error instanceof Error && (
-      /ArcGIS layer request failed \((?:502|503|504)\)/.test(error.message) ||
-      /timeout|timed out|fetch failed|ECONNRESET|EAI_AGAIN/i.test(error.name + " " + error.message)
-    );
+    const errorName = error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : "";
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isTransientUpstreamFailure =
+      /ArcGIS layer request failed \((?:502|503|504)\)/.test(errorMessage) ||
+      /timeout|timed out|fetch failed|ECONNRESET|EAI_AGAIN|aborted/i.test(errorName + " " + errorMessage);
     if (isTransientUpstreamFailure || depth >= 2 || area <= 0.00002) {
       console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
       return { features: [], failed: true };
@@ -927,9 +948,19 @@ async function getParcels(
   }
 
   if (results.every((result) => result.failed)) {
+    const unavailableProviders = results.map((result) => result.provider.id);
     return NextResponse.json(
-      { error: "The cadastral parcel boundary sources are temporarily unavailable." },
-      { status: 502, headers: { "Cache-Control": "no-store" } }
+      {
+        error: "The cadastral parcel boundary sources are temporarily unavailable.",
+        unavailableProviders
+      },
+      {
+        status: 502,
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Parcel-Provider-Warning": "Unavailable provider(s): " + unavailableProviders.join(", ")
+        }
+      }
     );
   }
 
