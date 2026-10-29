@@ -120,7 +120,11 @@ function formatShortMoney(value: number): string {
   return new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(value);
 }
 
-type AreaSearchResult = SelectedArea & { id: string };
+type AreaSearchResult = SelectedArea & {
+  id: string;
+  mapSourceId?: "kigali" | "bugesera";
+  sourceObjectId?: string | null;
+};
 type AddressSearchResult = {
   id: string;
   kind: "address";
@@ -709,7 +713,7 @@ export function MapExperience() {
     }
   };
 
-  const selectGlobalSearchResult = (result: GlobalSearchResult) => {
+  const selectGlobalSearchResult = async (result: GlobalSearchResult) => {
     setWorkspaceMode("areas");
     setGlobalSearchOpen(false);
     setGlobalSearch("");
@@ -738,9 +742,52 @@ export function MapExperience() {
       return;
     }
 
-    const area = result as AreaSearchResult;
+    let area = result as AreaSearchResult;
     globalSearchMarkerRef.current?.remove();
     globalSearchMarkerRef.current = null;
+
+    // Autocomplete deliberately returns attributes only. Resolve geometry for
+    // this one selected feature so typing a name never downloads dozens of full
+    // polygons, while selecting the result still takes the user to its exact area.
+    if (
+      area.level !== "parcel" &&
+      !area.bounds &&
+      area.mapSourceId &&
+      area.sourceObjectId
+    ) {
+      const params = new URLSearchParams({
+        resolveGeometry: "1",
+        source: area.mapSourceId,
+        level: area.level,
+        name: area.name,
+        district: area.district
+      });
+      if (area.sector) params.set("sector", area.sector);
+      if (area.cell) params.set("cell", area.cell);
+      if (area.village) params.set("village", area.village);
+      if (area.districtId) params.set("districtId", area.districtId);
+      if (area.sectorId) params.set("sectorId", area.sectorId);
+      if (area.cellId) params.set("cellId", area.cellId);
+      if (area.villageId) params.set("villageId", area.villageId);
+      try {
+        const response = await fetch("/api/geography/areas/search?" + params.toString());
+        if (!response.ok) throw new Error("Selected boundary could not be loaded.");
+        const geometry = await response.json() as {
+          bounds?: [number, number, number, number] | null;
+          center?: [number, number] | null;
+        };
+        area = {
+          ...area,
+          bounds: geometry.bounds ?? null,
+          center: geometry.center ?? null
+        };
+      } catch {
+        // Keep the selected record visible in its details panel, but do not
+        // invent a location if the map's own source cannot return its geometry.
+        area = { ...area, bounds: null, center: null };
+      }
+    }
+
     setSelectedArea(area);
     if (!mapInstance) return;
 

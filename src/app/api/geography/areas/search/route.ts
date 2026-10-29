@@ -7,8 +7,6 @@ const KIGALI_MAP_SERVER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer";
 const BUGESERA_MAP_SERVER =
   "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
-const NATIONAL_ADMIN_SERVER =
-  "https://moegis.environment.gov.rw/server/rest/services/Hosted/Administrative_boundaries/FeatureServer";
 const KIGALI_PARCELS =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
 const BUGESERA_PARCELS =
@@ -16,7 +14,7 @@ const BUGESERA_PARCELS =
 
 type AdminAreaLevel = "district" | "sector" | "cell" | "village";
 type AreaLevel = AdminAreaLevel | "parcel";
-type SourceId = "kigali" | "bugesera" | "national";
+type SourceId = "kigali" | "bugesera";
 type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
 type LayerQueryResponse = {
@@ -51,6 +49,8 @@ type SearchArea = {
   averageLandPricePerM2: number | null;
   sourceLabel: string;
   sourceType: "administrative-boundary" | "cadastral-parcel";
+  mapSourceId?: SourceId;
+  sourceObjectId?: string | null;
   upi?: string | null;
   parcelNumber?: string | null;
   parcelSizeM2?: number | null;
@@ -60,6 +60,23 @@ type SearchArea = {
 };
 
 const PILOT_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
+const SOURCE_DISTRICTS: Record<SourceId, string[]> = {
+  kigali: ["Gasabo", "Kicukiro", "Nyarugenge"],
+  bugesera: ["Bugesera"]
+};
+const ADMIN_MAP_SOURCES: Record<SourceId, {
+  baseUrl: string;
+  layers: Record<AdminAreaLevel, number>;
+}> = {
+  kigali: {
+    baseUrl: KIGALI_MAP_SERVER,
+    layers: { district: 4, sector: 5, cell: 6, village: 7 }
+  },
+  bugesera: {
+    baseUrl: BUGESERA_MAP_SERVER,
+    layers: { district: 2, sector: 4, cell: 3, village: 5 }
+  }
+};
 const DISTRICT_PRICE_SNAPSHOTS: Record<string, number> = {
   gasabo: 36103,
   kicukiro: 61499,
@@ -155,6 +172,7 @@ function centerFromBounds(bounds: [number, number, number, number] | null): [num
   return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
 }
 
+
 function chooseField(fields: FieldMetadata[], candidates: string[]): string | null {
   for (const candidate of candidates) {
     const key = normalizeKey(candidate);
@@ -204,30 +222,34 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   const nameFields = chooseTextFields(fields, candidate.name);
   if (nameFields.length === 0) return [];
 
-  // Scope the GIS query to the four pilot districts BEFORE ArcGIS applies
-  // resultRecordCount. Filtering after the server-side limit silently discarded
-  // valid Gasabo/Kicukiro/Nyarugenge/Bugesera records whenever country-wide
-  // matches filled the first page.
+  // Search the exact administrative layers that feed the map. This avoids
+  // mismatches between the visible Kigali/Bugesera map data and a separate
+  // national boundary dataset.
   const districtFields = level === "district"
     ? nameFields
     : chooseTextFields(fields, candidate.district);
-  if (districtFields.length === 0) return [];
-  const pilotDistrictValues = [
-    "Gasabo", "Gasabo District",
-    "Kicukiro", "Kicukiro District",
-    "Nyarugenge", "Nyarugenge District",
-    "Bugesera", "Bugesera District"
-  ];
-  const pilotDistrictWhere = "(" + districtFields.map((field) =>
-    "(" + pilotDistrictValues.map((districtName) =>
-      field + " = '" + districtName.replace(/'/g, "''") + "'"
-    ).join(" OR ") + ")"
-  ).join(" OR ") + ")";
-  const scopeToPilotDistricts = (where: string) =>
-    "(" + pilotDistrictWhere + ") AND (" + where + ")";
+  if (districtFields.length === 0 && source !== "bugesera") return [];
+  const allowedDistrictValues = SOURCE_DISTRICTS[source].flatMap((name) => [
+    name,
+    name.toUpperCase(),
+    name.toLowerCase(),
+    name + " District",
+    name.toUpperCase() + " DISTRICT"
+  ]);
+  const districtScopeWhere = districtFields.length === 0
+    ? "1=1"
+    : "(" + districtFields.map((field) =>
+        "(" + allowedDistrictValues.map((districtName) =>
+          field + " = '" + districtName.replace(/'/g, "''") + "'"
+        ).join(" OR ") + ")"
+      ).join(" OR ") + ")";
+  const scopeToMappedDistricts = (where: string) =>
+    "(" + districtScopeWhere + ") AND (" + where + ")";
 
   const escaped = query.replace(/'/g, "''");
   const requestedFields = new Set<string>(nameFields);
+  const objectIdField = chooseField(fields, ["objectid", "objectid_1", "objectid_12", "fid", "id"]);
+  if (objectIdField) requestedFields.add(objectIdField);
   for (const field of chooseTextFields(fields, ["province", "province_name", "prov_name", "province_e"])) requestedFields.add(field);
   for (const key of ["district", "sector", "cell", "village"] as const) {
     for (const field of chooseTextFields(fields, candidate[key])) requestedFields.add(field);
@@ -237,8 +259,9 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
 
   const commonParams = {
     outFields: Array.from(requestedFields).join(","),
-    returnGeometry: "true",
-    outSR: "4326",
+    // Autocomplete returns names, hierarchy, and stable feature IDs only.
+    // Full polygon geometry is fetched only after the user selects a result.
+    returnGeometry: "false",
     f: "json"
   };
   const prefixWhere = "(" + nameFields.map((field) =>
@@ -248,13 +271,15 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     field + " LIKE '%" + escaped + "%'"
   ).join(" OR ") + ")";
 
-  const queryLayer = async (where: string, limit: number): Promise<LayerQueryResponse> => {
+  const queryLayer = async (where: string): Promise<LayerQueryResponse> => {
     const params = new URLSearchParams({
       ...commonParams,
-      where,
-      resultRecordCount: String(limit),
-      orderByFields: nameFields[0] + " ASC"
+      where
     });
+    // The map's administrative endpoints are older MapServer layers. They can
+    // reject resultRecordCount/resultOffset as "Pagination is not supported".
+    // A server-side name + district filter keeps each response scoped without
+    // relying on paging.
     const response = await fetch(layerUrl + "/query?" + params.toString(), {
       headers: { Accept: "application/json" },
       next: { revalidate: 300 },
@@ -270,10 +295,8 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   // exact administrative name ahead of similarly named villages and prevents
   // common short prefixes from hiding the place the user actually typed.
   const [prefixPayload, containsPayload] = await Promise.all([
-    // Preserve enough precise/prefix candidates, but keep fuzzy substring
-    // geometry payloads small enough for Vercel's 2 MB data-cache limit.
-    queryLayer(scopeToPilotDistricts(prefixWhere), 20),
-    queryLayer(scopeToPilotDistricts(containsWhere), 15)
+    queryLayer(scopeToMappedDistricts(prefixWhere)),
+    queryLayer(scopeToMappedDistricts(containsWhere))
   ]);
   const features = [...(prefixPayload.features ?? []), ...(containsPayload.features ?? [])];
 
@@ -281,7 +304,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const attributes = feature.attributes ?? {};
     const name = value(attributes, nameFields);
     const district = (level === "district" ? name : value(attributes, chooseTextFields(fields, candidate.district))) ??
-      (normalizeDistrictKey(name ?? "") === "bugesera" ? "Bugesera" : null);
+      (source === "bugesera" ? "Bugesera" : null);
     if (!name || !district || !PILOT_DISTRICTS.has(normalizeDistrictKey(district))) return [];
     const sector = level === "sector" ? name : value(attributes, chooseTextFields(fields, candidate.sector));
     const cell = level === "cell" ? name : value(attributes, chooseTextFields(fields, candidate.cell));
@@ -293,9 +316,11 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const villageId = value(attributes, ids.village ?? []);
     const province = value(attributes, ["province", "province_name", "prov_name", "province_e"]) ??
       (normalizeDistrictKey(district) === "bugesera" ? "Eastern Province" : "Kigali City");
-    const bounds = boundsFromGeometry(feature.geometry);
+    // The autocomplete query has no geometry. Keep the map feature ID so a
+    // single exact geometry lookup can run when the user selects this result.
+    const sourceObjectId = objectIdField ? value(attributes, [objectIdField]) : null;
     return [{
-      id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, index].filter(Boolean).join("-"),
+      id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, sourceObjectId ?? index].filter(Boolean).join("-"),
       level,
       name,
       province,
@@ -308,16 +333,108 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
       village,
       villageId,
       averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[normalizeDistrictKey(district)] ?? null : null,
-      sourceLabel: source === "national"
-        ? "Government administrative boundaries · 2022 census mapping"
-        : source === "kigali"
-          ? "Kigali City Master Plan administrative boundaries"
-          : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
+      sourceLabel: source === "kigali"
+        ? "Kigali City Master Plan administrative boundaries"
+        : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
       sourceType: "administrative-boundary" as const,
-      bounds,
-      center: centerFromBounds(bounds)
+      mapSourceId: source,
+      sourceObjectId,
+      bounds: null,
+      center: null
     }];
   });
+}
+
+async function resolveAdminAreaGeometry(
+  source: SourceId,
+  level: AdminAreaLevel,
+  target: {
+    name: string;
+    district: string;
+    sector: string | null;
+    cell: string | null;
+    village: string | null;
+    districtId: string | null;
+    sectorId: string | null;
+    cellId: string | null;
+    villageId: string | null;
+  }
+): Promise<{ bounds: [number, number, number, number]; center: [number, number] }> {
+  const sourceConfig = ADMIN_MAP_SOURCES[source];
+  const layerUrl = sourceConfig.baseUrl + "/" + sourceConfig.layers[level];
+  const metadata = await getLayerMetadata(layerUrl);
+  const fields = metadata.fields ?? [];
+  const candidates = CANDIDATES[level];
+  const conditions: string[] = [];
+
+  const quote = (raw: string) => "'" + raw.replace(/'/g, "''") + "'";
+  const conditionForValue = (fieldName: string, rawValue: string) => {
+    const field = fields.find((item) => item.name === fieldName);
+    const kind = field?.type?.toLowerCase() ?? "";
+    const numeric = kind.includes("oid") || kind.includes("integer") || kind.includes("double") || kind.includes("smallinteger");
+    const numberValue = Number(rawValue);
+    return numeric && Number.isFinite(numberValue)
+      ? fieldName + " = " + String(numberValue)
+      : fieldName + " = " + quote(rawValue);
+  };
+  const addTextCondition = (fieldCandidates: string[], rawValue: string | null) => {
+    if (!rawValue) return;
+    const field = chooseField(fields, fieldCandidates);
+    if (field) conditions.push(conditionForValue(field, rawValue));
+  };
+  const addIdentifierCondition = (key: AdminAreaLevel, rawValue: string | null) => {
+    if (!rawValue) return;
+    // Never use OBJECTID/FID as an administrative parent ID. Some public layers
+    // expose zero for every feature there; the real parent codes are separate fields.
+    const idCandidates = candidates.ids[key].filter((candidate) =>
+      !["objectid", "objectid1", "objectid12", "fid", "id"].includes(normalizeKey(candidate))
+    );
+    const field = chooseField(fields, idCandidates);
+    if (field) conditions.push(conditionForValue(field, rawValue));
+  };
+
+  addTextCondition(candidates.name, target.name);
+  if (level !== "district") {
+    addTextCondition(candidates.district, target.district);
+    addIdentifierCondition("district", target.districtId);
+  }
+  if (level === "cell" || level === "village") {
+    addTextCondition(candidates.sector, target.sector);
+    addIdentifierCondition("sector", target.sectorId);
+  }
+  if (level === "village") {
+    addTextCondition(candidates.cell, target.cell);
+    addIdentifierCondition("cell", target.cellId);
+  }
+  addIdentifierCondition(level, level === "district"
+    ? target.districtId
+    : level === "sector"
+      ? target.sectorId
+      : level === "cell"
+        ? target.cellId
+        : target.villageId);
+
+  if (conditions.length === 0) throw new Error("No usable name or parent fields exist for this layer.");
+  const params = new URLSearchParams({
+    where: conditions.join(" AND "),
+    outFields: "*",
+    returnGeometry: "true",
+    outSR: "4326",
+    f: "json"
+  });
+  const response = await fetch(layerUrl + "/query?" + params.toString(), {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new Error("Selected boundary lookup failed (" + response.status + ")");
+  const payload = await response.json() as LayerQueryResponse;
+  if (payload.error) throw new Error(payload.error.message ?? "Selected boundary lookup failed");
+
+  const geometryFeature = (payload.features ?? []).find((feature) => boundsFromGeometry(feature.geometry) !== null);
+  const bounds = boundsFromGeometry(geometryFeature?.geometry);
+  if (!geometryFeature || !bounds) throw new Error("The selected boundary geometry was not returned.");
+  return { bounds, center: centerFromBounds(bounds) as [number, number] };
 }
 
 type NominatimResult = {
@@ -568,6 +685,37 @@ async function browseParcels(
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const addressOnly = request.nextUrl.searchParams.get("addressOnly") === "1";
+  if (request.nextUrl.searchParams.get("resolveGeometry") === "1") {
+    const rawSource = request.nextUrl.searchParams.get("source");
+    const rawLevel = request.nextUrl.searchParams.get("level");
+    const target = {
+      name: request.nextUrl.searchParams.get("name")?.trim() ?? "",
+      district: request.nextUrl.searchParams.get("district")?.trim() ?? "",
+      sector: request.nextUrl.searchParams.get("sector")?.trim() || null,
+      cell: request.nextUrl.searchParams.get("cell")?.trim() || null,
+      village: request.nextUrl.searchParams.get("village")?.trim() || null,
+      districtId: request.nextUrl.searchParams.get("districtId")?.trim() || null,
+      sectorId: request.nextUrl.searchParams.get("sectorId")?.trim() || null,
+      cellId: request.nextUrl.searchParams.get("cellId")?.trim() || null,
+      villageId: request.nextUrl.searchParams.get("villageId")?.trim() || null
+    };
+    if (
+      (rawSource !== "kigali" && rawSource !== "bugesera") ||
+      !["district", "sector", "cell", "village"].includes(rawLevel ?? "") ||
+      !target.name
+    ) {
+      return NextResponse.json({ error: "A mapped source, administrative level, and area name are required." }, { status: 400 });
+    }
+    try {
+      const resolved = await resolveAdminAreaGeometry(rawSource, rawLevel as AdminAreaLevel, target);
+      return NextResponse.json(resolved, {
+        headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800" }
+      });
+    } catch (error) {
+      console.error("Selected administrative boundary resolution failed.", error);
+      return NextResponse.json({ error: "The selected administrative boundary could not be resolved." }, { status: 502 });
+    }
+  }
   const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
   if (rawQuery.length < 2 && !browseMode) {
     return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
@@ -579,12 +727,21 @@ export async function GET(request: NextRequest) {
     .replace(/\s+(?:district|sector|cell|village)$/i, "")
     .trim();
   const cleanedKey = normalizeKey(cleanedQuery);
-  // Accept common spoken/spelling variants; display the government spelling.
+  // Search aliases are input helpers only. Results always show the exact name
+  // from the mapped administrative source, never the alias supplied by a user.
+  const kibagabagaAliases = ["kivagagaga", "kivagabaga", "kiwagabaga", "kibagabaga"];
+  const isKibagabagaAlias = cleanedKey.length >= 4 && kibagabagaAliases.some(
+    (alias) => alias.startsWith(cleanedKey) || cleanedKey.startsWith(alias)
+  );
   const bugeseraAliases = ["wijesera", "wugesera", "wujezera"];
   const isBugeseraAlias = cleanedKey.length >= 4 && bugeseraAliases.some(
     (alias) => alias.startsWith(cleanedKey) || cleanedKey.startsWith(alias)
   );
-  const query = isBugeseraAlias ? "Bugesera" : cleanedQuery;
+  const query = isKibagabagaAlias
+    ? "Kibagabaga"
+    : isBugeseraAlias
+      ? "Bugesera"
+      : cleanedQuery;
   const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
@@ -652,13 +809,16 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const adminTasks = (Object.entries({ district: 0, sector: 1, cell: 2, village: 3 }) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
-    searchLayer("national", NATIONAL_ADMIN_SERVER, level, layerId, query)
-      .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
-      .catch((error) => {
-        console.error("Official administrative search failed for " + level + ".", error);
-        return { areas: [] as SearchArea[], failed: true, kind: "administrative" as const };
-      })
+  const adminSources = Object.entries(ADMIN_MAP_SOURCES) as Array<[SourceId, typeof ADMIN_MAP_SOURCES[SourceId]]>;
+  const adminTasks = adminSources.flatMap(([sourceId, source]) =>
+    (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
+      searchLayer(sourceId, source.baseUrl, level, layerId, query)
+        .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
+        .catch((error) => {
+          console.error("Mapped administrative search failed for " + sourceId + " " + level + ".", error);
+          return { areas: [] as SearchArea[], failed: true, kind: "administrative" as const };
+        })
+    )
   );
   const shouldSearchParcels = /\d/.test(query) || fullUpiQuery !== null;
   const parcelTasks = shouldSearchParcels
@@ -675,7 +835,7 @@ export async function GET(request: NextRequest) {
   const results = await Promise.all(tasks);
   const administrativeResults = results.filter((result) => result.kind === "administrative");
   if (administrativeResults.length === 0 || administrativeResults.every((result) => result.failed)) {
-    return NextResponse.json({ error: "The official administrative search service is temporarily unavailable." }, { status: 502 });
+    return NextResponse.json({ error: "The map's administrative search sources are temporarily unavailable." }, { status: 502 });
   }
   const allAreas = results.flatMap((result) => result.areas);
   const areas = fullUpiQuery
@@ -707,11 +867,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     areas: sorted,
     searched: query,
-    coverage: "Government administrative hierarchy: Gasabo, Kicukiro, Nyarugenge and Bugesera; cadastral search from connected parcel sources"
+    coverage: "Mapped administrative layers: Kigali City Master Plan (Gasabo, Kicukiro and Nyarugenge) and Geodata Rwanda Bugesera Masterplan; cadastral search from connected parcel sources"
   }, {
     headers: {
       "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
-      "X-Data-Source": "Government administrative boundaries · 2022 census mapping; Kigali City and Bugesera cadastral sources"
+      "X-Data-Source": "Kigali City Master Plan; Geodata Rwanda Bugesera Masterplan; cadastral sources"
     }
   });
 }
