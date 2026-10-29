@@ -18,7 +18,7 @@ type SourceId = "kigali" | "bugesera";
 type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
 type LayerQueryResponse = {
-  features?: Array<{ attributes?: Record<string, unknown> }>;
+  features?: Array<{ attributes?: Record<string, unknown>; geometry?: unknown }>;
   error?: { code?: number; message?: string };
   exceededTransferLimit?: boolean;
 };
@@ -44,6 +44,7 @@ type SearchArea = {
   parcelSizeM2?: number | null;
   lastUpdatedOn?: number | null;
   bounds?: [number, number, number, number] | null;
+  center?: [number, number] | null;
 };
 
 const PILOT_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
@@ -91,6 +92,41 @@ const CANDIDATES: Record<AdminAreaLevel, { name: string[]; district: string[]; s
 
 function normalizeKey(value: string): string {
   return value.toLocaleLowerCase("en").replace(/[^a-z0-9]/g, "");
+}
+
+function collectCoordinates(value: unknown, output: Array<[number, number]>): void {
+  if (!Array.isArray(value)) return;
+  if (
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    typeof value[1] === "number" &&
+    Number.isFinite(value[0]) &&
+    Number.isFinite(value[1])
+  ) {
+    output.push([value[0], value[1]]);
+    return;
+  }
+  for (const child of value) collectCoordinates(child, output);
+}
+
+function boundsFromGeometry(geometry: unknown): [number, number, number, number] | null {
+  if (!geometry || typeof geometry !== "object") return null;
+  const object = geometry as Record<string, unknown>;
+  const coordinates = "rings" in object ? object.rings : object.coordinates;
+  const positions: Array<[number, number]> = [];
+  collectCoordinates(coordinates, positions);
+  if (positions.length === 0) return null;
+  const bounds: [number, number, number, number] = [
+    Math.min(...positions.map(([longitude]) => longitude)),
+    Math.min(...positions.map(([, latitude]) => latitude)),
+    Math.max(...positions.map(([longitude]) => longitude)),
+    Math.max(...positions.map(([, latitude]) => latitude))
+  ];
+  return bounds.every(Number.isFinite) ? bounds : null;
+}
+
+function centerFromBounds(bounds: [number, number, number, number] | null): [number, number] | null {
+  return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
 }
 
 function chooseField(fields: FieldMetadata[], candidates: string[]): string | null {
@@ -155,7 +191,9 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   const params = new URLSearchParams({
     where: nameField + " LIKE " + "'%" + escaped + "%'",
     outFields: Array.from(requestedFields).join(","),
-    returnGeometry: "false",
+    returnGeometry: "true",
+    outSR: "4326",
+    resultRecordCount: "25",
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
@@ -172,7 +210,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const name = value(attributes, candidate.name);
     const district = (level === "district" ? name : value(attributes, candidate.district)) ??
       (source === "bugesera" ? "Bugesera" : null);
-    if (!name || !district || !PILOT_DISTRICTS.has(district.toLocaleLowerCase("en"))) return [];
+    if (!name || !district || !PILOT_DISTRICTS.has(normalizeKey(district))) return [];
     const sector = level === "sector" ? name : value(attributes, candidate.sector);
     const cell = level === "cell" ? name : value(attributes, candidate.cell);
     const village = level === "village" ? name : value(attributes, candidate.village);
@@ -184,6 +222,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const province = source === "bugesera"
       ? "Eastern Province"
       : value(attributes, ["province", "prov_name", "province_name", "province_e"]) ?? "Kigali City";
+    const bounds = boundsFromGeometry(feature.geometry);
     return [{
       id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, index].filter(Boolean).join("-"),
       level,
@@ -197,11 +236,13 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
       cellId,
       village,
       villageId,
-      averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[district.toLocaleLowerCase("en")] ?? null : null,
+      averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[normalizeKey(district)] ?? null : null,
       sourceLabel: source === "kigali"
         ? "Kigali City Master Plan administrative boundaries"
         : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
-      sourceType: "administrative-boundary" as const
+      sourceType: "administrative-boundary" as const,
+      bounds,
+      center: centerFromBounds(bounds)
     }];
   });
 }
@@ -264,7 +305,8 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
   const params = new URLSearchParams({
     where: "(" + conditions.join(" OR ") + ")",
     outFields: Array.from(new Set(fieldsToReturn)).join(",") || "*",
-    returnGeometry: "false",
+    returnGeometry: "true",
+    outSR: "4326",
     resultRecordCount: "25",
     f: "json"
   });
@@ -290,6 +332,7 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
     const size = sizeRaw === null ? null : Number(sizeRaw);
     const updatedRaw = value(attributes, ["last_updated_on", "lastupdatedon"]);
     const updated = updatedRaw === null ? null : Number(updatedRaw);
+    const bounds = boundsFromGeometry(feature.geometry);
     return [{
       id: "parcel-" + normalizeKey(upi),
       level: "parcel" as const,
@@ -312,7 +355,8 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
       parcelNumber,
       parcelSizeM2: size !== null && Number.isFinite(size) ? size : null,
       lastUpdatedOn: updated !== null && Number.isFinite(updated) ? updated : null,
-      bounds: null
+      bounds,
+      center: centerFromBounds(bounds)
     }];
   });
 }
@@ -404,7 +448,7 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "public, max-age=30, s-maxage=60" }
     });
   }
-  const query = rawQuery.slice(0, 80);
+  const query = rawQuery.slice(0, 80).replace(/\s+(?:district|sector|cell|village)$/i, "").trim();
   const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
