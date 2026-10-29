@@ -587,6 +587,10 @@ export async function GET(request: NextRequest) {
     : [];
   const tasks = [...adminTasks, ...parcelTasks];
   const results = await Promise.all(tasks);
+  const administrativeResults = results.filter((result) => result.kind === "administrative");
+  if (administrativeResults.length === 0 || administrativeResults.every((result) => result.failed)) {
+    return NextResponse.json({ error: "The official administrative search service is temporarily unavailable." }, { status: 502 });
+  }
   const allAreas = results.flatMap((result) => result.areas);
   const areas = fullUpiQuery
     ? allAreas.filter((area) => area.level === "parcel" && normalizeKey(area.upi ?? "") === normalizeKey(fullUpiQuery))
@@ -614,9 +618,6 @@ export async function GET(request: NextRequest) {
       a.district.localeCompare(b.district) || (a.sector ?? "").localeCompare(b.sector ?? "");
   }).slice(0, 80);
 
-  if (adminTasks.every((result) => result === undefined) || (adminTasks.length > 0 && adminTasks.every((result) => (result as { failed: boolean }).failed))) {
-    return NextResponse.json({ error: "The administrative search services are unavailable." }, { status: 502 });
-  }
   return NextResponse.json({
     areas: sorted,
     searched: query,
