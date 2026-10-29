@@ -36,8 +36,7 @@ import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 import {
   ParcelComparisonPanel,
   ParcelIntelligenceInline,
-  type ParcelComparisonItem,
-  type UnitPriceBasis
+  type ParcelComparisonItem
 } from "@/components/map/ParcelIntelligence";
 
 type WorkspaceMode = "areas" | "projects";
