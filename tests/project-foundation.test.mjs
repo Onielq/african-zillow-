@@ -74,7 +74,7 @@ test("cadastral outlines and parcel geometry are active from village zoom", asyn
 
 test("the map idle fallback does not race the queued viewport refresh and abort cadastral requests", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  const scheduledRefresh = mapView.slice(mapView.indexOf("const scheduleRefresh = () =>"), mapView.indexOf("const setHover = (", mapView.indexOf("const scheduleRefresh = () =>"));
+  const scheduledRefresh = mapView.slice(mapView.indexOf("const scheduleRefresh = () =>"), mapView.indexOf("const setHover = (", mapView.indexOf("const scheduleRefresh = () =>")));
   const idleFallback = mapView.slice(mapView.indexOf('map.once("idle", () =>'), mapView.indexOf('if (!viewportListenersAttached)', mapView.indexOf('map.once("idle", () =>')));
 
   assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
