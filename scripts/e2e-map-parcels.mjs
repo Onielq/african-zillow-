@@ -92,7 +92,10 @@ try {
     const url = "/api/geography/areas?level=parcel&source=bugesera&bbox=" +
       encodeURIComponent("30.12,-2.30,30.15,-2.26");
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetch(url, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(25_000)
+      });
       const body = await response.json().catch(() => null);
       return {
         url,

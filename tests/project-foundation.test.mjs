@@ -79,6 +79,10 @@ test("the map idle fallback does not race the queued viewport refresh and abort 
 
   assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
   assert.match(idleFallback, /if \(needsRefresh\) \{[\s\S]*?clearTimeout\(refreshTimer\);[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+  assert.match(mapView, /const refreshKey = \[/);
+  assert.match(mapView, /activeRefreshKey === refreshKey/);
+  assert.match(mapView, /area-refresh-skipped-duplicate/);
+  assert.match(mapView, /if \(activeController === controller\) \{[\s\S]*?activeController = null;[\s\S]*?activeRefreshKey = null;/);
 });
 
 test("zoning codes are separated when a source record combines short codes and sources live in the Sources panel", async () => {
@@ -811,6 +815,16 @@ test("parcel detail zoning uses exact cadastral geometry and reports mapped clas
   assert.match(experience, /parcel-zoning\?/);
 });
 
+
+test("parcel API fails fast on upstream gateway outages and bounds the browser probe", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  const e2e = await readProjectFile("scripts/e2e-map-parcels.mjs");
+
+  assert.ok(route.includes("isTransientUpstreamFailure"));
+  assert.ok(route.includes("ArcGIS layer request failed \\((?:502|503|504)\\)"));
+  assert.match(route, /isTransientUpstreamFailure \|\| depth >= 2/);
+  assert.ok(e2e.includes("AbortSignal.timeout(25_000)"));
+});
 
 test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
