@@ -534,7 +534,7 @@ const LAND_PRICE_RAMP = [
 function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel = false) {
   return [
     "case",
-    ["boolean", ["feature-state", "selected"], false], isParcel ? "#67E8F9" : "#FFE3A1",
+    ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
     ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     showPrice
       ? [
@@ -1524,7 +1524,7 @@ export function MapView({
             "fill-opacity": level === "parcel"
               ? [
                   "case",
-                  ["boolean", ["feature-state", "selected"], false], 0.38,
+                  ["boolean", ["feature-state", "selected"], false], 0.5,
                   ["boolean", ["feature-state", "hover"], false], 0.16,
                   0.008
                 ]
@@ -1546,7 +1546,7 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00E5FF" : "#126347",
+              level === "parcel" ? "#00F0FF" : "#126347",
               ["boolean", ["feature-state", "hover"], false],
               "#06492E",
               level === "parcel"
@@ -1561,7 +1561,7 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 3.2 : 2.5,
+              level === "parcel" ? 4.0 : 2.5,
               ["boolean", ["feature-state", "hover"], false],
               level === "parcel" ? 2.5 : 2.6,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
