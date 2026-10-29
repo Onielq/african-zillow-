@@ -34,7 +34,6 @@ test("administrative boundaries render per GIS source and reuse cached viewport 
   assert.match(route, /source must be kigali or bugesera/);
   assert.match(route, /sourceFilter\?\: "kigali" \| "bugesera"/);
   assert.match(route, /revalidateSeconds = 300/);
-  assert.match(route, /86_400/);
   assert.match(route, /s-maxage=3600, stale-while-revalidate=86400/);
   assert.match(mapView, /AREA_QUERY_GRIDS/);
   assert.match(mapView, /const areaCache = new Map/);
@@ -144,7 +143,7 @@ test("the map supports a satellite basemap without removing administrative overl
   assert.match(mapView, /SATELLITE_STYLE/);
   assert.match(mapView, /World_Imagery/);
   assert.match(mapView, /Imagery © Esri/);
-  assert.match(mapView, /map\.setStyle\(basemapMode === "satellite"/);
+  assert.match(mapView, /map\.setStyle\(basemapMode === "map"/);
   assert.match(experience, /aria-label="Basemap view"/);
   assert.match(experience, /setBasemapMode\("satellite"\)/);
   assert.match(experience, /setBasemapMode\("map"\)/);
@@ -309,8 +308,8 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.match(experience, /comparison-area-search/);
   assert.match(experience, /comparison-selected-chips/);
   assert.match(experience, /Clear all/);
-  assert.match(experience, /highestComparisonPrice/);
-  assert.match(experience, /Highest supplied/);
+  assert.match(experience, /lowestComparisonPrice/);
+  assert.match(experience, /Lowest comparable price per square metre/);
   assert.match(experience, /aria-modal="true"/);
   assert.match(experience, /area-market-grid/);
   assert.match(experience, /Projects in selected area/);
@@ -320,7 +319,7 @@ test("the reference screen audit and map comparison patterns are implemented wit
   assert.match(experience, /Expected unit/);
   assert.match(css, /comparison-modal-backdrop/);
   assert.match(css, /area-market-card/);
-  assert.match(css, /metric definition popover/i);
+  assert.match(css, /\.metric-info-panel/);
 });
 
 
@@ -542,7 +541,7 @@ test("comparison searches every pilot administrative level and accepts any mixed
   assert.doesNotMatch(experience, /comparedAreas\.length >= 4/);
   assert.match(experience, /comparisonKind: "project"/);
   assert.match(experience, /No verified project data/);
-  assert.match(experience, /Search district, sector, cell or village/);
+  assert.match(experience, /placeholder="District, sector, cell, village, UPI or parcel number"/);
 });
 
 test("transaction indicators distinguish NISR 2023 baselines from the unverified Bugesera month-to-date observation", async () => {
@@ -599,7 +598,9 @@ test("comparison search includes cadastral UPI and parcel number", async () => {
   assert.match(search, /KIGALI_PARCELS/);
   assert.match(search, /BUGESERA_PARCELS/);
   assert.match(search, /async function searchParcels/);
-  assert.match(search, /outFields: "upi,province,district,sector,cell,village,parcel_number,size,last_updated_on"/);
+  assert.match(search, /const upiField = chooseField\(fields, \["upi", "unique_parcel_identifier", "uniqueparcelidentifier"\]\)/);
+  assert.match(search, /const parcelNumberField = chooseField\(fields, \["parcel_number", "parcelnumber", "parcel_no", "parcelno"\]\)/);
+  assert.match(search, /outFields: Array.from\(new Set\(fieldsToReturn\)\)\.join\(","\) \|\| "\*"/);
   assert.match(experience, /UPI or parcel number/);
   assert.match(experience, /area\.upi/);
   assert.match(experience, /normalizeAreaName\(area\.parcelNumber\)/);

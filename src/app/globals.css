@@ -2,24 +2,59 @@
 
 :root {
   color-scheme: light;
-  --canvas: #F5F7F5;
-  --surface: #FFFFFF;
-  --surface-muted: #F0F3F1;
-  --ink: #17231F;
-  --ink-secondary: #596861;
-  --ink-muted: #77847D;
-  --border: #DCE4DE;
-  --border-strong: #B9C7BE;
-  --brand: #176B50;
-  --brand-hover: #12563F;
-  --brand-tint: #E7F3EC;
-  --focus: #2563EB;
-  --warning: #A15C07;
-  --success: #18794E;
+
+  /* Primitive palette: update these values before changing component styling. */
+  --palette-canvas: #F5F7F5;
+  --palette-white: #FFFFFF;
+  --palette-surface-muted: #F0F3F1;
+  --palette-ink: #17231F;
+  --palette-ink-secondary: #596861;
+  --palette-ink-muted: #77847D;
+  --palette-border: #DCE4DE;
+  --palette-border-strong: #B9C7BE;
+  --palette-forest: #176B50;
+  --palette-forest-hover: #12563F;
+  --palette-forest-tint: #E7F3EC;
+  --palette-focus: #2563EB;
+  --palette-warning: #A15C07;
+  --palette-success: #18794E;
+  --palette-map-canvas: #E7EDE8;
+
+  /* Semantic tokens: describe purpose, not the component using the value. */
+  --canvas: var(--palette-canvas);
+  --surface: var(--palette-white);
+  --surface-muted: var(--palette-surface-muted);
+  --ink: var(--palette-ink);
+  --ink-secondary: var(--palette-ink-secondary);
+  --ink-muted: var(--palette-ink-muted);
+  --border: var(--palette-border);
+  --border-strong: var(--palette-border-strong);
+  --brand: var(--palette-forest);
+  --brand-hover: var(--palette-forest-hover);
+  --brand-tint: var(--palette-forest-tint);
+  --focus: var(--palette-focus);
+  --warning: var(--palette-warning);
+  --success: var(--palette-success);
+
+  /* Shared spacing and type scales for future component work. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text-compact: 12px;
+  --text-ui: 14px;
+  --text-section: 16px;
+  --text-heading: 20px;
+
+  /* Component tokens: deliberate, reusable shape and elevation. */
   --header-height: 66px;
-  --radius-control: 12px;
-  --radius-panel: 16px;
-  --shadow-floating: 0 8px 30px rgb(23 35 31 / 11%), 0 1px 3px rgb(23 35 31 / 6%);
+  --radius-control: 11px;
+  --radius-panel: 18px;
+  --tap-target-min: 44px;
+  --shadow-floating: 0 12px 32px rgb(23 35 31 / 10%), 0 2px 6px rgb(23 35 31 / 5%);
 }
 
 * {
@@ -38,8 +73,8 @@ body {
 body {
   background: var(--canvas);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
+  font-family: var(--font-ui);
+  font-size: var(--text-ui);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -189,7 +224,7 @@ button:disabled {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: #E7EDE8;
+  background: var(--palette-map-canvas);
 }
 
 .maplibre-mount {
@@ -198,7 +233,7 @@ button:disabled {
   inset: 0;
   width: 100%;
   height: 100%;
-  background: #E7EDE8;
+  background: var(--palette-map-canvas);
 }
 
 .maplibre-mount .maplibregl-canvas {
@@ -2922,7 +2957,6 @@ button:disabled {
   border-radius: 13px;
   background: #141414;
   box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
-  cursor: pointer;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   transition: transform 0.2s ease, opacity 0.25s ease;
 }
@@ -2937,7 +2971,29 @@ button:disabled {
   transform: translateY(10px);
 }
 
-.expert-card:focus-visible {
+.expert-card:has(.expert-main-action:focus-visible) {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.expert-main-action {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.expert-main-action:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
@@ -2960,12 +3016,14 @@ button:disabled {
 }
 
 .expert-text {
+  display: block;
   flex: 1;
   min-width: 0;
   overflow: hidden;
 }
 
 .expert-title {
+  display: block;
   margin-bottom: 2px;
   overflow: hidden;
   color: #fff;
@@ -2978,6 +3036,7 @@ button:disabled {
 }
 
 .expert-subtitle {
+  display: block;
   overflow: hidden;
   color: #8a8a8e;
   font-size: 12px;
@@ -2994,12 +3053,12 @@ button:disabled {
 
 .expert-close-btn {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -12px;
+  right: -12px;
   z-index: 2;
   display: flex;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -3011,8 +3070,15 @@ button:disabled {
   transition: transform 0.15s ease;
 }
 
+.expert-close-btn::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+}
+
 .expert-close-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.06);
 }
 
 .expert-close-btn:focus-visible,
@@ -3023,8 +3089,8 @@ button:disabled {
 
 .expert-close-btn svg {
   display: block;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   stroke: #1a1a1c;
   stroke-width: 2.2;
   stroke-linecap: round;
@@ -3091,12 +3157,6 @@ button:disabled {
 
 
 /* Product polish pass: calmer materials, clearer hierarchy, easier controls. */
-:root {
-  --radius-control: 11px;
-  --radius-panel: 18px;
-  --shadow-floating: 0 12px 32px rgb(23 35 31 / 10%), 0 2px 6px rgb(23 35 31 / 5%);
-}
-
 .topbar {
   background: rgb(255 255 255 / 92%);
   box-shadow: 0 1px 0 rgb(23 35 31 / 2%);
@@ -3538,4 +3598,24 @@ input {
 @media (max-width: 460px) {
   .parcel-access-list li { grid-template-columns: minmax(70px, auto) minmax(0, 1fr); }
   .parcel-access-list li small { grid-column: 2; text-align: left; }
+}
+
+
+/* Evidence notes remain readable without competing with the map or parcel price. */
+.parcel-price-source {
+  margin: -2px 0 9px;
+  color: var(--ink-secondary);
+  font-size: var(--text-compact);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.directory-evidence-note {
+  margin: 12px 0 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  color: var(--ink-secondary);
+  font-size: var(--text-compact);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }

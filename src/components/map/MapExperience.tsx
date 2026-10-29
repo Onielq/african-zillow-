@@ -142,6 +142,8 @@ function getUnitPriceEstimate(
   allowDistrictFallback = false
 ): UnitPriceEstimate {
   const districtKey = normalizeAreaName(area.district);
+  // uses the currently connected district transaction-price snapshot where finer-level data is missing.
+  // Keep this as a fallback only: a parcel-specific asking price needs a named source.
   if (area.level === "district" && area.averageLandPricePerM2 !== null) {
     return {
       pricePerM2: area.averageLandPricePerM2,
@@ -536,7 +538,7 @@ export function MapExperience() {
   const [selectedMetric, setSelectedMetric] =
     useState<MarketMetric>("averageLandPricePerM2");
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
-  const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("12m");
+  const analysisPeriod: AnalysisPeriod = "12m";
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
@@ -563,7 +565,7 @@ export function MapExperience() {
   const [comparisonSearchStatus, setComparisonSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [comparedAreas, setComparedAreas] = useState<ComparisonItem[]>([]);
   const [comparisonFeedback, setComparisonFeedback] = useState("");
-  const [nearbyAccess, setNearbyAccess] = useState<NearbyAccessState>(null);
+  const [nearbyAccessSnapshot, setNearbyAccessSnapshot] = useState<{ key: string; value: Exclude<NearbyAccessState, null> } | null>(null);
   const [compareProjectName, setCompareProjectName] = useState("");
   const [compareProjectUrl, setCompareProjectUrl] = useState("");
   const [selectedTransactionEstimate, setSelectedTransactionEstimate] = useState<TransactionEstimateResponse | null>(null);
@@ -577,6 +579,27 @@ export function MapExperience() {
   const [boundaryStatus, setBoundaryStatus] =
     useState<BoundaryStatus>("loading");
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
+  const nearbyAreaLevel = selectedArea?.level ?? null;
+  const nearbyAreaLongitude = selectedArea?.center?.[0] ?? null;
+  const nearbyAreaLatitude = selectedArea?.center?.[1] ?? null;
+  const nearbyAreaDistrict = selectedArea?.district ?? null;
+  const nearbyAreaUpi = selectedArea?.upi ?? null;
+  const nearbyAreaName = selectedArea?.name ?? null;
+  const nearbyAccessKey = nearbyAreaLevel === "parcel" &&
+    nearbyAreaLongitude !== null &&
+    nearbyAreaLatitude !== null
+      ? [nearbyAreaUpi ?? nearbyAreaName ?? "", nearbyAreaLongitude, nearbyAreaLatitude, nearbyAreaDistrict ?? ""].join("|")
+      : null;
+  const nearbyAccess: NearbyAccessState = nearbyAccessKey === null
+    ? null
+    : nearbyAccessSnapshot?.key === nearbyAccessKey
+      ? nearbyAccessSnapshot.value
+      : {
+          status: "loading",
+          items: [],
+          source: "Valhalla · OpenStreetMap road graph",
+          note: "Estimated road routes; not live traffic."
+        };
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
 
@@ -806,45 +829,43 @@ export function MapExperience() {
       : null;
 
   useEffect(() => {
-    const area = selectedArea;
-    if (!area || area.level !== "parcel" || !area.center) {
-      setNearbyAccess(null);
+    if (
+      nearbyAccessKey === null ||
+      nearbyAreaLongitude === null ||
+      nearbyAreaLatitude === null ||
+      nearbyAreaDistrict === null
+    ) {
       return;
     }
     const controller = new AbortController();
-    setNearbyAccess({
-      status: "loading",
-      items: [],
-      source: "Valhalla · OpenStreetMap road graph",
-      note: "Estimated road routes; not live traffic."
-    });
     const params = new URLSearchParams({
-      lat: String(area.center[1]),
-      lon: String(area.center[0]),
-      district: area.district
+      lat: String(nearbyAreaLatitude),
+      lon: String(nearbyAreaLongitude),
+      district: nearbyAreaDistrict
     });
     fetch("/api/geography/nearby-access?" + params.toString(), { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as NearbyAccessResponse;
         if (!response.ok) throw new Error(payload.message ?? "Road access estimates are unavailable.");
-        if (!controller.signal.aborted) setNearbyAccess(payload);
+        if (!controller.signal.aborted) {
+          setNearbyAccessSnapshot({ key: nearbyAccessKey, value: payload });
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setNearbyAccess({
-          status: "error",
-          items: [],
-          source: "Valhalla · OpenStreetMap road graph",
-          note: "Road-route estimates are not available for this parcel right now."
-        });
+        if (!controller.signal.aborted) {
+          setNearbyAccessSnapshot({
+            key: nearbyAccessKey,
+            value: {
+              status: "error",
+              items: [],
+              source: "Valhalla · OpenStreetMap road graph",
+              note: "Road-route estimates are not available for this parcel right now."
+            }
+          });
+        }
       });
     return () => controller.abort();
-  }, [
-    selectedArea?.level,
-    selectedArea?.upi,
-    selectedArea?.center?.[0],
-    selectedArea?.center?.[1],
-    selectedArea?.district
-  ]);
+  }, [nearbyAccessKey, nearbyAreaLongitude, nearbyAreaLatitude, nearbyAreaDistrict]);
 
   useEffect(() => {
     let active = true;
@@ -870,9 +891,6 @@ export function MapExperience() {
     const query = compareSearch.trim();
     const shouldBrowseParcels = compareBrowseOpen && query.length === 0;
     if (query.length < 2 && !shouldBrowseParcels) {
-      setComparisonSearchResults([]);
-      setComparisonSearchStatus("idle");
-      setComparisonBrowseHasMore(false);
       return;
     }
     const controller = new AbortController();
@@ -1133,6 +1151,9 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
+          <Link className="compare-control" href="/data-sources">
+            Data sources
+          </Link>
           <Link className="compare-control" href="/contact">
             Contact
           </Link>
@@ -1180,11 +1201,13 @@ export function MapExperience() {
 
         <div className="map-vignette" aria-hidden="true" />
 
-        <TalkToExpert
-          developerName={selectedArea?.level === "parcel" ? selectedArea.developerName?.trim() || "Taiseel Development" : "Taiseel Development"}
-          parcelUpi={selectedArea?.level === "parcel" ? selectedArea.upi : null}
-          visible={selectedArea?.level === "parcel"}
-        />
+        {selectedArea?.level === "parcel" ? (
+          <TalkToExpert
+            key={`${selectedArea.upi ?? selectedArea.name}:${selectedArea.center?.join(",") ?? ""}`}
+            developerName={selectedArea.developerName?.trim() || "Taiseel Development"}
+            parcelUpi={selectedArea.upi}
+          />
+        ) : null}
 
         <div className="basemap-switcher" role="group" aria-label="Basemap view">
           <button
@@ -1553,6 +1576,10 @@ export function MapExperience() {
                 ))}
               </div>
             ) : null}
+            <p className="directory-evidence-note">
+              Public websites are discovery leads, not verification of current licensing, affiliation, or availability.
+              No “top agent” ranking published.
+            </p>
           </aside>
         ) : null}
 
@@ -1755,6 +1782,9 @@ export function MapExperience() {
                 </strong>
               </div>
             ) : null}
+            {selectedArea.level === "parcel" && hasSourcedParcelPrice && selectedArea.parcelPriceSource ? (
+              <p className="parcel-price-source">Source: {selectedArea.parcelPriceSource}</p>
+            ) : null}
             {selectedArea.level === "parcel" ? (
               <div className="parcel-confidence-strip" aria-label="Parcel data confidence">
                 <span
@@ -1887,7 +1917,7 @@ export function MapExperience() {
                       ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(parcelUnitPriceEstimate.pricePerM2) + " RWF/m²"
                       : "Not available"}
                   </strong>
-                  <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Used to calculate the parcel asking price."}</small>
+                  <small>{hasSourcedParcelPrice ? "Area-level benchmark for comparison; it is not the displayed parcel price." : "Asking price is calculated as parcel area × the available average transaction price per m². This is an estimate, not a verified listing price."}</small>
                 </div>
                 <div>
                   <span>Average reference price · district benchmark</span>
@@ -2370,9 +2400,14 @@ export function MapExperience() {
               onChange={(event) => {
                 const value = event.target.value;
                 setCompareSearch(value);
-                setCompareBrowseOpen(value.trim().length === 0);
+                const normalizedQuery = value.trim();
+                setCompareBrowseOpen(normalizedQuery.length === 0);
                 setComparisonBrowseOffset(0);
                 setComparisonBrowseHasMore(false);
+                if (normalizedQuery.length > 0 && normalizedQuery.length < 2) {
+                  setComparisonSearchResults([]);
+                  setComparisonSearchStatus("idle");
+                }
               }}
               placeholder="District, sector, cell, village, UPI or parcel number" type="search" value={compareSearch} />
             {compareBrowseOpen || normalizedComparisonSearch.length >= 2 ? (
@@ -2388,7 +2423,16 @@ export function MapExperience() {
                       const isAdded = comparedAreas.some((existing) => comparisonItemKey(existing) === comparisonItemKey(candidate));
                       return (
                         <button aria-selected={isAdded} className="comparison-search-result" disabled={isAdded} key={area.id}
-                          onClick={() => { addAreaToComparison(area); if (!isAdded) { setCompareSearch(""); setCompareBrowseOpen(false); } }}
+                          onClick={() => {
+                            addAreaToComparison(area);
+                            if (!isAdded) {
+                              setCompareSearch("");
+                              setCompareBrowseOpen(false);
+                              setComparisonSearchResults([]);
+                              setComparisonSearchStatus("idle");
+                              setComparisonBrowseHasMore(false);
+                            }
+                          }}
                           role="option" type="button">
                           <span className="comparison-search-dot" aria-hidden="true" />
                           <span className="comparison-search-result-copy">
