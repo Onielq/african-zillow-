@@ -2287,8 +2287,13 @@ export function MapView({
       scheduleShowOverlayRefresh();
       scheduleZoningRefresh();
       refreshMetricBubbles();
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => void refreshAreas(), 220);
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        // Clear the handle before refreshing so an idle fallback cannot mistake
+        // an already-fired timer for a refresh that is still queued.
+        refreshTimer = null;
+        void refreshAreas();
+      }, 220);
     };
 
     const setHover = (
@@ -2446,7 +2451,16 @@ export function MapView({
           parcelFeatures,
           needsRefresh
         });
-        if (needsRefresh) void refreshAreas();
+        if (needsRefresh) {
+          // The idle fallback can race with a delayed moveend/zoomend refresh.
+          // Cancel that queued timer before starting the immediate refresh;
+          // otherwise the timer fires moments later and aborts this request set.
+          if (refreshTimer !== null) {
+            clearTimeout(refreshTimer);
+            refreshTimer = null;
+          }
+          void refreshAreas();
+        }
       });
 
       if (!viewportListenersAttached) {
@@ -2496,7 +2510,7 @@ export function MapView({
     resizeObserver?.observe(container);
 
     return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
