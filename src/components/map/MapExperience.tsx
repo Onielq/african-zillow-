@@ -2105,11 +2105,6 @@ export function MapExperience() {
               <p className="parcel-price-source">Source: {selectedArea.parcelPriceSource}</p>
             ) : null}
 
-                {selectedArea.zoningStatus === "not-covered" ? (
-                  <span className="confidence-chip confidence-chip-missing">Zoning not mapped</span>
-                ) : null}
-              </div>
-            ) : null}
             {selectedArea.level === "parcel" ? (
               <>
               <div className="parcel-details">
@@ -2734,10 +2729,10 @@ export function MapExperience() {
                             addAreaToComparison(area);
                             if (!isAdded) {
                               setCompareSearch("");
-                              setCompareBrowseOpen(false);
+                              
                               setComparisonSearchResults([]);
                               setComparisonSearchStatus("idle");
-                              setComparisonBrowseHasMore(false);
+                              
                             }
                           }}
                           role="option" type="button">
