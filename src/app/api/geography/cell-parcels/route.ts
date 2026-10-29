@@ -122,10 +122,12 @@ export async function GET(request: NextRequest) {
   }
 
   const layerUrl = district.toLowerCase() === "bugesera" ? BUGESERA_PARCELS : KIGALI_PARCELS;
+  // The map search accepts any casing. Use the same rule for the parcel-list
+  // lookup so a canonical result does not become empty when the user typed lowercase.
   const where = [
-    "district = '" + escapeSql(district) + "'",
-    "sector = '" + escapeSql(sector) + "'",
-    "cell = '" + escapeSql(cell) + "'",
+    "UPPER(district) = '" + escapeSql(district.toLocaleUpperCase("en")) + "'",
+    "UPPER(sector) = '" + escapeSql(sector.toLocaleUpperCase("en")) + "'",
+    "UPPER(cell) = '" + escapeSql(cell.toLocaleUpperCase("en")) + "'",
     "upi IS NOT NULL"
   ].join(" AND ");
   const outFields = "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on";
