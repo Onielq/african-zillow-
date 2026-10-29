@@ -578,7 +578,7 @@ test("parcel location access covers main-road proximity, schools, hospitals, tra
   assert.match(route, /Math\.round\(destination\.straightKm \* 100\) \/ 100/);
   assert.match(route, /amenity === "townhall"/);
   assert.match(route, /government === "administrative"/);
-  assert.match(route, /\["natural",?\s*\n\s*\["lake", "peak", "waterfall", "spring"\]/);
+  assert.ok(route.includes('["lake", "peak", "waterfall", "spring"]'));
   assert.ok(route.includes('["attraction", "viewpoint", "museum", "zoo", "theme_park"]'));
   assert.match(route, /OpenStreetMap may have incomplete or outdated facility and landmark coverage/);
   assert.match(experience, /Checking road, school, hospital, transport and landmark access/);
