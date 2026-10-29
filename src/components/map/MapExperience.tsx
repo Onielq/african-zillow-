@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
+import { Marker, type Map as MapLibreMapInstance } from "maplibre-gl";
 import { TalkToExpert } from "@/components/map/TalkToExpert";
-import type { Map as MapLibreMapInstance } from "maplibre-gl";
 import {
   MapView,
   isParcelPriceType,
@@ -94,7 +94,25 @@ type ComparisonItem = SelectedArea & {
   comparisonZoning?: Array<{ code: string | null; name: string }>;
 };
 type AreaSearchResult = SelectedArea & { id: string };
-type AreaSearchResponse = { areas: AreaSearchResult[]; message?: string; error?: string; browse?: boolean; nextOffset?: number; hasMore?: boolean };
+type AddressSearchResult = {
+  id: string;
+  kind: "address";
+  name: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  sourceLabel: string;
+};
+type GlobalSearchResult = AreaSearchResult | AddressSearchResult;
+type AreaSearchResponse = {
+  areas: AreaSearchResult[];
+  addresses?: AddressSearchResult[];
+  message?: string;
+  error?: string;
+  browse?: boolean;
+  nextOffset?: number;
+  hasMore?: boolean;
+};
 type ComparisonZoningResponse = { status?: "found" | "not-covered"; zones?: Array<{ code: string | null; name: string }>; error?: string };
 type NearbyAccessCategory = "School" | "Clinic / hospital" | "Public transport";
 type NearbyAccessItem = {
@@ -548,6 +566,10 @@ export function MapExperience() {
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [directorySearch, setDirectorySearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
+  const [globalSearchStatus, setGlobalSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
@@ -579,6 +601,8 @@ export function MapExperience() {
   const [boundaryStatus, setBoundaryStatus] =
     useState<BoundaryStatus>("loading");
   const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null);
+  const globalSearchMarkerRef = useRef<Marker | null>(null);
+  const globalSearchSequenceRef = useRef(0);
   const nearbyAreaLevel = selectedArea?.level ?? null;
   const nearbyAreaLongitude = selectedArea?.center?.[0] ?? null;
   const nearbyAreaLatitude = selectedArea?.center?.[1] ?? null;
@@ -604,11 +628,22 @@ export function MapExperience() {
   const areaPanelRef = useRef<HTMLElement>(null);
 
   const handleMapReady = useCallback(
-    (map: MapLibreMapInstance | null) => setMapInstance(map),
+    (map: MapLibreMapInstance | null) => {
+      if (!map) {
+        globalSearchMarkerRef.current?.remove();
+        globalSearchMarkerRef.current = null;
+      }
+      setMapInstance(map);
+    },
     []
   );
   const handleAreaSelected = useCallback(
-    (area: SelectedArea | null) => setSelectedArea(area),
+    (area: SelectedArea | null) => {
+      globalSearchMarkerRef.current?.remove();
+      globalSearchMarkerRef.current = null;
+      setGlobalSearchOpen(false);
+      setSelectedArea(area);
+    },
     []
   );
   const handleBasemapStatus = useCallback(
@@ -619,6 +654,94 @@ export function MapExperience() {
     (status: BoundaryStatus) => setBoundaryStatus(status),
     []
   );
+
+  const searchGlobalAddress = async (query: string) => {
+    const requestId = ++globalSearchSequenceRef.current;
+    if (query.trim().length < 4) {
+      setGlobalSearchStatus("ready");
+      return;
+    }
+    setGlobalSearchStatus("loading");
+    try {
+      const response = await fetch(
+        "/api/geography/areas/search?addressOnly=1&q=" + encodeURIComponent(query.trim())
+      );
+      if (!response.ok) throw new Error("Address search failed (" + response.status + ")");
+      const payload = await response.json() as AreaSearchResponse;
+      if (requestId !== globalSearchSequenceRef.current) return;
+      const addresses = payload.addresses ?? [];
+      setGlobalSearchResults((current) => [
+        ...current.filter((item) => !("kind" in item && item.kind === "address")),
+        ...addresses
+      ]);
+      setGlobalSearchStatus("ready");
+    } catch {
+      setGlobalSearchStatus("error");
+    }
+  };
+
+  const selectGlobalSearchResult = (result: GlobalSearchResult) => {
+    setWorkspaceMode("areas");
+    setGlobalSearchOpen(false);
+    setGlobalSearch("");
+    setGlobalSearchResults([]);
+    setGlobalSearchStatus("idle");
+    setSourcesOpen(false);
+    setShowOpen(false);
+    setMetricInfoOpen(false);
+    setMetricsOpen(false);
+    setDevelopersOpen(false);
+    setProjectsOpen(false);
+
+    if ("kind" in result && result.kind === "address") {
+      setSelectedArea(null);
+      if (mapInstance) {
+        globalSearchMarkerRef.current?.remove();
+        globalSearchMarkerRef.current = new Marker({ color: "#00CFE8", scale: 1.05 })
+          .setLngLat([result.longitude, result.latitude])
+          .addTo(mapInstance);
+        mapInstance.flyTo({
+          center: [result.longitude, result.latitude],
+          zoom: 17.2,
+          duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
+        });
+      }
+      return;
+    }
+
+    const area = result as AreaSearchResult;
+    globalSearchMarkerRef.current?.remove();
+    globalSearchMarkerRef.current = null;
+    setSelectedArea(area);
+    if (!mapInstance) return;
+
+    const mobile = window.matchMedia("(max-width: 720px)").matches;
+    const padding = mobile
+      ? { top: 168, bottom: 138, left: 20, right: 20 }
+      : { top: 126, bottom: 78, left: 340, right: 78 };
+    const maxZoom: Record<SelectedArea["level"], number> = {
+      district: 11.7,
+      sector: 14.8,
+      cell: 16,
+      village: 16.8,
+      parcel: 19.3
+    };
+
+    if (area.bounds) {
+      const [west, south, east, north] = area.bounds;
+      mapInstance.fitBounds([[west, south], [east, north]], {
+        padding,
+        maxZoom: maxZoom[area.level],
+        duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
+      });
+    } else if (area.center) {
+      mapInstance.flyTo({
+        center: area.center,
+        zoom: maxZoom[area.level],
+        duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
+      });
+    }
+  };
 
   const fetchTransactionEstimate = async (area: SelectedArea, signal?: AbortSignal): Promise<TransactionEstimateResponse | null> => {
     if (area.level === "parcel") return null;
@@ -888,6 +1011,34 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
+    const requestId = ++globalSearchSequenceRef.current;
+    const query = globalSearch.trim();
+    if (query.length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setGlobalSearchStatus("loading");
+      try {
+        const url = "/api/geography/areas/search?q=" + encodeURIComponent(query);
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error("Place search failed (" + response.status + ")");
+        const payload = await response.json() as AreaSearchResponse;
+        if (controller.signal.aborted || requestId !== globalSearchSequenceRef.current) return;
+        const results: GlobalSearchResult[] = [...(payload.areas ?? [])];
+        setGlobalSearchResults(results);
+        setGlobalSearchStatus("ready");
+      } catch {
+        if (controller.signal.aborted || requestId !== globalSearchSequenceRef.current) return;
+        setGlobalSearchResults([]);
+        setGlobalSearchStatus("error");
+      }
+    }, 260);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [globalSearch]);
+
+  useEffect(() => {
     const query = compareSearch.trim();
     const shouldBrowseParcels = compareBrowseOpen && query.length === 0;
     if (query.length < 2 && !shouldBrowseParcels) {
@@ -1154,9 +1305,6 @@ export function MapExperience() {
           <Link className="compare-control" href="/data-sources">
             Data sources
           </Link>
-          <Link className="compare-control" href="/contact">
-            Contact
-          </Link>
         </nav>
 
         <div aria-label="Application modes" className="topbar-actions">
@@ -1197,6 +1345,7 @@ export function MapExperience() {
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
           onAreaSelected={handleAreaSelected}
+          selectedArea={selectedArea}
         />
 
         <div className="map-vignette" aria-hidden="true" />
@@ -1268,6 +1417,132 @@ export function MapExperience() {
 
         <div className="map-floating-toolbar" ref={toolbarRef}>
           <div aria-label="Investment map actions" className="map-toolbar investment-toolbar">
+            <div className="global-area-search">
+              <div className="global-area-search-field">
+                <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
+                  <circle cx="8.8" cy="8.8" r="5.4" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+                <input
+                  aria-label="Search addresses, districts, sectors, cells, villages and parcels"
+                  aria-expanded={globalSearchOpen}
+                  aria-controls="global-area-search-results"
+                  autoComplete="off"
+                  className="global-area-search-input"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setGlobalSearch(value);
+                    setGlobalSearchOpen(true);
+                    if (value.trim().length < 2) {
+                      setGlobalSearchResults([]);
+                      setGlobalSearchStatus("idle");
+                    }
+                  }}
+                  onFocus={() => setGlobalSearchOpen(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setGlobalSearchOpen(false);
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      const query = globalSearch.trim();
+                      const isFullUpi = /^\d{1,2}(?:[/.\-\s]\d{1,2}){3}[/.\-\s]\d{1,7}$/.test(query);
+                      const looksLikeAddress = !isFullUpi && (
+                        query.includes(",") ||
+                        /\b(?:road|street|avenue|drive|close|lane|boulevard|rd|st|ave)\b/i.test(query) ||
+                        /^(?:kn|kg|kk)\s*[- ]?\s*\d+/i.test(query)
+                      );
+                      const addressResult = globalSearchResults.find(
+                        (result) => "kind" in result && result.kind === "address"
+                      );
+                      if (looksLikeAddress && addressResult) {
+                        selectGlobalSearchResult(addressResult);
+                      } else if (looksLikeAddress || globalSearchResults.length === 0) {
+                        void searchGlobalAddress(query);
+                      } else {
+                        selectGlobalSearchResult(globalSearchResults[0]);
+                      }
+                    }
+                  }}
+                  placeholder="Search address, area, UPI…"
+                  aria-autocomplete="list"
+                  role="combobox"
+                  type="search"
+                  value={globalSearch}
+                />
+                {globalSearch.trim() ? (
+                  <button
+                    aria-label="Clear map search"
+                    className="global-area-search-clear"
+                    onClick={() => {
+                      setGlobalSearch("");
+                      setGlobalSearchResults([]);
+                      setGlobalSearchStatus("idle");
+                      setGlobalSearchOpen(true);
+                    }}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              {globalSearchOpen ? (
+                <div aria-label="Search results" className="global-area-search-results" id="global-area-search-results" role="listbox">
+                  {globalSearch.trim().length < 2 ? (
+                    <p className="global-area-search-message">Search an address, district, sector, cell, village, parcel number or full UPI.</p>
+                  ) : globalSearchStatus === "loading" && globalSearchResults.length === 0 ? (
+                    <p className="global-area-search-message" role="status">Searching Rwanda…</p>
+                  ) : globalSearchStatus === "error" && globalSearchResults.length === 0 ? (
+                    <p className="global-area-search-message" role="status">Search is temporarily unavailable.</p>
+                  ) : globalSearchResults.length > 0 ? (
+                    globalSearchResults.map((result) => {
+                      const isAddress = "kind" in result && result.kind === "address";
+                      const level = isAddress ? null : (result as AreaSearchResult).level;
+                      const area = isAddress ? null : result as AreaSearchResult;
+                      return (
+                        <button
+                          aria-label={isAddress ? "Find address " + result.name : "Find " + level + " " + result.name}
+                          aria-selected={false}
+                          className="global-area-search-result"
+                          key={result.id}
+                          onClick={() => selectGlobalSearchResult(result)}
+                          role="option"
+                          type="button"
+                        >
+                          <span className={isAddress ? "global-area-search-symbol global-area-search-address" : "global-area-search-symbol"} aria-hidden="true">
+                            {isAddress ? "⌖" : level === "parcel" ? "▱" : "◇"}
+                          </span>
+                          <span className="global-area-search-copy">
+                            <strong>{result.name}</strong>
+                            <small>
+                              {isAddress
+                                ? (result as AddressSearchResult).displayName
+                                : [
+                                    areaLevelLabel((area as AreaSearchResult).level),
+                                    (area as AreaSearchResult).district,
+                                    (area as AreaSearchResult).sector,
+                                    (area as AreaSearchResult).cell,
+                                    (area as AreaSearchResult).village,
+                                    (area as AreaSearchResult).level === "parcel" && (area as AreaSearchResult).upi
+                                      ? "UPI " + (area as AreaSearchResult).upi
+                                      : null
+                                  ].filter(Boolean).join(" · ")}
+                            </small>
+                          </span>
+                          <span className="global-area-search-type">
+                            {isAddress ? "Address" : areaLevelLabel((area as AreaSearchResult).level)}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="global-area-search-message">
+                      {globalSearchStatus === "ready"
+                        ? "No matching area. Press Enter to search this as an address."
+                        : "No matching place found. Try a shorter name or paste the full UPI."}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <button
               aria-expanded={developersOpen}
               className={developersOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}

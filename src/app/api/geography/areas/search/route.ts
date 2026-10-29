@@ -18,9 +18,19 @@ type SourceId = "kigali" | "bugesera";
 type FieldMetadata = { name: string; alias?: string; type?: string };
 type LayerMetadata = { fields?: FieldMetadata[]; error?: { message?: string } };
 type LayerQueryResponse = {
-  features?: Array<{ attributes?: Record<string, unknown> }>;
+  features?: Array<{ attributes?: Record<string, unknown>; geometry?: unknown }>;
   error?: { code?: number; message?: string };
   exceededTransferLimit?: boolean;
+};
+
+type SearchAddress = {
+  id: string;
+  kind: "address";
+  name: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  sourceLabel: string;
 };
 
 type SearchArea = {
@@ -44,6 +54,7 @@ type SearchArea = {
   parcelSizeM2?: number | null;
   lastUpdatedOn?: number | null;
   bounds?: [number, number, number, number] | null;
+  center?: [number, number] | null;
 };
 
 const PILOT_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
@@ -91,6 +102,41 @@ const CANDIDATES: Record<AdminAreaLevel, { name: string[]; district: string[]; s
 
 function normalizeKey(value: string): string {
   return value.toLocaleLowerCase("en").replace(/[^a-z0-9]/g, "");
+}
+
+function collectCoordinates(value: unknown, output: Array<[number, number]>): void {
+  if (!Array.isArray(value)) return;
+  if (
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    typeof value[1] === "number" &&
+    Number.isFinite(value[0]) &&
+    Number.isFinite(value[1])
+  ) {
+    output.push([value[0], value[1]]);
+    return;
+  }
+  for (const child of value) collectCoordinates(child, output);
+}
+
+function boundsFromGeometry(geometry: unknown): [number, number, number, number] | null {
+  if (!geometry || typeof geometry !== "object") return null;
+  const object = geometry as Record<string, unknown>;
+  const coordinates = "rings" in object ? object.rings : object.coordinates;
+  const positions: Array<[number, number]> = [];
+  collectCoordinates(coordinates, positions);
+  if (positions.length === 0) return null;
+  const bounds: [number, number, number, number] = [
+    Math.min(...positions.map(([longitude]) => longitude)),
+    Math.min(...positions.map(([, latitude]) => latitude)),
+    Math.max(...positions.map(([longitude]) => longitude)),
+    Math.max(...positions.map(([, latitude]) => latitude))
+  ];
+  return bounds.every(Number.isFinite) ? bounds : null;
+}
+
+function centerFromBounds(bounds: [number, number, number, number] | null): [number, number] | null {
+  return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
 }
 
 function chooseField(fields: FieldMetadata[], candidates: string[]): string | null {
@@ -155,7 +201,9 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   const params = new URLSearchParams({
     where: nameField + " LIKE " + "'%" + escaped + "%'",
     outFields: Array.from(requestedFields).join(","),
-    returnGeometry: "false",
+    returnGeometry: "true",
+    outSR: "4326",
+    resultRecordCount: "25",
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
@@ -172,7 +220,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const name = value(attributes, candidate.name);
     const district = (level === "district" ? name : value(attributes, candidate.district)) ??
       (source === "bugesera" ? "Bugesera" : null);
-    if (!name || !district || !PILOT_DISTRICTS.has(district.toLocaleLowerCase("en"))) return [];
+    if (!name || !district || !PILOT_DISTRICTS.has(normalizeKey(district))) return [];
     const sector = level === "sector" ? name : value(attributes, candidate.sector);
     const cell = level === "cell" ? name : value(attributes, candidate.cell);
     const village = level === "village" ? name : value(attributes, candidate.village);
@@ -184,6 +232,7 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
     const province = source === "bugesera"
       ? "Eastern Province"
       : value(attributes, ["province", "prov_name", "province_name", "province_e"]) ?? "Kigali City";
+    const bounds = boundsFromGeometry(feature.geometry);
     return [{
       id: [source, level, districtId ?? district, sectorId ?? sector, cellId ?? cell, villageId ?? village, index].filter(Boolean).join("-"),
       level,
@@ -197,13 +246,67 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
       cellId,
       village,
       villageId,
-      averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[district.toLocaleLowerCase("en")] ?? null : null,
+      averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[normalizeKey(district)] ?? null : null,
       sourceLabel: source === "kigali"
         ? "Kigali City Master Plan administrative boundaries"
         : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
-      sourceType: "administrative-boundary" as const
+      sourceType: "administrative-boundary" as const,
+      bounds,
+      center: centerFromBounds(bounds)
     }];
   });
+}
+
+type NominatimResult = {
+  osm_type?: string;
+  osm_id?: number;
+  display_name?: string;
+  lat?: string;
+  lon?: string;
+};
+
+async function searchAddresses(query: string): Promise<SearchAddress[]> {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("countrycodes", "rw");
+  url.searchParams.set("viewbox", "28.7,-1.0,31.05,-2.95");
+  url.searchParams.set("bounded", "1");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "6");
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "RwandaLandIntelligence/1.0 (address search)"
+      },
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!response.ok) throw new Error("Address search returned HTTP " + response.status);
+    const results = await response.json() as NominatimResult[];
+    return results.flatMap((item) => {
+      const latitude = Number(item.lat);
+      const longitude = Number(item.lon);
+      const displayName = item.display_name?.trim();
+      if (!displayName || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
+      if (longitude < 28.7 || longitude > 31.05 || latitude < -2.95 || latitude > -1.0) return [];
+      const name = displayName.split(",")[0]?.trim() || displayName;
+      return [{
+        id: "address-" + (item.osm_type ?? "place") + "-" + String(item.osm_id ?? displayName),
+        kind: "address" as const,
+        name,
+        displayName,
+        latitude,
+        longitude,
+        sourceLabel: "OpenStreetMap Nominatim geocoding"
+      }];
+    });
+  } catch (error) {
+    console.warn("Rwanda address geocoding is temporarily unavailable.", error);
+    return [];
+  }
 }
 
 function canonicalFullUpi(value: string): string | null {
@@ -264,7 +367,8 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
   const params = new URLSearchParams({
     where: "(" + conditions.join(" OR ") + ")",
     outFields: Array.from(new Set(fieldsToReturn)).join(",") || "*",
-    returnGeometry: "false",
+    returnGeometry: "true",
+    outSR: "4326",
     resultRecordCount: "25",
     f: "json"
   });
@@ -290,6 +394,7 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
     const size = sizeRaw === null ? null : Number(sizeRaw);
     const updatedRaw = value(attributes, ["last_updated_on", "lastupdatedon"]);
     const updated = updatedRaw === null ? null : Number(updatedRaw);
+    const bounds = boundsFromGeometry(feature.geometry);
     return [{
       id: "parcel-" + normalizeKey(upi),
       level: "parcel" as const,
@@ -312,7 +417,8 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
       parcelNumber,
       parcelSizeM2: size !== null && Number.isFinite(size) ? size : null,
       lastUpdatedOn: updated !== null && Number.isFinite(updated) ? updated : null,
-      bounds: null
+      bounds,
+      center: centerFromBounds(bounds)
     }];
   });
 }
@@ -398,18 +504,40 @@ async function browseParcels(
 
 export async function GET(request: NextRequest) {
   const rawQuery = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const addressOnly = request.nextUrl.searchParams.get("addressOnly") === "1";
   const browseMode = request.nextUrl.searchParams.get("browse") === "1" && rawQuery.length < 2;
   if (rawQuery.length < 2 && !browseMode) {
     return NextResponse.json({ areas: [], message: "Enter at least two characters or focus the search to browse parcels." }, {
       headers: { "Cache-Control": "public, max-age=30, s-maxage=60" }
     });
   }
-  const query = rawQuery.slice(0, 80);
+  const query = rawQuery.slice(0, 80).replace(/\s+(?:district|sector|cell|village)$/i, "").trim();
   const fullUpiQuery = canonicalFullUpi(query);
   const sources = [
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
     { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
   ];
+
+  // Public geocoding is explicit on submit, not called on every autocomplete
+  // keystroke. This respects shared geocoder capacity and avoids noisy traffic.
+  if (addressOnly) {
+    if (query.length < 4) {
+      return NextResponse.json({ addresses: [], searched: query, message: "Enter a longer address." }, {
+        headers: { "Cache-Control": "public, max-age=0, s-maxage=300" }
+      });
+    }
+    const addresses = await searchAddresses(query);
+    return NextResponse.json({
+      addresses,
+      searched: query,
+      sourceLabel: "OpenStreetMap Nominatim geocoding"
+    }, {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "X-Data-Source": "OpenStreetMap Nominatim geocoding"
+      }
+    });
+  }
 
   if (browseMode) {
     const offsetRaw = Number(request.nextUrl.searchParams.get("offset") ?? 0);
