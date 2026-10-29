@@ -893,17 +893,25 @@ export function MapExperience() {
         zones: []
       });
 
-      const zoningParams = new URLSearchParams({
-        district: match.district,
-        upi: match.upi ?? upi
-      });
-      const zoningResponse = await fetch("/api/geography/parcel-zoning?" + zoningParams.toString());
-      const zoningPayload = await zoningResponse.json() as ComparisonZoningResponse;
-      if (!zoningResponse.ok) throw new Error(zoningPayload.error ?? "Parcel zoning is unavailable.");
-      updateProjectParcelRecord(itemKey, upi, {
-        zoningStatus: zoningPayload.status === "found" ? "found" : "not-covered",
-        zones: zoningPayload.zones ?? []
-      });
+      try {
+        const zoningParams = new URLSearchParams({
+          district: match.district,
+          upi: match.upi ?? upi
+        });
+        const zoningResponse = await fetch("/api/geography/parcel-zoning?" + zoningParams.toString());
+        const zoningPayload = await zoningResponse.json() as ComparisonZoningResponse;
+        if (!zoningResponse.ok) throw new Error(zoningPayload.error ?? "Parcel zoning is unavailable.");
+        updateProjectParcelRecord(itemKey, upi, {
+          zoningStatus: zoningPayload.status === "found" ? "found" : "not-covered",
+          zones: zoningPayload.zones ?? []
+        });
+      } catch {
+        // Preserve the fact that the cadastral UPI matched even if zoning lookup fails.
+        updateProjectParcelRecord(itemKey, upi, {
+          zoningStatus: "error",
+          zones: []
+        });
+      }
     } catch {
       updateProjectParcelRecord(itemKey, upi, {
         lookupStatus: "unavailable",
