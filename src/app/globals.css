@@ -347,6 +347,7 @@ button:disabled {
 }
 
 .map-floating-toolbar {
+  z-index: 70;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
@@ -355,11 +356,12 @@ button:disabled {
 
 .map-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   max-width: 100%;
   padding: 5px;
-  overflow-x: auto;
+  overflow: visible;
   border: 1px solid rgb(220 228 222 / 95%);
   border-radius: 15px;
   background: rgb(255 255 255 / 95%);
@@ -417,6 +419,7 @@ button:disabled {
 
 .global-area-search {
   position: relative;
+  z-index: 80;
   flex: 0 0 auto;
 }
 
@@ -486,10 +489,10 @@ button:disabled {
 }
 
 .global-area-search-results {
-  position: fixed;
-  z-index: 40;
-  top: 130px;
-  left: max(18px, calc(50% - 405px));
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  left: 0;
   display: grid;
   width: min(380px, calc(100vw - 36px));
   max-height: min(56vh, 470px);
@@ -1313,10 +1316,9 @@ button:disabled {
   }
 
   .global-area-search-results {
-    top: 158px;
-    left: 12px;
-    width: calc(100vw - 24px);
-    max-width: 390px;
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(390px, calc(100vw - 24px));
     max-height: min(48vh, 390px);
   }
 
@@ -3043,73 +3045,11 @@ button:disabled {
 .comparison-project-add .comparison-search {
   min-height: 36px;
 }
-.comparison-project-upis-label {
+.comparison-project-source-label {
   margin-top: 2px;
   color: #52685a;
   font-size: 10px;
   font-weight: 750;
-}
-.comparison-project-upis {
-  display: block;
-  width: 100%;
-  min-height: 74px;
-  padding: 9px 10px;
-  resize: vertical;
-  border: 1px solid #d6e2d9;
-  border-radius: 9px;
-  background: #fff;
-  color: #223b2d;
-  font: inherit;
-  font-size: 11px;
-  line-height: 1.5;
-}
-.comparison-project-upis:focus-visible {
-  outline: 2px solid #80bda0;
-  outline-offset: 2px;
-}
-.project-parcel-link-list {
-  display: grid;
-  gap: 8px;
-  min-width: 170px;
-  max-width: 260px;
-}
-.project-parcel-link-warning {
-  display: block;
-  color: #826436;
-  font-size: 9px;
-  font-weight: 750;
-  line-height: 1.4;
-  white-space: normal;
-}
-.project-parcel-link-item {
-  display: grid;
-  gap: 3px;
-  padding: 7px 8px;
-  border: 1px solid #dfe8e1;
-  border-radius: 8px;
-  background: #f8faf8;
-}
-.project-parcel-link-item > strong {
-  color: #1e4530;
-  font-size: 10px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.project-parcel-link-item > small,
-.project-parcel-zones > small {
-  display: block;
-  color: #66786c;
-  font-size: 9px;
-  line-height: 1.45;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.project-parcel-zones {
-  display: grid;
-  gap: 3px;
-  margin-top: 2px;
-  padding-top: 4px;
-  border-top: 1px solid #e1e9e3;
 }
 .comparison-project-add-button {
   min-height: 36px;
@@ -3935,5 +3875,97 @@ input {
 
   .comparison-search-filter-row small {
     grid-column: 1 / -1;
+  }
+}
+
+
+/* Map search is a floating suggestion panel, never a scrollable navbar. */
+.global-area-search-results {
+  box-sizing: border-box;
+  max-width: calc(100vw - 24px);
+}
+
+.comparison-search-help {
+  margin: -2px 0 8px;
+  color: #6a796f;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.comparison-project-source-label {
+  margin-top: 2px;
+  color: #52685a;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.comparison-project-source-link {
+  display: inline-block;
+  margin-top: 5px;
+  color: #176b50;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.comparison-project-source-link:hover {
+  text-decoration: underline;
+}
+
+/* Parcel prices stay compact and can switch between exact and rounded amounts. */
+.parcel-price-headline {
+  margin: 2px 0 8px;
+  max-width: 100%;
+}
+
+.parcel-price-value-button {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parcel-price-value-button:focus-visible {
+  outline: 2px solid #00cfe8;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.parcel-price-headline .parcel-price-value {
+  display: block;
+  max-width: 100%;
+  color: #165c3d;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 740;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.parcel-price-value-animate {
+  animation: parcel-price-value-update 220ms ease both;
+}
+
+@keyframes parcel-price-value-update {
+  from { opacity: 0.25; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 700px) {
+  .parcel-price-headline .parcel-price-value {
+    font-size: 21px;
+  }
+
+  .global-area-search-results {
+    width: min(390px, calc(100vw - 24px));
   }
 }
