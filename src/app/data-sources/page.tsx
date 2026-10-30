@@ -181,6 +181,7 @@ export default function DataSourcesPage() {
         </Link>
         <nav className={styles.navigation} aria-label="Page navigation">
           <Link href="/">Map workspace</Link>
+          <Link href="/explorer">Market Explorer</Link>
           <span aria-current="page">Data sources</span>
         </nav>
       </header>
