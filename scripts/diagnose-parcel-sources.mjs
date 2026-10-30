@@ -21,8 +21,13 @@ const SOURCES = [
     url: "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/KigaliParcels_withZoning/FeatureServer/0"
   },
   {
+    id: "bugesera-geodata-lais",
+    label: "Bugesera LAIS parcels exposed by the supplied GeoData viewer",
+    url: "https://geodata.rw/server/rest/services/LAISData/Bugesera_Parcels/FeatureServer/0"
+  },
+  {
     id: "bugesera-lais",
-    label: "Bugesera LAIS parcels",
+    label: "Bugesera LAIS parcels (services7 copy currently configured)",
     url: "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0"
   }
 ];
@@ -92,22 +97,33 @@ async function inspectSource(source) {
     if (!metaResponse.ok || metadata.error) return result;
 
     const bbox = source.id.startsWith("bugesera") ? BUGESERA_BBOX : KIGALI_BBOX;
+    const availableFields = (metadata.fields ?? []).map((field) => field.name).filter(Boolean);
+    const preferredFields = [
+      "upi", "objectid", "objectid_1", "parcel_number", "parcelnumber",
+      "district", "district_name", "sector", "sector_name", "cell",
+      "cell_name", "village", "village_name", "size", "area"
+    ];
+    const outFields = preferredFields.filter((candidate) =>
+      availableFields.some((field) => field.toLowerCase() === candidate.toLowerCase())
+    ).join(",") || (metadata.objectIdField ?? metadata.objectIdFieldName ?? "*");
+    const upiField = availableFields.find((field) => field.toLowerCase() === "upi");
+    const where = upiField ? upiField + " IS NOT NULL" : "1=1";
     const sampleParams = new URLSearchParams({
-      where: "upi IS NOT NULL",
-      outFields: "upi,objectid,parcel_number,district,sector,cell",
+      where,
+      outFields,
       returnGeometry: "true",
       outSR: "4326",
       resultRecordCount: "2",
       f: "json"
     });
     const bboxParams = new URLSearchParams({
-      where: "upi IS NOT NULL",
+      where,
       geometry: bbox.join(","),
       geometryType: "esriGeometryEnvelope",
       inSR: "4326",
       outSR: "4326",
       spatialRel: "esriSpatialRelIntersects",
-      outFields: "upi,objectid,parcel_number,district,sector,cell",
+      outFields,
       returnGeometry: "true",
       resultRecordCount: "2",
       f: "json"
