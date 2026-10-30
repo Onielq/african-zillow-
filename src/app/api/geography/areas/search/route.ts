@@ -482,7 +482,7 @@ async function searchLayer(
       sourceLabel: source === "kigali"
         ? "Kigali City Master Plan administrative boundaries"
         : baseUrl === BUGESERA_NISR_VILLAGE_FEATURE_SERVER
-          ? "NISR 2022 Census · Rwanda village boundary layer"
+          ? "NISR · Rwanda village boundary polygons (source capture 2012)"
           : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
       sourceType: "administrative-boundary" as const,
       mapSourceId: source,
