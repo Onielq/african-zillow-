@@ -161,6 +161,18 @@ test("the map supports a satellite basemap without removing administrative overl
   assert.match(experience, /setBasemapMode\("satellite"\)/);
   assert.match(experience, /setBasemapMode\("map"\)/);
   assert.match(css, /\.basemap-switcher/);
+  assert.match(mapView, /const maxAttempts = level === "parcel" \? 2 : 1/);
+  assert.match(mapView, /area-api-retry/);
+  assert.match(mapView, /parcel-refresh-retry-scheduled/);
+  assert.match(mapView, /basemap-readiness/);
+  assert.match(mapView, /sourceId === "world-imagery"/);
+  assert.match(mapView, /map\.isSourceLoaded\("world-imagery"\)/);
+  const satelliteStyle = mapView.slice(
+    mapView.indexOf("const SATELLITE_STYLE"),
+    mapView.indexOf("const HYBRID_STYLE")
+  );
+  assert.match(satelliteStyle, /World_Imagery/);
+  assert.doesNotMatch(satelliteStyle, /World_Transportation/);
 });
 
 test("the investment workspace exposes six metrics, property scope, and period filters", async () => {
@@ -852,7 +864,9 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
 
   assert.ok(route.includes("isTransientUpstreamFailure"));
   assert.ok(route.includes("ArcGIS layer request failed \\((?:502|503|504)\\)"));
-  assert.match(route, /isTransientUpstreamFailure \|\| depth >= 2/);
+  assert.match(route, /if \(depth >= 2 \|\| area <= 0\.00002\)/);
+  assert.match(route, /if \(isTransientUpstreamFailure\)/);
+  assert.match(route, /Retrying cadastral parcel GIS tile with smaller bounds/);
   assert.ok(route.includes("Promise.race([fetchPromise, timeoutPromise])"));
   assert.match(route, /ArcGIS layer request timed out after/);
   assert.ok(route.includes("Promise.race([fallbackPromise, timeoutPromise])"));
@@ -879,6 +893,10 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(e2e.includes("avoiding a duplicate GIS request"));
   assert.ok(e2e.includes("fallbackReason: body?.fallbackReason"));
   assert.ok(e2e.includes('responseHeaders["x-parcel-fallback-status"]'));
+  assert.ok(e2e.includes('getByRole("button", { name: "Satellite" })'));
+  assert.ok(e2e.includes("basemapTileResponses"));
+  assert.ok(e2e.includes("imagerySourceLoaded"));
+  assert.ok(e2e.includes("status-dot-ready"));
 });
 
 test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {

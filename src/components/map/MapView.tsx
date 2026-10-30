@@ -581,28 +581,22 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Esri imagery with subtle road references so roads remain distinguishable in satellite.
+// Satellite mode is imagery only. Keep roads in the separate Hybrid mode so
+// a failed optional reference overlay cannot make satellite imagery look blank.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 23,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
-    },
-    "world-transportation": {
-      type: "raster",
-      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
-      attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     }
   },
   layers: [
-    // Keep these layers visible at parcel zoom; MapLibre overzooms the source's
-    // z19 raster tiles at closer zoom levels rather than hiding them.
-    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
-    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24, paint: { "raster-opacity": 0.48 } }
+    // The service publishes imagery through z23. Keep the layer visible to
+    // parcel zoom and let MapLibre overzoom only above the provider's max zoom.
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 }
   ]
 };
 
@@ -939,6 +933,8 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
+  const basemapTileErrorRef = useRef(false);
+  const basemapStyleSequenceRef = useRef(0);
   const showLandPriceHeatmapRef = useRef(showLandPriceHeatmap);
   const selectedMetricRef = useRef<MapMetric>(selectedMetric);
   const metricBubbleValuesRef = useRef<MetricBubbleValue[]>([]);
@@ -959,6 +955,8 @@ export function MapView({
     if (!map || activeBasemapModeRef.current === basemapMode) return;
 
     activeBasemapModeRef.current = basemapMode;
+    basemapTileErrorRef.current = false;
+    basemapStyleSequenceRef.current += 1;
     onStatusChange("loading");
 
     map.setStyle(basemapMode === "map"
@@ -1113,6 +1111,10 @@ export function MapView({
     let viewportListenersAttached = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let basemapReadyTimer: ReturnType<typeof setTimeout> | null = null;
+    let parcelRefreshRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastParcelRetryKey: string | null = null;
+    let parcelRetryCountForKey = 0;
     let activeController: AbortController | null = null;
     let activeRefreshKey: string | null = null;
     let refreshSequence = 0;
@@ -1962,6 +1964,27 @@ export function MapView({
       }
     };
 
+    const waitBeforeAreaRetry = (signal: AbortSignal, delayMs: number) =>
+      new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener("abort", abort);
+          resolve();
+        };
+        const abort = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          signal.removeEventListener("abort", abort);
+          reject(new Error("Area request was cancelled before its retry."));
+        };
+        const timer = setTimeout(finish, delayMs);
+        if (signal.aborted) abort();
+        else signal.addEventListener("abort", abort, { once: true });
+      });
+
     const fetchAreas = async (
       level: AreaLevel,
       adminSource: AdminSourceId,
@@ -1975,27 +1998,100 @@ export function MapView({
       const queryBounds = requestBoundsForArea(viewBounds, level);
       const bbox = queryBounds.join(",");
       const requestUrl = `/api/geography/areas?level=${level}&source=${adminSource}&bbox=${encodeURIComponent(bbox)}`;
-      recordE2ETrace("area-api-request", { level, adminSource, bbox, zoom: Number(map.getZoom().toFixed(2)) });
-      const response = await fetch(requestUrl, { signal });
+      // Parcel requests get one bounded retry. A transient 502 or a successful
+      // but empty response must not be cached as if it were complete coverage.
+      const maxAttempts = level === "parcel" ? 2 : 1;
+      let lastError: unknown = null;
 
-      if (!response.ok) {
-        recordE2ETrace("area-api-failure", { level, adminSource, status: response.status });
-        if (cached && boundsIntersect(cached.bounds, queryBounds)) {
-          recordE2ETrace("area-api-cache-fallback", {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        if (signal.aborted) throw new Error("Area request was cancelled.");
+        recordE2ETrace("area-api-request", {
+          level,
+          adminSource,
+          bbox,
+          attempt,
+          zoom: Number(map.getZoom().toFixed(2))
+        });
+
+        try {
+          const response = await fetch(requestUrl, { signal });
+          if (!response.ok) {
+            recordE2ETrace("area-api-failure", {
+              level,
+              adminSource,
+              status: response.status,
+              attempt
+            });
+            const transient = [500, 502, 503, 504].includes(response.status);
+            if (level === "parcel" && transient && attempt < maxAttempts) {
+              recordE2ETrace("area-api-retry", {
+                level,
+                adminSource,
+                reason: "http-" + response.status,
+                nextAttempt: attempt + 1
+              });
+              await waitBeforeAreaRetry(signal, 650);
+              continue;
+            }
+
+            if (cached && boundsIntersect(cached.bounds, queryBounds)) {
+              recordE2ETrace("area-api-cache-fallback", {
+                level,
+                adminSource,
+                status: response.status,
+                cachedFeatureCount: cached.data.features?.length ?? 0
+              });
+              return cached.data;
+            }
+            throw new Error(`Administrative boundary request failed (${response.status})`);
+          }
+
+          const data = (await response.json()) as MapFeatureCollection;
+          const featureCount = data.features?.length ?? 0;
+          recordE2ETrace("area-api-response", {
             level,
             adminSource,
             status: response.status,
-            cachedFeatureCount: cached.data.features?.length ?? 0
+            featureCount,
+            attempt
           });
-          return cached.data;
+
+          if (level === "parcel" && featureCount === 0 && attempt < maxAttempts) {
+            recordE2ETrace("area-api-retry", {
+              level,
+              adminSource,
+              reason: "empty-feature-collection",
+              nextAttempt: attempt + 1
+            });
+            await waitBeforeAreaRetry(signal, 650);
+            continue;
+          }
+
+          if (!signal.aborted && !(level === "parcel" && featureCount === 0)) {
+            areaCache.set(cacheKey, { bounds: queryBounds, data });
+          }
+          return data;
+        } catch (error) {
+          lastError = error;
+          if (signal.aborted) throw error;
+
+          const httpFailure = error instanceof Error &&
+            /Administrative boundary request failed \(\d+\)/.test(error.message);
+          if (level === "parcel" && !httpFailure && attempt < maxAttempts) {
+            recordE2ETrace("area-api-retry", {
+              level,
+              adminSource,
+              reason: "network-error",
+              nextAttempt: attempt + 1
+            });
+            await waitBeforeAreaRetry(signal, 650);
+            continue;
+          }
+          throw error;
         }
-        throw new Error(`Administrative boundary request failed (${response.status})`);
       }
 
-      const data = (await response.json()) as MapFeatureCollection;
-      recordE2ETrace("area-api-response", { level, adminSource, status: response.status, featureCount: data.features?.length ?? 0 });
-      if (!signal.aborted) areaCache.set(cacheKey, { bounds: queryBounds, data });
-      return data;
+      throw lastError instanceof Error ? lastError : new Error("Parcel boundary request failed.");
     };
 
     const refreshAreas = async () => {
@@ -2037,6 +2133,10 @@ export function MapView({
         ...viewBounds.map((value) => value.toFixed(6)),
         ...requestSources
       ].join("|");
+      if (lastParcelRetryKey !== refreshKey) {
+        lastParcelRetryKey = refreshKey;
+        parcelRetryCountForKey = 0;
+      }
 
       // style.load, moveend/zoomend, and the one-time idle recovery can all
       // request the same viewport. Reuse the in-flight request set instead of
@@ -2067,6 +2167,7 @@ export function MapView({
       const pendingTasks: Promise<void>[] = [];
       let activeSourceSuccesses = 0;
       let activeSourceFailures = 0;
+      let parcelSourceFailures = 0;
       const activeSourceCount = requestSources.length;
       let activeStatusReported = false;
 
@@ -2117,6 +2218,7 @@ export function MapView({
               .catch((error: unknown) => {
                 if (controller.signal.aborted || sequence !== refreshSequence) return;
                 if (level === activeLevel) activeSourceFailures += 1;
+                if (level === "parcel") parcelSourceFailures += 1;
                 console.error(`Administrative ${level} boundaries failed for ${adminSource}.`, error);
               })
           );
@@ -2235,6 +2337,38 @@ export function MapView({
         updateLayerVisibility();
         if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
+
+        if (parcelResult && parcelResult.data.features.length > 0) {
+          if (lastParcelRetryKey === refreshKey) {
+            lastParcelRetryKey = null;
+            parcelRetryCountForKey = 0;
+          }
+        } else if (
+          (activeLevel === "village" || activeLevel === "parcel") &&
+          parcelSourceFailures > 0 &&
+          parcelRetryCountForKey < 1 &&
+          parcelRefreshRetryTimer === null
+        ) {
+          // The idle callback can run while the first request set is still in
+          // flight. If that request later fails, schedule a fresh bounded
+          // refresh after its controller has been released.
+          parcelRetryCountForKey += 1;
+          recordE2ETrace("parcel-refresh-retry-scheduled", {
+            refreshKey,
+            retry: parcelRetryCountForKey
+          });
+          const retryDeadline = Date.now() + 20_000;
+          const retryFailedViewport = () => {
+            parcelRefreshRetryTimer = null;
+            if (activeController && activeRefreshKey === refreshKey && Date.now() < retryDeadline) {
+              parcelRefreshRetryTimer = setTimeout(retryFailedViewport, 500);
+              return;
+            }
+            if (activeController && activeRefreshKey !== refreshKey) return;
+            if (map.getZoom() >= VILLAGE_ZOOM) void refreshAreas();
+          };
+          parcelRefreshRetryTimer = setTimeout(retryFailedViewport, 900);
+        }
 
         if (activeSourceCount === 0 || activeSourceSuccesses > 0) {
           onBoundaryStatusChange("ready");
@@ -2359,6 +2493,10 @@ export function MapView({
     refreshZoningRef.current = scheduleZoningRefresh;
 
     const scheduleRefresh = () => {
+      if (parcelRefreshRetryTimer !== null) {
+        clearTimeout(parcelRefreshRetryTimer);
+        parcelRefreshRetryTimer = null;
+      }
       updateLayerVisibility();
       scheduleShowOverlayRefresh();
       scheduleZoningRefresh();
@@ -2500,6 +2638,11 @@ export function MapView({
     map.on("style.load", () => {
       styleLoaded = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
+      basemapTileErrorRef.current = false;
+      const styleMode = activeBasemapModeRef.current;
+      const styleSequence = basemapStyleSequenceRef.current;
+      onStatusChange("loading");
       addAdministrativeLayers();
       addShowOverlayLayers();
       addZoningOverlayLayers();
@@ -2508,7 +2651,29 @@ export function MapView({
       applyShowOverlayFilters(map, showLayersRef.current);
       void refreshShowOverlays();
       void refreshZoningOverlay();
-      onStatusChange("ready");
+      const reportBasemapReadiness = () => {
+        if (
+          styleSequence !== basemapStyleSequenceRef.current ||
+          styleMode !== activeBasemapModeRef.current
+        ) return;
+        if (basemapReadyTimer !== null) {
+          clearTimeout(basemapReadyTimer);
+          basemapReadyTimer = null;
+        }
+        const sourceLoaded = styleMode === "map"
+          ? map.areTilesLoaded()
+          : Boolean(map.getSource("world-imagery") && map.isSourceLoaded("world-imagery"));
+        const ready = sourceLoaded && !basemapTileErrorRef.current;
+        recordE2ETrace("basemap-readiness", {
+          mode: styleMode,
+          sourceLoaded,
+          tileError: basemapTileErrorRef.current,
+          ready
+        });
+        onStatusChange(ready ? "ready" : "error");
+      };
+      map.once("idle", reportBasemapReadiness);
+      basemapReadyTimer = setTimeout(reportBasemapReadiness, 15_000);
       void refreshAreas();
       attachInteractionHandlers();
 
@@ -2547,7 +2712,34 @@ export function MapView({
     });
 
     map.on("error", (event) => {
-      if (styleLoaded || !event.error) return;
+      if (!event.error) return;
+      const mapError = event as typeof event & { sourceId?: string };
+      const sourceId = mapError.sourceId ?? null;
+      const mode = activeBasemapModeRef.current;
+      recordE2ETrace("basemap-or-style-error", {
+        mode,
+        sourceId,
+        message: event.error.message
+      });
+
+      // Raster source errors happen after style.load. The previous handler
+      // returned as soon as the style loaded, hiding failed satellite tiles
+      // while the status indicator continued to say "Basemap connected".
+      if (sourceId === "world-imagery") {
+        basemapTileErrorRef.current = true;
+        onStatusChange("error");
+        return;
+      }
+      if (sourceId === "world-transportation" && mode === "hybrid") {
+        basemapTileErrorRef.current = true;
+        onStatusChange("error");
+        return;
+      }
+      if (styleLoaded) {
+        basemapTileErrorRef.current = true;
+        onStatusChange("error");
+        return;
+      }
 
       if (!fallbackAttempted) {
         fallbackAttempted = true;
@@ -2587,6 +2779,8 @@ export function MapView({
 
     return () => {
       if (refreshTimer !== null) clearTimeout(refreshTimer);
+      if (parcelRefreshRetryTimer !== null) clearTimeout(parcelRefreshRetryTimer);
+      if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
