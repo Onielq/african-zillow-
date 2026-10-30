@@ -1523,7 +1523,10 @@ export function MapExperience() {
                       if (globalSearchStatus === "loading") return;
                       const query = globalSearch.trim();
                       const isFullUpi = /^\d{1,2}(?:[/.\-\s]\d{1,2}){3}[/.\-\s]\d{1,7}$/.test(query);
-                      const looksLikeAddress = !isFullUpi && (
+                      const administrativeResult = globalSearchResults.find(
+                        (result) => !("kind" in result && result.kind === "address")
+                      );
+                      const looksLikeAddress = !isFullUpi && !administrativeResult && (
                         query.includes(",") ||
                         /\b(?:road|street|avenue|drive|close|lane|boulevard|rd|st|ave)\b/i.test(query) ||
                         /^(?:kn|kg|kk)\s*[- ]?\s*\d+/i.test(query)
