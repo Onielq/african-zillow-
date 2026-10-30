@@ -12,7 +12,9 @@ const diagnostics = {
   pageErrors: [],
   consoleErrors: [],
   failedRequests: [],
-  areaApiResponses: []
+  areaApiResponses: [],
+  basemapTileResponses: [],
+  failedBasemapTileRequests: []
 };
 
 page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
@@ -20,15 +22,29 @@ page.on("console", (message) => {
   if (message.type() === "error") diagnostics.consoleErrors.push(message.text());
 });
 page.on("requestfailed", (request) => {
-  if (request.url().includes("/api/geography/areas")) {
+  const url = request.url();
+  if (url.includes("/api/geography/areas")) {
     diagnostics.failedRequests.push({
-      url: request.url(),
+      url,
+      error: request.failure()?.errorText ?? "request failed"
+    });
+  }
+  if (/ArcGIS\/rest\/services\/(World_Imagery|Reference\/World_Transportation)\/MapServer\/tile\//i.test(url)) {
+    diagnostics.failedBasemapTileRequests.push({
+      url,
       error: request.failure()?.errorText ?? "request failed"
     });
   }
 });
 page.on("response", async (response) => {
-  if (!response.url().includes("/api/geography/areas")) return;
+  const responseUrl = response.url();
+  if (/ArcGIS\/rest\/services\/(World_Imagery|Reference\/World_Transportation)\/MapServer\/tile\//i.test(responseUrl)) {
+    diagnostics.basemapTileResponses.push({
+      url: responseUrl,
+      status: response.status()
+    });
+  }
+  if (!responseUrl.includes("/api/geography/areas")) return;
   let summary = {};
   const responseHeaders = response.headers();
   try {
@@ -102,7 +118,7 @@ try {
     } catch {
       return false;
     }
-  }, undefined, { timeout: 40_000 }).catch(() => {});
+  }, undefined, { timeout: 50_000 }).catch(() => {});
 
   // Only issue a second direct API request if the map did not load parcels.
   // Avoid duplicating a slow GIS/fallback request when the visible map already
@@ -147,6 +163,31 @@ try {
         }
       });
 
+  // Exercise the satellite basemap as part of the same live-map test.
+  // The default vector style can load successfully while the imagery raster
+  // tiles fail later, so verify both the source and actual tile responses.
+  await page.getByRole("button", { name: "Satellite" }).click();
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.isStyleLoaded() && map.getSource("world-imagery"));
+  }, undefined, { timeout: 45_000 });
+  await page.waitForFunction(() => {
+    const statusDot = document.querySelector(".map-status-card .status-dot");
+    return Boolean(statusDot && (
+      statusDot.classList.contains("status-dot-ready") ||
+      statusDot.classList.contains("status-dot-error")
+    ));
+  }, undefined, { timeout: 25_000 }).catch(() => {});
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return false;
+    try {
+      return map.querySourceFeatures("land-parcels").length > 0;
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: 50_000 }).catch(() => {});
+
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Map was not available during diagnostics.");
@@ -185,6 +226,14 @@ try {
       zoom: Number(map.getZoom().toFixed(2)),
       center: map.getCenter().toArray(),
       styleLoaded: map.isStyleLoaded(),
+      basemap: {
+        mode: map.getSource("world-imagery") ? "satellite" : "map",
+        imagerySourceExists: Boolean(map.getSource("world-imagery")),
+        imagerySourceLoaded: Boolean(map.getSource("world-imagery") && map.isSourceLoaded("world-imagery")),
+        allTilesLoaded: map.areTilesLoaded(),
+        statusDotClass: document.querySelector(".map-status-card .status-dot")?.className ?? null,
+        statusText: document.querySelector(".map-status-card")?.textContent?.trim() ?? null
+      },
       villageOutline: layerState("village-outline"),
       parcelOutline: layerState("parcel-outline"),
       parcelFill: layerState("parcel-fill"),
@@ -224,6 +273,15 @@ try {
   }
   if (result.renderedParcelOutlineFeatures <= 0) {
     throw new Error("No cadastral parcel outlines rendered at village zoom. See map/source/network diagnostics above.");
+  }
+  if (!result.basemap.imagerySourceExists || !result.basemap.imagerySourceLoaded || !result.basemap.statusDotClass?.includes("status-dot-ready")) {
+    throw new Error("Satellite imagery did not reach a healthy ready state. See basemap tile request diagnostics above.");
+  }
+  if (!diagnostics.basemapTileResponses.some((item) => item.url.includes("World_Imagery") && item.status === 200)) {
+    throw new Error("No successful Esri World Imagery tiles were received.");
+  }
+  if (diagnostics.failedBasemapTileRequests.length > 0 || diagnostics.basemapTileResponses.some((item) => item.url.includes("World_Imagery") && item.status >= 400)) {
+    throw new Error("Satellite imagery tile requests failed. See basemap diagnostics above.");
   }
   if (diagnostics.pageErrors.length > 0) {
     throw new Error("Browser runtime errors: " + diagnostics.pageErrors.join(" | "));
