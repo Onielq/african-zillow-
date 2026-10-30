@@ -394,7 +394,6 @@ async function inspectBugeseraAdministrativeHierarchy() {
           where: "UPPER(" + nameField + ") = '" + term.replace(/'/g, "''") + "' OR UPPER(" + nameField + ") LIKE '" + term.replace(/'/g, "''") + "%'",
           outFields: "*",
           returnGeometry: "false",
-          resultRecordCount: "8",
           f: "json"
         });
         const response = await readJson(layer.url + "/query?" + params);
