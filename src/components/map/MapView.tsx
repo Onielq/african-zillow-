@@ -2644,6 +2644,11 @@ export function MapView({
     map.on("style.load", () => {
       styleLoaded = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
+      basemapTileErrorRef.current = false;
+      const styleMode = activeBasemapModeRef.current;
+      const styleSequence = basemapStyleSequenceRef.current;
+      onStatusChange("loading");
       addAdministrativeLayers();
       addShowOverlayLayers();
       addZoningOverlayLayers();
@@ -2652,7 +2657,29 @@ export function MapView({
       applyShowOverlayFilters(map, showLayersRef.current);
       void refreshShowOverlays();
       void refreshZoningOverlay();
-      onStatusChange("ready");
+      const reportBasemapReadiness = () => {
+        if (
+          styleSequence !== basemapStyleSequenceRef.current ||
+          styleMode !== activeBasemapModeRef.current
+        ) return;
+        if (basemapReadyTimer !== null) {
+          clearTimeout(basemapReadyTimer);
+          basemapReadyTimer = null;
+        }
+        const sourceLoaded = styleMode === "map"
+          ? map.areTilesLoaded()
+          : Boolean(map.getSource("world-imagery") && map.isSourceLoaded("world-imagery"));
+        const ready = sourceLoaded && !basemapTileErrorRef.current;
+        recordE2ETrace("basemap-readiness", {
+          mode: styleMode,
+          sourceLoaded,
+          tileError: basemapTileErrorRef.current,
+          ready
+        });
+        onStatusChange(ready ? "ready" : "error");
+      };
+      map.once("idle", reportBasemapReadiness);
+      basemapReadyTimer = setTimeout(reportBasemapReadiness, 15_000);
       void refreshAreas();
       attachInteractionHandlers();
 
@@ -2691,7 +2718,33 @@ export function MapView({
     });
 
     map.on("error", (event) => {
-      if (styleLoaded || !event.error) return;
+      if (!event.error) return;
+      const mapError = event as typeof event & { sourceId?: string };
+      const sourceId = mapError.sourceId ?? null;
+      const mode = activeBasemapModeRef.current;
+      recordE2ETrace("basemap-or-style-error", {
+        mode,
+        sourceId,
+        message: event.error.message
+      });
+
+      // Raster source errors happen after style.load. The previous handler
+      // returned as soon as the style loaded, hiding failed satellite tiles
+      // while the status indicator continued to say "Basemap connected".
+      if (sourceId === "world-imagery") {
+        basemapTileErrorRef.current = true;
+        onStatusChange("error");
+        return;
+      }
+      if (sourceId === "world-transportation" && mode === "hybrid") {
+        basemapTileErrorRef.current = true;
+        onStatusChange("error");
+        return;
+      }
+      if (styleLoaded) {
+        onStatusChange("error");
+        return;
+      }
 
       if (!fallbackAttempted) {
         fallbackAttempted = true;
