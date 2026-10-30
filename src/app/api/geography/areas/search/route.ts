@@ -146,6 +146,41 @@ function chooseTextFields(fields: FieldMetadata[], candidates: string[]): string
   })));
 }
 
+type HierarchyParentLevel = "district" | "sector" | "cell";
+
+function orderedParentMappings(count: number): HierarchyParentLevel[][] {
+  const levels: HierarchyParentLevel[] = ["district", "sector", "cell"];
+  const mappings: HierarchyParentLevel[][] = [];
+  for (let mask = 1; mask < 1 << levels.length; mask += 1) {
+    const mapping = levels.filter((_, index) => Boolean(mask & (1 << index)));
+    if (mapping.length === count) mappings.push(mapping);
+  }
+  return mappings;
+}
+
+function hierarchyPathWhere(fields: FieldMetadata[], pathTokens: string[]): string | null {
+  if (pathTokens.length < 2 || pathTokens.length > 4) return null;
+  const candidates = CANDIDATES.village;
+  const mappings = orderedParentMappings(pathTokens.length - 1);
+  const alternatives = mappings.flatMap((mapping) => {
+    const conditions = mapping.map((level, index) => {
+      const fieldNames = chooseTextFields(fields, candidates[level]);
+      if (fieldNames.length === 0) return null;
+      let token = pathTokens[index].trim();
+      if (level === "district") token = token.replace(/\\s+district$/i, "").trim();
+      const escaped = token.toLocaleUpperCase("en").replace(/'/g, "''");
+      const values = level === "district" ? [escaped, escaped + " DISTRICT"] : [escaped];
+      return "(" + fieldNames.map((field) =>
+        "(" + values.map((value) => "UPPER(" + field + ") = '" + value + "'").join(" OR ") + ")"
+      ).join(" OR ") + ")";
+    });
+    return conditions.every((condition): condition is string => condition !== null)
+      ? ["(" + conditions.join(" AND ") + ")"]
+      : [];
+  });
+  return alternatives.length > 0 ? "(" + alternatives.join(" OR ") + ")" : null;
+}
+
 function collectCoordinates(value: unknown, output: Array<[number, number]>): void {
   if (!Array.isArray(value)) return;
   if (
@@ -223,7 +258,14 @@ async function getLayerMetadata(url: string): Promise<LayerMetadata> {
   return pending;
 }
 
-async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLevel, layerId: number, query: string): Promise<SearchArea[]> {
+async function searchLayer(
+  source: SourceId,
+  baseUrl: string,
+  level: AdminAreaLevel,
+  layerId: number,
+  query: string,
+  hierarchyPathTokens?: string[]
+): Promise<SearchArea[]> {
   const layerUrl = baseUrl + "/" + layerId;
   const metadata = await getLayerMetadata(layerUrl);
   const fields = metadata.fields ?? [];
@@ -254,6 +296,10 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
       ).join(" OR ") + ")";
   const scopeToMappedDistricts = (where: string) =>
     "(" + districtScopeWhere + ") AND (" + where + ")";
+  const hierarchyWhere = hierarchyPathTokens
+    ? hierarchyPathWhere(fields, hierarchyPathTokens)
+    : null;
+  if (hierarchyPathTokens && !hierarchyWhere) return [];
 
   // ArcGIS SQL comparison can be case-sensitive on these published layers.
   // Normalise both sides in SQL so lowercase, uppercase, and mixed-case input behave alike.
@@ -305,9 +351,11 @@ async function searchLayer(source: SourceId, baseUrl: string, level: AdminAreaLe
   // Run prefix/exact matching alongside substring matching. This puts the
   // exact administrative name ahead of similarly named villages and prevents
   // common short prefixes from hiding the place the user actually typed.
+  const withHierarchy = (where: string) =>
+    scopeToMappedDistricts(hierarchyWhere ? "(" + hierarchyWhere + ") AND (" + where + ")" : where);
   const [prefixPayload, containsPayload] = await Promise.all([
-    queryLayer(scopeToMappedDistricts(prefixWhere)),
-    queryLayer(scopeToMappedDistricts(containsWhere))
+    queryLayer(withHierarchy(prefixWhere)),
+    queryLayer(withHierarchy(containsWhere))
   ]);
   const features = [...(prefixPayload.features ?? []), ...(containsPayload.features ?? [])];
 
@@ -820,18 +868,38 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  const hierarchyPathTokens = query
+    .split(/[,>›|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const isHierarchyPath = hierarchyPathTokens.length >= 2 &&
+    hierarchyPathTokens.length <= 4 &&
+    hierarchyPathTokens.every((part) => part.length >= 2 && part.length <= 60);
+  const hierarchySearchTokens = isHierarchyPath ? hierarchyPathTokens : null;
+  const administrativeNameQuery = hierarchySearchTokens?.at(-1) ?? query;
+
   const adminSources = Object.entries(ADMIN_MAP_SOURCES) as Array<[SourceId, typeof ADMIN_MAP_SOURCES[SourceId]]>;
-  const adminTasks = adminSources.flatMap(([sourceId, source]) =>
-    (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>).map(([level, layerId]) =>
-      searchLayer(sourceId, source.baseUrl, level, layerId, query)
+  const adminTasks = adminSources.flatMap(([sourceId, source]) => {
+    const levels = hierarchySearchTokens
+      ? ([["village", source.layers.village]] as Array<[AdminAreaLevel, number]>)
+      : (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>);
+    return levels.map(([level, layerId]) =>
+      searchLayer(
+        sourceId,
+        source.baseUrl,
+        level,
+        layerId,
+        administrativeNameQuery,
+        hierarchySearchTokens ?? undefined
+      )
         .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
         .catch((error) => {
           console.error("Mapped administrative search failed for " + sourceId + " " + level + ".", error);
           return { areas: [] as SearchArea[], failed: true, kind: "administrative" as const };
         })
-    )
-  );
-  const shouldSearchParcels = /\d/.test(query) || fullUpiQuery !== null;
+    );
+  });
+  const shouldSearchParcels = !hierarchySearchTokens && /\\d/.test(query) || fullUpiQuery !== null;
   const parcelTasks = shouldSearchParcels
     ? sources.map((source) =>
         searchParcels(source.id, source.parcelUrl, query)
@@ -885,7 +953,7 @@ export async function GET(request: NextRequest) {
         ].join("|");
     if (!deduplicated.has(key)) deduplicated.set(key, area);
   }
-  const normalizedQuery = normalizeKey(query);
+  const normalizedQuery = normalizeKey(administrativeNameQuery);
   const matchRank = (area: SearchArea) => {
     const labels = [area.name, area.upi, area.parcelNumber].filter((value): value is string => Boolean(value)).map(normalizeKey);
     if (labels.some((value) => value === normalizedQuery)) return 0;
