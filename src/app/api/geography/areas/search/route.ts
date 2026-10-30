@@ -181,7 +181,7 @@ function hierarchyPathWhere(
       const fieldNames = chooseTextFields(fields, candidates[parentLevel]);
       if (fieldNames.length === 0) return null;
       let token = pathTokens[index].trim();
-      if (parentLevel === "district") token = token.replace(/\\s+district$/i, "").trim();
+      if (parentLevel === "district") token = token.replace(/\s+district$/i, "").trim();
       const escaped = token.toLocaleUpperCase("en").replace(/'/g, "''");
       const values = parentLevel === "district" ? [escaped, escaped + " DISTRICT"] : [escaped];
       return "(" + fieldNames.map((field) =>
