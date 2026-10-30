@@ -362,3 +362,85 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Consistent interaction and scan-friendly source metadata. */
+.page {
+  min-height: 100dvh;
+}
+
+.navigation a {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 140ms ease;
+}
+
+.navigation a:focus-visible,
+.footer a:focus-visible,
+.card a:focus-visible,
+.healthButton:focus-visible {
+  outline: 2px solid #176b50;
+  outline-offset: 3px;
+  border-radius: 5px;
+}
+
+.summary strong,
+.healthDetails dd {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.card,
+.rules > div,
+.summary > div {
+  box-shadow: none;
+}
+
+.card:hover {
+  border-color: #b9c7be;
+}
+
+@media (max-width: 760px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary > div:first-child {
+    border-radius: 12px 0 0 0;
+  }
+
+  .summary > div:nth-child(2) {
+    border-radius: 0 12px 0 0;
+  }
+
+  .summary > div:nth-last-child(2) {
+    border-radius: 0 0 0 12px;
+  }
+
+  .summary > div:last-child {
+    border-radius: 0 0 12px 0;
+  }
+
+  .rules {
+    grid-template-columns: 1fr;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .hero,
+  .sourceSection,
+  .rules,
+  .summary {
+    padding-right: 15px;
+    padding-left: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navigation a,
+  .card {
+    transition: none;
+  }
+}
