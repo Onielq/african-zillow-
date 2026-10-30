@@ -971,4 +971,6 @@ test("place search is case-insensitive for administrative names and cell parcel 
   assert.match(areasRoute, /const splitBeforeQuery = area > 0\.0003 && depth < 1/);
   assert.match(areasRoute, /queryArcGisLayer\(\s*provider\.layerUrl,\s*bounds,\s*80,/);
   assert.match(areasRoute, /if \(features\.length >= 80 && depth < 3 && budget\.remaining >= 64/);
+  assert.match(areasRoute, /if \(depth >= 2 \|\| area <= 0\.00002\)/);
+  assert.match(areasRoute, /Retrying cadastral parcel GIS tile with smaller bounds/);
 });
