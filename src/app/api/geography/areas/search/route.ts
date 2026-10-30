@@ -302,7 +302,8 @@ async function searchLayer(
   layerId: number,
   query: string,
   hierarchyPathTokens?: string[],
-  parentCellIds?: string[]
+  parentCellIds?: string[],
+  exactOnly = false
 ): Promise<SearchArea[]> {
   const layerUrl = baseUrl + "/" + layerId;
   const metadata = await getLayerMetadata(layerUrl);
@@ -366,6 +367,9 @@ async function searchLayer(
     returnGeometry: "false",
     f: "json"
   };
+  const exactWhere = "(" + nameFields.map((field) =>
+    "UPPER(" + field + ") = '" + escapedUpper + "'"
+  ).join(" OR ") + ")";
   const prefixWhere = "(" + nameFields.map((field) =>
     "(UPPER(" + field + ") = '" + escapedUpper + "' OR UPPER(" + field + ") LIKE '" + escapedUpper + "%')"
   ).join(" OR ") + ")";
@@ -398,10 +402,12 @@ async function searchLayer(
   // common short prefixes from hiding the place the user actually typed.
   const withHierarchy = (where: string) =>
     scopeToMappedDistricts(hierarchyFilter ? "(" + hierarchyFilter + ") AND (" + where + ")" : where);
-  const [prefixPayload, containsPayload] = await Promise.all([
-    queryLayer(withHierarchy(prefixWhere)),
-    queryLayer(withHierarchy(containsWhere))
-  ]);
+  const [prefixPayload, containsPayload] = exactOnly
+    ? [await queryLayer(withHierarchy(exactWhere)), { features: [] } as LayerQueryResponse]
+    : await Promise.all([
+        queryLayer(withHierarchy(prefixWhere)),
+        queryLayer(withHierarchy(containsWhere))
+      ]);
   const features = [...(prefixPayload.features ?? []), ...(containsPayload.features ?? [])];
 
   return features.flatMap((feature, index) => {
@@ -467,7 +473,7 @@ async function searchVillageHierarchy(
   );
 
   if (!hasCellPath) {
-    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens);
+    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens, undefined, true);
   }
 
   // Some Bugesera village polygons carry cell_id but omit the cell name.
@@ -481,7 +487,9 @@ async function searchVillageHierarchy(
     "cell",
     layers.cell,
     cellName,
-    cellParentTokens.length ? cellParentTokens : undefined
+    cellParentTokens.length ? cellParentTokens : undefined,
+    undefined,
+    true
   );
   const cellIds = Array.from(new Set(cells.map((area) => area.cellId).filter(
     (id): id is string => Boolean(id)
@@ -497,7 +505,7 @@ async function searchVillageHierarchy(
   if (cellIds.length === 0) {
     // A source that repeats its cell name in village records can still resolve
     // the path directly; never invent an ID when the cell layer omits one.
-    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens);
+    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens, undefined, true);
   }
 
   const villages = await searchLayer(
@@ -507,7 +515,8 @@ async function searchVillageHierarchy(
     layers.village,
     villageName,
     cellParentTokens.length ? cellParentTokens : undefined,
-    cellIds
+    cellIds,
+    true
   );
   const cellNameById = new Map(cells.flatMap((area) =>
     area.cellId ? [[area.cellId, area.name] as const] : []
