@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Map as MapLibreMapInstance } from "maplibre-gl";
+import { MapView, type BasemapMode, type MapOverlayCategory, type MapMetric, type BasemapStatus, type BoundaryStatus, type SelectedArea } from "@/components/map/MapView";
 import {
   DISTRICT_LAND_PRICE_BENCHMARKS,
   LAND_PRICE_BENCHMARK_SOURCE,
@@ -191,6 +193,12 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
   const [geometry, setGeometry] = useState<GeometryResponse | null>(null);
   const [transactionStatus, setTransactionStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [geometryStatus, setGeometryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(null);
+  const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
+  const [mapStatus, setMapStatus] = useState<BasemapStatus>("loading");
+  const [boundaryStatus, setBoundaryStatus] = useState<BoundaryStatus>("loading");
+  const [mapLayers, setMapLayers] = useState<MapOverlayCategory[]>([]);
+  const [showZoning, setShowZoning] = useState(false);
 
   const pathKey = initialAreaPath.join("|");
   const isProfileRoute = initialAreaPath.length > 0;
@@ -364,6 +372,35 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
     void Promise.all(requests);
     return () => controller.abort();
   }, [selectedArea]);
+
+
+  useEffect(() => {
+    if (!mapInstance || !geometry?.bounds || !selectedArea) return;
+    const [west, south, east, north] = geometry.bounds;
+    mapInstance.fitBounds([[west, south], [east, north]], {
+      padding: 42,
+      maxZoom: selectedArea.level === "district" ? 10.5 : selectedArea.level === "sector" ? 12.5 : selectedArea.level === "cell" ? 14 : 15.5,
+      duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 550
+    });
+  }, [mapInstance, geometry, selectedArea]);
+
+  const handleMapReady = useCallback((map: MapLibreMapInstance | null) => {
+    setMapInstance(map);
+  }, []);
+  const handleMapStatus = useCallback((status: BasemapStatus) => {
+    setMapStatus(status);
+  }, []);
+  const handleBoundaryStatus = useCallback((status: BoundaryStatus) => {
+    setBoundaryStatus(status);
+  }, []);
+  const handleMapAreaSelected = useCallback((_area: SelectedArea | null) => {
+    // The main map workspace remains the place for parcel inspection and map actions.
+  }, []);
+  const toggleMapLayer = (layer: MapOverlayCategory) => {
+    setMapLayers((current) => current.includes(layer)
+      ? current.filter((item) => item !== layer)
+      : [...current, layer]);
+  };
 
   const selectArea = (area: AreaSearchResult) => {
     setSearchOpen(false);
@@ -705,18 +742,38 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
                           {geometryStatus === "loading" ? "Resolving…" : geometryStatus === "ready" ? "Geometry resolved" : "Map check required"}
                         </span>
                       </div>
-                      <div className={styles.mapPreview}>
-                        <div className={styles.mapPreviewGrid} aria-hidden="true"/>
-                        <div className={styles.mapPreviewInner}>
-                          <span className={styles.mapPin}/>
-                          <strong>{selectedArea.name}</strong>
-                          <small>{selectedArea.district}</small>
+                      <div className={styles.mapControlRow}>
+                        <div className={styles.basemapControls} role="group" aria-label="Area map basemap">
+                          <button type="button" aria-pressed={basemapMode === "map"} onClick={() => setBasemapMode("map")}>Map</button>
+                          <button type="button" aria-pressed={basemapMode === "satellite"} onClick={() => setBasemapMode("satellite")}>Satellite</button>
+                          <button type="button" aria-pressed={basemapMode === "hybrid"} onClick={() => setBasemapMode("hybrid")}>Hybrid</button>
                         </div>
+                        <span className={styles.mapStatus}>{mapStatus === "ready" ? "Map ready" : mapStatus === "error" ? "Basemap issue" : "Loading map"}</span>
+                      </div>
+                      <div className={styles.mapCanvas} aria-label={"Live geographic map for " + selectedArea.name}>
+                        <MapView
+                          basemapMode={basemapMode}
+                          showLandPriceHeatmap={false}
+                          selectedMetric={"averageLandPricePerM2" as MapMetric}
+                          showLayers={mapLayers}
+                          showZoning={showZoning}
+                          showScope="pilot"
+                          onMapReady={handleMapReady}
+                          onStatusChange={handleMapStatus}
+                          onBoundaryStatusChange={handleBoundaryStatus}
+                          onAreaSelected={handleMapAreaSelected}
+                          selectedArea={selectedArea as SelectedArea}
+                        />
+                      </div>
+                      <div className={styles.mapLayerControls}>
+                        <button type="button" aria-pressed={mapLayers.includes("transportation")} onClick={() => toggleMapLayer("transportation")}>Roads & transport</button>
+                        <button type="button" aria-pressed={mapLayers.includes("nature")} onClick={() => toggleMapLayer("nature")}>Nature</button>
+                        <button type="button" aria-pressed={showZoning} onClick={() => setShowZoning((value) => !value)}>Zoning</button>
                       </div>
                       <p className={styles.mapCaption}>
-                        This is a location handoff, not a substitute map. Open the live Map workspace to inspect the actual boundary, parcel lines, roads and overlays.
+                        Boundary loading status: {boundaryStatus}. Parcel outlines appear at parcel zoom where the connected source provides them.
                       </p>
-                      <Link href={openMapHref} className={styles.secondaryButton}>Open live map <span aria-hidden="true">↗</span></Link>
+                      <Link href={openMapHref} className={styles.secondaryButton}>Open full map workspace <span aria-hidden="true">↗</span></Link>
                     </article>
                     <article className={styles.locationPanel}>
                       <strong>Administrative location</strong>
