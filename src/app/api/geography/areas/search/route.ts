@@ -486,6 +486,14 @@ async function searchVillageHierarchy(
   const cellIds = Array.from(new Set(cells.map((area) => area.cellId).filter(
     (id): id is string => Boolean(id)
   )));
+  console.info("Administrative hierarchy cell lookup.", {
+    source,
+    pathTokens,
+    cellName,
+    cellParentTokens,
+    cellMatches: cells.map((area) => ({ name: area.name, cellId: area.cellId, district: area.district, sector: area.sector })),
+    cellIds
+  });
   if (cellIds.length === 0) {
     // A source that repeats its cell name in village records can still resolve
     // the path directly; never invent an ID when the cell layer omits one.
@@ -504,6 +512,12 @@ async function searchVillageHierarchy(
   const cellNameById = new Map(cells.flatMap((area) =>
     area.cellId ? [[area.cellId, area.name] as const] : []
   ));
+  console.info("Administrative hierarchy village lookup.", {
+    source,
+    villageName,
+    cellIds,
+    villageMatches: villages.map((area) => ({ name: area.name, cellId: area.cellId, district: area.district, sector: area.sector, cell: area.cell }))
+  });
   return villages.map((area) => ({
     ...area,
     cell: area.cell ?? (area.cellId ? cellNameById.get(area.cellId) ?? null : null)
