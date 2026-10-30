@@ -161,13 +161,16 @@ function orderedParentMappings(count: number): HierarchyParentLevel[][] {
 function hierarchyPathWhere(fields: FieldMetadata[], pathTokens: string[]): string | null {
   if (pathTokens.length < 2 || pathTokens.length > 4) return null;
   const candidates = CANDIDATES.village;
-  const mappings = orderedParentMappings(pathTokens.length - 1);
+  const firstTokenIsDistrict = PILOT_DISTRICTS.has(normalizeDistrictKey(pathTokens[0]));
+  const mappings = orderedParentMappings(pathTokens.length - 1).filter((mapping) =>
+    !firstTokenIsDistrict || mapping[0] === "district"
+  );
   const alternatives = mappings.flatMap((mapping) => {
     const conditions = mapping.map((level, index) => {
       const fieldNames = chooseTextFields(fields, candidates[level]);
       if (fieldNames.length === 0) return null;
       let token = pathTokens[index].trim();
-      if (level === "district") token = token.replace(/\\s+district$/i, "").trim();
+      if (level === "district") token = token.replace(/\s+district$/i, "").trim();
       const escaped = token.toLocaleUpperCase("en").replace(/'/g, "''");
       const values = level === "district" ? [escaped, escaped + " DISTRICT"] : [escaped];
       return "(" + fieldNames.map((field) =>
@@ -899,7 +902,7 @@ export async function GET(request: NextRequest) {
         })
     );
   });
-  const shouldSearchParcels = !hierarchySearchTokens && /\\d/.test(query) || fullUpiQuery !== null;
+  const shouldSearchParcels = !hierarchySearchTokens && (/\d/.test(query) || fullUpiQuery !== null);
   const parcelTasks = shouldSearchParcels
     ? sources.map((source) =>
         searchParcels(source.id, source.parcelUrl, query)
