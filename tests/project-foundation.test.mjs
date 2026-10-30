@@ -942,6 +942,7 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(search.includes("setTimeout(resolve, 350)"));
   assert.ok(search.includes("RwandaLandIntelligenceMap/administrative-search"));
   assert.ok(search.includes('"User-Agent"'));
+  assert.ok(search.includes('cache: "no-store"'));
   assert.ok(search.includes("exactOnly"));
   assert.ok(search.includes("queryLayer(withHierarchy(exactWhere))"));
   assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeDistrictKey(district))"));
