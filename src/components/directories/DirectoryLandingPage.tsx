@@ -43,6 +43,7 @@ type DirectoryLandingPageProps = {
 
 const NAV_ITEMS = [
   { href: "/", label: "Map workspace", key: "map" },
+  { href: "/explorer", label: "Market Explorer", key: "explorer" },
   { href: "/projects", label: "Projects", key: "projects" },
   { href: "/developers", label: "Developers & agents", key: "developers" },
   { href: "/data-sources", label: "Data sources", key: "sources" }
