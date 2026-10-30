@@ -938,7 +938,7 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(search.includes("parentCellIds"));
   assert.ok(search.includes("identifierListWhere"));
   assert.ok(search.includes("village_boundary/FeatureServer"));
-  assert.ok(search.includes("NISR 2022 Census · Rwanda village boundary layer"));
+  assert.ok(search.includes("NISR · Rwanda village boundary polygons (source capture 2012)"));
   assert.ok(search.includes("BUGESERA_NISR_VILLAGE_LAYER"));
   assert.ok(search.includes("GIS layer metadata unavailable"));
   assert.ok(search.includes("const transient = [429, 500, 502, 503, 504].includes(response.status)"));
