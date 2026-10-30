@@ -940,6 +940,8 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(search.includes("GIS layer metadata unavailable"));
   assert.ok(search.includes("const transient = [429, 500, 502, 503, 504].includes(response.status)"));
   assert.ok(search.includes("setTimeout(resolve, 350)"));
+  assert.ok(search.includes("RwandaLandIntelligenceMap/administrative-search"));
+  assert.ok(search.includes('"User-Agent"'));
   assert.ok(search.includes("exactOnly"));
   assert.ok(search.includes("queryLayer(withHierarchy(exactWhere))"));
   assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeDistrictKey(district))"));
