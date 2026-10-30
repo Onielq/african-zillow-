@@ -281,7 +281,10 @@ async function getLayerMetadata(url: string): Promise<LayerMetadata> {
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
           const response = await fetch(url + "?f=json", {
-            headers: { Accept: "application/json" },
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
+            },
             next: { revalidate: 86400 },
             signal: AbortSignal.timeout(8000)
           });
@@ -411,7 +414,10 @@ async function searchLayer(
     // A server-side name + district filter keeps each response scoped without
     // relying on paging.
     const response = await fetch(layerUrl + "/query?" + params.toString(), {
-      headers: { Accept: "application/json" },
+      headers: {
+              Accept: "application/json",
+              "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
+            },
       next: { revalidate: 300 },
       signal: AbortSignal.timeout(10_000)
     });
@@ -635,7 +641,10 @@ async function resolveAdminAreaGeometry(
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
-    headers: { Accept: "application/json" },
+    headers: {
+              Accept: "application/json",
+              "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
+            },
     next: { revalidate: 300 },
     signal: AbortSignal.timeout(10_000)
   });
@@ -765,7 +774,10 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
-    headers: { Accept: "application/json" },
+    headers: {
+              Accept: "application/json",
+              "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
+            },
     next: { revalidate: 300 },
     signal: AbortSignal.timeout(10_000)
   });
@@ -844,7 +856,10 @@ async function browseParcels(
     f: "json"
   });
   const response = await fetch(layerUrl + "/query?" + params.toString(), {
-    headers: { Accept: "application/json" },
+    headers: {
+              Accept: "application/json",
+              "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
+            },
     next: { revalidate: 300 },
     signal: AbortSignal.timeout(10_000)
   });
