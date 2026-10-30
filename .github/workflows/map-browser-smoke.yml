@@ -33,6 +33,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
+      - name: Verify live administrative path search
+        env:
+          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+        run: node scripts/smoke-test-admin-path-search.mjs
+
       - name: Verify live parcel outlines at village zoom
         env:
           APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
