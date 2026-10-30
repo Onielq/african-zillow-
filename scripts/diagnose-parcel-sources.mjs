@@ -191,12 +191,163 @@ async function inspectBugeseraViewportLoads() {
   return { bbox, tests };
 }
 
+async function inspectGeoDataViewerAndParTes() {
+  const itemId = "7ca1b5f6bde6461abb269de05f167f4f";
+  const itemRoots = [
+    "https://geodata.rw/portal/sharing/rest/content/items/" + itemId,
+    "https://www.arcgis.com/sharing/rest/content/items/" + itemId
+  ];
+  const viewerItems = await Promise.all(itemRoots.map(async (root) => {
+    try {
+      const [metadataResponse, dataResponse] = await Promise.all([
+        readJson(root + "?f=json"),
+        readJson(root + "/data?f=json")
+      ]);
+      const metadata = metadataResponse.data ?? {};
+      const appData = dataResponse.data ?? null;
+      const operationalLayers = [];
+      const webMapIds = new Set();
+      const serviceUrls = new Set();
+      const visited = new Set();
+      const walk = (value, depth = 0) => {
+        if (!value || typeof value !== "object" || depth > 12 || visited.has(value)) return;
+        visited.add(value);
+        if (Array.isArray(value)) {
+          for (const item of value) walk(item, depth + 1);
+          return;
+        }
+        const record = value;
+        const title = typeof record.title === "string" ? record.title : null;
+        const url = typeof record.url === "string" ? record.url : null;
+        const layerType = typeof record.layerType === "string" ? record.layerType : null;
+        const itemIdValue = typeof record.itemId === "string" ? record.itemId : null;
+        if (itemIdValue && /^[a-f0-9]{32}$/i.test(itemIdValue)) webMapIds.add(itemIdValue);
+        if (url && /FeatureServer|MapServer|ImageServer|VectorTileServer/i.test(url)) {
+          serviceUrls.add(url);
+          operationalLayers.push({ title, url, layerType, itemId: itemIdValue });
+        }
+        for (const [key, child] of Object.entries(record)) {
+          if (/webmap|web.?map|mapitem/i.test(key) && typeof child === "string" && /^[a-f0-9]{32}$/i.test(child)) {
+            webMapIds.add(child);
+          } else {
+            walk(child, depth + 1);
+          }
+        }
+      };
+      walk(appData);
+      return {
+        root,
+        metadata: {
+          httpStatus: metadataResponse.httpStatus,
+          title: metadata.title ?? null,
+          type: metadata.type ?? null,
+          typeKeywords: metadata.typeKeywords ?? [],
+          url: metadata.url ?? null,
+          error: metadata.error ?? null
+        },
+        appData: {
+          httpStatus: dataResponse.httpStatus,
+          parseError: Boolean(dataResponse.parseError),
+          error: dataResponse.data?.error ?? null,
+          webMapIds: [...webMapIds],
+          serviceUrls: [...serviceUrls],
+          operationalLayers: operationalLayers.slice(0, 100)
+        }
+      };
+    } catch (error) {
+      return { root, error: error instanceof Error ? error.message : String(error) };
+    }
+  }));
+
+  const layerUrl = "https://geodata.rw/server/rest/services/ParTes/Buges_Par_Test/FeatureServer/0";
+  let parTes;
+  try {
+    const metadataResponse = await readJson(layerUrl + "?f=json");
+    const metadata = metadataResponse.data ?? {};
+    const fieldNames = (metadata.fields ?? []).map((field) => field.name).filter(Boolean);
+    const safeFieldNames = fieldNames.filter((name) =>
+      /^(objectid|fid|id|upi|parcel.?number|district|sector|cell|village|size|area|land.?use|zoning|zone.?code|status|last.?updated)/i.test(name) &&
+      !/owner|proprietor|person|identity|phone|email|address/i.test(name)
+    );
+    const upiField = fieldNames.find((name) => /^upi$/i.test(name));
+    const objectIdField = metadata.objectIdField ?? metadata.objectIdFieldName ??
+      fieldNames.find((name) => /^objectid$/i.test(name)) ?? null;
+    const where = upiField ? upiField + " IS NOT NULL" : objectIdField ? objectIdField + " IS NOT NULL" : "1=1";
+    const sampleParams = new URLSearchParams({
+      where,
+      outFields: safeFieldNames.length ? safeFieldNames.join(",") : "*",
+      returnGeometry: "true",
+      outSR: "4326",
+      resultRecordCount: "2",
+      f: "json"
+    });
+    const viewportParams = new URLSearchParams({
+      where,
+      geometry: BUGESERA_BBOX.join(","),
+      geometryType: "esriGeometryEnvelope",
+      inSR: "4326",
+      outSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      outFields: safeFieldNames.length ? safeFieldNames.join(",") : "*",
+      returnGeometry: "true",
+      resultRecordCount: "2",
+      f: "json"
+    });
+    const [sampleResponse, viewportResponse] = await Promise.all([
+      readJson(layerUrl + "/query?" + sampleParams),
+      readJson(layerUrl + "/query?" + viewportParams)
+    ]);
+    const sample = sampleResponse.data ?? {};
+    const viewport = viewportResponse.data ?? {};
+    const feature = sample.features?.[0] ?? viewport.features?.[0] ?? null;
+    const geometry = feature?.geometry ?? null;
+    parTes = {
+      url: layerUrl,
+      metadata: {
+        httpStatus: metadataResponse.httpStatus,
+        name: metadata.name ?? null,
+        geometryType: metadata.geometryType ?? null,
+        objectIdField,
+        maxRecordCount: metadata.maxRecordCount ?? null,
+        extent: metadata.extent ?? null,
+        spatialReference: metadata.spatialReference ?? null,
+        fields: fieldNames,
+        hasUpi: Boolean(upiField)
+      },
+      sampleQuery: {
+        httpStatus: sampleResponse.httpStatus,
+        elapsedMs: sampleResponse.elapsedMs ?? null,
+        error: sample.error ?? sampleResponse.sample ?? null,
+        returnedFeatures: sample.features?.length ?? null,
+        spatialReference: sample.spatialReference ?? geometry?.spatialReference ?? null,
+        firstAttributes: feature?.attributes ?? null,
+        geometryType: metadata.geometryType ?? null,
+        firstCoordinate: firstCoordinate(geometry),
+        coordinateAssessment: coordinateAssessment(firstCoordinate(geometry))
+      },
+      bugeseraViewportQuery: {
+        bbox: BUGESERA_BBOX,
+        httpStatus: viewportResponse.httpStatus,
+        elapsedMs: viewportResponse.elapsedMs ?? null,
+        error: viewport.error ?? viewportResponse.sample ?? null,
+        returnedFeatures: viewport.features?.length ?? null,
+        firstCoordinate: firstCoordinate(viewport.features?.[0]?.geometry)
+      }
+    };
+  } catch (error) {
+    parTes = { url: layerUrl, error: error instanceof Error ? error.message : String(error) };
+  }
+  return { viewerItems, parTes };
+}
+
 const results = await Promise.all(SOURCES.map(inspectSource));
 const bugeseraViewportLoadTest = await inspectBugeseraViewportLoads();
+const geoDataViewerInvestigation = await inspectGeoDataViewerAndParTes();
 console.log(JSON.stringify({
   checkedAt: new Date().toISOString(),
   results,
-  bugeseraViewportLoadTest
+  bugeseraViewportLoadTest,
+  geoDataViewerInvestigation
 }, null, 2));
 if (results.every((result) => !result.metadata && !result.error)) {
   process.exitCode = 1;
