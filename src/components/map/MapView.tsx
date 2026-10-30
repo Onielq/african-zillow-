@@ -581,28 +581,22 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Esri imagery with subtle road references so roads remain distinguishable in satellite.
+// Satellite mode is imagery only. Keep roads in the separate Hybrid mode so
+// a failed optional reference overlay cannot make satellite imagery look blank.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 23,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
-    },
-    "world-transportation": {
-      type: "raster",
-      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
-      attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     }
   },
   layers: [
-    // Keep these layers visible at parcel zoom; MapLibre overzooms the source's
-    // z19 raster tiles at closer zoom levels rather than hiding them.
-    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
-    { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24, paint: { "raster-opacity": 0.48 } }
+    // The service publishes imagery through z23. Keep the layer visible to
+    // parcel zoom and let MapLibre overzoom only above the provider's max zoom.
+    { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 }
   ]
 };
 
