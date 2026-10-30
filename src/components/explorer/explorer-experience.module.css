@@ -703,56 +703,67 @@
   color: #68766e;
 }
 
-.mapPreview {
-  position: relative;
-  display: grid;
-  min-height: 185px;
-  overflow: hidden;
-  place-items: center;
-  margin-top: 13px;
-  border: 1px solid #dce4de;
-  border-radius: 8px;
-  background:
-    linear-gradient(28deg, transparent 48%, rgb(145 163 151 / 24%) 49%, rgb(145 163 151 / 24%) 50%, transparent 51%),
-    linear-gradient(110deg, transparent 48%, rgb(145 163 151 / 20%) 49%, rgb(145 163 151 / 20%) 50%, transparent 51%),
-    #edf2ee;
-}
-
-.mapPreviewGrid {
-  position: absolute;
-  inset: 0;
-  opacity: .55;
-  background-image: linear-gradient(rgb(184 198 188 / 35%) 1px, transparent 1px), linear-gradient(90deg, rgb(184 198 188 / 35%) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
-
-.mapPreviewInner {
-  position: relative;
+.mapControlRow {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.basemapControls,
+.mapLayerControls {
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
-  color: #34453b;
-  text-align: center;
 }
 
-.mapPreviewInner strong {
-  font-size: 13px;
+.basemapControls button,
+.mapLayerControls button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #dce4de;
+  border-radius: 7px;
+  background: #fff;
+  color: #596861;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
 }
 
-.mapPreviewInner small {
-  color: #68766e;
+.basemapControls button[aria-pressed="true"],
+.mapLayerControls button[aria-pressed="true"] {
+  border-color: #8fb7a0;
+  background: #eaf4ed;
+  color: #176b50;
+}
+
+.mapStatus {
+  flex: 0 0 auto;
+  color: #77847d;
   font-size: 9px;
 }
 
-.mapPin {
-  width: 13px;
-  height: 13px;
-  border: 3px solid #fff;
-  border-radius: 50% 50% 50% 0;
-  background: #176b50;
-  box-shadow: 0 2px 7px rgb(23 35 31 / 20%);
-  transform: rotate(-45deg);
+.mapCanvas {
+  position: relative;
+  height: 350px;
+  overflow: hidden;
+  margin-top: 9px;
+  border: 1px solid #dce4de;
+  border-radius: 9px;
+  background: #e7ede8;
+}
+
+.mapLayerControls {
+  margin-top: 9px;
+}
+
+.mapCaption {
+  margin: 10px 0 12px;
+  color: #77847d;
+  font-size: 9px;
+  line-height: 1.6;
 }
 
 .mapCaption,
