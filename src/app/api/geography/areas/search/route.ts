@@ -148,8 +148,7 @@ function chooseTextFields(fields: FieldMetadata[], candidates: string[]): string
 
 type HierarchyParentLevel = "district" | "sector" | "cell";
 
-function orderedParentMappings(count: number): HierarchyParentLevel[][] {
-  const levels: HierarchyParentLevel[] = ["district", "sector", "cell"];
+function orderedParentMappings(levels: HierarchyParentLevel[], count: number): HierarchyParentLevel[][] {
   const mappings: HierarchyParentLevel[][] = [];
   for (let mask = 1; mask < 1 << levels.length; mask += 1) {
     const mapping = levels.filter((_, index) => Boolean(mask & (1 << index)));
@@ -158,21 +157,33 @@ function orderedParentMappings(count: number): HierarchyParentLevel[][] {
   return mappings;
 }
 
-function hierarchyPathWhere(fields: FieldMetadata[], pathTokens: string[]): string | null {
-  if (pathTokens.length < 2 || pathTokens.length > 4) return null;
-  const candidates = CANDIDATES.village;
+function hierarchyPathWhere(
+  fields: FieldMetadata[],
+  pathTokens: string[],
+  level: AdminAreaLevel
+): string | null {
+  const parentLevels: HierarchyParentLevel[] = level === "cell"
+    ? ["district", "sector"]
+    : level === "village"
+      ? ["district", "sector", "cell"]
+      : level === "sector"
+        ? ["district"]
+        : [];
+  if (pathTokens.length < 1 || pathTokens.length > parentLevels.length) return null;
+
+  const candidates = CANDIDATES[level];
   const firstTokenIsDistrict = PILOT_DISTRICTS.has(normalizeDistrictKey(pathTokens[0]));
-  const mappings = orderedParentMappings(pathTokens.length - 1).filter((mapping) =>
+  const mappings = orderedParentMappings(parentLevels, pathTokens.length).filter((mapping) =>
     !firstTokenIsDistrict || mapping[0] === "district"
   );
   const alternatives = mappings.flatMap((mapping) => {
-    const conditions = mapping.map((level, index) => {
-      const fieldNames = chooseTextFields(fields, candidates[level]);
+    const conditions = mapping.map((parentLevel, index) => {
+      const fieldNames = chooseTextFields(fields, candidates[parentLevel]);
       if (fieldNames.length === 0) return null;
       let token = pathTokens[index].trim();
-      if (level === "district") token = token.replace(/\s+district$/i, "").trim();
+      if (parentLevel === "district") token = token.replace(/\\s+district$/i, "").trim();
       const escaped = token.toLocaleUpperCase("en").replace(/'/g, "''");
-      const values = level === "district" ? [escaped, escaped + " DISTRICT"] : [escaped];
+      const values = parentLevel === "district" ? [escaped, escaped + " DISTRICT"] : [escaped];
       return "(" + fieldNames.map((field) =>
         "(" + values.map((value) => "UPPER(" + field + ") = '" + value + "'").join(" OR ") + ")"
       ).join(" OR ") + ")";
@@ -182,6 +193,29 @@ function hierarchyPathWhere(fields: FieldMetadata[], pathTokens: string[]): stri
       : [];
   });
   return alternatives.length > 0 ? "(" + alternatives.join(" OR ") + ")" : null;
+}
+
+function identifierListWhere(
+  fields: FieldMetadata[],
+  candidates: string[],
+  values: string[]
+): string | null {
+  if (values.length === 0) return null;
+  const fieldName = chooseField(fields, candidates);
+  if (!fieldName) return null;
+  const metadata = fields.find((field) => field.name === fieldName);
+  const type = metadata?.type?.toLowerCase() ?? "";
+  const isNumeric = type.includes("oid") || type.includes("integer") ||
+    type.includes("double") || type.includes("smallinteger");
+  const literals = values.map((raw) => {
+    if (isNumeric) {
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) ? String(numeric) : null;
+    }
+    return "'" + raw.replace(/'/g, "''") + "'";
+  });
+  if (literals.some((literal) => literal === null)) return null;
+  return fieldName + " IN (" + literals.join(",") + ")";
 }
 
 function collectCoordinates(value: unknown, output: Array<[number, number]>): void {
@@ -267,7 +301,8 @@ async function searchLayer(
   level: AdminAreaLevel,
   layerId: number,
   query: string,
-  hierarchyPathTokens?: string[]
+  hierarchyPathTokens?: string[],
+  parentCellIds?: string[]
 ): Promise<SearchArea[]> {
   const layerUrl = baseUrl + "/" + layerId;
   const metadata = await getLayerMetadata(layerUrl);
@@ -299,10 +334,17 @@ async function searchLayer(
       ).join(" OR ") + ")";
   const scopeToMappedDistricts = (where: string) =>
     "(" + districtScopeWhere + ") AND (" + where + ")";
-  const hierarchyWhere = hierarchyPathTokens
-    ? hierarchyPathWhere(fields, hierarchyPathTokens)
+  const hierarchyWhere = hierarchyPathTokens?.length
+    ? hierarchyPathWhere(fields, hierarchyPathTokens, level)
     : null;
-  if (hierarchyPathTokens && !hierarchyWhere) return [];
+  const parentCellIdWhere = parentCellIds?.length
+    ? identifierListWhere(fields, candidate.ids.cell, parentCellIds)
+    : null;
+  if ((hierarchyPathTokens?.length && !hierarchyWhere) || (parentCellIds?.length && !parentCellIdWhere)) return [];
+  const hierarchyConditions = [hierarchyWhere, parentCellIdWhere].filter(
+    (condition): condition is string => Boolean(condition)
+  );
+  const hierarchyFilter = hierarchyConditions.length ? hierarchyConditions.join(" AND ") : null;
 
   // ArcGIS SQL comparison can be case-sensitive on these published layers.
   // Normalise both sides in SQL so lowercase, uppercase, and mixed-case input behave alike.
@@ -355,7 +397,7 @@ async function searchLayer(
   // exact administrative name ahead of similarly named villages and prevents
   // common short prefixes from hiding the place the user actually typed.
   const withHierarchy = (where: string) =>
-    scopeToMappedDistricts(hierarchyWhere ? "(" + hierarchyWhere + ") AND (" + where + ")" : where);
+    scopeToMappedDistricts(hierarchyFilter ? "(" + hierarchyFilter + ") AND (" + where + ")" : where);
   const [prefixPayload, containsPayload] = await Promise.all([
     queryLayer(withHierarchy(prefixWhere)),
     queryLayer(withHierarchy(containsWhere))
@@ -405,6 +447,67 @@ async function searchLayer(
       center: null
     }];
   });
+}
+
+async function searchVillageHierarchy(
+  source: SourceId,
+  baseUrl: string,
+  layers: Record<AdminAreaLevel, number>,
+  pathTokens: string[]
+): Promise<SearchArea[]> {
+  const villageName = pathTokens.at(-1) ?? "";
+  const parentTokens = pathTokens.slice(0, -1);
+  if (!villageName || parentTokens.length === 0) return [];
+
+  const firstTokenIsDistrict = PILOT_DISTRICTS.has(normalizeDistrictKey(parentTokens[0]));
+  const hasCellPath = (
+    (parentTokens.length === 1 && !firstTokenIsDistrict) ||
+    (parentTokens.length === 2 && !firstTokenIsDistrict) ||
+    parentTokens.length === 3
+  );
+
+  if (!hasCellPath) {
+    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens);
+  }
+
+  // Some Bugesera village polygons carry cell_id but omit the cell name.
+  // Resolve the visible cell name against the parent cell layer first, then
+  // use those official IDs to filter the village layer.
+  const cellName = parentTokens.at(-1) ?? "";
+  const cellParentTokens = parentTokens.slice(0, -1);
+  const cells = await searchLayer(
+    source,
+    baseUrl,
+    "cell",
+    layers.cell,
+    cellName,
+    cellParentTokens.length ? cellParentTokens : undefined
+  );
+  const cellIds = Array.from(new Set(cells.map((area) => area.cellId).filter(
+    (id): id is string => Boolean(id)
+  )));
+  if (cellIds.length === 0) {
+    // A source that repeats its cell name in village records can still resolve
+    // the path directly; never invent an ID when the cell layer omits one.
+    return searchLayer(source, baseUrl, "village", layers.village, villageName, parentTokens);
+  }
+
+  const villages = await searchLayer(
+    source,
+    baseUrl,
+    "village",
+    layers.village,
+    villageName,
+    cellParentTokens.length ? cellParentTokens : undefined,
+    cellIds
+  );
+  const cellNameById = new Map(cells.flatMap((area) =>
+    area.cellId ? [[area.cellId, area.name] as const] : []
+  ));
+  return villages.map((area) => ({
+    ...area,
+    cell: area.cell ?? (area.cellId ? cellNameById.get(area.cellId) ?? null : null)
+  }));
 }
 
 async function resolveAdminAreaGeometry(
@@ -887,14 +990,9 @@ export async function GET(request: NextRequest) {
       ? ([["village", source.layers.village]] as Array<[AdminAreaLevel, number]>)
       : (Object.entries(source.layers) as Array<[AdminAreaLevel, number]>);
     return levels.map(([level, layerId]) =>
-      searchLayer(
-        sourceId,
-        source.baseUrl,
-        level,
-        layerId,
-        administrativeNameQuery,
-        hierarchySearchTokens ?? undefined
-      )
+      (hierarchySearchTokens
+        ? searchVillageHierarchy(sourceId, source.baseUrl, source.layers, hierarchySearchTokens)
+        : searchLayer(sourceId, source.baseUrl, level, layerId, administrativeNameQuery))
         .then((areas) => ({ areas, failed: false, kind: "administrative" as const }))
         .catch((error) => {
           console.error("Mapped administrative search failed for " + sourceId + " " + level + ".", error);
