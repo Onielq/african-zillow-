@@ -2736,6 +2736,7 @@ export function MapView({
         return;
       }
       if (styleLoaded) {
+        basemapTileErrorRef.current = true;
         onStatusChange("error");
         return;
       }
