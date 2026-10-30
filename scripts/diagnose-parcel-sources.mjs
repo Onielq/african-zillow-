@@ -356,6 +356,55 @@ async function inspectGeoDataViewerAndParTes() {
   return { viewerItems, parTes };
 }
 
+async function inspectNisrVillageBoundaryFallback() {
+  const layerUrl = "https://geodata.rw/server/rest/services/village_boundary/FeatureServer/2";
+  try {
+    const metadataResponse = await readJson(layerUrl + "?f=json");
+    const metadata = metadataResponse.data ?? {};
+    const fieldNames = (metadata.fields ?? []).map((field) => field.name);
+    const where = [
+      "UPPER(district) = 'BUGESERA'",
+      "UPPER(sector) = 'RUHUHA'",
+      "UPPER(cell) = 'KINDAMA'",
+      "UPPER(village) = 'REBERO'"
+    ].join(" AND ");
+    const params = new URLSearchParams({
+      where,
+      outFields: "objectid,province,province_id,district,district_id,sector,sector_id,cell,cell_id,village,village_id",
+      returnGeometry: "true",
+      outSR: "4326",
+      resultRecordCount: "10",
+      f: "json"
+    });
+    const queryResponse = await readJson(layerUrl + "/query?" + params);
+    const payload = queryResponse.data ?? {};
+    const features = payload.features ?? [];
+    return {
+      url: layerUrl,
+      metadataHttpStatus: metadataResponse.httpStatus,
+      metadataError: metadata.error ?? metadataResponse.sample ?? null,
+      layerName: metadata.name ?? null,
+      geometryType: metadata.geometryType ?? null,
+      objectIdField: metadata.objectIdField ?? null,
+      fields: fieldNames,
+      query: {
+        where,
+        httpStatus: queryResponse.httpStatus,
+        elapsedMs: queryResponse.elapsedMs ?? null,
+        error: payload.error ?? queryResponse.sample ?? null,
+        returnedFeatures: features.length,
+        results: features.slice(0, 10).map((feature) => ({
+          attributes: feature.attributes ?? {},
+          geometryType: feature.geometry?.rings ? "rings" : feature.geometry?.coordinates ? "coordinates" : null,
+          firstCoordinate: firstCoordinate(feature.geometry)
+        }))
+      }
+    };
+  } catch (error) {
+    return { url: layerUrl, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function inspectBugeseraAdministrativeHierarchy() {
   const layers = [
     {
@@ -425,12 +474,14 @@ const results = await Promise.all(SOURCES.map(inspectSource));
 const bugeseraViewportLoadTest = await inspectBugeseraViewportLoads();
 const geoDataViewerInvestigation = await inspectGeoDataViewerAndParTes();
 const bugeseraAdministrativeHierarchy = await inspectBugeseraAdministrativeHierarchy();
+const nisrVillageBoundaryFallback = await inspectNisrVillageBoundaryFallback();
 console.log(JSON.stringify({
   checkedAt: new Date().toISOString(),
   results,
   bugeseraViewportLoadTest,
   geoDataViewerInvestigation,
-  bugeseraAdministrativeHierarchy
+  bugeseraAdministrativeHierarchy,
+  nisrVillageBoundaryFallback
 }, null, 2));
 if (results.every((result) => !result.metadata && !result.error)) {
   process.exitCode = 1;
