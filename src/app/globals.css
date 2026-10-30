@@ -15,7 +15,7 @@
   --palette-forest: #176B50;
   --palette-forest-hover: #12563F;
   --palette-forest-tint: #E7F3EC;
-  --palette-focus: #2563EB;
+  --palette-focus: #176B50;
   --palette-warning: #A15C07;
   --palette-success: #18794E;
   --palette-map-canvas: #E7EDE8;
@@ -43,7 +43,7 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --text-compact: 12px;
   --text-ui: 14px;
   --text-section: 16px;
@@ -103,6 +103,7 @@ button:disabled {
   flex-direction: column;
   width: 100%;
   height: 100svh;
+  height: 100dvh;
   min-height: 520px;
   overflow: hidden;
   background: var(--canvas);
@@ -4074,5 +4075,52 @@ input {
 
   .parcel-price-kpi .parcel-price-headline .parcel-price-value {
     font-size: 21px;
+  }
+}
+
+
+/* Shared finishing layer: consistent focus, readable data and restrained interaction. */
+:where(button, a, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline-color: var(--brand);
+}
+
+:where(input, select, textarea) {
+  accent-color: var(--brand);
+}
+
+:where(.map-status-card, .map-floating-toolbar, .data-note, .parcel-price-kpi) {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+:where(.map-status-card, .data-note) {
+  border-color: rgb(185 199 190 / 72%);
+}
+
+:where(.toolbar-action, .mode-chip, .compare-control, .maplibregl-ctrl-group button) {
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+:where(.toolbar-action, .mode-chip, .compare-control):not(:disabled):hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-muted);
+  color: var(--ink);
+}
+
+:where(.maplibregl-ctrl-group button):hover {
+  background-color: var(--brand-tint) !important;
+}
+
+:where(.parcel-price-value, .metric-value, .toolbar-count, .summary strong) {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.toolbar-action, .mode-chip, .compare-control, .maplibregl-ctrl-group button) {
+    transition: none;
   }
 }
