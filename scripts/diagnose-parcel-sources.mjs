@@ -356,14 +356,82 @@ async function inspectGeoDataViewerAndParTes() {
   return { viewerItems, parTes };
 }
 
+async function inspectBugeseraAdministrativeHierarchy() {
+  const layers = [
+    {
+      id: "bugesera-cell-layer",
+      level: "cell",
+      url: "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer/3",
+      searchTerms: ["KINDAMA"]
+    },
+    {
+      id: "bugesera-village-layer",
+      level: "village",
+      url: "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer/5",
+      searchTerms: ["REBERO"]
+    }
+  ];
+  return Promise.all(layers.map(async (layer) => {
+    try {
+      const metadataResponse = await readJson(layer.url + "?f=json");
+      const metadata = metadataResponse.data ?? {};
+      const fields = metadata.fields ?? [];
+      const nameCandidates = layer.level === "cell"
+        ? ["cell", "cell_name", "cell_1", "cellule_1", "name", "name_e"]
+        : ["village", "village_name", "village_1", "name", "name_e"];
+      const nameField = fields.find((field) =>
+        nameCandidates.some((candidate) =>
+          candidate.toLowerCase().replace(/[^a-z0-9]/g, "") === String(field.name).toLowerCase().replace(/[^a-z0-9]/g, "")
+        ) && String(field.type ?? "").toLowerCase().includes("string")
+      )?.name ?? null;
+      const queryResults = [];
+      for (const term of layer.searchTerms) {
+        if (!nameField) {
+          queryResults.push({ term, error: "No matching string name field found." });
+          continue;
+        }
+        const params = new URLSearchParams({
+          where: "UPPER(" + nameField + ") = '" + term.replace(/'/g, "''") + "' OR UPPER(" + nameField + ") LIKE '" + term.replace(/'/g, "''") + "%'",
+          outFields: "*",
+          returnGeometry: "false",
+          resultRecordCount: "8",
+          f: "json"
+        });
+        const response = await readJson(layer.url + "/query?" + params);
+        queryResults.push({
+          term,
+          httpStatus: response.httpStatus,
+          error: response.data?.error ?? response.sample ?? null,
+          returnedFeatures: response.data?.features?.length ?? null,
+          records: (response.data?.features ?? []).slice(0, 8).map((feature) => feature.attributes ?? {})
+        });
+      }
+      return {
+        id: layer.id,
+        url: layer.url,
+        metadataHttpStatus: metadataResponse.httpStatus,
+        layerName: metadata.name ?? null,
+        geometryType: metadata.geometryType ?? null,
+        objectIdField: metadata.objectIdField ?? null,
+        fields: fields.map((field) => ({ name: field.name, type: field.type, alias: field.alias })),
+        queryResults
+      };
+    } catch (error) {
+      return { id: layer.id, url: layer.url, error: error instanceof Error ? error.message : String(error) };
+    }
+  }));
+}
+
 const results = await Promise.all(SOURCES.map(inspectSource));
 const bugeseraViewportLoadTest = await inspectBugeseraViewportLoads();
 const geoDataViewerInvestigation = await inspectGeoDataViewerAndParTes();
+const bugeseraAdministrativeHierarchy = await inspectBugeseraAdministrativeHierarchy();
 console.log(JSON.stringify({
   checkedAt: new Date().toISOString(),
   results,
   bugeseraViewportLoadTest,
-  geoDataViewerInvestigation
+  geoDataViewerInvestigation,
+  bugeseraAdministrativeHierarchy
 }, null, 2));
 if (results.every((result) => !result.metadata && !result.error)) {
   process.exitCode = 1;
