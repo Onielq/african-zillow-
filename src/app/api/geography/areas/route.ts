@@ -906,9 +906,17 @@ async function queryParcelBounds(
     const isTransientUpstreamFailure =
       /ArcGIS layer request failed \((?:502|503|504)\)/.test(errorMessage) ||
       /timeout|timed out|fetch failed|ECONNRESET|EAI_AGAIN|aborted/i.test(errorName + " " + errorMessage);
-    if (isTransientUpstreamFailure || depth >= 2 || area <= 0.00002) {
+    if (depth >= 2 || area <= 0.00002) {
       console.error("Cadastral parcel GIS tile failed for " + provider.id + ".", error);
       return { features: [], failed: true };
+    }
+
+    if (isTransientUpstreamFailure) {
+      // A transient timeout on one narrow viewport does not prove that the
+      // whole parcel source is unavailable. Retry it as smaller adjacent tiles;
+      // the previous early return caused one failed tile to blank the entire
+      // Bugesera parcel layer even when neighbouring requests could succeed.
+      console.warn("Retrying cadastral parcel GIS tile with smaller bounds for " + provider.id + ".", error);
     }
 
     return queryParcelChildren(provider, splitBounds, depth + 1, budget);
