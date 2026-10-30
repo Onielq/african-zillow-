@@ -1352,6 +1352,24 @@ export function MapExperience() {
     return () => context.revert();
   }, [selectedArea]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const areaSearch = params.get("areaSearch");
+    if (!areaSearch) return;
+
+    setWorkspaceMode("areas");
+    setSelectedArea(null);
+    setGlobalSearch(areaSearch);
+    setGlobalSearchOpen(true);
+
+    params.delete("areaSearch");
+    const remainingQuery = params.toString();
+    const cleanUrl = window.location.pathname +
+      (remainingQuery ? "?" + remainingQuery : "") +
+      window.location.hash;
+    window.history.replaceState(window.history.state, "", cleanUrl);
+  }, []);
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -1388,6 +1406,9 @@ export function MapExperience() {
             </svg>
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
+          <Link className="compare-control" href="/explorer">
+            Explorer
+          </Link>
           <Link className="compare-control" href="/data-sources">
             Data sources
           </Link>
