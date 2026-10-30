@@ -765,7 +765,6 @@
 /* Keep the directory experience aligned with the map workspace. */
 .page {
   min-height: 100dvh;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .navigation a {
