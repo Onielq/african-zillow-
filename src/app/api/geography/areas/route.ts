@@ -871,7 +871,7 @@ async function queryParcelBounds(
     const features = await queryArcGisLayer(
       provider.layerUrl,
       bounds,
-      80,
+      25,
       "upi IS NOT NULL",
       "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
       180,
@@ -879,10 +879,10 @@ async function queryParcelBounds(
     );
 
     // Keep each full-geometry response small enough for the public Bugesera
-    // service to answer reliably. When a tile fills this 80-feature batch,
-    // subdivide it and keep the smaller child results instead of retrying a
-    // large response that has timed out in production.
-    if (features.length >= 80 && depth < 3 && budget.remaining >= 64 && splitBounds.length > 0) {
+    // service to answer reliably. A 25-feature query is consistently faster
+    // than 80-feature responses; subdivide a full tile and merge the children
+    // so this smaller response limit does not silently omit parcel coverage.
+    if (features.length >= 25 && depth < 3 && budget.remaining >= 64 && splitBounds.length > 0) {
       const splitResult = await queryParcelChildren(provider, splitBounds, depth + 1, budget);
       if (splitResult.features.length > 0 || !splitResult.failed) return splitResult;
 
