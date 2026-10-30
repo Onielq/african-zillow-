@@ -277,15 +277,39 @@ async function getLayerMetadata(url: string): Promise<LayerMetadata> {
   let pending = metadataCache.get(url);
   if (!pending) {
     pending = (async () => {
-      const response = await fetch(url + "?f=json", {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 86400 },
-        signal: AbortSignal.timeout(8000)
-      });
-      if (!response.ok) throw new Error("GIS layer metadata unavailable (" + response.status + ")");
-      const data = await response.json() as LayerMetadata;
-      if (data.error) throw new Error(data.error.message ?? "GIS layer metadata failed");
-      return data;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const response = await fetch(url + "?f=json", {
+            headers: { Accept: "application/json" },
+            next: { revalidate: 86400 },
+            signal: AbortSignal.timeout(8000)
+          });
+          if (!response.ok) {
+            const transient = [429, 500, 502, 503, 504].includes(response.status);
+            if (transient && attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 350));
+              continue;
+            }
+            throw new Error("GIS layer metadata unavailable (" + response.status + ")");
+          }
+          const data = await response.json() as LayerMetadata;
+          if (data.error) {
+            const code = Number((data.error as { code?: number }).code);
+            if ([429, 500, 502, 503, 504].includes(code) && attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 350));
+              continue;
+            }
+            throw new Error(data.error.message ?? "GIS layer metadata failed");
+          }
+          return data;
+        } catch (error) {
+          lastError = error;
+          if (attempt >= 2) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("GIS layer metadata failed.");
     })().catch((error) => {
       metadataCache.delete(url);
       throw error;
