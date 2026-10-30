@@ -930,7 +930,13 @@ test("global search returns navigable areas, resolves addresses on submit and hi
 
   assert.ok(search.includes("addressOnly"));
   assert.ok(search.includes("OpenStreetMap Nominatim geocoding"));
+  assert.ok(search.includes("hierarchyPathWhere"));
+  assert.ok(search.includes("orderedParentMappings"));
+  assert.ok(search.includes("hierarchySearchTokens"));
+  assert.ok(search.includes("administrativeNameQuery"));
   assert.ok(search.includes("PILOT_DISTRICTS.has(normalizeDistrictKey(district))"));
+  assert.ok(experience.includes("const administrativeResult ="));
+  assert.ok(experience.includes("!isFullUpi && !administrativeResult"));
   assert.ok(search.includes("boundsFromGeometry"));
   assert.ok(search.includes("centerFromBounds"));
   assert.ok(search.includes('returnGeometry: "true"'));
