@@ -39,7 +39,7 @@ jobs:
         run: |
           npm run start -- --hostname 127.0.0.1 > /tmp/parcel-app.log 2>&1 &
           sleep 4
-          node scripts/smoke-test-admin-path-search.mjs
+          node scripts/smoke-test-admin-path-search.mjs || { tail -n 160 /tmp/parcel-app.log; exit 1; }
           node scripts/smoke-test-parcel-api.mjs
       # Run the public GIS probes even if the production smoke test fails;
       # otherwise the first HTTP 502 masks whether the upstream parcel services
