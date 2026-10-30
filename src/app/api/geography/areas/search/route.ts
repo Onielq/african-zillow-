@@ -7,6 +7,10 @@ const KIGALI_MAP_SERVER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer";
 const BUGESERA_MAP_SERVER =
   "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer";
+const BUGESERA_NISR_VILLAGE_FEATURE_SERVER =
+  "https://geodata.rw/server/rest/services/village_boundary/FeatureServer";
+const BUGESERA_NISR_VILLAGE_LAYER =
+  BUGESERA_NISR_VILLAGE_FEATURE_SERVER + "/2";
 const KIGALI_PARCELS =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
 const BUGESERA_PARCELS =
@@ -477,7 +481,9 @@ async function searchLayer(
       averageLandPricePerM2: level === "district" ? DISTRICT_PRICE_SNAPSHOTS[normalizeDistrictKey(district)] ?? null : null,
       sourceLabel: source === "kigali"
         ? "Kigali City Master Plan administrative boundaries"
-        : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
+        : baseUrl === BUGESERA_NISR_VILLAGE_FEATURE_SERVER
+          ? "NISR 2022 Census · Rwanda village boundary layer"
+          : "Geodata Rwanda Bugesera Masterplan administrative boundaries",
       sourceType: "administrative-boundary" as const,
       mapSourceId: source,
       sourceObjectId,
@@ -496,6 +502,24 @@ async function searchVillageHierarchy(
   const villageName = pathTokens.at(-1) ?? "";
   const parentTokens = pathTokens.slice(0, -1);
   if (!villageName || parentTokens.length === 0) return [];
+
+  // The old Bugesera Masterplan overlay service intermittently returns HTTP 500
+  // for both its cell and village layer metadata. The public NISR 2022 village
+  // layer contains village names plus district/sector/cell names and official
+  // IDs in one FeatureServer layer, so query that authoritative hierarchy
+  // directly instead of making two fragile MapServer calls.
+  if (source === "bugesera") {
+    return searchLayer(
+      source,
+      BUGESERA_NISR_VILLAGE_FEATURE_SERVER,
+      "village",
+      2,
+      villageName,
+      parentTokens,
+      undefined,
+      true
+    );
+  }
 
   const firstTokenIsDistrict = PILOT_DISTRICTS.has(normalizeDistrictKey(parentTokens[0]));
   const hasCellPath = (
@@ -526,14 +550,6 @@ async function searchVillageHierarchy(
   const cellIds = Array.from(new Set(cells.map((area) => area.cellId).filter(
     (id): id is string => Boolean(id)
   )));
-  console.info("Administrative hierarchy cell lookup.", {
-    source,
-    pathTokens,
-    cellName,
-    cellParentTokens,
-    cellMatches: cells.map((area) => ({ name: area.name, cellId: area.cellId, district: area.district, sector: area.sector })),
-    cellIds
-  });
   if (cellIds.length === 0) {
     // A source that repeats its cell name in village records can still resolve
     // the path directly; never invent an ID when the cell layer omits one.
@@ -553,12 +569,6 @@ async function searchVillageHierarchy(
   const cellNameById = new Map(cells.flatMap((area) =>
     area.cellId ? [[area.cellId, area.name] as const] : []
   ));
-  console.info("Administrative hierarchy village lookup.", {
-    source,
-    villageName,
-    cellIds,
-    villageMatches: villages.map((area) => ({ name: area.name, cellId: area.cellId, district: area.district, sector: area.sector, cell: area.cell }))
-  });
   return villages.map((area) => ({
     ...area,
     cell: area.cell ?? (area.cellId ? cellNameById.get(area.cellId) ?? null : null)
@@ -581,7 +591,9 @@ async function resolveAdminAreaGeometry(
   }
 ): Promise<{ bounds: [number, number, number, number]; center: [number, number] }> {
   const sourceConfig = ADMIN_MAP_SOURCES[source];
-  const layerUrl = sourceConfig.baseUrl + "/" + sourceConfig.layers[level];
+  const layerUrl = source === "bugesera" && level === "village"
+    ? BUGESERA_NISR_VILLAGE_LAYER
+    : sourceConfig.baseUrl + "/" + sourceConfig.layers[level];
   const metadata = await getLayerMetadata(layerUrl);
   const fields = metadata.fields ?? [];
   const candidates = CANDIDATES[level];
