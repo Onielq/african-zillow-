@@ -285,7 +285,9 @@ async function getLayerMetadata(url: string): Promise<LayerMetadata> {
               Accept: "application/json",
               "User-Agent": "RwandaLandIntelligenceMap/administrative-search"
             },
-            next: { revalidate: 86400 },
+            // The module-level promise cache below stores successful metadata.
+            // Do not let Next's shared Data Cache retain a transient GIS 500.
+            cache: "no-store",
             signal: AbortSignal.timeout(8000)
           });
           if (!response.ok) {
