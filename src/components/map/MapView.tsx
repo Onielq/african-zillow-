@@ -2944,7 +2944,7 @@ export function MapView({
             const rawName = [properties.name, properties.name_en, properties.name_local, properties.operator]
               .find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null;
             const geometryKey = geometry.type === "Point"
-              ? JSON.stringify((geometry as Extract<Geometry, { type: "Point" }>).coordinates.map((value) => Number(value.toFixed(5)))
+              ? JSON.stringify((geometry as Extract<Geometry, { type: "Point" }>).coordinates.map((value) => Number(value.toFixed(5))))
               : String(item.id ?? rawName ?? index);
             const fallbackId = "vector-" + layer.category + "-" + layer.id + "-" + String(item.id ?? geometryKey);
             const dedupeKey = layer.category + "|" + layer.id + "|" + geometryKey;
