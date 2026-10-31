@@ -404,18 +404,12 @@ export async function GET(request: NextRequest) {
     // failing as a unit on the initial Rwanda-wide view, hiding every category.
     // The lighter groups can now succeed independently.
     const pointOfInterestCategories = categories.filter((category) => category !== "transportation");
-    const queryGroups: Array<{ categories: OverlayCategory[]; query: string }> = [];
+    const queryGroups: Array<{ categories: OverlayCategory[] }> = [];
     if (pointOfInterestCategories.length > 0) {
-      queryGroups.push({
-        categories: pointOfInterestCategories,
-        query: ""
-      });
+      queryGroups.push({ categories: pointOfInterestCategories });
     }
     if (categories.includes("transportation")) {
-      queryGroups.push({
-        categories: ["transportation"],
-        query: ""
-      });
+      queryGroups.push({ categories: ["transportation"] });
     }
 
     let successfulQueries = 0;
@@ -425,9 +419,7 @@ export async function GET(request: NextRequest) {
     const collections = await Promise.all(targetBounds.map(async (target) => {
       const jobs = queryGroups.map((group) => ({
         categories: group.categories,
-        query: group.categories.includes("transportation")
-          ? queryFor(["transportation"], target, false)
-          : queryFor(pointOfInterestCategories, target, false)
+        query: queryFor(group.categories, target, false)
       }));
       const results = await Promise.all(jobs.map(async (job) => {
         try {
