@@ -121,7 +121,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
   }
 
   const output = outputGeometry ? "out center geom tags;" : "out center tags;";
-  return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\n" + output;
+  return "[out:json][timeout:5];\n(\n" + selections.join("\n") + "\n);\n" + output;
 }
 
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
