@@ -535,7 +535,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
   return [
     "case",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
+    ["boolean", ["feature-state", "hover"], false], "#4FD58A",
     showPrice
       ? [
           "case",
@@ -550,7 +550,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
   ["boolean", ["feature-state", "selected"], false], 0.44,
-  ["boolean", ["feature-state", "hover"], false], 0.40,
+  ["boolean", ["feature-state", "hover"], false], 0.34,
   0.10
 ] as never;
 
@@ -1685,7 +1685,7 @@ export function MapView({
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? "#00EFFF" : "#45EFAF",
               ["boolean", ["feature-state", "hover"], false],
-              "#42F0A8",
+              "#26D978",
               "rgba(0,0,0,0)"
             ],
             "line-width": [
@@ -1693,7 +1693,7 @@ export function MapView({
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? 15 : 9,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 0 : level === "district" ? 9 : level === "sector" ? 8 : level === "cell" ? 7 : 6,
+              level === "parcel" ? 0 : level === "district" ? 11 : level === "sector" ? 9 : level === "cell" ? 8 : 7,
               0
             ],
             "line-blur": [
@@ -1701,7 +1701,7 @@ export function MapView({
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? 6.2 : 4.2,
               ["boolean", ["feature-state", "hover"], false],
-              level === "district" ? 4.5 : level === "sector" ? 4.0 : level === "cell" ? 3.6 : 3.2,
+              level === "district" ? 4.8 : level === "sector" ? 4.2 : level === "cell" ? 3.8 : 3.4,
               0
             ],
             "line-opacity": [
@@ -1746,7 +1746,7 @@ export function MapView({
               ["boolean", ["feature-state", "selected"], false],
               level === "parcel" ? 5.0 : 4.0,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.6 : level === "district" ? 4.2 : level === "sector" ? 3.8 : level === "cell" ? 3.4 : 3.0,
+              level === "parcel" ? 1.6 : level === "district" ? 4.8 : level === "sector" ? 4.4 : level === "cell" ? 4.0 : 3.6,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
@@ -3321,8 +3321,16 @@ export function MapView({
             clearTimeout(initialOverlayIdleFallbackTimer);
             initialOverlayIdleFallbackTimer = null;
           }
-          scheduleShowOverlayRefresh();
+          // The first idle frame is the reliable point at which the initial
+          // camera has settled. Load the default place layers now, rather than
+          // depending on a later user toggle or pan to start their first fetch.
+          if (showOverlayScheduleTimer !== null) {
+            clearTimeout(showOverlayScheduleTimer);
+            showOverlayScheduleTimer = null;
+          }
+          void refreshShowOverlays();
         }
+
         const level = activeAreaLevel(map.getZoom());
         const activeFeatures = areaDataRef.current[level]?.features.length ?? 0;
         const parcelFeatures = areaDataRef.current.parcel?.features.length ?? 0;
@@ -3332,17 +3340,22 @@ export function MapView({
           activeLevel: level,
           activeFeatures,
           parcelFeatures,
-          needsRefresh
+          needsRefresh,
+          initialIdle: initialMapIdleReached
         });
-        if (needsRefresh) {
-          // The idle fallback can race with a delayed moveend/zoomend refresh.
-          // Cancel that queued timer before starting the immediate refresh;
-          // otherwise the timer fires moments later and aborts this request set.
+
+        // Run one immediate viewport check on the first settled frame. The
+        // in-flight refresh key prevents this from duplicating an identical
+        // request that began in style.load. Later idle frames only retry when
+        // the active boundary source is still empty.
+        if (needsRefresh || initialMapIdleReached) {
           if (refreshTimer !== null) {
             clearTimeout(refreshTimer);
             refreshTimer = null;
           }
           void refreshAreas();
+          refreshMetricBubbles();
+          updateLayerVisibility();
         }
       });
 
