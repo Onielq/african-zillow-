@@ -278,24 +278,36 @@ function pointInDistrictAreas(point: [number, number], areas: DistrictAreaFeatur
 async function getPilotDistrictFeatures(request: NextRequest): Promise<DistrictAreaFeature[]> {
   if (!pilotDistrictFeaturesPromise) {
     pilotDistrictFeaturesPromise = (async () => {
-      const url = new URL("/api/geography/areas", request.url);
-      url.searchParams.set("level", "district");
-      url.searchParams.set("bbox", PILOT_DISTRICT_BOUNDS.join(","));
-      const response = await fetch(url, {
-        headers: { Accept: "application/geo+json, application/json" },
-        next: { revalidate: 300 },
-        signal: AbortSignal.timeout(30000)
-      });
-      if (!response.ok) throw new Error("Pilot district boundary query returned HTTP " + response.status);
-      const payload = await response.json() as { features?: DistrictAreaFeature[] };
-      const features = (payload.features ?? []).filter((feature) => {
+      // Match the two source-specific requests used by the map itself. The
+      // combined GIS request can fail as a whole if either provider times out,
+      // even though the other provider and its district polygons are healthy.
+      const sourceIds = ["kigali", "bugesera"] as const;
+      const sourceFeatures = await Promise.all(sourceIds.map(async (sourceId) => {
+        const url = new URL("/api/geography/areas", request.url);
+        url.searchParams.set("level", "district");
+        url.searchParams.set("source", sourceId);
+        url.searchParams.set("bbox", PILOT_DISTRICT_BOUNDS.join(","));
+        const response = await fetch(url, {
+          headers: { Accept: "application/geo+json, application/json" },
+          next: { revalidate: 300 },
+          signal: AbortSignal.timeout(18000)
+        });
+        if (!response.ok) {
+          throw new Error("Pilot " + sourceId + " district boundary query returned HTTP " + response.status);
+        }
+        const payload = await response.json() as { features?: DistrictAreaFeature[]; error?: string };
+        if (payload.error) throw new Error("Pilot " + sourceId + " district boundary query: " + payload.error);
+        return payload.features ?? [];
+      }));
+      const features = sourceFeatures.flat().filter((feature) => {
         const district = String(feature.properties?.district ?? "").trim().toLowerCase();
         return PILOT_DISTRICT_NAMES.has(district) && feature.geometry !== null;
       });
-      if (![...KIGALI_DISTRICT_NAMES, "bugesera"].every((district) =>
-        features.some((feature) => String(feature.properties?.district ?? "").trim().toLowerCase() === district)
-      )) {
-        throw new Error("One or more pilot district boundaries are missing; map overlays will fail closed.");
+      const missing = [...KIGALI_DISTRICT_NAMES, "bugesera"].filter((district) =>
+        !features.some((feature) => String(feature.properties?.district ?? "").trim().toLowerCase() === district)
+      );
+      if (missing.length > 0) {
+        throw new Error("Pilot district boundary coverage is missing: " + missing.join(", "));
       }
       return features;
     })().catch((error) => {
