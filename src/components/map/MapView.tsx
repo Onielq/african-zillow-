@@ -550,7 +550,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
   ["boolean", ["feature-state", "selected"], false], 0.44,
-  ["boolean", ["feature-state", "hover"], false], 0.34,
+  ["boolean", ["feature-state", "hover"], false], 0.46,
   0.10
 ] as never;
 
@@ -3331,6 +3331,7 @@ export function MapView({
           void refreshShowOverlays();
         }
 
+        const isFirstIdleFrame = !initialMapIdleReached;
         const level = activeAreaLevel(map.getZoom());
         const activeFeatures = areaDataRef.current[level]?.features.length ?? 0;
         const parcelFeatures = areaDataRef.current.parcel?.features.length ?? 0;
@@ -3344,16 +3345,23 @@ export function MapView({
           initialIdle: initialMapIdleReached
         });
 
-        // Run one immediate viewport check on the first settled frame. The
-        // in-flight refresh key prevents this from duplicating an identical
-        // request that began in style.load. Later idle frames only retry when
-        // the active boundary source is still empty.
-        if (needsRefresh || initialMapIdleReached) {
+        // Retain the empty-source recovery path for later idle frames.
+        if (needsRefresh) {
           if (refreshTimer !== null) {
             clearTimeout(refreshTimer);
             refreshTimer = null;
           }
           void refreshAreas();
+        } else if (isFirstIdleFrame) {
+          // The first idle frame also gets one immediate refresh check. This
+          // makes initial data loading independent of any later user click.
+          if (refreshTimer !== null) {
+            clearTimeout(refreshTimer);
+            refreshTimer = null;
+          }
+          void refreshAreas();
+        }
+        if (isFirstIdleFrame || needsRefresh) {
           refreshMetricBubbles();
           updateLayerVisibility();
         }
