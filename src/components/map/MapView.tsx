@@ -1194,6 +1194,7 @@ export function MapView({
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
     let selectedFeatureHighlightActive = false;
+    let selectedFeatureAreaKey: string | null = null;
     let lastMapPointerPoint: { x: number; y: number } | null = null;
 
     const refreshMetricBubbles = () => {
@@ -1553,11 +1554,28 @@ export function MapView({
       map.getCanvas().style.cursor = feature ? "pointer" : "";
     };
 
+    const normalizeSelectionPart = (value: unknown) => String(value ?? "")
+      .trim()
+      .replace(/\\s+/g, " ")
+      .toLocaleLowerCase("en");
+    const selectionKeyForArea = (area: SelectedArea) => [
+      area.level,
+      normalizeSelectionPart(area.district),
+      normalizeSelectionPart(area.sector),
+      normalizeSelectionPart(area.cell),
+      normalizeSelectionPart(area.village),
+      area.level === "parcel"
+        ? normalizeSelectionPart(area.upi)
+        : normalizeSelectionPart(area.name)
+    ].join("|");
+
     const selectFeatureState = (
-      nextFeature: { source: string; id: string | number } | null
+      nextFeature: { source: string; id: string | number } | null,
+      areaKey: string | null = null
     ) => {
       setFeatureFlag(selectedFeature, "selected", false);
       selectedFeature = nextFeature;
+      selectedFeatureAreaKey = nextFeature ? areaKey : null;
       selectedFeatureHighlightActive = nextFeature !== null;
       setFeatureFlag(selectedFeature, "selected", true);
       refreshMetricBubblesRef.current?.();
@@ -1568,11 +1586,18 @@ export function MapView({
         selectFeatureState(null);
         return;
       }
+      const areaKey = selectionKeyForArea(area);
+      // A map click already knows the exact rendered feature ID. Do not
+      // overwrite that selection during the parent React state handoff;
+      // the area data cache can still be catching up for a freshly loaded plot.
+      if (
+        selectedFeature &&
+        selectedFeatureHighlightActive &&
+        selectedFeatureAreaKey === areaKey
+      ) return;
+
       const features = areaDataRef.current[area.level]?.features ?? [];
-      const normalize = (value: unknown) => String(value ?? "")
-        .trim()
-        .replace(/\\s+/g, " ")
-        .toLocaleLowerCase("en");
+      const normalize = normalizeSelectionPart;
       const match = features.find((feature) => {
         const properties = feature.properties ?? {};
         if (area.level === "parcel") {
@@ -1587,7 +1612,7 @@ export function MapView({
       });
       const id = match?.id;
       if (match && (typeof id === "string" || typeof id === "number")) {
-        selectFeatureState({ source: AREA_LAYERS[area.level].source, id });
+        selectFeatureState({ source: AREA_LAYERS[area.level].source, id }, areaKey);
       } else {
         selectFeatureState(null);
       }
@@ -3023,17 +3048,15 @@ export function MapView({
 
     const handleDocumentPointerMove = (event: PointerEvent) => {
       if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
-      const rect = map.getCanvas().getBoundingClientRect();
-      const pointerInsideMap =
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom;
+      const canvas = map.getCanvas();
+      const target = event.target;
+      const pointerOnCanvas = target === canvas ||
+        (target instanceof Node && canvas.contains(target));
 
-      // Opening the parcel inspector can cover the point where the user clicked.
-      // Keep the selected parcel glowing while the pointer is stationary, then
-      // clear it only after the pointer actually moves outside the map canvas.
-      if (!pointerInsideMap) clearParcelGlow();
+      // The inspector can cover the clicked plot without moving the pointer.
+      // A stationary click must keep the glow; a real move onto the inspector,
+      // toolbar or any other UI surface clears it.
+      if (!pointerOnCanvas) clearParcelGlow();
     };
 
     const handleWindowBlur = () => clearParcelGlow();
@@ -3073,7 +3096,7 @@ export function MapView({
       const parcelMarketStatus = level === "parcel" ? suppliedMarketStatus : null;
       const parcelMarketStatusSource = suppliedMarketStatus ? "source" as const : null;
 
-      selectFeatureState({ source, id });
+      selectFeatureState({ source, id }, selectionKeyForArea(area));
       onAreaSelected({
         ...area,
         parcelMarketStatus,
