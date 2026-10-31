@@ -1357,10 +1357,12 @@ export function MapExperience() {
     const areaSearch = params.get("areaSearch");
     if (!areaSearch) return;
 
-    setWorkspaceMode("areas");
-    setSelectedArea(null);
-    setGlobalSearch(areaSearch);
-    setGlobalSearchOpen(true);
+    const timer = window.setTimeout(() => {
+      setWorkspaceMode("areas");
+      setSelectedArea(null);
+      setGlobalSearch(areaSearch);
+      setGlobalSearchOpen(true);
+    }, 0);
 
     params.delete("areaSearch");
     const remainingQuery = params.toString();
@@ -1368,6 +1370,7 @@ export function MapExperience() {
       (remainingQuery ? "?" + remainingQuery : "") +
       window.location.hash;
     window.history.replaceState(window.history.state, "", cleanUrl);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
