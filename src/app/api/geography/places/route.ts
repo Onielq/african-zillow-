@@ -516,21 +516,15 @@ export async function GET(request: NextRequest) {
     const missingForViewport = Array.from(requiredDistricts).filter((district) =>
       !availableDistricts.has(district)
     );
-    if (missingForViewport.length > 0) {
-      return NextResponse.json(
-        {
-          error: "Official district boundaries are incomplete for this map view.",
-          missingDistricts: missingForViewport
-        },
-        {
-          status: 502,
-          headers: {
-            "Cache-Control": "no-store",
-            "X-Overlay-Stage": "pilot-district-incomplete",
-            "X-Overlay-Missing-Districts": missingForViewport.join(",")
-          }
-        }
-      );
+    const boundaryCoveragePartial = missingForViewport.length > 0;
+    if (boundaryCoveragePartial) {
+      // Keep the features that can be clipped to boundaries that did load.
+      // Blocking the entire overlay because one district polygon is missing
+      // made every place disappear on the initial Rwanda-wide view.
+      console.warn("Place overlays will use the official district boundaries currently available.", {
+        missingDistricts: missingForViewport,
+        availableDistricts: Array.from(availableDistricts)
+      });
     }
 
     // Keep the place-of-interest query separate from road geometry. A single
@@ -629,16 +623,23 @@ export async function GET(request: NextRequest) {
     const features = Array.from(deduplicated.values())
       .flatMap((feature) => clipFeatureToDistricts(feature, allowedDistricts))
       .slice(0, 6000);
-    const partial = failedCategories.size > 0;
-    const warning = partial
-      ? "Some context layers are temporarily unavailable: " + Array.from(failedCategories).join(", ") + "."
-      : null;
+    const partial = failedCategories.size > 0 || boundaryCoveragePartial;
+    const warning = boundaryCoveragePartial
+      ? "Some place features could not be clipped because these official district boundaries are temporarily missing: " + missingForViewport.join(", ") + "."
+      : failedCategories.size > 0
+        ? "Some context layers are temporarily unavailable: " + Array.from(failedCategories).join(", ") + "."
+        : null;
 
     return NextResponse.json(
       {
         type: "FeatureCollection",
         features,
-        ...(partial ? { partial: true, warning, failedCategories: Array.from(failedCategories) } : {})
+        ...(partial ? {
+          partial: true,
+          warning,
+          failedCategories: Array.from(failedCategories),
+          ...(boundaryCoveragePartial ? { missingDistricts: missingForViewport } : {})
+        } : {})
       },
       {
         headers: {
@@ -656,7 +657,8 @@ export async function GET(request: NextRequest) {
           "X-Overlay-Stage": "complete",
           "X-Overlay-Successful-Query-Count": String(successfulQueries),
           "X-Overlay-Failed-Query-Count": String(failedQueries),
-          ...(partial ? { "X-Overlay-Partial": "true" } : {})
+          ...(partial ? { "X-Overlay-Partial": "true" } : {}),
+          ...(boundaryCoveragePartial ? { "X-Overlay-Missing-Districts": missingForViewport.join(",") } : {})
         }
       }
     );
