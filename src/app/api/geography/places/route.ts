@@ -51,12 +51,10 @@ const VALID_CATEGORIES: OverlayCategory[] = [
   "nature"
 ];
 const OVERPASS_ENDPOINTS = [
-  // Distribute initial parallel map queries across independent global instances.
-  // Public Overpass servers are best-effort and can return 429/502/504 under load.
+  // Independent public instances, with short per-instance timeouts.
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-  "https://lz4.overpass-api.de/api/interpreter",
-  "https://overpass-api.de/api/interpreter"
+  "https://lz4.overpass-api.de/api/interpreter"
 ];
 let overpassEndpointCursor = 0;
 
@@ -79,60 +77,51 @@ function intersection(a: Bounds, b: Bounds): Bounds | null {
   return result[0] < result[2] && result[1] < result[3] ? result : null;
 }
 
-function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: boolean): string {
+function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): string {
   const [west, south, east, north] = bounds;
   const box = [south, west, north, east].join(",");
   const selections: string[] = [];
+  const outputGeometry = categories.includes("transportation");
 
-  if (roadsOnly) {
-    selections.push(
-      'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
-    );
-    return "[out:json][timeout:12];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
+  // Keep the first country-level view light. Add finer road classes and bus
+  // stops only as users zoom into neighbourhoods and villages.
+  if (categories.includes("transportation")) {
+    const roadClasses = zoom >= 15
+      ? "motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"
+      : zoom >= 12
+        ? "motorway|trunk|primary|secondary|tertiary|residential|unclassified"
+        : zoom >= 10
+          ? "motorway|trunk|primary|secondary|tertiary"
+          : "motorway|trunk|primary|secondary";
+    selections.push('way["highway"~"^(' + roadClasses + ')$"](' + box + ");");
+    if (zoom >= 10) {
+      selections.push('nwr["highway"="bus_stop"](' + box + ");");
+      selections.push('nwr["amenity"~"bus_station|bus_stop"](' + box + ");");
+    }
   }
 
+  // Use nwr to query nodes, ways and relations in one selector instead of
+  // repeating each tag query three times.
   if (categories.includes("landmarks")) {
-    for (const element of ["node", "way", "relation"]) {
-      selections.push(
-        element + '["tourism"~"attraction|museum|artwork|zoo|viewpoint|theme_park"](' + box + ");"
-      );
-      selections.push(element + '["historic"](' + box + ");");
-    }
+    selections.push('nwr["tourism"~"attraction|museum|artwork|zoo|viewpoint|theme_park"](' + box + ");");
+    selections.push('nwr["historic"](' + box + ");");
   }
 
   if (categories.includes("healthEducation")) {
-    for (const element of ["node", "way", "relation"]) {
-      selections.push(
-        element + '["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");"
-      );
-      selections.push(
-        element + '["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");"
-      );
-    }
-  }
-
-  if (categories.includes("transportation")) {
-    selections.push(
-      'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
-    );
-    selections.push('node["highway"="bus_stop"](' + box + ");");
-    selections.push('node["amenity"~"bus_station|bus_stop"](' + box + ");");
-    selections.push('way["amenity"="bus_station"](' + box + ");");
-    selections.push('relation["amenity"="bus_station"](' + box + ");");
+    selections.push('nwr["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");");
+    selections.push('nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");");
   }
 
   if (categories.includes("nature")) {
-    for (const element of ["node", "way", "relation"]) {
-      selections.push(element + '["leisure"~"park|nature_reserve"](' + box + ");");
-      selections.push(element + '["natural"~"water|waterfall"](' + box + ");");
-      selections.push(element + '["water"="lake"](' + box + ");");
-      selections.push(element + '["waterway"="waterfall"](' + box + ");");
-      selections.push(element + '["boundary"="protected_area"](' + box + ");");
-    }
+    selections.push('nwr["leisure"~"park|nature_reserve"](' + box + ");");
+    selections.push('nwr["natural"~"water|waterfall"](' + box + ");");
+    selections.push('nwr["water"="lake"](' + box + ");");
+    selections.push('nwr["waterway"="waterfall"](' + box + ");");
+    selections.push('nwr["boundary"="protected_area"](' + box + ");");
   }
 
-  const output = categories.includes("transportation") ? "out geom tags;" : "out center tags;";
-  return "[out:json][timeout:12];\n(\n" + selections.join("\n") + "\n);\n" + output;
+  const output = outputGeometry ? "out center geom tags;" : "out center tags;";
+  return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\n" + output;
 }
 
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
@@ -163,7 +152,7 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
             "User-Agent": "Taiseel Rwanda Land Intelligence map overlay"
           },
           body: new URLSearchParams({ data: query }).toString(),
-          signal: AbortSignal.timeout(14_000)
+          signal: AbortSignal.timeout(6_500)
         });
         if (!response.ok) throw new Error("HTTP " + response.status);
         const payload = await response.json() as OsmResponse;
@@ -537,43 +526,38 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Keep the place-of-interest query separate from road geometry. A single
-    // broad Overpass request containing every tag family and road geometry was
-    // failing as a unit on the initial Rwanda-wide view, hiding every category.
-    // The lighter groups can now succeed independently.
-    const pointOfInterestCategories = categories.filter((category) => category !== "transportation");
+    // Isolate categories so a slow nature or road query cannot suppress all
+    // other places. Health/landmarks remain grouped because their selectors
+    // are small; nature and road geometry use separate requests.
     const queryGroups: Array<{ categories: OverlayCategory[] }> = [];
-    if (pointOfInterestCategories.length > 0) {
-      queryGroups.push({ categories: pointOfInterestCategories });
-    }
-    if (categories.includes("transportation")) {
-      queryGroups.push({ categories: ["transportation"] });
-    }
+    const landmarkHealth = categories.filter((category) =>
+      category === "landmarks" || category === "healthEducation"
+    );
+    if (landmarkHealth.length > 0) queryGroups.push({ categories: landmarkHealth });
+    if (categories.includes("nature")) queryGroups.push({ categories: ["nature"] });
+    if (categories.includes("transportation")) queryGroups.push({ categories: ["transportation"] });
 
     let successfulQueries = 0;
     let failedQueries = 0;
     const failedCategories = new Set<OverlayCategory>();
 
     const collections = await Promise.all(targetBounds.map(async (target) => {
-      const jobs = queryGroups.map((group) => ({
-        categories: group.categories,
-        query: queryFor(group.categories, target, false)
-      }));
-      const results = await Promise.all(jobs.map(async (job) => {
+      // Serialize category requests within each extent. This caps initial
+      // concurrency at two queries (Kigali + Bugesera), not every category at once.
+      const results: Array<{ categories: OverlayCategory[]; elements: OsmElement[] }> = [];
+      for (const group of queryGroups) {
+        const query = queryFor(group.categories, target, zoom);
         try {
-          const elements = await queryOverpass(job.query);
+          const elements = await queryOverpass(query);
           successfulQueries += 1;
-          return { categories: job.categories, elements };
+          results.push({ categories: group.categories, elements });
         } catch (error) {
           failedQueries += 1;
-          for (const category of job.categories) failedCategories.add(category);
-          console.warn(
-            "OpenStreetMap context group failed for " + job.categories.join(", ") + ".",
-            error
-          );
-          return { categories: job.categories, elements: [] as OsmElement[] };
+          for (const category of group.categories) failedCategories.add(category);
+          console.warn("OpenStreetMap context group failed for " + group.categories.join(", ") + ".", error);
+          results.push({ categories: group.categories, elements: [] });
         }
-      }));
+      }
 
       return results.flatMap(({ categories: groupCategories, elements }) =>
         elements.flatMap((element) => {
@@ -606,6 +590,9 @@ export async function GET(request: NextRequest) {
         })
       );
     }));
+
+
+    if (successfulQueries === 0 && failedQueries > 0) {    }));
 
     if (successfulQueries === 0 && failedQueries > 0) {
       return NextResponse.json(
