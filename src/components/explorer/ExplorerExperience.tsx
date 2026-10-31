@@ -162,7 +162,7 @@ function districtBenchmark(district: string): DistrictLandPriceBenchmark | null 
   return DISTRICT_LAND_PRICE_BENCHMARKS[normalize(district)] ?? null;
 }
 
-function levelLabel(level: AreaLevel): string {
+function levelLabel(level: AreaLevel | "parcel"): string {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
