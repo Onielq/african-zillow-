@@ -209,11 +209,7 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
 
   useEffect(() => {
     const query = searchQuery.trim();
-    if (query.length < 2) {
-      setSearchResults([]);
-      setSearchStatus("idle");
-      return;
-    }
+    if (query.length < 2) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -242,13 +238,7 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
   }, [searchQuery]);
 
   useEffect(() => {
-    if (!pathKey) {
-      setSelectedArea(null);
-      setProfileStatus("idle");
-      setTransactionEstimate(null);
-      setGeometry(null);
-      return;
-    }
+    if (!pathKey) return;
 
     const [rawLevel, ...parts] = pathKey.split("|");
     if (!["district", "sector", "cell", "village"].includes(rawLevel) || parts.length === 0) {
@@ -319,10 +309,11 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
     if (area.cell) transactionParams.set("cell", area.cell);
     if (area.village) transactionParams.set("village", area.village);
 
-    setTransactionStatus("loading");
-    setGeometryStatus(area.mapSourceId ? "loading" : "idle");
+    const loadAreaContext = async () => {
+      setTransactionStatus("loading");
+      setGeometryStatus(area.mapSourceId ? "loading" : "idle");
 
-    const requests: Array<Promise<void>> = [
+      const requests: Array<Promise<void>> = [
       fetch("/api/geography/transaction-estimate?" + transactionParams.toString(), {
         signal: controller.signal
       }).then(async (response) => {
@@ -369,7 +360,10 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
       );
     }
 
-    void Promise.all(requests);
+      await Promise.all(requests);
+    };
+
+    void loadAreaContext();
     return () => controller.abort();
   }, [selectedArea]);
 
@@ -471,6 +465,10 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
                     onChange={(event) => {
                       setSearchQuery(event.target.value);
                       setSearchOpen(true);
+                      if (event.target.value.trim().length < 2) {
+                        setSearchResults([]);
+                        setSearchStatus("idle");
+                      }
                     }}
                     onKeyDown={(event) => {
                       if (event.key === "Escape") setSearchOpen(false);
@@ -718,7 +716,7 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
                   </div>
                   {selectedArea.level === "district" && selectedArea.district.toLowerCase() === "bugesera" ? (
                     <div className={styles.warningNote}>
-                      Bugesera's reported current-month dashboard figure is not shown as a verified sales count. The source snapshot requires reconciliation before it can be used for rankings.
+                      Bugesera&apos;s reported current-month dashboard figure is not shown as a verified sales count. The source snapshot requires reconciliation before it can be used for rankings.
                     </div>
                   ) : null}
                   <div className={styles.methodNote}>
