@@ -535,7 +535,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
   return [
     "case",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
+    ["boolean", ["feature-state", "hover"], false], "#83E8B5",
     showPrice
       ? [
           "case",
@@ -550,7 +550,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
   ["boolean", ["feature-state", "selected"], false], 0.42,
-  ["boolean", ["feature-state", "hover"], false], 0.78,
+  ["boolean", ["feature-state", "hover"], false], 0.86,
   0.23
 ] as never;
 
@@ -1113,8 +1113,10 @@ export function MapView({
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let basemapReadyTimer: ReturnType<typeof setTimeout> | null = null;
     let parcelRefreshRetryTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastParcelRetryKey: string | null = null;
-    let parcelRetryCountForKey = 0;
+    let lastAreaRetryKey: string | null = null;
+    let areaRetryCountForKey = 0;
+    let initialMapIdleReached = false;
+    let initialOverlayIdleFallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let activeController: AbortController | null = null;
     let activeRefreshKey: string | null = null;
     let refreshSequence = 0;
@@ -1450,6 +1452,37 @@ export function MapView({
       }
     };
 
+    const refreshHoverAtLastPointer = () => {
+      const point = lastMapPointerPoint;
+      if (!point) return;
+
+      const level = activeAreaLevel(map.getZoom());
+      if (level === "parcel") {
+        if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", false);
+        hoveredFeature = null;
+        return;
+      }
+
+      const layer = AREA_LAYERS[level];
+      if (!map.getLayer(layer.fill)) return;
+      const feature = map.queryRenderedFeatures(point, { layers: [layer.fill] })[0];
+      const id = feature ? getFeatureId(feature) : null;
+      const nextFeature = id === null ? null : { source: layer.source, id };
+
+      if (
+        hoveredFeature &&
+        (!nextFeature ||
+          hoveredFeature.source !== nextFeature.source ||
+          String(hoveredFeature.id) !== String(nextFeature.id))
+      ) {
+        setFeatureFlag(hoveredFeature, "hover", false);
+      }
+
+      hoveredFeature = nextFeature;
+      setFeatureFlag(hoveredFeature, "hover", true);
+      map.getCanvas().style.cursor = feature ? "pointer" : "";
+    };
+
     const selectFeatureState = (
       nextFeature: { source: string; id: string | number } | null
     ) => {
@@ -1530,7 +1563,7 @@ export function MapView({
             "fill-opacity": level === "parcel"
               ? [
                   "case",
-                  ["boolean", ["feature-state", "selected"], false], 0.34,
+                  ["boolean", ["feature-state", "selected"], false], 0.42,
                   ["boolean", ["feature-state", "hover"], false], 0.12,
                   0.008
                 ]
@@ -1553,33 +1586,33 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00EFFF" : "#45DFA0",
+              level === "parcel" ? "#00EFFF" : "#45EFAF",
               ["boolean", ["feature-state", "hover"], false],
-              "#36E59B",
+              "#42F0A8",
               "rgba(0,0,0,0)"
             ],
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 16 : 12,
+              level === "parcel" ? 22 : 18,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 0 : 11,
+              level === "parcel" ? 0 : level === "district" ? 19 : level === "sector" ? 17 : level === "cell" ? 15 : 13,
               0
             ],
             "line-blur": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 6.2 : 5.2,
+              level === "parcel" ? 9.5 : 7.2,
               ["boolean", ["feature-state", "hover"], false],
-              4.8,
+              level === "district" ? 8 : level === "sector" ? 7.4 : level === "cell" ? 6.8 : 6.2,
               0
             ],
             "line-opacity": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 0.96 : 0.82,
+              level === "parcel" ? 1 : 0.96,
               ["boolean", ["feature-state", "hover"], false],
-              0.82,
+              0.98,
               0
             ]
           }
@@ -1614,9 +1647,9 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 5.8 : 5.2,
+              level === "parcel" ? 7.2 : 5.8,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.25 : level === "district" ? 5.9 : level === "sector" ? 5.6 : 5.3,
+              level === "parcel" ? 1.6 : level === "district" ? 8.2 : level === "sector" ? 7.6 : level === "cell" ? 7 : 6.4,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
@@ -2058,9 +2091,10 @@ export function MapView({
       const queryBounds = requestBoundsForArea(viewBounds, level);
       const bbox = queryBounds.join(",");
       const requestUrl = `/api/geography/areas?level=${level}&source=${adminSource}&bbox=${encodeURIComponent(bbox)}`;
-      // Parcel requests get one bounded retry. A transient 502 or a successful
-      // but empty response must not be cached as if it were complete coverage.
-      const maxAttempts = level === "parcel" ? 2 : 1;
+      // GIS publishers can briefly return 5xx, network errors or empty
+      // feature sets during the first viewport request. Retry every geography
+      // level so a transient response cannot leave the map blank until a pan.
+      const maxAttempts = 2;
       let lastError: unknown = null;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -2083,14 +2117,14 @@ export function MapView({
               attempt
             });
             const transient = [500, 502, 503, 504].includes(response.status);
-            if (level === "parcel" && transient && attempt < maxAttempts) {
+            if (transient && attempt < maxAttempts) {
               recordE2ETrace("area-api-retry", {
                 level,
                 adminSource,
                 reason: "http-" + response.status,
                 nextAttempt: attempt + 1
               });
-              await waitBeforeAreaRetry(signal, 650);
+              await waitBeforeAreaRetry(signal, 650 * attempt);
               continue;
             }
 
@@ -2116,14 +2150,15 @@ export function MapView({
             attempt
           });
 
-          if (level === "parcel" && featureCount === 0 && attempt < maxAttempts) {
+          const isActiveGeographyLevel = level === activeAreaLevel(map.getZoom());
+          if ((level === "parcel" || isActiveGeographyLevel) && featureCount === 0 && attempt < maxAttempts) {
             recordE2ETrace("area-api-retry", {
               level,
               adminSource,
               reason: "empty-feature-collection",
               nextAttempt: attempt + 1
             });
-            await waitBeforeAreaRetry(signal, 650);
+            await waitBeforeAreaRetry(signal, 650 * attempt);
             continue;
           }
 
@@ -2137,14 +2172,14 @@ export function MapView({
 
           const httpFailure = error instanceof Error &&
             /Administrative boundary request failed \(\d+\)/.test(error.message);
-          if (level === "parcel" && !httpFailure && attempt < maxAttempts) {
+          if (!httpFailure && attempt < maxAttempts) {
             recordE2ETrace("area-api-retry", {
               level,
               adminSource,
               reason: "network-error",
               nextAttempt: attempt + 1
             });
-            await waitBeforeAreaRetry(signal, 650);
+            await waitBeforeAreaRetry(signal, 650 * attempt);
             continue;
           }
           throw error;
@@ -2193,9 +2228,9 @@ export function MapView({
         ...viewBounds.map((value) => value.toFixed(6)),
         ...requestSources
       ].join("|");
-      if (lastParcelRetryKey !== refreshKey) {
-        lastParcelRetryKey = refreshKey;
-        parcelRetryCountForKey = 0;
+      if (lastAreaRetryKey !== refreshKey) {
+        lastAreaRetryKey = refreshKey;
+        areaRetryCountForKey = 0;
       }
 
       // style.load, moveend/zoomend, and the one-time idle recovery can all
@@ -2241,6 +2276,9 @@ export function MapView({
         source.setData(merged);
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
+        if (level === activeAreaLevel(map.getZoom()) && lastMapPointerPoint) {
+          map.once("idle", refreshHoverAtLastPointer);
+        }
         if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
       };
@@ -2398,24 +2436,25 @@ export function MapView({
         if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
 
-        if (parcelResult && parcelResult.data.features.length > 0) {
-          if (lastParcelRetryKey === refreshKey) {
-            lastParcelRetryKey = null;
-            parcelRetryCountForKey = 0;
+        const activeViewportFailed =
+          activeSourceFailures > 0 ||
+          ((activeLevel === "village" || activeLevel === "parcel") && parcelSourceFailures > 0);
+        if (!activeViewportFailed) {
+          if (lastAreaRetryKey === refreshKey) {
+            lastAreaRetryKey = null;
+            areaRetryCountForKey = 0;
           }
-        } else if (
-          (activeLevel === "village" || activeLevel === "parcel") &&
-          parcelSourceFailures > 0 &&
-          parcelRetryCountForKey < 1 &&
-          parcelRefreshRetryTimer === null
-        ) {
-          // The idle callback can run while the first request set is still in
-          // flight. If that request later fails, schedule a fresh bounded
-          // refresh after its controller has been released.
-          parcelRetryCountForKey += 1;
-          recordE2ETrace("parcel-refresh-retry-scheduled", {
+        } else if (areaRetryCountForKey < 1 && parcelRefreshRetryTimer === null) {
+          // Any missing active geography layer gets one automatic viewport
+          // retry. The visitor should not have to pan, zoom or click to reveal it.
+          areaRetryCountForKey += 1;
+          lastAreaRetryKey = refreshKey;
+          recordE2ETrace("area-refresh-retry-scheduled", {
             refreshKey,
-            retry: parcelRetryCountForKey
+            activeLevel,
+            activeSourceFailures,
+            parcelSourceFailures,
+            retry: areaRetryCountForKey
           });
           const retryDeadline = Date.now() + 20_000;
           const retryFailedViewport = () => {
@@ -2425,7 +2464,7 @@ export function MapView({
               return;
             }
             if (activeController && activeRefreshKey !== refreshKey) return;
-            if (map.getZoom() >= VILLAGE_ZOOM) void refreshAreas();
+            if (map.getZoom() >= 5) void refreshAreas();
           };
           parcelRefreshRetryTimer = setTimeout(retryFailedViewport, 900);
         }
@@ -2584,6 +2623,7 @@ export function MapView({
         showOverlayRecoveryTimer = null;
       }
       applyShowOverlayFilters(map, showLayersRef.current);
+      if (!initialMapIdleReached) return;
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayTimer = setTimeout(() => void refreshShowOverlays(), 260);
     };
@@ -2832,6 +2872,11 @@ export function MapView({
 
     map.on("style.load", () => {
       styleLoaded = true;
+      initialMapIdleReached = false;
+      if (initialOverlayIdleFallbackTimer !== null) {
+        clearTimeout(initialOverlayIdleFallbackTimer);
+        initialOverlayIdleFallbackTimer = null;
+      }
       if (fallbackTimer) clearTimeout(fallbackTimer);
       if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
       basemapTileErrorRef.current = false;
@@ -2850,6 +2895,12 @@ export function MapView({
       // which leaves place layers empty until the next manual interaction.
       scheduleShowOverlayRefresh();
       void refreshZoningOverlay();
+      initialOverlayIdleFallbackTimer = setTimeout(() => {
+        if (initialMapIdleReached) return;
+        initialMapIdleReached = true;
+        initialOverlayIdleFallbackTimer = null;
+        scheduleShowOverlayRefresh();
+      }, 2_000);
       const reportBasemapReadiness = () => {
         if (
           styleSequence !== basemapStyleSequenceRef.current ||
@@ -2880,6 +2931,14 @@ export function MapView({
       // active data source at idle so a transient early return cannot leave the
       // entire map showing administrative fills with empty outlines.
       map.once("idle", () => {
+        if (!initialMapIdleReached) {
+          initialMapIdleReached = true;
+          if (initialOverlayIdleFallbackTimer !== null) {
+            clearTimeout(initialOverlayIdleFallbackTimer);
+            initialOverlayIdleFallbackTimer = null;
+          }
+          scheduleShowOverlayRefresh();
+        }
         const level = activeAreaLevel(map.getZoom());
         const activeFeatures = areaDataRef.current[level]?.features.length ?? 0;
         const parcelFeatures = areaDataRef.current.parcel?.features.length ?? 0;
@@ -2980,6 +3039,7 @@ export function MapView({
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       if (parcelRefreshRetryTimer !== null) clearTimeout(parcelRefreshRetryTimer);
       if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
+      if (initialOverlayIdleFallbackTimer !== null) clearTimeout(initialOverlayIdleFallbackTimer);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
       showOverlayController?.abort();
