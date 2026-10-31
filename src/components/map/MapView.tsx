@@ -2106,14 +2106,7 @@ export function MapView({
         source: "openmaptiles",
         "source-layer": "poi",
         minzoom: 7.8,
-        filter: [
-          "all",
-          ["==", ["geometry-type"], "Point"],
-          ["any",
-            ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall", "office", "post"]]],
-            ["in", ["get", "subclass"], ["literal", ["viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site"]]]
-          ]
-        ],
+        filter: openMapTilesPoiFilter(["landmarks"]) as never,
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 2.4, 12, 3.8, 16, 5.4],
           "circle-color": "#707A80",
