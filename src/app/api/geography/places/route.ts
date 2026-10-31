@@ -156,7 +156,7 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
             "User-Agent": "Rwanda Land Intelligence map overlay"
           },
           body: new URLSearchParams({ data: query }).toString(),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(14_000)
         });
         if (!response.ok) throw new Error("Overpass returned HTTP " + response.status);
         const payload = await response.json() as OsmResponse;
@@ -374,11 +374,12 @@ async function getPilotDistrictFeatures(): Promise<DistrictAreaFeature[]> {
       if (features.length === 0) {
         throw new Error("No official pilot district polygons could be fetched. " + failures.join("; "));
       }
-      // Partial official coverage is safe: clip to the districts that were
-      // actually returned. Missing districts produce a visible partial warning,
-      // rather than blocking every context feature across the remaining pilot.
+      // A partial boundary set must never become the cached "complete" pilot
+      // geography. The current request may still inspect the districts returned,
+      // but the next request must retry any missing publisher layer.
       if (missing.length > 0 || failures.length > 0) {
-        console.warn("Partial official district clip coverage.", { missing, failures });
+        console.warn("Partial official district clip coverage; will retry missing districts on the next request.", { missing, failures });
+        pilotDistrictFeaturesPromise = null;
       }
       return features;
     })().catch((error) => {
@@ -497,6 +498,40 @@ export async function GET(request: NextRequest) {
             String(feature.properties?.district ?? "").trim().toLowerCase() === "bugesera"
           )
         : allPilotDistricts;
+
+    // Do not silently return an empty overlay for a viewport whose official
+    // clipping boundary failed to load. That was causing place layers in
+    // Bugesera/Kigali to look as though they were off until another user action
+    // caused a fresh request.
+    const requiredDistricts = new Set<string>();
+    if (targetBounds.some((target) => intersection(target, KIGALI_EXTENT) !== null)) {
+      for (const district of KIGALI_DISTRICT_NAMES) requiredDistricts.add(district);
+    }
+    if (targetBounds.some((target) => intersection(target, BUGESERA_EXTENT) !== null)) {
+      requiredDistricts.add("bugesera");
+    }
+    const availableDistricts = new Set(allowedDistricts.map((feature) =>
+      String(feature.properties?.district ?? "").trim().toLowerCase()
+    ));
+    const missingForViewport = Array.from(requiredDistricts).filter((district) =>
+      !availableDistricts.has(district)
+    );
+    if (missingForViewport.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Official district boundaries are incomplete for this map view.",
+          missingDistricts: missingForViewport
+        },
+        {
+          status: 502,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-Overlay-Stage": "pilot-district-incomplete",
+            "X-Overlay-Missing-Districts": missingForViewport.join(",")
+          }
+        }
+      );
+    }
 
     // Keep the place-of-interest query separate from road geometry. A single
     // broad Overpass request containing every tag family and road geometry was
