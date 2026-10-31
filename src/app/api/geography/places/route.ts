@@ -54,7 +54,6 @@ const OVERPASS_ENDPOINTS = [
   // Independent public instances, with short per-instance timeouts.
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-  "https://lz4.overpass-api.de/api/interpreter"
 ];
 let overpassEndpointCursor = 0;
 
