@@ -2816,29 +2816,28 @@ export function MapView({
     let showOverlayRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
     let showOverlayScheduleTimer: ReturnType<typeof setTimeout> | null = null;
     let showOverlayRequestKey: string | null = null;
+    let showOverlayActiveKey: string | null = null;
+    let showOverlayCompletedKey: string | null = null;
     let showOverlayAutomaticRetryUsed = false;
 
     const refreshShowOverlays = async () => {
       const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
-      // The GeoJSON source is added during style.load. Do not wait for every basemap tile:
-      // context data must begin loading on the first view, not after a later map movement.
       if (!source) return;
-      if (showOverlayRecoveryTimer !== null) {
-        clearTimeout(showOverlayRecoveryTimer);
-        showOverlayRecoveryTimer = null;
-      }
-      showOverlayController?.abort();
-      showOverlayController = null;
-      const sequence = ++showOverlaySequence;
+
       const categories = showLayersRef.current;
       if (categories.length === 0) {
+        if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
+        showOverlayRecoveryTimer = null;
+        showOverlayController?.abort();
+        showOverlayController = null;
+        showOverlayActiveKey = null;
+        showOverlayCompletedKey = null;
+        showOverlayRequestKey = null;
         showOverlayAutomaticRetryUsed = false;
         source.setData(emptyFeatureCollection());
         return;
       }
 
-      const controller = new AbortController();
-      showOverlayController = controller;
       const bounds = map.getBounds();
       const bbox = [
         bounds.getWest(),
@@ -2854,10 +2853,29 @@ export function MapView({
         zoom: String(zoom)
       });
       const requestKey = [categories.join(","), bbox, showScopeRef.current, zoom.toFixed(0)].join("|");
+
       if (showOverlayRequestKey !== requestKey) {
+        if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
+        showOverlayRecoveryTimer = null;
+        showOverlayController?.abort();
+        showOverlayController = null;
+        showOverlayActiveKey = null;
+        showOverlayCompletedKey = null;
         showOverlayRequestKey = requestKey;
         showOverlayAutomaticRetryUsed = false;
       }
+      if (showOverlayCompletedKey === requestKey) return;
+      if (
+        showOverlayActiveKey === requestKey &&
+        showOverlayController &&
+        !showOverlayController.signal.aborted
+      ) return;
+      if (showOverlayRecoveryTimer !== null) return;
+
+      const sequence = ++showOverlaySequence;
+      const controller = new AbortController();
+      showOverlayController = controller;
+      showOverlayActiveKey = requestKey;
 
       let lastError: unknown = null;
       const partialFeatures = new Map<string, MapFeatureCollection["features"][number]>();
@@ -2898,6 +2916,9 @@ export function MapView({
 
           source.setData(data);
           showOverlayAutomaticRetryUsed = false;
+          showOverlayCompletedKey = requestKey;
+          showOverlayActiveKey = null;
+          if (showOverlayController === controller) showOverlayController = null;
           recordE2ETrace("show-overlay-response", {
             categories,
             featureCount: data.features?.length ?? 0,
@@ -2918,6 +2939,8 @@ export function MapView({
         type: "FeatureCollection",
         features: Array.from(partialFeatures.values())
       } as MapFeatureCollection);
+      showOverlayActiveKey = null;
+      if (showOverlayController === controller) showOverlayController = null;
       recordE2ETrace("show-overlay-response", {
         categories,
         featureCount: partialFeatures.size,
@@ -3238,6 +3261,12 @@ export function MapView({
       const styleSequence = basemapStyleSequenceRef.current;
       onStatusChange("loading");
       addAdministrativeLayers();
+      showOverlayController?.abort();
+      showOverlayController = null;
+      showOverlayRequestKey = null;
+      showOverlayActiveKey = null;
+      showOverlayCompletedKey = null;
+      showOverlayAutomaticRetryUsed = false;
       addShowOverlayLayers();
       addContextVectorLayers();
       addZoningOverlayLayers();
