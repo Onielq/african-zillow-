@@ -2832,7 +2832,7 @@ export function MapView({
           // Source features are available even when a symbol/circle layer has
           // not yet been placed or drawn. This avoids waiting for a later pan
           // or layer-toggle to reveal context on the first map visit.
-          sourceFeatures = map.querySourceFeatures("openmaptiles", { sourceLayer });
+          sourceFeatures = map.querySourceFeatures("openmaptiles", { sourceLayer }) as unknown as MapGeoJSONFeature[];
         } catch {
           sourceFeatures = [];
         }
