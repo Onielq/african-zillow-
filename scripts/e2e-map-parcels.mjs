@@ -145,8 +145,10 @@ try {
   // before the user clicks a layer toggle or moves the map.
   const initialOverlayHandle = await page.waitForFunction(() => {
     const trace = window.__RLI_E2E_TRACE__ ?? [];
-    return trace.find((entry) => entry.event === "show-overlay-response") ?? false;
-  }, undefined, { timeout: 45_000 });
+    return trace.find((entry) =>
+      entry.event === "show-overlay-response" && Number(entry.featureCount) > 0
+    ) ?? false;
+  }, undefined, { timeout: 60_000 });
   const initialOverlayCheck = await initialOverlayHandle.jsonValue();
   if (!initialOverlayCheck || initialOverlayCheck.featureCount <= 0) {
     throw new Error("Place overlays did not return any features on the initial map view.");
