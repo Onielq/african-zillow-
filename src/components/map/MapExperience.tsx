@@ -595,7 +595,7 @@ export function MapExperience() {
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
-  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>([]);
+  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks", "healthEducation", "transportation", "nature"]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [directorySearch, setDirectorySearch] = useState("");
