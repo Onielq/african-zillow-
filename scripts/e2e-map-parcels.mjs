@@ -46,9 +46,14 @@ page.on("response", async (response) => {
     });
   }
   if (responseUrl.includes("/api/geography/places")) {
+    const headers = response.headers();
     const entry = {
       url: responseUrl,
       status: response.status(),
+      contentType: headers["content-type"] ?? null,
+      stage: headers["x-overlay-stage"] ?? null,
+      cfRay: headers["cf-ray"] ?? null,
+      server: headers.server ?? null,
       featureCount: null,
       partial: false,
       warning: null,
@@ -57,17 +62,24 @@ page.on("response", async (response) => {
     };
     diagnostics.placeApiResponses.push(entry);
     try {
-      const body = await response.json();
+      const rawBody = await response.text();
+      let body: Record<string, unknown> = {};
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        Object.assign(entry, { bodySnippet: rawBody.slice(0, 500) });
+      }
       Object.assign(entry, {
-        featureCount: Array.isArray(body?.features) ? body.features.length : null,
-        partial: body?.partial ?? false,
-        warning: body?.warning ?? null,
-        failedCategories: body?.failedCategories ?? [],
-        error: body?.error ?? null
+        featureCount: Array.isArray(body.features) ? body.features.length : null,
+        partial: body.partial ?? false,
+        warning: body.warning ?? null,
+        failedCategories: body.failedCategories ?? [],
+        error: body.error ?? null,
+        detail: body.detail ?? null
       });
     } catch (error) {
       Object.assign(entry, {
-        parseError: error instanceof Error ? error.message : String(error)
+        readError: error instanceof Error ? error.message : String(error)
       });
     }
     return;
