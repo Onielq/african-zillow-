@@ -1993,11 +1993,11 @@ export function MapView({
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3.6, 11, 5.2, 15, 7],
             "circle-color": [
               "match", ["get", "overlay_category"],
-              "landmarks", "#D6A344",
-              "healthEducation", "#CB605B",
-              "transportation", "#4A89D0",
-              "nature", "#3C9B74",
-              "#7A8B80"
+              "landmarks", "#808A90",
+              "healthEducation", "#808A90",
+              "transportation", "#808A90",
+              "nature", "#808A90",
+              "#808A90"
             ],
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-width": 1.8,
@@ -2816,51 +2816,47 @@ export function MapView({
     const buildVectorTileOverlayFallback = (
       categories: MapOverlayCategory[]
     ): MapFeatureCollection["features"] => {
-      const vectorLayers: Array<{ id: string; category: MapOverlayCategory }> = [
-        { id: "context-vector-roads", category: "transportation" },
-        { id: "context-vector-schools-health", category: "healthEducation" },
-        { id: "context-vector-landmarks", category: "landmarks" },
-        { id: "context-vector-transit", category: "transportation" },
-        { id: "context-vector-parks-fill", category: "nature" },
-        { id: "context-vector-industrial-fill", category: "landmarks" },
-        { id: "context-vector-forest-fill", category: "nature" },
-        { id: "context-vector-water-fill", category: "nature" },
-        { id: "context-vector-waterways", category: "nature" }
-      ];
       const features = new Map<string, MapFeatureCollection["features"][number]>();
+      const poiHealth = new Set(["school", "kindergarten", "university", "college", "hospital", "clinic", "doctors", "pharmacy", "dentist"]);
+      const poiTransport = new Set(["bus_stop", "bus_station", "station", "tram_stop", "platform"]);
+      const poiLandmarks = new Set([
+        "viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site",
+        "government", "administrative", "government_office", "sector_office", "courthouse",
+        "police", "fire_station", "post_office", "convention_centre", "convention_center",
+        "business_centre", "business_center", "community_centre", "community_center"
+      ]);
 
-      for (const layer of vectorLayers) {
-        if (!categories.includes(layer.category) || !map.getLayer(layer.id)) continue;
-        if (map.getLayoutProperty(layer.id, "visibility") === "none") continue;
-
-        let rendered: MapGeoJSONFeature[] = [];
+      const addSourceLayer = (sourceLayer: string, categoryFor: (properties: Record<string, unknown>) => MapOverlayCategory | null) => {
+        let sourceFeatures: MapGeoJSONFeature[] = [];
         try {
-          rendered = map.queryRenderedFeatures(undefined, { layers: [layer.id] });
+          // Source features are available even when a symbol/circle layer has
+          // not yet been placed or drawn. This avoids waiting for a later pan
+          // or layer-toggle to reveal context on the first map visit.
+          sourceFeatures = map.querySourceFeatures("openmaptiles", { sourceLayer });
         } catch {
-          continue;
+          sourceFeatures = [];
         }
 
-        for (const [index, item] of rendered.entries()) {
+        for (const [index, item] of sourceFeatures.entries()) {
           const geometry = item.geometry as Geometry | null;
           if (!geometry || !geometry.type) continue;
-          const properties = (item.properties ?? {}) as AreaProperties;
-          const rawName = [
-            properties.name,
-            (properties as Record<string, unknown>).name_en,
-            (properties as Record<string, unknown>).name_local,
-            (properties as Record<string, unknown>).operator
-          ].find((value): value is string =>
-            typeof value === "string" && value.trim().length > 0
-          ) ?? null;
-          const sourceLayer = (item as MapGeoJSONFeature & { sourceLayer?: string }).sourceLayer ?? layer.id;
+          const properties = (item.properties ?? {}) as Record<string, unknown>;
+          const category = categoryFor(properties);
+          if (!category || !categories.includes(category)) continue;
           const geometryKey = geometry.type === "Point"
             ? JSON.stringify((geometry as Extract<Geometry, { type: "Point" }>).coordinates.map((value) =>
                 Number(value.toFixed(5))
               ))
-            : rawName ?? String(item.id ?? index);
-          const fallbackId = "vector-" + layer.category + "-" + sourceLayer + "-" +
+            : String(item.id ?? JSON.stringify((geometry as { coordinates?: unknown }).coordinates).slice(0, 240));
+          const rawName = [
+            properties.name_en,
+            properties.name,
+            properties.name_local,
+            properties.operator
+          ].find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null;
+          const fallbackId = "vector-" + category + "-" + sourceLayer + "-" +
             String(item.id ?? geometryKey);
-          const dedupeKey = layer.category + "|" + sourceLayer + "|" + geometryKey;
+          const dedupeKey = category + "|" + sourceLayer + "|" + geometryKey;
           if (features.has(dedupeKey)) continue;
 
           features.set(dedupeKey, {
@@ -2870,17 +2866,123 @@ export function MapView({
             properties: {
               ...properties,
               name: rawName,
-              overlay_category: layer.category,
+              overlay_category: category,
               source_id: fallbackId,
               source_type: "openmaptiles-vector-fallback",
               source_label: "OpenFreeMap / OpenMapTiles vector tiles; viewport and zoom coverage varies",
-              detail: "Fallback from the vector map tiles already loaded for this viewport."
+              detail: "Geographic context from the vector map tiles already loaded for this viewport."
             }
           });
+        }
+      };
+
+      if (categories.includes("healthEducation") || categories.includes("landmarks") || categories.includes("transportation")) {
+        addSourceLayer("poi", (properties) => {
+          const poiClass = String(properties.class ?? "");
+          const subclass = String(properties.subclass ?? "");
+          if (categories.includes("healthEducation") &&
+              (["school", "college", "hospital"].includes(poiClass) || poiHealth.has(subclass))) {
+            return "healthEducation";
+          }
+          if (categories.includes("transportation") &&
+              (["bus", "railway", "aerialway"].includes(poiClass) || poiTransport.has(subclass))) {
+            return "transportation";
+          }
+          if (categories.includes("landmarks") &&
+              (["attraction", "castle", "art_gallery", "stadium", "town_hall", "office", "post"].includes(poiClass) ||
+                poiLandmarks.has(subclass))) {
+            return "landmarks";
+          }
+          return null;
+        });
+      }
+
+      if (categories.includes("transportation")) {
+        addSourceLayer("transportation", (properties) =>
+          ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"].includes(String(properties.class ?? ""))
+            ? "transportation"
+            : null
+        );
+      }
+      if (categories.includes("nature")) {
+        addSourceLayer("park", () => "nature");
+        addSourceLayer("landcover", (properties) => String(properties.class ?? "") === "wood" ? "nature" : null);
+        addSourceLayer("water", (properties) => ["lake", "pond", "river"].includes(String(properties.class ?? "")) ? "nature" : null);
+        addSourceLayer("waterway", () => "nature");
+      }
+      if (categories.includes("landmarks")) {
+        addSourceLayer("landuse", (properties) => String(properties.class ?? "") === "industrial" ? "landmarks" : null);
+      }
+
+      // Keep the rendered-layer fallback as a secondary path for styles that
+      // expose vector layers but do not return source-layer features.
+      if (features.size === 0) {
+        const vectorLayers: Array<{ id: string; category: MapOverlayCategory }> = [
+          { id: "context-vector-roads", category: "transportation" },
+          { id: "context-vector-schools-health", category: "healthEducation" },
+          { id: "context-vector-landmarks", category: "landmarks" },
+          { id: "context-vector-transit", category: "transportation" },
+          { id: "context-vector-parks-fill", category: "nature" },
+          { id: "context-vector-industrial-fill", category: "landmarks" },
+          { id: "context-vector-forest-fill", category: "nature" },
+          { id: "context-vector-water-fill", category: "nature" },
+          { id: "context-vector-waterways", category: "nature" }
+        ];
+        for (const layer of vectorLayers) {
+          if (!categories.includes(layer.category) || !map.getLayer(layer.id)) continue;
+          if (map.getLayoutProperty(layer.id, "visibility") === "none") continue;
+          let rendered: MapGeoJSONFeature[] = [];
+          try {
+            rendered = map.queryRenderedFeatures(undefined, { layers: [layer.id] });
+          } catch {
+            continue;
+          }
+          for (const [index, item] of rendered.entries()) {
+            const geometry = item.geometry as Geometry | null;
+            if (!geometry || !geometry.type) continue;
+            const properties = (item.properties ?? {}) as Record<string, unknown>;
+            const rawName = [properties.name, properties.name_en, properties.name_local, properties.operator]
+              .find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null;
+            const geometryKey = geometry.type === "Point"
+              ? JSON.stringify((geometry as Extract<Geometry, { type: "Point" }>).coordinates.map((value) => Number(value.toFixed(5)))
+              : String(item.id ?? rawName ?? index);
+            const fallbackId = "vector-" + layer.category + "-" + layer.id + "-" + String(item.id ?? geometryKey);
+            const dedupeKey = layer.category + "|" + layer.id + "|" + geometryKey;
+            if (features.has(dedupeKey)) continue;
+            features.set(dedupeKey, {
+              type: "Feature",
+              id: fallbackId,
+              geometry,
+              properties: {
+                ...properties,
+                name: rawName,
+                overlay_category: layer.category,
+                source_id: fallbackId,
+                source_type: "openmaptiles-vector-fallback",
+                source_label: "OpenFreeMap / OpenMapTiles vector tiles; viewport and zoom coverage varies",
+                detail: "Fallback from the vector map tiles already loaded for this viewport."
+              }
+            });
+          }
         }
       }
 
       return Array.from(features.values()).slice(0, 2500);
+    };
+
+    const publishVectorTileFallback = () => {
+      const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
+      if (!source || showLayersRef.current.length === 0) return 0;
+      const features = buildVectorTileOverlayFallback(showLayersRef.current);
+      if (features.length > 0) {
+        source.setData({ type: "FeatureCollection", features } as MapFeatureCollection);
+        recordE2ETrace("show-overlay-vector-fallback-immediate", {
+          featureCount: features.length,
+          categories: showLayersRef.current,
+          zoom: Number(map.getZoom().toFixed(1))
+        });
+      }
+      return features.length;
     };
 
     const refreshShowOverlays = async () => {
@@ -3090,6 +3192,9 @@ export function MapView({
       // automatically because regional vector tiles can omit point features.
       applyShowOverlayFilters(map, showLayersRef.current);
       applyVectorContextVisibility(map, showLayersRef.current);
+      // Publish local vector-tile context before any optional network request.
+      // This is the first-load path; it never waits for Overpass to succeed.
+      publishVectorTileFallback();
 
       if (showOverlayScheduleTimer !== null) clearTimeout(showOverlayScheduleTimer);
       if (showLayersRef.current.length === 0) {
@@ -3447,6 +3552,10 @@ export function MapView({
             clearTimeout(showOverlayScheduleTimer);
             showOverlayScheduleTimer = null;
           }
+          // Map idle means the initial visible vector tiles have settled.
+          // Publish POIs/roads from those tiles first, then let the API enrich
+          // the same source when its external providers respond.
+          publishVectorTileFallback();
           void refreshShowOverlays();
         }
 
