@@ -2452,7 +2452,9 @@ export function MapView({
 
     const refreshShowOverlays = async () => {
       const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
-      if (!map.isStyleLoaded() || !source) return;
+      // The GeoJSON source is added during style.load. Do not wait for every basemap tile:
+      // context data must begin loading on the first view, not after a later map movement.
+      if (!source) return;
       showOverlayController?.abort();
       showOverlayController = null;
       const sequence = ++showOverlaySequence;
@@ -2477,19 +2479,36 @@ export function MapView({
         scope: showScopeRef.current
       });
 
-      try {
-        const response = await fetch("/api/geography/places?" + params.toString(), {
-          signal: controller.signal
-        });
-        if (!response.ok) throw new Error("Place overlay request failed (" + response.status + ")");
-        const data = await response.json() as MapFeatureCollection;
-        if (sequence !== showOverlaySequence || controller.signal.aborted) return;
-        source.setData(data);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error("Map place overlay loading failed.", error);
-        source.setData(emptyFeatureCollection());
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          recordE2ETrace("show-overlay-request", { categories, bbox, attempt });
+          const response = await fetch("/api/geography/places?" + params.toString(), {
+            signal: controller.signal
+          });
+          if (!response.ok) throw new Error("Place overlay request failed (" + response.status + ")");
+          const data = await response.json() as MapFeatureCollection;
+          if (sequence !== showOverlaySequence || controller.signal.aborted) return;
+          source.setData(data);
+          recordE2ETrace("show-overlay-response", {
+            categories,
+            featureCount: data.features?.length ?? 0,
+            attempt
+          });
+          return;
+        } catch (error) {
+          lastError = error;
+          if (controller.signal.aborted || sequence !== showOverlaySequence) return;
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700));
+        }
       }
+      if (controller.signal.aborted || sequence !== showOverlaySequence) return;
+      console.error("Map place overlay loading failed after automatic retry.", lastError);
+      recordE2ETrace("show-overlay-failed", {
+        categories,
+        reason: lastError instanceof Error ? lastError.message : String(lastError)
+      });
+      source.setData(emptyFeatureCollection());
     };
 
     const scheduleShowOverlayRefresh = () => {
@@ -2505,7 +2524,7 @@ export function MapView({
 
     const refreshZoningOverlay = async () => {
       const source = map.getSource("zoning-overlay") as GeoJSONSource | undefined;
-      if (!map.isStyleLoaded() || !source) return;
+      if (!source) return;
       zoningOverlayController?.abort();
       zoningOverlayController = null;
       const sequence = ++zoningOverlaySequence;
