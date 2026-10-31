@@ -139,22 +139,22 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
   if (categories.includes("healthEducation")) {
     selections.push(regionalView
       ? 'nwr["amenity"~"school|university|college|hospital"](' + box + ");"
-      : 'nwr["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");');
+      : 'nwr["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");");
     selections.push(regionalView
       ? 'nwr["healthcare"="hospital"](' + box + ");"
-      : 'nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");');
+      : 'nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");");
   }
 
   if (categories.includes("nature")) {
     selections.push('nwr["leisure"~"park|nature_reserve"](' + box + ");");
     selections.push(regionalView
       ? 'nwr["natural"="water"](' + box + ");"
-      : 'nwr["natural"~"water|waterfall|wood"](' + box + ");');
+      : 'nwr["natural"~"water|waterfall|wood"](' + box + ");");
     selections.push('nwr["water"="lake"](' + box + ");");
-    selections.push('nwr["landuse"="forest"](' + box + ");');
+    selections.push('nwr["landuse"="forest"](' + box + ");");
     if (!regionalView) {
       selections.push('nwr["waterway"="waterfall"](' + box + ");");
-      selections.push('nwr["boundary"="protected_area"](' + box + ");');
+      selections.push('nwr["boundary"="protected_area"](' + box + ");");
     }
   }
 
