@@ -3021,11 +3021,30 @@ export function MapView({
       map.getCanvas().style.cursor = feature ? "pointer" : "";
     };
 
+    const handleDocumentPointerMove = (event: PointerEvent) => {
+      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
+      const rect = map.getCanvas().getBoundingClientRect();
+      const pointerInsideMap =
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+
+      // Opening the parcel inspector can cover the point where the user clicked.
+      // Keep the selected parcel glowing while the pointer is stationary, then
+      // clear it only after the pointer actually moves outside the map canvas.
+      if (!pointerInsideMap) clearParcelGlow();
+    };
+
+    const handleWindowBlur = () => clearParcelGlow();
+
     const handleMapPointerLeave = () => {
       lastMapPointerPoint = null;
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
-      clearParcelGlow();
+      // Do not clear a clicked parcel here. Opening its detail panel may cover
+      // the pointer without the user moving it; document pointer movement below
+      // distinguishes that layout change from an actual pointer leaving.
       map.getCanvas().style.cursor = "";
     };
 
@@ -3079,6 +3098,8 @@ export function MapView({
 
       map.on("mousemove", handleMapPointerMove);
       map.getCanvas().addEventListener("mouseleave", handleMapPointerLeave);
+      window.addEventListener("pointermove", handleDocumentPointerMove);
+      window.addEventListener("blur", handleWindowBlur);
       map.on("zoomend", () => {
         // The pointer often stays still while a user zooms. Re-check that same
         // screen position against the newly active admin level.
@@ -3312,6 +3333,8 @@ export function MapView({
       activeController?.abort();
       resizeObserver?.disconnect();
       map.getCanvas().removeEventListener("mouseleave", handleMapPointerLeave);
+      window.removeEventListener("pointermove", handleDocumentPointerMove);
+      window.removeEventListener("blur", handleWindowBlur);
       map.remove();
       mapRef.current = null;
       if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {
