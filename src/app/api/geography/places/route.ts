@@ -643,7 +643,7 @@ export async function GET(request: NextRequest) {
       {
         headers: {
           "Cache-Control": partial
-            ? "public, max-age=0, s-maxage=60, stale-while-revalidate=300"
+            ? "no-store"
             : "public, max-age=0, s-maxage=300, stale-while-revalidate=900",
           "X-Data-Source": "OpenStreetMap / Overpass API",
           "X-Map-Coverage": scope === "kigali"
