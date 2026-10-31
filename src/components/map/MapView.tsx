@@ -2820,6 +2820,76 @@ export function MapView({
     let showOverlayCompletedKey: string | null = null;
     let showOverlayAutomaticRetryUsed = false;
 
+    const buildVectorTileOverlayFallback = (
+      categories: MapOverlayCategory[]
+    ): MapFeatureCollection["features"] => {
+      const vectorLayers: Array<{ id: string; category: MapOverlayCategory }> = [
+        { id: "context-vector-roads", category: "transportation" },
+        { id: "context-vector-schools-health", category: "healthEducation" },
+        { id: "context-vector-landmarks", category: "landmarks" },
+        { id: "context-vector-transit", category: "transportation" },
+        { id: "context-vector-parks-fill", category: "nature" },
+        { id: "context-vector-industrial-fill", category: "landmarks" },
+        { id: "context-vector-forest-fill", category: "nature" },
+        { id: "context-vector-water-fill", category: "nature" },
+        { id: "context-vector-waterways", category: "nature" }
+      ];
+      const features = new Map<string, MapFeatureCollection["features"][number]>();
+
+      for (const layer of vectorLayers) {
+        if (!categories.includes(layer.category) || !map.getLayer(layer.id)) continue;
+        if (map.getLayoutProperty(layer.id, "visibility") === "none") continue;
+
+        let rendered: MapGeoJSONFeature[] = [];
+        try {
+          rendered = map.queryRenderedFeatures(undefined, { layers: [layer.id] });
+        } catch {
+          continue;
+        }
+
+        for (const [index, item] of rendered.entries()) {
+          const geometry = item.geometry as Geometry | null;
+          if (!geometry || !geometry.type) continue;
+          const properties = (item.properties ?? {}) as AreaProperties;
+          const rawName = [
+            properties.name,
+            (properties as Record<string, unknown>).name_en,
+            (properties as Record<string, unknown>).name_local,
+            (properties as Record<string, unknown>).operator
+          ].find((value): value is string =>
+            typeof value === "string" && value.trim().length > 0
+          ) ?? null;
+          const sourceLayer = (item as MapGeoJSONFeature & { sourceLayer?: string }).sourceLayer ?? layer.id;
+          const geometryKey = geometry.type === "Point"
+            ? JSON.stringify((geometry as Extract<Geometry, { type: "Point" }>).coordinates.map((value) =>
+                Number(value.toFixed(5))
+              ))
+            : rawName ?? String(item.id ?? index);
+          const fallbackId = "vector-" + layer.category + "-" + sourceLayer + "-" +
+            String(item.id ?? geometryKey);
+          const dedupeKey = layer.category + "|" + sourceLayer + "|" + geometryKey;
+          if (features.has(dedupeKey)) continue;
+
+          features.set(dedupeKey, {
+            type: "Feature",
+            id: fallbackId,
+            geometry,
+            properties: {
+              ...properties,
+              name: rawName,
+              overlay_category: layer.category,
+              source_id: fallbackId,
+              source_type: "openmaptiles-vector-fallback",
+              source_label: "OpenFreeMap / OpenMapTiles vector tiles; viewport and zoom coverage varies",
+              detail: "Fallback from the vector map tiles already loaded for this viewport."
+            }
+          });
+        }
+      }
+
+      return Array.from(features.values()).slice(0, 2500);
+    };
+
     const refreshShowOverlays = async () => {
       const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
       if (!source) return;
@@ -2886,7 +2956,18 @@ export function MapView({
           const response = await fetch("/api/geography/places?" + params.toString(), {
             signal: controller.signal
           });
-          if (!response.ok) throw new Error("Place overlay request failed (" + response.status + ")");
+          if (!response.ok) {
+            const body = await response.json().catch(() => null) as {
+              error?: string;
+              detail?: string;
+              failedCategories?: string[];
+            } | null;
+            lastFailedCategories = body?.failedCategories ?? categories;
+            throw new Error(
+              "Place overlay request failed (" + response.status + ")" +
+              (body?.detail ? ": " + body.detail : body?.error ? ": " + body.error : "")
+            );
+          }
           const data = await response.json() as MapFeatureCollection & {
             partial?: boolean;
             warning?: string;
@@ -2914,6 +2995,23 @@ export function MapView({
             break;
           }
 
+          if ((data.features?.length ?? 0) === 0) {
+            const fallbackFeatures = buildVectorTileOverlayFallback(categories);
+            if (fallbackFeatures.length > 0) {
+              source.setData({ type: "FeatureCollection", features: fallbackFeatures });
+              showOverlayAutomaticRetryUsed = false;
+              showOverlayCompletedKey = requestKey;
+              showOverlayActiveKey = null;
+              if (showOverlayController === controller) showOverlayController = null;
+              recordE2ETrace("show-overlay-vector-fallback", {
+                categories,
+                featureCount: fallbackFeatures.length,
+                reason: "Overpass returned an empty viewport"
+              });
+              return;
+            }
+          }
+
           source.setData(data);
           showOverlayAutomaticRetryUsed = false;
           showOverlayCompletedKey = requestKey;
@@ -2933,14 +3031,30 @@ export function MapView({
       }
       if (controller.signal.aborted || sequence !== showOverlaySequence) return;
 
-      // Keep working categories visible even when another publisher/query group
-      // is unavailable. The recovery request below retries the missing group.
+      // Preserve any successful Overpass features, then fill missing context
+      // from the vector tiles already rendered by the basemap. This keeps public
+      // places visible when all optional Overpass instances are unavailable.
+      const fallbackFeatures = buildVectorTileOverlayFallback(categories);
+      for (const feature of fallbackFeatures) {
+        partialFeatures.set("vector-fallback:" + String(feature.id), feature);
+      }
       source.setData({
         type: "FeatureCollection",
         features: Array.from(partialFeatures.values())
       } as MapFeatureCollection);
       showOverlayActiveKey = null;
       if (showOverlayController === controller) showOverlayController = null;
+      if (fallbackFeatures.length > 0) {
+        showOverlayCompletedKey = requestKey;
+        showOverlayAutomaticRetryUsed = false;
+        recordE2ETrace("show-overlay-vector-fallback", {
+          categories,
+          featureCount: fallbackFeatures.length,
+          retainedOverpassFeatureCount: partialFeatures.size - fallbackFeatures.length,
+          failedCategories: lastFailedCategories
+        });
+        return;
+      }
       recordE2ETrace("show-overlay-response", {
         categories,
         featureCount: partialFeatures.size,
