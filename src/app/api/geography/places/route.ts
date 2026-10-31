@@ -431,6 +431,8 @@ function clipFeatureToDistricts(
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  const requestedZoom = Number(params.get("zoom") ?? "8");
+  const zoom = Number.isFinite(requestedZoom) ? Math.max(5, Math.min(20, requestedZoom)) : 8;
   const bounds = parseBounds(params.get("bbox"));
   if (!bounds) {
     return NextResponse.json(
