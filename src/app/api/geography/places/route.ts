@@ -132,7 +132,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
       selections.push('nwr["office"~"government|administrative|diplomatic"](' + box + ");");
       selections.push('nwr["amenity"~"townhall|police|fire_station|courthouse|community_centre|convention_centre"](' + box + ");");
       selections.push('nwr["landuse"="industrial"](' + box + ");");
-      selections.push('nwr["man_made"="works"](' + box + ");');
+      selections.push('nwr["man_made"="works"](' + box + ");");
     }
   }
 
