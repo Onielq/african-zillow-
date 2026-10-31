@@ -57,7 +57,7 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
   assert.match(mapView, /0\.2/);
-  assert.match(mapView, /0\.40/);
+  assert.match(mapView, /0\.46/);
   assert.match(mapView, /0\.44/);
   assert.match(mapView, /0\.10/);
   assert.match(mapView, /0\.5/);
@@ -81,6 +81,8 @@ test("the map idle fallback does not race the queued viewport refresh and abort 
 
   assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
   assert.match(idleFallback, /if \(needsRefresh\) \{[\s\S]*?clearTimeout\(refreshTimer\);[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+  assert.match(idleFallback, /else if \(isFirstIdleFrame\) \{[\s\S]*?void refreshAreas\(\);/);
+  assert.match(idleFallback, /void refreshShowOverlays\(\);/);
   assert.match(mapView, /const refreshKey = \[/);
   assert.match(mapView, /activeRefreshKey === refreshKey/);
   assert.match(mapView, /area-refresh-skipped-duplicate/);
@@ -647,7 +649,7 @@ test("map hover and metric bubbles follow the selected indicator at each adminis
   const metrics = await readProjectFile("src/app/api/geography/metric-bubbles/route.ts");
 
   assert.match(mapView, /feature-state.*hover/s);
-  assert.match(mapView, /#65D5A1/);
+  assert.match(mapView, /#4FD58A/);
   assert.match(mapView, /VILLAGE_ZOOM = 16\.2/);
   assert.match(mapView, /metric-bubbles-circle/);
   assert.match(mapView, /selectedMetricRef/);
