@@ -569,7 +569,64 @@ function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverla
   for (const [id, filter] of filters) {
     if (map.getLayer(id)) map.setFilter(id, filter as never);
   }
+  applyVectorContextVisibility(map, categories);
 }
+
+const CONTEXT_VECTOR_LAYER_CATEGORIES: Array<[string, MapOverlayCategory]> = [
+  ["context-vector-roads-casing", "transportation"],
+  ["context-vector-roads", "transportation"],
+  ["context-vector-schools-health", "healthEducation"],
+  ["context-vector-landmarks", "landmarks"],
+  ["context-vector-transit", "transportation"],
+  ["context-vector-parks-fill", "nature"],
+  ["context-vector-parks-outline", "nature"],
+  ["context-vector-water-fill", "nature"],
+  ["context-vector-water-outline", "nature"],
+  ["context-vector-waterways", "nature"],
+  ["context-vector-poi-labels", "landmarks"]
+];
+
+function openMapTilesPoiFilter(categories: MapOverlayCategory[]): unknown[] {
+  const matches: unknown[][] = [];
+  if (categories.includes("healthEducation")) {
+    matches.push(
+      ["in", ["get", "class"], ["literal", ["school", "college", "hospital"]]],
+      ["in", ["get", "subclass"], ["literal", ["school", "kindergarten", "university", "clinic", "doctors", "pharmacy", "dentist"]]]
+    );
+  }
+  if (categories.includes("landmarks")) {
+    matches.push(
+      ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall"]]],
+      ["in", ["get", "subclass"], ["literal", ["viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site"]]]
+    );
+  }
+  if (categories.includes("transportation")) {
+    matches.push(
+      ["in", ["get", "class"], ["literal", ["bus", "railway", "aerialway"]]],
+      ["in", ["get", "subclass"], ["literal", ["bus_stop", "bus_station", "station", "tram_stop", "platform"]]]
+    );
+  }
+  if (matches.length === 0) return ["==", ["get", "class"], "__hidden__"];
+  return ["all", ["==", ["geometry-type"], "Point"], ["any", ...matches]];
+}
+
+function applyVectorContextVisibility(map: MapLibreMapInstance, categories: MapOverlayCategory[]) {
+  const enabled = new Set(categories);
+  for (const [layerId, category] of CONTEXT_VECTOR_LAYER_CATEGORIES) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", enabled.has(category) ? "visible" : "none");
+    }
+  }
+  if (map.getLayer("context-vector-poi-labels")) {
+    map.setFilter("context-vector-poi-labels", [
+      "all",
+      ["has", "name"],
+      ["<=", ["coalesce", ["get", "rank"], 99], 18],
+      openMapTilesPoiFilter(categories)
+    ] as never);
+  }
+}
+
 const NORMAL_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || FALLBACK_STYLE_URL;
 
@@ -591,6 +648,11 @@ const SATELLITE_STYLE: StyleSpecification = {
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
       tileSize: 256, minzoom: 0, maxzoom: 23,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    },
+    openmaptiles: {
+      type: "vector",
+      url: "https://tiles.openfreemap.org/planet",
+      attribution: "© OpenFreeMap © OpenMapTiles · Data from OpenStreetMap contributors"
     }
   },
   layers: [
@@ -614,6 +676,11 @@ const HYBRID_STYLE: StyleSpecification = {
       tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
       tileSize: 256, minzoom: 0, maxzoom: 19,
       attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
+    },
+    openmaptiles: {
+      type: "vector",
+      url: "https://tiles.openfreemap.org/planet",
+      attribution: "© OpenFreeMap © OpenMapTiles · Data from OpenStreetMap contributors"
     }
   },
   layers: [
@@ -1935,6 +2002,193 @@ export function MapView({
       applyShowOverlayFilters(map, showLayersRef.current);
     };
 
+
+    const addContextVectorLayers = () => {
+      // The Liberty base style already uses this source. Add the same public
+      // vector tiles to imagery-only styles so roads, POIs and nature features
+      // remain available in Map, Satellite and Hybrid views.
+      if (!map.getSource("openmaptiles")) {
+        map.addSource("openmaptiles", {
+          type: "vector",
+          url: "https://tiles.openfreemap.org/planet",
+          attribution: "© OpenFreeMap © OpenMapTiles · Data from OpenStreetMap contributors"
+        });
+      }
+
+      const beforeId = map.getLayer(AREA_LAYERS.district.label)
+        ? AREA_LAYERS.district.label
+        : undefined;
+      const addLayer = (layer: Parameters<MapLibreMapInstance["addLayer"]>[0]) => {
+        if (!map.getLayer(layer.id)) map.addLayer(layer, beforeId);
+      };
+
+      addLayer({
+        id: "context-vector-roads-casing",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "transportation",
+        minzoom: 7.5,
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]]],
+        paint: {
+          "line-color": "#FFFFFF",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7.5, 2.1, 12, 3.8, 16, 5.4],
+          "line-opacity": 0.82
+        }
+      });
+      addLayer({
+        id: "context-vector-roads",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "transportation",
+        minzoom: 7.5,
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]]],
+        paint: {
+          "line-color": "#3E8198",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7.5, 0.9, 12, 1.6, 16, 2.5],
+          "line-opacity": 0.88
+        }
+      });
+      addLayer({
+        id: "context-vector-schools-health",
+        type: "circle",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 8.5,
+        filter: [
+          "all",
+          ["==", ["geometry-type"], "Point"],
+          ["any",
+            ["in", ["get", "class"], ["literal", ["school", "college", "hospital"]]],
+            ["in", ["get", "subclass"], ["literal", ["school", "kindergarten", "university", "clinic", "doctors", "pharmacy", "dentist"]]]
+          ]
+        ],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 2.5, 12, 3.8, 16, 5.4],
+          "circle-color": "#C85D55",
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-width": 1.3,
+          "circle-opacity": 0.96
+        }
+      });
+      addLayer({
+        id: "context-vector-landmarks",
+        type: "circle",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 8.5,
+        filter: [
+          "all",
+          ["==", ["geometry-type"], "Point"],
+          ["any",
+            ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall"]]],
+            ["in", ["get", "subclass"], ["literal", ["viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site"]]]
+          ]
+        ],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 2.4, 12, 3.8, 16, 5.4],
+          "circle-color": "#B98A37",
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-width": 1.3,
+          "circle-opacity": 0.96
+        }
+      });
+      addLayer({
+        id: "context-vector-transit",
+        type: "circle",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 9.5,
+        filter: [
+          "all",
+          ["==", ["geometry-type"], "Point"],
+          ["any",
+            ["in", ["get", "class"], ["literal", ["bus", "railway", "aerialway"]]],
+            ["in", ["get", "subclass"], ["literal", ["bus_stop", "bus_station", "station", "tram_stop", "platform"]]]
+          ]
+        ],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 9.5, 2.2, 13, 3.8, 16, 5.2],
+          "circle-color": "#4F83B6",
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-width": 1.2,
+          "circle-opacity": 0.96
+        }
+      });
+      addLayer({
+        id: "context-vector-parks-fill",
+        type: "fill",
+        source: "openmaptiles",
+        "source-layer": "park",
+        minzoom: 8,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+        paint: { "fill-color": "#4C9A70", "fill-opacity": 0.17 }
+      });
+      addLayer({
+        id: "context-vector-parks-outline",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "park",
+        minzoom: 8,
+        filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+        paint: { "line-color": "#3B805C", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.45, 15, 1.2], "line-opacity": 0.7 }
+      });
+      addLayer({
+        id: "context-vector-water-fill",
+        type: "fill",
+        source: "openmaptiles",
+        "source-layer": "water",
+        minzoom: 7,
+        filter: ["in", ["get", "class"], ["literal", ["lake", "pond", "river"]]],
+        paint: { "fill-color": "#65AFC9", "fill-opacity": 0.2 }
+      });
+      addLayer({
+        id: "context-vector-water-outline",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "water",
+        minzoom: 8,
+        filter: ["in", ["get", "class"], ["literal", ["lake", "pond", "river"]]],
+        paint: { "line-color": "#3B91B4", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 15, 1.15], "line-opacity": 0.75 }
+      });
+      addLayer({
+        id: "context-vector-waterways",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "waterway",
+        minzoom: 9,
+        paint: {
+          "line-color": "#4F9FC0",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 15, 1.6],
+          "line-opacity": 0.76
+        }
+      });
+      addLayer({
+        id: "context-vector-poi-labels",
+        type: "symbol",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 12.5,
+        filter: openMapTilesPoiFilter(showLayersRef.current) as never,
+        layout: {
+          "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
+          "text-font": ["Noto Sans Medium", "Arial Unicode MS Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 12.5, 9, 16, 11],
+          "text-offset": [0, 1.0],
+          "text-anchor": "top",
+          "text-max-width": 10,
+          "text-allow-overlap": false
+        },
+        paint: {
+          "text-color": "#233D31",
+          "text-halo-color": "#FFFFFF",
+          "text-halo-width": 1.6,
+          "text-halo-blur": 0.25
+        }
+      });
+
+      applyVectorContextVisibility(map, showLayersRef.current);
+    };
+
     const addZoningOverlayLayers = () => {
       if (!map.getSource("zoning-overlay")) {
         map.addSource("zoning-overlay", {
@@ -2624,15 +2878,11 @@ export function MapView({
     };
 
     const scheduleShowOverlayRefresh = () => {
-      showOverlayAutomaticRetryUsed = false;
-      if (showOverlayRecoveryTimer !== null) {
-        clearTimeout(showOverlayRecoveryTimer);
-        showOverlayRecoveryTimer = null;
-      }
+      // Context geometry comes directly from the OpenFreeMap vector tiles.
+      // Toggling layers only changes local MapLibre filters/visibility; it
+      // never requires a click-triggered request to a shared Overpass server.
       applyShowOverlayFilters(map, showLayersRef.current);
-      if (!initialMapIdleReached) return;
-      if (showOverlayTimer) clearTimeout(showOverlayTimer);
-      showOverlayTimer = setTimeout(() => void refreshShowOverlays(), 260);
+      applyVectorContextVisibility(map, showLayersRef.current);
     };
     refreshShowOverlaysRef.current = scheduleShowOverlayRefresh;
 
@@ -2892,6 +3142,7 @@ export function MapView({
       onStatusChange("loading");
       addAdministrativeLayers();
       addShowOverlayLayers();
+      addContextVectorLayers();
       addZoningOverlayLayers();
       keepParcelBoundariesAndMarkersAboveContext();
       updateLayerVisibility();
