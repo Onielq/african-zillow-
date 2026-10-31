@@ -101,6 +101,17 @@ try {
     return Boolean(map && map.isStyleLoaded());
   }, undefined, { timeout: 90_000 });
 
+  // Place/context overlays must be requested and rendered on the first view,
+  // before the user clicks a layer toggle or moves the map.
+  const initialOverlayHandle = await page.waitForFunction(() => {
+    const trace = window.__RLI_E2E_TRACE__ ?? [];
+    return trace.find((entry) => entry.event === "show-overlay-response") ?? false;
+  }, undefined, { timeout: 45_000 });
+  const initialOverlayCheck = await initialOverlayHandle.jsonValue();
+  if (!initialOverlayCheck || initialOverlayCheck.featureCount <= 0) {
+    throw new Error("Place overlays did not return any features on the initial map view.");
+  }
+
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
@@ -119,6 +130,49 @@ try {
       return false;
     }
   }, undefined, { timeout: 50_000 }).catch(() => {});
+
+  // Confirm that moving over a village boundary activates its hover state,
+  // and moving off the boundary removes that state.
+  const villageHoverTarget = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return null;
+    const rect = map.getCanvas().getBoundingClientRect();
+    for (let y = 18; y < rect.height - 18; y += 24) {
+      for (let x = 18; x < rect.width - 18; x += 24) {
+        const feature = map.queryRenderedFeatures([x, y], {
+          layers: ["village-fill"]
+        }).find((item) => item.id !== undefined);
+        if (feature && (typeof feature.id === "string" || typeof feature.id === "number")) {
+          return {
+            x: rect.left + x,
+            y: rect.top + y,
+            source: feature.source,
+            id: feature.id
+          };
+        }
+      }
+    }
+    return null;
+  });
+  if (!villageHoverTarget) {
+    throw new Error("No rendered village polygon was available for the hover interaction check.");
+  }
+  await page.mouse.move(villageHoverTarget.x, villageHoverTarget.y);
+  await page.waitForFunction(({ source, id }) => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.getFeatureState({ source, id }).hover === true);
+  }, villageHoverTarget, { timeout: 8_000 });
+  await page.mouse.move(12, 12);
+  await page.waitForFunction(({ source, id }) => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.getFeatureState({ source, id }).hover !== true);
+  }, villageHoverTarget, { timeout: 8_000 });
+  const villageHoverCheck = {
+    source: villageHoverTarget.source,
+    featureId: villageHoverTarget.id,
+    highlightActivated: true,
+    highlightClearedOnLeave: true
+  };
 
   // Only issue a second direct API request if the map did not load parcels.
   // Avoid duplicating a slow GIS/fallback request when the visible map already
@@ -259,6 +313,8 @@ try {
     url: baseUrl,
     zoomLevel: "village",
     ...result,
+    initialOverlayCheck,
+    villageHoverCheck,
     directParcelApi,
     removedPanelCount,
     exploreAreaTextCount,
