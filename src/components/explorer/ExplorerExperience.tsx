@@ -197,7 +197,7 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
   const [mapStatus, setMapStatus] = useState<BasemapStatus>("loading");
   const [boundaryStatus, setBoundaryStatus] = useState<BoundaryStatus>("loading");
-  const [mapLayers, setMapLayers] = useState<MapOverlayCategory[]>([]);
+  const [mapLayers, setMapLayers] = useState<MapOverlayCategory[]>(["landmarks", "healthEducation", "transportation", "nature"]);
   const [showZoning, setShowZoning] = useState(false);
 
   const pathKey = initialAreaPath.join("|");
