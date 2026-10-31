@@ -275,18 +275,24 @@ function pointInDistrictAreas(point: [number, number], areas: DistrictAreaFeatur
   });
 }
 
-const PILOT_DISTRICT_LAYERS = [
+type PilotDistrictLayer = {
+  id: "kigali" | "bugesera";
+  url: string;
+  districts: readonly string[];
+};
+
+const PILOT_DISTRICT_LAYERS: readonly PilotDistrictLayer[] = [
   {
-    id: "kigali" as const,
+    id: "kigali",
     url: "https://masterplan.kigalicity.gov.rw/server/rest/services/Masterplan2020/Masterplan2020_22Apr2026/MapServer/4",
     districts: ["gasabo", "kicukiro", "nyarugenge"]
   },
   {
-    id: "bugesera" as const,
+    id: "bugesera",
     url: "https://geodata.rw/server/rest/services/Overlays/Bugesera_Masterplan/MapServer/2",
     districts: ["bugesera"]
   }
-] as const;
+];
 
 function readDistrictName(properties: Record<string, unknown>): string {
   const candidates = new Set(["district", "districtname", "district1", "distname", "name", "namee"]);
