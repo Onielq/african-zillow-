@@ -2162,7 +2162,11 @@ export function MapView({
             continue;
           }
 
-          if (!signal.aborted && !(level === "parcel" && featureCount === 0)) {
+          if (
+            !signal.aborted &&
+            !(level === "parcel" && featureCount === 0) &&
+            !(isActiveGeographyLevel && featureCount === 0)
+          ) {
             areaCache.set(cacheKey, { bounds: queryBounds, data });
           }
           return data;
@@ -2309,7 +2313,8 @@ export function MapView({
                 levelData.set(adminSource, data);
                 publishLevel(level);
                 if (level === activeLevel) {
-                  activeSourceSuccesses += 1;
+                  if ((data.features?.length ?? 0) > 0) activeSourceSuccesses += 1;
+                  else activeSourceFailures += 1;
                   reportActiveReady();
                 }
               })
