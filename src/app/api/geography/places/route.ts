@@ -51,9 +51,14 @@ const VALID_CATEGORIES: OverlayCategory[] = [
   "nature"
 ];
 const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter"
+  // Distribute initial parallel map queries across independent global instances.
+  // Public Overpass servers are best-effort and can return 429/502/504 under load.
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter",
+  "https://overpass-api.de/api/interpreter"
 ];
+let overpassEndpointCursor = 0;
 
 function parseBounds(value: string | null): Bounds | null {
   if (!value) return null;
@@ -145,20 +150,22 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
   if (inFlight) return inFlight;
 
   const pending = (async () => {
-    let lastError: unknown;
-    for (const endpoint of OVERPASS_ENDPOINTS) {
+    const startIndex = overpassEndpointCursor++ % OVERPASS_ENDPOINTS.length;
+    const failures: string[] = [];
+    for (let attempt = 0; attempt < OVERPASS_ENDPOINTS.length; attempt += 1) {
+      const endpoint = OVERPASS_ENDPOINTS[(startIndex + attempt) % OVERPASS_ENDPOINTS.length];
       try {
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
             "Accept": "application/json",
-            "User-Agent": "Rwanda Land Intelligence map overlay"
+            "User-Agent": "Taiseel Rwanda Land Intelligence map overlay"
           },
           body: new URLSearchParams({ data: query }).toString(),
           signal: AbortSignal.timeout(14_000)
         });
-        if (!response.ok) throw new Error("Overpass returned HTTP " + response.status);
+        if (!response.ok) throw new Error("HTTP " + response.status);
         const payload = await response.json() as OsmResponse;
         if (payload.remark) throw new Error(payload.remark);
         const elements = payload.elements ?? [];
@@ -170,10 +177,13 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
         }
         return elements;
       } catch (error) {
-        lastError = error;
+        failures.push(
+          new URL(endpoint).hostname + ": " +
+          (error instanceof Error ? error.message : String(error))
+        );
       }
     }
-    throw lastError instanceof Error ? lastError : new Error("OpenStreetMap query failed");
+    throw new Error("All Overpass instances failed: " + failures.join(" | "));
   })().finally(() => {
     overpassInFlight.delete(query);
   });
