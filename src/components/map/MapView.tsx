@@ -2814,6 +2814,7 @@ export function MapView({
     let showOverlayController: AbortController | null = null;
     let showOverlaySequence = 0;
     let showOverlayRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    let showOverlayScheduleTimer: ReturnType<typeof setTimeout> | null = null;
     let showOverlayRequestKey: string | null = null;
     let showOverlayAutomaticRetryUsed = false;
 
@@ -2943,11 +2944,22 @@ export function MapView({
     };
 
     const scheduleShowOverlayRefresh = () => {
-      // Context geometry comes directly from the OpenFreeMap vector tiles.
-      // Toggling layers only changes local MapLibre filters/visibility; it
-      // never requires a click-triggered request to a shared Overpass server.
+      // Vector tiles remain the fast path. Supplement them with the place API
+      // automatically because regional vector tiles can omit point features.
       applyShowOverlayFilters(map, showLayersRef.current);
       applyVectorContextVisibility(map, showLayersRef.current);
+
+      if (showOverlayScheduleTimer !== null) clearTimeout(showOverlayScheduleTimer);
+      if (showLayersRef.current.length === 0) {
+        showOverlayController?.abort();
+        const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
+        source?.setData(emptyFeatureCollection());
+        return;
+      }
+      showOverlayScheduleTimer = setTimeout(() => {
+        showOverlayScheduleTimer = null;
+        void refreshShowOverlays();
+      }, 320);
     };
     refreshShowOverlaysRef.current = scheduleShowOverlayRefresh;
 
@@ -3384,6 +3396,7 @@ export function MapView({
       if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
       if (initialOverlayIdleFallbackTimer !== null) clearTimeout(initialOverlayIdleFallbackTimer);
       if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
+      if (showOverlayScheduleTimer !== null) clearTimeout(showOverlayScheduleTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
       zoningOverlayController?.abort();
