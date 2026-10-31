@@ -2526,12 +2526,14 @@ export function MapView({
         bounds.getEast(),
         bounds.getNorth()
       ].map((value) => value.toFixed(6)).join(",");
+      const zoom = Number(map.getZoom().toFixed(1));
       const params = new URLSearchParams({
         categories: categories.join(","),
         bbox,
-        scope: showScopeRef.current
+        scope: showScopeRef.current,
+        zoom: String(zoom)
       });
-      const requestKey = [categories.join(","), bbox, showScopeRef.current].join("|");
+      const requestKey = [categories.join(","), bbox, showScopeRef.current, zoom.toFixed(0)].join("|");
       if (showOverlayRequestKey !== requestKey) {
         showOverlayRequestKey = requestKey;
         showOverlayAutomaticRetryUsed = false;
