@@ -599,8 +599,13 @@ function openMapTilesPoiFilter(categories: MapOverlayCategory[]): unknown[] {
   }
   if (categories.includes("landmarks")) {
     matches.push(
-      ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall"]]],
-      ["in", ["get", "subclass"], ["literal", ["viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site"]]]
+      ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall", "office", "post"]]],
+      ["in", ["get", "subclass"], ["literal", [
+        "viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site",
+        "government", "administrative", "government_office", "sector_office", "courthouse",
+        "police", "fire_station", "post_office", "convention_centre", "convention_center",
+        "business_centre", "business_center", "community_centre", "community_center"
+      ]]]
     );
   }
   if (categories.includes("transportation")) {
