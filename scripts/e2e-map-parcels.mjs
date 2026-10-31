@@ -156,6 +156,8 @@ try {
       "context-vector-industrial-fill",
       "context-vector-forest-fill"
     ];
+    const placeSourceCount = map.querySourceFeatures("show-overlays").length;
+    const renderedPlaces = map.queryRenderedFeatures(undefined, { layers: ["show-poi-circles"] }).length;
     const zoom = map.getZoom();
     const visibleLayers = expectedLayers.filter((id) =>
       map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none"
@@ -183,7 +185,9 @@ try {
     if (
       !renderedLayers.includes("context-vector-roads") ||
       featureCount <= 0 ||
-      !pointLayersEligibleAtStart
+      !pointLayersEligibleAtStart ||
+      placeSourceCount <= 0 ||
+      renderedPlaces <= 0
     ) return false;
     return {
       event: "first-load-vector-context-rendered",
@@ -192,7 +196,9 @@ try {
       visibleLayers,
       renderedLayers,
       pointLayerZooms,
-      pointLayersEligibleAtStart
+      pointLayersEligibleAtStart,
+      placeSourceCount,
+      renderedPlaces
     };
   }, undefined, { timeout: 60_000 });
   const initialOverlayCheck = await initialOverlayHandle.jsonValue();
