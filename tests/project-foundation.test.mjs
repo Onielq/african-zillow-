@@ -57,7 +57,9 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
   assert.match(mapView, /0\.2/);
-  assert.match(mapView, /0\.42/);
+  assert.match(mapView, /0\.40/);
+  assert.match(mapView, /0\.44/);
+  assert.match(mapView, /0\.10/);
   assert.match(mapView, /0\.5/);
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
 });
@@ -702,7 +704,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /id: "metric-bubbles-circle"/);
   assert.match(mapView, /"circle-radius": \[\s*"case",\s*\["==", \["get", "show_dot"\], true\],\s*2\.35,\s*3\.2\s*\]/);
   assert.doesNotMatch(mapView, /"circle-radius": \[\s*"case"[\s\S]{0,200}\["interpolate", \["linear"\], \["zoom"\]/);
-  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*\[/);
+  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
   assert.match(mapView, /"line-width": \[\s*"case",\s*\["boolean", \["feature-state", "selected"\], false\]/);
   assert.match(mapView, /level === "parcel" \? 1\.25 : level === "village" \? 1\.35 : 1\.05/);
