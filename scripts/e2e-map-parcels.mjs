@@ -152,8 +152,11 @@ try {
       "context-vector-landmarks",
       "context-vector-transit",
       "context-vector-parks-fill",
-      "context-vector-water-fill"
+      "context-vector-water-fill",
+      "context-vector-industrial-fill",
+      "context-vector-forest-fill"
     ];
+    const zoom = map.getZoom();
     const visibleLayers = expectedLayers.filter((id) =>
       map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none"
     );
@@ -162,15 +165,34 @@ try {
       map.getLayoutProperty(id, "visibility") !== "none" &&
       map.queryRenderedFeatures(undefined, { layers: [id] }).length > 0
     );
+    const initialPointLayers = [
+      "context-vector-schools-health",
+      "context-vector-landmarks",
+      "context-vector-transit"
+    ];
+    const pointLayerZooms = Object.fromEntries(initialPointLayers.map((id) => [
+      id,
+      map.getLayer(id)?.minzoom ?? 0
+    ]));
+    const pointLayersEligibleAtStart = initialPointLayers.every((id) =>
+      map.getLayer(id) && (map.getLayer(id)?.minzoom ?? 0) <= zoom
+    );
     const featureCount = renderedLayers.reduce((total, id) =>
       total + map.queryRenderedFeatures(undefined, { layers: [id] }).length, 0
     );
-    if (!renderedLayers.includes("context-vector-roads") || featureCount <= 0) return false;
+    if (
+      !renderedLayers.includes("context-vector-roads") ||
+      featureCount <= 0 ||
+      !pointLayersEligibleAtStart
+    ) return false;
     return {
       event: "first-load-vector-context-rendered",
+      zoom,
       featureCount,
       visibleLayers,
-      renderedLayers
+      renderedLayers,
+      pointLayerZooms,
+      pointLayersEligibleAtStart
     };
   }, undefined, { timeout: 60_000 });
   const initialOverlayCheck = await initialOverlayHandle.jsonValue();
@@ -366,11 +388,19 @@ try {
     );
   }, undefined, { timeout: 20_000 });
 
+  const parcelFillOpacity = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return map?.getPaintProperty("parcel-fill", "fill-opacity") ?? null;
+  });
+  if (parcelFillOpacity !== 0.006) {
+    throw new Error("Selected parcel fills must remain transparent; the selection glow belongs on its outline only.");
+  }
   const parcelGlowCheck = {
     source: parcelHoverTarget.source,
     featureId: parcelHoverTarget.id,
     glowActivatedOnClick: true,
     glowRemovedOnLeave: true,
+    parcelFillOpacity,
     pointerStayedOnMapForLeave: Boolean(parcelBlankPoint)
   };
   // Only issue a second direct API request if the map did not load parcels.
