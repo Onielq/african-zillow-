@@ -13,6 +13,7 @@ const diagnostics = {
   consoleErrors: [],
   failedRequests: [],
   areaApiResponses: [],
+  placeApiResponses: [],
   basemapTileResponses: [],
   failedBasemapTileRequests: []
 };
@@ -23,7 +24,7 @@ page.on("console", (message) => {
 });
 page.on("requestfailed", (request) => {
   const url = request.url();
-  if (url.includes("/api/geography/areas")) {
+  if (url.includes("/api/geography/areas") || url.includes("/api/geography/places")) {
     diagnostics.failedRequests.push({
       url,
       error: request.failure()?.errorText ?? "request failed"
@@ -43,6 +44,27 @@ page.on("response", async (response) => {
       url: responseUrl,
       status: response.status()
     });
+  }
+  if (responseUrl.includes("/api/geography/places")) {
+    let summary = {};
+    try {
+      const body = await response.json();
+      summary = {
+        featureCount: Array.isArray(body?.features) ? body.features.length : null,
+        partial: body?.partial ?? false,
+        warning: body?.warning ?? null,
+        failedCategories: body?.failedCategories ?? [],
+        error: body?.error ?? null
+      };
+    } catch (error) {
+      summary = { parseError: error instanceof Error ? error.message : String(error) };
+    }
+    diagnostics.placeApiResponses.push({
+      url: responseUrl,
+      status: response.status(),
+      ...summary
+    });
+    return;
   }
   if (!responseUrl.includes("/api/geography/areas")) return;
   let summary = {};
