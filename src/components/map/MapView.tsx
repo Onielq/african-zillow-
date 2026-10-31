@@ -583,7 +583,6 @@ const CONTEXT_VECTOR_LAYER_CATEGORIES: Array<[string, MapOverlayCategory]> = [
   ["context-vector-water-fill", "nature"],
   ["context-vector-water-outline", "nature"],
   ["context-vector-waterways", "nature"],
-  ["context-vector-poi-labels", "landmarks"]
 ];
 
 function openMapTilesPoiFilter(categories: MapOverlayCategory[]): unknown[] {
@@ -618,6 +617,10 @@ function applyVectorContextVisibility(map: MapLibreMapInstance, categories: MapO
     }
   }
   if (map.getLayer("context-vector-poi-labels")) {
+    const hasPoiCategory = categories.some((category) =>
+      category === "healthEducation" || category === "landmarks" || category === "transportation"
+    );
+    map.setLayoutProperty("context-vector-poi-labels", "visibility", hasPoiCategory ? "visible" : "none");
     map.setFilter("context-vector-poi-labels", [
       "all",
       ["has", "name"],
@@ -2747,7 +2750,6 @@ export function MapView({
 
     let showOverlayController: AbortController | null = null;
     let showOverlaySequence = 0;
-    let showOverlayTimer: ReturnType<typeof setTimeout> | null = null;
     let showOverlayRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
     let showOverlayRequestKey: string | null = null;
     let showOverlayAutomaticRetryUsed = false;
@@ -3298,7 +3300,6 @@ export function MapView({
       if (parcelRefreshRetryTimer !== null) clearTimeout(parcelRefreshRetryTimer);
       if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
       if (initialOverlayIdleFallbackTimer !== null) clearTimeout(initialOverlayIdleFallbackTimer);
-      if (showOverlayTimer) clearTimeout(showOverlayTimer);
       if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
