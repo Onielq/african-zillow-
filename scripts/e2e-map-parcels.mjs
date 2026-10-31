@@ -141,17 +141,41 @@ try {
     return Boolean(map && map.isStyleLoaded());
   }, undefined, { timeout: 90_000 });
 
-  // Place/context overlays must be requested and rendered on the first view,
-  // before the user clicks a layer toggle or moves the map.
+  // Context layers must be visible from the first map view without relying
+  // on a click, layer toggle, pan or a separate Overpass request.
   const initialOverlayHandle = await page.waitForFunction(() => {
-    const trace = window.__RLI_E2E_TRACE__ ?? [];
-    return trace.find((entry) =>
-      entry.event === "show-overlay-response" && Number(entry.featureCount) > 0
-    ) ?? false;
+    const map = window.__RLI_E2E_MAP__;
+    if (!map || !map.isStyleLoaded() || !map.getSource("openmaptiles")) return false;
+    const expectedLayers = [
+      "context-vector-roads",
+      "context-vector-schools-health",
+      "context-vector-landmarks",
+      "context-vector-transit",
+      "context-vector-parks-fill",
+      "context-vector-water-fill"
+    ];
+    const visibleLayers = expectedLayers.filter((id) =>
+      map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none"
+    );
+    const renderedLayers = expectedLayers.filter((id) =>
+      map.getLayer(id) &&
+      map.getLayoutProperty(id, "visibility") !== "none" &&
+      map.queryRenderedFeatures(undefined, { layers: [id] }).length > 0
+    );
+    const featureCount = renderedLayers.reduce((total, id) =>
+      total + map.queryRenderedFeatures(undefined, { layers: [id] }).length, 0
+    );
+    if (!renderedLayers.includes("context-vector-roads") || featureCount <= 0) return false;
+    return {
+      event: "first-load-vector-context-rendered",
+      featureCount,
+      visibleLayers,
+      renderedLayers
+    };
   }, undefined, { timeout: 60_000 });
   const initialOverlayCheck = await initialOverlayHandle.jsonValue();
   if (!initialOverlayCheck || initialOverlayCheck.featureCount <= 0) {
-    throw new Error("Place overlays did not return any features on the initial map view.");
+    throw new Error("Map context layers did not render automatically on the initial view.");
   }
 
   await page.evaluate(() => {
