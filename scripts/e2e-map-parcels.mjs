@@ -63,9 +63,9 @@ page.on("response", async (response) => {
     diagnostics.placeApiResponses.push(entry);
     try {
       const rawBody = await response.text();
-      let body: Record<string, unknown> = {};
+      let body = {};
       try {
-        body = JSON.parse(rawBody) as Record<string, unknown>;
+        body = JSON.parse(rawBody);
       } catch {
         Object.assign(entry, { bodySnippet: rawBody.slice(0, 500) });
       }
