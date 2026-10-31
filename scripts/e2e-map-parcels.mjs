@@ -320,6 +320,26 @@ try {
     return Boolean(map && map.getFeatureState({ source, id }).selected !== true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
+  // Clear the selected parcel after the interaction assertion, then return to
+  // village zoom so the existing cadastral-boundary screenshot remains a
+  // village-level diagnostic rather than a parcel-level screenshot.
+  if (parcelBlankPoint) {
+    await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
+  }
+  await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) throw new Error("Opt-in test map was not exposed.");
+    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
+  });
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(
+      map &&
+      map.getLayoutProperty("village-outline", "visibility") === "visible" &&
+      map.getLayoutProperty("parcel-outline", "visibility") === "visible"
+    );
+  }, undefined, { timeout: 20_000 });
+
   const parcelGlowCheck = {
     source: parcelHoverTarget.source,
     featureId: parcelHoverTarget.id,
