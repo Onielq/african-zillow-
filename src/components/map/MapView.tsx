@@ -2552,6 +2552,13 @@ export function MapView({
         type: "FeatureCollection",
         features: Array.from(partialFeatures.values())
       } as MapFeatureCollection);
+      recordE2ETrace("show-overlay-response", {
+        categories,
+        featureCount: partialFeatures.size,
+        attempt: 2,
+        partial: true,
+        failedCategories: lastFailedCategories
+      });
       console.warn("Map place overlays are incomplete; an automatic recovery will run.", lastError);
       recordE2ETrace("show-overlay-failed", {
         categories,
