@@ -1122,6 +1122,7 @@ export function MapView({
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
     let selectedFeatureHighlightActive = false;
+    let lastMapPointerPoint: { x: number; y: number } | null = null;
 
     const refreshMetricBubbles = () => {
       if (!map.isStyleLoaded()) return;
@@ -2686,6 +2687,7 @@ export function MapView({
     // events can fire during zoom transitions and clear a highlight while the
     // pointer is still over the newly active administrative level.
     const handleMapPointerMove = (event: { point: { x: number; y: number } }) => {
+      lastMapPointerPoint = event.point;
       const level = activeAreaLevel(map.getZoom());
       const layer = AREA_LAYERS[level];
       const feature = map.queryRenderedFeatures(event.point, { layers: [layer.fill] })[0];
@@ -2714,6 +2716,7 @@ export function MapView({
     };
 
     const handleMapPointerLeave = () => {
+      lastMapPointerPoint = null;
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
       clearParcelGlow();
@@ -2770,7 +2773,12 @@ export function MapView({
 
       map.on("mousemove", handleMapPointerMove);
       map.on("mouseleave", handleMapPointerLeave);
-      map.on("zoomstart", handleMapPointerLeave);
+      map.on("zoomend", () => {
+        // The pointer often stays still while a user zooms. Re-check that same
+        // screen position against the newly active admin level.
+        if (lastMapPointerPoint) handleMapPointerMove({ point: lastMapPointerPoint });
+        else handleMapPointerLeave();
+      });
 
       // Clicking a price capsule or collision dot selects that parcel too.
       // The marker carries the original cadastral feature ID so map styling and
