@@ -161,9 +161,10 @@ test("the map supports a satellite basemap without removing administrative overl
   assert.match(experience, /setBasemapMode\("satellite"\)/);
   assert.match(experience, /setBasemapMode\("map"\)/);
   assert.match(css, /\.basemap-switcher/);
-  assert.match(mapView, /const maxAttempts = level === "parcel" \? 2 : 1/);
-  assert.match(mapView, /area-api-retry/);
-  assert.match(mapView, /parcel-refresh-retry-scheduled/);
+  assert.match(mapView, /openmaptiles: \{/);
+  assert.match(mapView, /context-vector-roads/);
+  assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice/);
+  assert.match(mapView, /map-idle-area-check/);
   assert.match(mapView, /basemap-readiness/);
   assert.match(mapView, /sourceId === "world-imagery"/);
   assert.match(mapView, /map\.isSourceLoaded\("world-imagery"\)/);
@@ -539,7 +540,6 @@ test("parcel asking price is parcel area multiplied by the available average tra
 test("Show uses minimal on-off switches for all four place categories and zoning across the pilot", async () => {
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  const places = await readProjectFile("src/app/api/geography/places/route.ts");
   const zoning = await readProjectFile("src/app/api/geography/zoning/route.ts");
 
   for (const label of ["Landmarks", "Medical & schools", "Transportation", "Nature", "Zoning"]) {
@@ -549,14 +549,16 @@ test("Show uses minimal on-off switches for all four place categories and zoning
   assert.match(experience, /show-toggle-track/);
   assert.match(mapView, /showZoning/);
   assert.match(mapView, /\/api\/geography\/zoning\?bbox=/);
-  assert.match(places, /groupCategories\.includes\("healthEducation"\) &&\s*\(/);
-  assert.match(places, /pointOfInterestCategories/);
-  assert.match(places, /failedCategories/);
-  assert.match(places, /queryGroups\.map/);
+  assert.match(mapView, /openmaptiles: \{/);
+  assert.match(mapView, /context-vector-schools-health/);
+  assert.match(mapView, /context-vector-landmarks/);
+  assert.match(mapView, /context-vector-transit/);
+  assert.match(mapView, /context-vector-parks-fill/);
+  assert.match(mapView, /context-vector-water-fill/);
+  assert.match(mapView, /applyVectorContextVisibility/);
+  assert.match(mapView, /Context geometry comes directly from the OpenFreeMap vector tiles/);
+  assert.match(mapView, /addContextVectorLayers\(\)/);
   assert.match(experience, /useState<MapOverlayCategory\[]>\(\["landmarks", "healthEducation", "transportation", "nature"\]\)/);
-  assert.match(mapView, /context data must begin loading on the first view/);
-  assert.match(mapView, /show-overlay-response/);
-  assert.match(places, /overpassCache/);
   assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
   assert.match(zoning, /Bugesera_DLUP/);
 });
