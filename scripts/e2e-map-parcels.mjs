@@ -171,49 +171,162 @@ try {
     }
   }, undefined, { timeout: 50_000 }).catch(() => {});
 
-  // Confirm that moving over a village boundary activates its hover state,
-  // and moving off the boundary removes that state.
-  const villageHoverTarget = await page.evaluate(() => {
+  // Check hover highlighting at every administrative level. The pointer
+  // stays in the same screen position while zooming; the map must retarget the
+  // highlight to the newly active district/sector/cell/village polygon.
+  const hierarchyHoverChecks = [];
+  const hoverLevels = [
+    { level: "district", zoom: 8.35, layer: "district-fill", source: "admin-districts" },
+    { level: "sector", zoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
+    { level: "cell", zoom: 15.5, layer: "cell-fill", source: "admin-cells" },
+    { level: "village", zoom: 16.6, layer: "village-fill", source: "admin-villages" }
+  ];
+
+  for (const config of hoverLevels) {
+    await page.evaluate(({ zoom }) => {
+      const map = window.__RLI_E2E_MAP__;
+      if (!map) throw new Error("Opt-in test map was not exposed.");
+      map.jumpTo({ center: [30.133, -2.283], zoom });
+    }, config);
+
+    await page.waitForFunction(({ layer, source }) => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(
+        map &&
+        map.getLayer(layer) &&
+        map.getLayoutProperty(layer, "visibility") === "visible" &&
+        map.querySourceFeatures(source).length > 0
+      );
+    }, config, { timeout: 35_000 });
+
+    const target = await page.evaluate(({ layer }) => {
+      const map = window.__RLI_E2E_MAP__;
+      if (!map) return null;
+      const rect = map.getCanvas().getBoundingClientRect();
+      for (let y = 22; y < rect.height - 22; y += 18) {
+        for (let x = 390; x < rect.width - 18; x += 18) {
+          const feature = map.queryRenderedFeatures([x, y], { layers: [layer] })
+            .find((item) => typeof item.id === "string" || typeof item.id === "number");
+          if (feature) {
+            return { x: rect.left + x, y: rect.top + y, source: feature.source, id: feature.id };
+          }
+        }
+      }
+      return null;
+    }, config);
+
+    if (!target) throw new Error("No rendered " + config.level + " polygon was available for hover testing.");
+
+    await page.mouse.move(target.x, target.y);
+    await page.waitForFunction(({ source, id }) => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(map && map.getFeatureState({ source, id }).hover === true);
+    }, target, { timeout: 8_000 });
+
+    const blankPoint = await page.evaluate(({ layer }) => {
+      const map = window.__RLI_E2E_MAP__;
+      if (!map) return null;
+      const rect = map.getCanvas().getBoundingClientRect();
+      for (let x = rect.width - 14; x > 390; x -= 18) {
+        for (let y = rect.height - 14; y > 14; y -= 18) {
+          if (map.queryRenderedFeatures([x, y], { layers: [layer] }).length === 0) {
+            return { x: rect.left + x, y: rect.top + y };
+          }
+        }
+      }
+      return null;
+    }, config);
+
+    if (blankPoint) await page.mouse.move(blankPoint.x, blankPoint.y);
+    else await page.mouse.move(12, 12);
+
+    await page.waitForFunction(({ source, id }) => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(map && map.getFeatureState({ source, id }).hover !== true);
+    }, target, { timeout: 8_000 });
+
+    hierarchyHoverChecks.push({
+      level: config.level,
+      source: target.source,
+      featureId: target.id,
+      highlightActivated: true,
+      highlightClearedOnLeave: true,
+      pointerStayedOnMapForLeave: Boolean(blankPoint)
+    });
+  }
+
+  // A parcel is different: click selects it and creates a strong glow. The
+  // glow disappears when the cursor leaves that parcel, while its detail
+  // selection can remain open.
+  await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) throw new Error("Opt-in test map was not exposed.");
+    map.jumpTo({ center: [30.133, -2.283], zoom: 17.4 });
+  });
+
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map || !map.getLayer("parcel-fill")) return false;
+    try {
+      return map.querySourceFeatures("land-parcels").length > 0 &&
+        map.getLayoutProperty("parcel-fill", "visibility") === "visible";
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: 50_000 });
+
+  const parcelHoverTarget = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let y = 18; y < rect.height - 18; y += 24) {
-      for (let x = 18; x < rect.width - 18; x += 24) {
-        const feature = map.queryRenderedFeatures([x, y], {
-          layers: ["village-fill"]
-        }).find((item) => item.id !== undefined);
-        if (feature && (typeof feature.id === "string" || typeof feature.id === "number")) {
-          return {
-            x: rect.left + x,
-            y: rect.top + y,
-            source: feature.source,
-            id: feature.id
-          };
+    for (let y = 22; y < rect.height - 22; y += 14) {
+      for (let x = 390; x < rect.width - 18; x += 14) {
+        const feature = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] })
+          .find((item) => typeof item.id === "string" || typeof item.id === "number");
+        if (feature) {
+          return { x: rect.left + x, y: rect.top + y, source: feature.source, id: feature.id };
         }
       }
     }
     return null;
   });
-  if (!villageHoverTarget) {
-    throw new Error("No rendered village polygon was available for the hover interaction check.");
-  }
-  await page.mouse.move(villageHoverTarget.x, villageHoverTarget.y);
-  await page.waitForFunction(({ source, id }) => {
-    const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).hover === true);
-  }, villageHoverTarget, { timeout: 8_000 });
-  await page.mouse.move(12, 12);
-  await page.waitForFunction(({ source, id }) => {
-    const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).hover !== true);
-  }, villageHoverTarget, { timeout: 8_000 });
-  const villageHoverCheck = {
-    source: villageHoverTarget.source,
-    featureId: villageHoverTarget.id,
-    highlightActivated: true,
-    highlightClearedOnLeave: true
-  };
+  if (!parcelHoverTarget) throw new Error("No rendered parcel polygon was available for the selection glow check.");
 
+  await page.mouse.click(parcelHoverTarget.x, parcelHoverTarget.y);
+  await page.waitForFunction(({ source, id }) => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.getFeatureState({ source, id }).selected === true);
+  }, parcelHoverTarget, { timeout: 8_000 });
+
+  const parcelBlankPoint = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return null;
+    const rect = map.getCanvas().getBoundingClientRect();
+    for (let x = rect.width - 12; x > 390; x -= 12) {
+      for (let y = rect.height - 12; y > 12; y -= 12) {
+        if (map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] }).length === 0) {
+          return { x: rect.left + x, y: rect.top + y };
+        }
+      }
+    }
+    return null;
+  });
+
+  if (parcelBlankPoint) await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
+  else await page.mouse.move(12, 12);
+
+  await page.waitForFunction(({ source, id }) => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.getFeatureState({ source, id }).selected !== true);
+  }, parcelHoverTarget, { timeout: 8_000 });
+
+  const parcelGlowCheck = {
+    source: parcelHoverTarget.source,
+    featureId: parcelHoverTarget.id,
+    glowActivatedOnClick: true,
+    glowRemovedOnLeave: true,
+    pointerStayedOnMapForLeave: Boolean(parcelBlankPoint)
+  };
   // Only issue a second direct API request if the map did not load parcels.
   // Avoid duplicating a slow GIS/fallback request when the visible map already
   // proves that the API supplied cadastral features.
@@ -354,7 +467,8 @@ try {
     zoomLevel: "village",
     ...result,
     initialOverlayCheck,
-    villageHoverCheck,
+    hierarchyHoverChecks,
+    parcelGlowCheck,
     directParcelApi,
     removedPanelCount,
     exploreAreaTextCount,
