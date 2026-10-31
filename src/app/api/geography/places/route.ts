@@ -399,35 +399,73 @@ export async function GET(request: NextRequest) {
           )
         : allPilotDistricts;
 
+    // Keep the place-of-interest query separate from road geometry. A single
+    // broad Overpass request containing every tag family and road geometry was
+    // failing as a unit on the initial Rwanda-wide view, hiding every category.
+    // The lighter groups can now succeed independently.
+    const pointOfInterestCategories = categories.filter((category) => category !== "transportation");
+    const queryGroups: Array<{ categories: OverlayCategory[]; query: string }> = [];
+    if (pointOfInterestCategories.length > 0) {
+      queryGroups.push({
+        categories: pointOfInterestCategories,
+        query: ""
+      });
+    }
+    if (categories.includes("transportation")) {
+      queryGroups.push({
+        categories: ["transportation"],
+        query: ""
+      });
+    }
+
+    let successfulQueries = 0;
+    let failedQueries = 0;
+    const failedCategories = new Set<OverlayCategory>();
+
     const collections = await Promise.all(targetBounds.map(async (target) => {
-      const jobs: Array<Promise<OsmElement[]>> = [
-        queryOverpass(queryFor(categories, target, false))
-      ];
-      if (categories.includes("transportation")) {
-        jobs.push(queryOverpass(queryFor(categories, target, true)));
-      }
-      const results = await Promise.all(jobs);
-      return results.flatMap((elements) =>
+      const jobs = queryGroups.map((group) => ({
+        categories: group.categories,
+        query: group.categories.includes("transportation")
+          ? queryFor(["transportation"], target, false)
+          : queryFor(pointOfInterestCategories, target, false)
+      }));
+      const results = await Promise.all(jobs.map(async (job) => {
+        try {
+          const elements = await queryOverpass(job.query);
+          successfulQueries += 1;
+          return { categories: job.categories, elements };
+        } catch (error) {
+          failedQueries += 1;
+          for (const category of job.categories) failedCategories.add(category);
+          console.warn(
+            "OpenStreetMap context group failed for " + job.categories.join(", ") + ".",
+            error
+          );
+          return { categories: job.categories, elements: [] as OsmElement[] };
+        }
+      }));
+
+      return results.flatMap(({ categories: groupCategories, elements }) =>
         elements.flatMap((element) => {
           const tags = element.tags ?? {};
           let actualCategory: OverlayCategory | null = null;
           if (
-            categories.includes("transportation") &&
+            groupCategories.includes("transportation") &&
             (typeof tags.highway === "string" || tags.amenity === "bus_station" || tags.amenity === "bus_stop")
           ) actualCategory = "transportation";
           else if (
-            categories.includes("healthEducation") &&
+            groupCategories.includes("healthEducation") &&
             (
               ["school", "university", "college", "hospital", "clinic", "doctors", "pharmacy"].includes(tags.amenity ?? "") ||
               ["hospital", "clinic", "doctor", "pharmacy"].includes(tags.healthcare ?? "")
             )
           ) actualCategory = "healthEducation";
           else if (
-            categories.includes("landmarks") &&
+            groupCategories.includes("landmarks") &&
             (typeof tags.historic === "string" || ["attraction", "museum", "artwork", "zoo", "viewpoint", "theme_park"].includes(tags.tourism ?? ""))
           ) actualCategory = "landmarks";
           else if (
-            categories.includes("nature") &&
+            groupCategories.includes("nature") &&
             (["park", "nature_reserve"].includes(tags.leisure ?? "") ||
               ["water", "waterfall"].includes(tags.natural ?? "") ||
               tags.water === "lake" || tags.waterway === "waterfall" || tags.boundary === "protected_area")
@@ -439,6 +477,22 @@ export async function GET(request: NextRequest) {
       );
     }));
 
+    if (successfulQueries === 0 && failedQueries > 0) {
+      return NextResponse.json(
+        {
+          error: "OpenStreetMap context is temporarily unavailable.",
+          failedCategories: Array.from(failedCategories)
+        },
+        {
+          status: 502,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-Overlay-Failed-Categories": Array.from(failedCategories).join(",")
+          }
+        }
+      );
+    }
+
     const deduplicated = new Map<string, OverlayFeature>();
     for (const feature of collections.flat()) {
       if (!feature) continue;
@@ -447,12 +501,22 @@ export async function GET(request: NextRequest) {
     const features = Array.from(deduplicated.values())
       .flatMap((feature) => clipFeatureToDistricts(feature, allowedDistricts))
       .slice(0, 6000);
+    const partial = failedCategories.size > 0;
+    const warning = partial
+      ? "Some context layers are temporarily unavailable: " + Array.from(failedCategories).join(", ") + "."
+      : null;
 
     return NextResponse.json(
-      { type: "FeatureCollection", features },
+      {
+        type: "FeatureCollection",
+        features,
+        ...(partial ? { partial: true, warning, failedCategories: Array.from(failedCategories) } : {})
+      },
       {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=900",
+          "Cache-Control": partial
+            ? "public, max-age=0, s-maxage=60, stale-while-revalidate=300"
+            : "public, max-age=0, s-maxage=300, stale-while-revalidate=900",
           "X-Data-Source": "OpenStreetMap / Overpass API",
           "X-Map-Coverage": scope === "kigali"
             ? "Clipped to official Gasabo, Kicukiro and Nyarugenge district polygons; OSM completeness varies"
@@ -460,7 +524,8 @@ export async function GET(request: NextRequest) {
               ? "Bugesera pilot extent; source objects may be mapped incompletely"
               : "Kigali and Bugesera pilot extents",
           "X-Feature-Limit": "At most 6000 overlay features are returned for a viewport",
-          "X-Attribution": "© OpenStreetMap contributors, ODbL"
+          "X-Attribution": "© OpenStreetMap contributors, ODbL",
+          ...(partial ? { "X-Overlay-Partial": "true" } : {})
         }
       }
     );
