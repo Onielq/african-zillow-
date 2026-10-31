@@ -51,9 +51,11 @@ const VALID_CATEGORIES: OverlayCategory[] = [
   "nature"
 ];
 const OVERPASS_ENDPOINTS = [
-  // Independent public instances, with short per-instance timeouts.
+  // Independent public instances. Queries are cached and limited to the
+  // current map viewport; the final endpoint is a best-effort fallback.
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
 ];
 let overpassEndpointCursor = 0;
 
@@ -80,54 +82,62 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
   const [west, south, east, north] = bounds;
   const box = [south, west, north, east].join(",");
   const selections: string[] = [];
-  const outputGeometry = categories.includes("transportation");
+  const regionalView = zoom < 10;
+  const outputGeometry = categories.includes("transportation") && !regionalView;
 
-  // Keep the first country-level view light. Add finer road classes and bus
-  // stops only as users zoom into neighbourhoods and villages.
-  if (categories.includes("transportation")) {
+  if (categories.includes("transportation") && !regionalView) {
     const roadClasses = zoom >= 15
       ? "motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"
       : zoom >= 12
         ? "motorway|trunk|primary|secondary|tertiary|residential|unclassified"
-        : zoom >= 10
-          ? "motorway|trunk|primary|secondary|tertiary"
-          : "motorway|trunk|primary|secondary";
+        : "motorway|trunk|primary|secondary|tertiary";
     selections.push('way["highway"~"^(' + roadClasses + ')$"](' + box + ");");
-    if (zoom >= 10) {
-      selections.push('nwr["highway"="bus_stop"](' + box + ");");
-      selections.push('nwr["amenity"~"bus_station|bus_stop"](' + box + ");");
+    selections.push('nwr["highway"="bus_stop"](' + box + ");");
+    selections.push('nwr["amenity"~"bus_station|bus_stop"](' + box + ");');
+  }
+
+  if (categories.includes("landmarks")) {
+    if (regionalView) {
+      // At country/region scale return a short list of recognisable anchors.
+      selections.push('nwr["tourism"~"attraction|museum|zoo|viewpoint|theme_park"](' + box + ");");
+      selections.push('nwr["office"~"government|administrative"](' + box + ");");
+      selections.push('nwr["amenity"~"townhall|police|fire_station|courthouse|convention_centre"](' + box + ");");
+      selections.push('nwr["landuse"="industrial"](' + box + ");");
+    } else {
+      selections.push('nwr["tourism"~"attraction|museum|artwork|zoo|viewpoint|theme_park"](' + box + ");");
+      selections.push('nwr["historic"](' + box + ");");
+      selections.push('nwr["office"~"government|administrative|diplomatic"](' + box + ");");
+      selections.push('nwr["amenity"~"townhall|police|fire_station|courthouse|community_centre|convention_centre"](' + box + ");");
+      selections.push('nwr["landuse"="industrial"](' + box + ");");
+      selections.push('nwr["man_made"="works"](' + box + ");');
     }
   }
 
-  // Use nwr to query nodes, ways and relations in one selector instead of
-  // repeating each tag query three times.
-  if (categories.includes("landmarks")) {
-    selections.push('nwr["tourism"~"attraction|museum|artwork|zoo|viewpoint|theme_park"](' + box + ");");
-    selections.push('nwr["historic"](' + box + ");");
-    selections.push('nwr["office"~"government|administrative|diplomatic"](' + box + ");");
-    selections.push('nwr["amenity"~"townhall|police|fire_station|courthouse|community_centre|convention_centre"](' + box + ");");
-    selections.push('nwr["landuse"="industrial"](' + box + ");");
-    selections.push('nwr["man_made"="works"](' + box + ");");
-  }
-
   if (categories.includes("healthEducation")) {
-    selections.push('nwr["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");");
-    selections.push('nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");");
+    selections.push(regionalView
+      ? 'nwr["amenity"~"school|university|college|hospital"](' + box + ");"
+      : 'nwr["amenity"~"school|university|college|hospital|clinic|doctors|pharmacy"](' + box + ");');
+    selections.push(regionalView
+      ? 'nwr["healthcare"="hospital"](' + box + ");"
+      : 'nwr["healthcare"~"hospital|clinic|doctor|pharmacy"](' + box + ");');
   }
 
   if (categories.includes("nature")) {
     selections.push('nwr["leisure"~"park|nature_reserve"](' + box + ");");
-    selections.push('nwr["natural"~"water|waterfall|wood"](' + box + ");");
-    selections.push('nwr["landuse"="forest"](' + box + ");");
+    selections.push(regionalView
+      ? 'nwr["natural"="water"](' + box + ");"
+      : 'nwr["natural"~"water|waterfall|wood"](' + box + ");');
     selections.push('nwr["water"="lake"](' + box + ");");
-    selections.push('nwr["waterway"="waterfall"](' + box + ");");
-    selections.push('nwr["boundary"="protected_area"](' + box + ");");
+    selections.push('nwr["landuse"="forest"](' + box + ");');
+    if (!regionalView) {
+      selections.push('nwr["waterway"="waterfall"](' + box + ");");
+      selections.push('nwr["boundary"="protected_area"](' + box + ");');
+    }
   }
 
-  const output = outputGeometry ? "out center geom tags;" : "out center tags;";
-  return "[out:json][timeout:5];\n(\n" + selections.join("\n") + "\n);\n" + output;
+  return "[out:json][timeout:10];\n(\n" + selections.join("\n") + "\n);\n" +
+    (outputGeometry ? "out center geom tags;" : "out center tags;");
 }
-
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
 const overpassInFlight = new Map<string, Promise<OsmElement[]>>();
 const OVERPASS_CACHE_MS = 5 * 60 * 1000;
@@ -547,7 +557,9 @@ export async function GET(request: NextRequest) {
     const queryGroups: Array<{ categories: OverlayCategory[] }> = [];
     const pointCategories = categories.filter((category) => category !== "transportation");
     if (pointCategories.length > 0) queryGroups.push({ categories: pointCategories });
-    if (categories.includes("transportation")) queryGroups.push({ categories: ["transportation"] });
+    if (categories.includes("transportation") && zoom >= 10) {
+      queryGroups.push({ categories: ["transportation"] });
+    }
 
     let successfulQueries = 0;
     let failedQueries = 0;
