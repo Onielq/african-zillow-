@@ -1465,7 +1465,7 @@ export function MapView({
 
       const layer = AREA_LAYERS[level];
       if (!map.getLayer(layer.fill)) return;
-      const feature = map.queryRenderedFeatures(point, { layers: [layer.fill] })[0];
+      const feature = map.queryRenderedFeatures([point.x, point.y], { layers: [layer.fill] })[0];
       const id = feature ? getFeatureId(feature) : null;
       const nextFeature = id === null ? null : { source: layer.source, id };
 
