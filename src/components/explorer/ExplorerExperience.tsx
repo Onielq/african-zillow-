@@ -242,8 +242,8 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
 
     const [rawLevel, ...parts] = pathKey.split("|");
     if (!["district", "sector", "cell", "village"].includes(rawLevel) || parts.length === 0) {
-      setProfileStatus("not-found");
-      return;
+      const timer = window.setTimeout(() => setProfileStatus("not-found"), 0);
+      return () => window.clearTimeout(timer);
     }
 
     const level = rawLevel as AreaLevel;
@@ -387,7 +387,7 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
   const handleBoundaryStatus = useCallback((status: BoundaryStatus) => {
     setBoundaryStatus(status);
   }, []);
-  const handleMapAreaSelected = useCallback((_area: SelectedArea | null) => {
+  const handleMapAreaSelected = useCallback(() => {
     // The main map workspace remains the place for parcel inspection and map actions.
   }, []);
   const toggleMapLayer = (layer: MapOverlayCategory) => {
