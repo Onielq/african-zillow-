@@ -549,7 +549,13 @@ test("Show uses minimal on-off switches for all four place categories and zoning
   assert.match(experience, /show-toggle-track/);
   assert.match(mapView, /showZoning/);
   assert.match(mapView, /\/api\/geography\/zoning\?bbox=/);
-  assert.match(places, /categories\.includes\("healthEducation"\) &&\s*\(/);
+  assert.match(places, /groupCategories\.includes\("healthEducation"\) &&\s*\(/);
+  assert.match(places, /pointOfInterestCategories/);
+  assert.match(places, /failedCategories/);
+  assert.match(places, /queryGroups\.map/);
+  assert.match(experience, /useState<MapOverlayCategory\[]>\(\["landmarks", "healthEducation", "transportation", "nature"\]\)/);
+  assert.match(mapView, /context data must begin loading on the first view/);
+  assert.match(mapView, /show-overlay-response/);
   assert.match(places, /overpassCache/);
   assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
   assert.match(zoning, /Bugesera_DLUP/);
