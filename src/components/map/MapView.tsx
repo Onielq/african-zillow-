@@ -549,9 +549,9 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
-  ["boolean", ["feature-state", "selected"], false], 0.42,
-  ["boolean", ["feature-state", "hover"], false], 0.86,
-  0.23
+  ["boolean", ["feature-state", "selected"], false], 0.44,
+  ["boolean", ["feature-state", "hover"], false], 0.40,
+  0.10
 ] as never;
 
 function applyShowOverlayFilters(map: MapLibreMapInstance, categories: MapOverlayCategory[]) {
@@ -580,6 +580,10 @@ const CONTEXT_VECTOR_LAYER_CATEGORIES: Array<[string, MapOverlayCategory]> = [
   ["context-vector-transit", "transportation"],
   ["context-vector-parks-fill", "nature"],
   ["context-vector-parks-outline", "nature"],
+  ["context-vector-industrial-fill", "landmarks"],
+  ["context-vector-industrial-outline", "landmarks"],
+  ["context-vector-forest-fill", "nature"],
+  ["context-vector-forest-outline", "nature"],
   ["context-vector-water-fill", "nature"],
   ["context-vector-water-outline", "nature"],
   ["context-vector-waterways", "nature"],
@@ -1655,14 +1659,7 @@ export function MapView({
             ),
             // Keep parcels almost transparent until selected. A selected parcel
             // gets a cyan wash as well as a bright outline so the chosen plot is obvious.
-            "fill-opacity": level === "parcel"
-              ? [
-                  "case",
-                  ["boolean", ["feature-state", "selected"], false], 0.42,
-                  ["boolean", ["feature-state", "hover"], false], 0.12,
-                  0.008
-                ]
-              : AREA_FILL_OPACITY_EXPRESSION
+            "fill-opacity": level === "parcel" ? 0.006 : AREA_FILL_OPACITY_EXPRESSION
           }
         });
       }
@@ -1689,17 +1686,17 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 22 : 18,
+              level === "parcel" ? 15 : 9,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 0 : level === "district" ? 19 : level === "sector" ? 17 : level === "cell" ? 15 : 13,
+              level === "parcel" ? 0 : level === "district" ? 9 : level === "sector" ? 8 : level === "cell" ? 7 : 6,
               0
             ],
             "line-blur": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 9.5 : 7.2,
+              level === "parcel" ? 6.2 : 4.2,
               ["boolean", ["feature-state", "hover"], false],
-              level === "district" ? 8 : level === "sector" ? 7.4 : level === "cell" ? 6.8 : 6.2,
+              level === "district" ? 4.5 : level === "sector" ? 4.0 : level === "cell" ? 3.6 : 3.2,
               0
             ],
             "line-opacity": [
@@ -1742,9 +1739,9 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 7.2 : 5.8,
+              level === "parcel" ? 5.0 : 4.0,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.6 : level === "district" ? 8.2 : level === "sector" ? 7.6 : level === "cell" ? 7 : 6.4,
+              level === "parcel" ? 1.6 : level === "district" ? 4.2 : level === "sector" ? 3.8 : level === "cell" ? 3.4 : 3.0,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
@@ -2081,7 +2078,7 @@ export function MapView({
         type: "circle",
         source: "openmaptiles",
         "source-layer": "poi",
-        minzoom: 8.5,
+        minzoom: 7.8,
         filter: [
           "all",
           ["==", ["geometry-type"], "Point"],
@@ -2092,7 +2089,7 @@ export function MapView({
         ],
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 2.5, 12, 3.8, 16, 5.4],
-          "circle-color": "#C85D55",
+          "circle-color": "#707A80",
           "circle-stroke-color": "#FFFFFF",
           "circle-stroke-width": 1.3,
           "circle-opacity": 0.96
@@ -2103,18 +2100,18 @@ export function MapView({
         type: "circle",
         source: "openmaptiles",
         "source-layer": "poi",
-        minzoom: 8.5,
+        minzoom: 7.8,
         filter: [
           "all",
           ["==", ["geometry-type"], "Point"],
           ["any",
-            ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall"]]],
+            ["in", ["get", "class"], ["literal", ["attraction", "castle", "art_gallery", "stadium", "town_hall", "office", "post"]]],
             ["in", ["get", "subclass"], ["literal", ["viewpoint", "monument", "memorial", "museum", "zoo", "ruins", "archaeological_site"]]]
           ]
         ],
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 2.4, 12, 3.8, 16, 5.4],
-          "circle-color": "#B98A37",
+          "circle-color": "#707A80",
           "circle-stroke-color": "#FFFFFF",
           "circle-stroke-width": 1.3,
           "circle-opacity": 0.96
@@ -2125,7 +2122,7 @@ export function MapView({
         type: "circle",
         source: "openmaptiles",
         "source-layer": "poi",
-        minzoom: 9.5,
+        minzoom: 8.0,
         filter: [
           "all",
           ["==", ["geometry-type"], "Point"],
@@ -2136,7 +2133,7 @@ export function MapView({
         ],
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 9.5, 2.2, 13, 3.8, 16, 5.2],
-          "circle-color": "#4F83B6",
+          "circle-color": "#78848A",
           "circle-stroke-color": "#FFFFFF",
           "circle-stroke-width": 1.2,
           "circle-opacity": 0.96
@@ -2159,6 +2156,42 @@ export function MapView({
         minzoom: 8,
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
         paint: { "line-color": "#3B805C", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.45, 15, 1.2], "line-opacity": 0.7 }
+      });
+      addLayer({
+        id: "context-vector-industrial-fill",
+        type: "fill",
+        source: "openmaptiles",
+        "source-layer": "landuse",
+        minzoom: 7.8,
+        filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "industrial"]],
+        paint: { "fill-color": "#8A9399", "fill-opacity": 0.22 }
+      });
+      addLayer({
+        id: "context-vector-industrial-outline",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "landuse",
+        minzoom: 7.8,
+        filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "industrial"]],
+        paint: { "line-color": "#657078", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.45, 15, 1.15], "line-opacity": 0.78 }
+      });
+      addLayer({
+        id: "context-vector-forest-fill",
+        type: "fill",
+        source: "openmaptiles",
+        "source-layer": "landcover",
+        minzoom: 7.5,
+        filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "wood"]],
+        paint: { "fill-color": "#7F8D82", "fill-opacity": 0.20 }
+      });
+      addLayer({
+        id: "context-vector-forest-outline",
+        type: "line",
+        source: "openmaptiles",
+        "source-layer": "landcover",
+        minzoom: 7.5,
+        filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "wood"]],
+        paint: { "line-color": "#66756A", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 15, 1.0], "line-opacity": 0.75 }
       });
       addLayer({
         id: "context-vector-water-fill",
@@ -2195,7 +2228,7 @@ export function MapView({
         type: "symbol",
         source: "openmaptiles",
         "source-layer": "poi",
-        minzoom: 12.5,
+        minzoom: 10.5,
         filter: openMapTilesPoiFilter(showLayersRef.current) as never,
         layout: {
           "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
@@ -2971,6 +3004,7 @@ export function MapView({
         parcelRefreshRetryTimer = null;
       }
       updateLayerVisibility();
+      if (lastMapPointerPoint) map.once("idle", refreshHoverAtLastPointer);
       scheduleShowOverlayRefresh();
       scheduleZoningRefresh();
       refreshMetricBubbles();
@@ -3124,9 +3158,9 @@ export function MapView({
       window.addEventListener("pointermove", handleDocumentPointerMove);
       window.addEventListener("blur", handleWindowBlur);
       map.on("zoomend", () => {
-        // The pointer often stays still while a user zooms. Re-check that same
-        // screen position against the newly active admin level.
-        if (lastMapPointerPoint) handleMapPointerMove({ point: lastMapPointerPoint });
+        // scheduleRefresh changes the visible polygon level on this same event.
+        // Re-query only after MapLibre has rendered that new level.
+        if (lastMapPointerPoint) map.once("idle", refreshHoverAtLastPointer);
         else handleMapPointerLeave();
       });
 
