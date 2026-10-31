@@ -841,7 +841,7 @@ test("parcel outlines keep a high-contrast casing above road and zoning overlays
   assert.match(mapView, /"line-width": \[/);
   assert.match(mapView, /VILLAGE_ZOOM, 1\.8/);
   assert.match(mapView, /PARCEL_ZOOM \+ 3\.85, 3\.2/);
-  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*\[/);
+  assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.doesNotMatch(mapView, /"line-width": \[\s*"case"[\s\S]{0,500}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
   assert.match(mapView, /map\.moveLayer\(layerId\)/);
