@@ -388,7 +388,23 @@ export async function GET(request: NextRequest) {
   try {
     // Always clip context layers against the official pilot district polygons.
     // Bounding boxes are only query optimizations; they do not define the city limits.
-    const allPilotDistricts = await getPilotDistrictFeatures(request);
+    let allPilotDistricts: DistrictAreaFeature[];
+    try {
+      allPilotDistricts = await getPilotDistrictFeatures(request);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("Pilot district clipping source failed for place overlays.", error);
+      return NextResponse.json(
+        { error: "Pilot district boundaries could not be loaded for place overlays.", detail },
+        {
+          status: 502,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-Overlay-Stage": "pilot-district-fetch"
+          }
+        }
+      );
+    }
     const allowedDistricts = scope === "kigali"
       ? allPilotDistricts.filter((feature) =>
           KIGALI_DISTRICT_NAMES.has(String(feature.properties?.district ?? "").trim().toLowerCase())
@@ -479,7 +495,9 @@ export async function GET(request: NextRequest) {
           status: 502,
           headers: {
             "Cache-Control": "no-store",
-            "X-Overlay-Failed-Categories": Array.from(failedCategories).join(",")
+            "X-Overlay-Stage": "overpass-query",
+            "X-Overlay-Failed-Categories": Array.from(failedCategories).join(","),
+            "X-Overlay-Failed-Query-Count": String(failedQueries)
           }
         }
       );
@@ -517,15 +535,28 @@ export async function GET(request: NextRequest) {
               : "Kigali and Bugesera pilot extents",
           "X-Feature-Limit": "At most 6000 overlay features are returned for a viewport",
           "X-Attribution": "© OpenStreetMap contributors, ODbL",
+          "X-Overlay-Stage": "complete",
+          "X-Overlay-Successful-Query-Count": String(successfulQueries),
+          "X-Overlay-Failed-Query-Count": String(failedQueries),
           ...(partial ? { "X-Overlay-Partial": "true" } : {})
         }
       }
     );
   } catch (error) {
     console.error("OpenStreetMap overlay query failed.", error);
+    const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Map overlays are temporarily unavailable. The base map and land boundaries remain available." },
-      { status: 502, headers: { "Cache-Control": "no-store" } }
+      {
+        error: "Map overlays are temporarily unavailable. The base map and land boundaries remain available.",
+        detail
+      },
+      {
+        status: 502,
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Overlay-Stage": "handler-exception"
+        }
+      }
     );
   }
 }
