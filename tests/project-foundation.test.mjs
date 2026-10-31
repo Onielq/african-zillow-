@@ -559,6 +559,10 @@ test("Show uses minimal on-off switches for all four place categories and zoning
   assert.match(mapView, /openmaptiles: \{/);
   assert.match(mapView, /context-vector-schools-health/);
   assert.match(mapView, /context-vector-landmarks/);
+  assert.match(mapView, /"government_office"/);
+  assert.match(mapView, /"sector_office"/);
+  assert.match(mapView, /"courthouse"/);
+  assert.match(mapView, /"convention_centre"/);
   assert.match(mapView, /context-vector-transit/);
   assert.match(mapView, /context-vector-parks-fill/);
   assert.match(mapView, /context-vector-water-fill/);
