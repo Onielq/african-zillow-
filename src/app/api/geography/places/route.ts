@@ -93,7 +93,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
         : "motorway|trunk|primary|secondary|tertiary";
     selections.push('way["highway"~"^(' + roadClasses + ')$"](' + box + ");");
     selections.push('nwr["highway"="bus_stop"](' + box + ");");
-    selections.push('nwr["amenity"~"bus_station|bus_stop"](' + box + ");');
+    selections.push('nwr["amenity"~"bus_station|bus_stop"](' + box + ");");
   }
 
   if (categories.includes("landmarks")) {
