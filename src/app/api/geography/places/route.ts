@@ -104,6 +104,10 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
   if (categories.includes("landmarks")) {
     selections.push('nwr["tourism"~"attraction|museum|artwork|zoo|viewpoint|theme_park"](' + box + ");");
     selections.push('nwr["historic"](' + box + ");");
+    selections.push('nwr["office"~"government|administrative|diplomatic"](' + box + ");");
+    selections.push('nwr["amenity"~"townhall|police|fire_station|courthouse|community_centre|convention_centre"](' + box + ");");
+    selections.push('nwr["landuse"="industrial"](' + box + ");");
+    selections.push('nwr["man_made"="works"](' + box + ");");
   }
 
   if (categories.includes("healthEducation")) {
@@ -113,7 +117,8 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): 
 
   if (categories.includes("nature")) {
     selections.push('nwr["leisure"~"park|nature_reserve"](' + box + ");");
-    selections.push('nwr["natural"~"water|waterfall"](' + box + ");");
+    selections.push('nwr["natural"~"water|waterfall|wood"](' + box + ");");
+    selections.push('nwr["landuse"="forest"](' + box + ");");
     selections.push('nwr["water"="lake"](' + box + ");");
     selections.push('nwr["waterway"="waterfall"](' + box + ");");
     selections.push('nwr["boundary"="protected_area"](' + box + ");");
@@ -206,10 +211,19 @@ function featureForElement(element: OsmElement, category: OverlayCategory): Over
   if (!geometry) return null;
   const rawName = tags.name ?? tags["name:en"] ?? tags.operator ?? null;
   const categoryLabel =
-    category === "landmarks" ? "Landmark" :
-    category === "healthEducation" ? (tags.amenity === "school" || tags.amenity === "university" ? "School" : "Medical facility") :
-    category === "transportation" ? (isRoad ? "Road" : "Bus stop / station") :
-    "Nature feature";
+    category === "landmarks"
+      ? tags.landuse === "industrial" || tags.man_made === "works"
+        ? "Industrial area"
+        : tags.office === "government" || ["townhall", "police", "fire_station", "courthouse"].includes(tags.amenity ?? "")
+          ? "Public facility"
+          : "Landmark"
+      : category === "healthEducation"
+        ? (tags.amenity === "school" || tags.amenity === "university" ? "School" : "Medical facility")
+        : category === "transportation"
+          ? (isRoad ? "Road" : "Bus stop / station")
+          : tags.landuse === "forest" || tags.natural === "wood"
+            ? "Forest / woodland"
+            : "Nature feature";
   const name = rawName || categoryLabel;
   const detail = [
     tags.amenity,
@@ -574,7 +588,14 @@ export async function GET(request: NextRequest) {
           ) actualCategory = "healthEducation";
           else if (
             groupCategories.includes("landmarks") &&
-            (typeof tags.historic === "string" || ["attraction", "museum", "artwork", "zoo", "viewpoint", "theme_park"].includes(tags.tourism ?? ""))
+            (
+              typeof tags.historic === "string" ||
+              typeof tags.office === "string" ||
+              tags.landuse === "industrial" ||
+              tags.man_made === "works" ||
+              ["attraction", "museum", "artwork", "zoo", "viewpoint", "theme_park"].includes(tags.tourism ?? "") ||
+              ["townhall", "police", "fire_station", "courthouse", "community_centre", "convention_centre"].includes(tags.amenity ?? "")
+            )
           ) actualCategory = "landmarks";
           else if (
             groupCategories.includes("nature") &&
