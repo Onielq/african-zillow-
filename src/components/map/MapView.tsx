@@ -1618,7 +1618,7 @@ export function MapView({
               level === "parcel" ? 1.25 : 4.4,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
-            "line-opacity": level === "parcel" ? 0.98 : 0.98
+            "line-opacity": level === "parcel" ? 0.98 : 0.94
           }
         });
       }
