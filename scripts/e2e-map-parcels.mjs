@@ -229,7 +229,7 @@ try {
       const map = window.__RLI_E2E_MAP__;
       if (!map) return null;
       const rect = map.getCanvas().getBoundingClientRect();
-      for (let y = 22; y < rect.height - 22; y += 18) {
+      for (let y = 150; y < rect.height - 170; y += 18) {
         for (let x = 390; x < rect.width - 18; x += 18) {
           const feature = map.queryRenderedFeatures([x, y], { layers: [layer] })
             .find((item) => typeof item.id === "string" || typeof item.id === "number");
@@ -253,8 +253,8 @@ try {
       const map = window.__RLI_E2E_MAP__;
       if (!map) return null;
       const rect = map.getCanvas().getBoundingClientRect();
-      for (let x = rect.width - 90; x > 410; x -= 18) {
-        for (let y = rect.height - 120; y > 70; y -= 18) {
+      for (let x = rect.width - 420; x > 410; x -= 18) {
+        for (let y = rect.height - 170; y > 150; y -= 18) {
           if (map.queryRenderedFeatures([x, y], { layers: [layer] }).length === 0) {
             return { x: rect.left + x, y: rect.top + y };
           }
@@ -305,7 +305,7 @@ try {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let y = 22; y < rect.height - 22; y += 14) {
+    for (let y = 150; y < rect.height - 170; y += 14) {
       for (let x = 390; x < rect.width - 18; x += 14) {
         const feature = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] })
           .find((item) => typeof item.id === "string" || typeof item.id === "number");
@@ -328,8 +328,8 @@ try {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let x = rect.width - 90; x > 410; x -= 12) {
-      for (let y = rect.height - 120; y > 70; y -= 12) {
+    for (let x = rect.width - 420; x > 410; x -= 12) {
+      for (let y = rect.height - 170; y > 150; y -= 12) {
         if (map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] }).length === 0) {
           return { x: rect.left + x, y: rect.top + y };
         }
