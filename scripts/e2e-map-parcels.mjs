@@ -227,8 +227,8 @@ try {
       const map = window.__RLI_E2E_MAP__;
       if (!map) return null;
       const rect = map.getCanvas().getBoundingClientRect();
-      for (let x = rect.width - 14; x > 390; x -= 18) {
-        for (let y = rect.height - 14; y > 14; y -= 18) {
+      for (let x = rect.width - 90; x > 410; x -= 18) {
+        for (let y = rect.height - 120; y > 70; y -= 18) {
           if (map.queryRenderedFeatures([x, y], { layers: [layer] }).length === 0) {
             return { x: rect.left + x, y: rect.top + y };
           }
@@ -302,8 +302,8 @@ try {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let x = rect.width - 12; x > 390; x -= 12) {
-      for (let y = rect.height - 12; y > 12; y -= 12) {
+    for (let x = rect.width - 90; x > 410; x -= 12) {
+      for (let y = rect.height - 120; y > 70; y -= 12) {
         if (map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] }).length === 0) {
           return { x: rect.left + x, y: rect.top + y };
         }
