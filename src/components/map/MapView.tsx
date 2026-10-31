@@ -535,7 +535,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
   return [
     "case",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
+    ["boolean", ["feature-state", "hover"], false], "#8AE8B5",
     showPrice
       ? [
           "case",
@@ -550,7 +550,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
   ["boolean", ["feature-state", "selected"], false], 0.42,
-  ["boolean", ["feature-state", "hover"], false], 0.74,
+  ["boolean", ["feature-state", "hover"], false], 0.78,
   0.23
 ] as never;
 
@@ -1529,8 +1529,8 @@ export function MapView({
             "fill-opacity": level === "parcel"
               ? [
                   "case",
-                  ["boolean", ["feature-state", "selected"], false], 0.5,
-                  ["boolean", ["feature-state", "hover"], false], 0.16,
+                  ["boolean", ["feature-state", "selected"], false], 0.34,
+                  ["boolean", ["feature-state", "hover"], false], 0.12,
                   0.008
                 ]
               : AREA_FILL_OPACITY_EXPRESSION
@@ -1552,33 +1552,33 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00EFFF" : "#59E5A1",
+              level === "parcel" ? "#00EFFF" : "#45DFA0",
               ["boolean", ["feature-state", "hover"], false],
-              "#65EBAA",
+              "#36E59B",
               "rgba(0,0,0,0)"
             ],
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 13 : 9.5,
+              level === "parcel" ? 16 : 12,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 0 : 8,
+              level === "parcel" ? 0 : 11,
               0
             ],
             "line-blur": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 5 : 4,
+              level === "parcel" ? 6.2 : 5.2,
               ["boolean", ["feature-state", "hover"], false],
-              3.4,
+              4.8,
               0
             ],
             "line-opacity": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 0.86 : 0.58,
+              level === "parcel" ? 0.96 : 0.82,
               ["boolean", ["feature-state", "hover"], false],
-              0.5,
+              0.82,
               0
             ]
           }
@@ -1598,9 +1598,9 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00F0FF" : "#126347",
+              level === "parcel" ? "#00F0FF" : "#125F42",
               ["boolean", ["feature-state", "hover"], false],
-              "#06492E",
+              "#06482F",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
@@ -1613,9 +1613,9 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 5.8 : 4.8,
+              level === "parcel" ? 5.8 : 5.2,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.25 : 4.4,
+              level === "parcel" ? 1.25 : level === "district" ? 5.9 : level === "sector" ? 5.6 : 5.3,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
             "line-opacity": level === "parcel" ? 0.98 : 0.94
@@ -2596,8 +2596,12 @@ export function MapView({
 
       if (
         hoveredFeature &&
-        (hoveredFeature.source !== source || hoveredFeature.id !== id)
-      ) {
+        hoveredFeature.source === source &&
+        id !== null &&
+        hoveredFeature.id === id
+      ) return;
+
+      if (hoveredFeature && (hoveredFeature.source !== source || hoveredFeature.id !== id)) {
         setFeatureFlag(hoveredFeature, "hover", false);
         hoveredFeature = null;
       }
@@ -2608,41 +2612,48 @@ export function MapView({
       }
     };
 
-    const handleAreaMove = (
-      level: AreaLevel,
-      event: { features?: MapGeoJSONFeature[] }
-    ) => {
+    const clearParcelGlow = () => {
+      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
+      setFeatureFlag(selectedFeature, "selected", false);
+      selectedFeatureHighlightActive = false;
+      refreshMetricBubblesRef.current?.();
+    };
+
+    // Query the active polygon layer on the map itself. Layer-specific mouseleave
+    // events can fire during zoom transitions and clear a highlight while the
+    // pointer is still over the newly active administrative level.
+    const handleMapPointerMove = (event: { point: { x: number; y: number } }) => {
+      const level = activeAreaLevel(map.getZoom());
       const layer = AREA_LAYERS[level];
-      const feature = event.features?.[0];
+      const feature = map.queryRenderedFeatures(event.point, { layers: [layer.fill] })[0];
       const id = feature ? getFeatureId(feature) : null;
 
       if (level === "parcel") {
+        setHover(layer.source, undefined);
         const isSelectedParcel = id !== null &&
           selectedFeature?.source === layer.source &&
           String(selectedFeature.id) === String(id);
-        if (isSelectedParcel && !selectedFeatureHighlightActive) {
+
+        if (!isSelectedParcel) clearParcelGlow();
+        if (isSelectedParcel && !selectedFeatureHighlightActive && selectedFeature) {
           selectedFeatureHighlightActive = true;
           setFeatureFlag(selectedFeature, "selected", true);
           refreshMetricBubblesRef.current?.();
         }
-        map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
+
+        map.getCanvas().style.cursor = feature ? "pointer" : "";
         return;
       }
 
+      clearParcelGlow();
       setHover(layer.source, feature);
-      map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
+      map.getCanvas().style.cursor = feature ? "pointer" : "";
     };
 
-    const handleLeave = () => {
+    const handleMapPointerLeave = () => {
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
-
-      // Keep the parcel inspector open, but remove its glow after the pointer leaves the plot.
-      if (selectedFeature?.source === AREA_LAYERS.parcel.source && selectedFeatureHighlightActive) {
-        setFeatureFlag(selectedFeature, "selected", false);
-        selectedFeatureHighlightActive = false;
-        refreshMetricBubblesRef.current?.();
-      }
+      clearParcelGlow();
       map.getCanvas().style.cursor = "";
     };
 
@@ -2677,7 +2688,10 @@ export function MapView({
         parcelMarketStatus,
         parcelMarketStatusSource
       });
-      fitFeature(map, feature, level);
+      // Parcel selection already happens at cadastral zoom. Fitting the clicked
+      // polygon would move it away from the pointer and instantly fire mouseleave,
+      // removing the glow before the person can inspect the selected shape.
+      if (level !== "parcel") fitFeature(map, feature, level);
     };
 
     const attachInteractionHandlers = () => {
@@ -2686,12 +2700,14 @@ export function MapView({
 
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
-        map.on("mousemove", layer.fill, (event) => handleAreaMove(level, event));
-        map.on("mouseleave", layer.fill, handleLeave);
         map.on("click", layer.fill, (event) =>
           handleAreaClick(level, layer.source, event.features?.[0])
         );
       }
+
+      map.on("mousemove", handleMapPointerMove);
+      map.on("mouseleave", handleMapPointerLeave);
+      map.on("zoomstart", handleMapPointerLeave);
 
       // Clicking a price capsule or collision dot selects that parcel too.
       // The marker carries the original cadastral feature ID so map styling and
