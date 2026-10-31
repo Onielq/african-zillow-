@@ -83,7 +83,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
     selections.push(
       'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
     );
-    return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
+    return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
   }
 
   if (categories.includes("landmarks")) {
@@ -127,7 +127,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
   }
 
   const output = categories.includes("transportation") ? "out geom tags;" : "out center tags;";
-  return "[out:json][timeout:22];\n(\n" + selections.join("\n") + "\n);\n" + output;
+  return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\n" + output;
 }
 
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
@@ -156,7 +156,7 @@ async function queryOverpass(query: string): Promise<OsmElement[]> {
             "User-Agent": "Rwanda Land Intelligence map overlay"
           },
           body: new URLSearchParams({ data: query }).toString(),
-          signal: AbortSignal.timeout(24000)
+          signal: AbortSignal.timeout(8000)
         });
         if (!response.ok) throw new Error("Overpass returned HTTP " + response.status);
         const payload = await response.json() as OsmResponse;
