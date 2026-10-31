@@ -2493,6 +2493,8 @@ export function MapView({
       }
 
       let lastError: unknown = null;
+      const partialFeatures = new Map<string, MapFeatureCollection["features"][number]>();
+      let lastFailedCategories: string[] = [];
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
           recordE2ETrace("show-overlay-request", { categories, bbox, attempt });
@@ -2500,8 +2502,33 @@ export function MapView({
             signal: controller.signal
           });
           if (!response.ok) throw new Error("Place overlay request failed (" + response.status + ")");
-          const data = await response.json() as MapFeatureCollection;
+          const data = await response.json() as MapFeatureCollection & {
+            partial?: boolean;
+            warning?: string;
+            failedCategories?: string[];
+          };
           if (sequence !== showOverlaySequence || controller.signal.aborted) return;
+
+          for (const [index, feature] of (data.features ?? []).entries()) {
+            partialFeatures.set(String(feature.id ?? feature.properties?.source_id ?? index), feature);
+          }
+
+          if (data.partial) {
+            lastFailedCategories = data.failedCategories ?? [];
+            lastError = new Error(data.warning ?? "Some place layers returned partial data.");
+            recordE2ETrace("show-overlay-partial", {
+              categories,
+              failedCategories: lastFailedCategories,
+              featureCount: data.features?.length ?? 0,
+              attempt
+            });
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 900));
+              continue;
+            }
+            break;
+          }
+
           source.setData(data);
           showOverlayAutomaticRetryUsed = false;
           recordE2ETrace("show-overlay-response", {
@@ -2513,16 +2540,24 @@ export function MapView({
         } catch (error) {
           lastError = error;
           if (controller.signal.aborted || sequence !== showOverlaySequence) return;
-          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700));
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 900));
         }
       }
       if (controller.signal.aborted || sequence !== showOverlaySequence) return;
-      console.error("Map place overlay loading failed after automatic retry.", lastError);
+
+      // Keep working categories visible even when another publisher/query group
+      // is unavailable. The recovery request below retries the missing group.
+      source.setData({
+        type: "FeatureCollection",
+        features: Array.from(partialFeatures.values())
+      } as MapFeatureCollection);
+      console.warn("Map place overlays are incomplete; an automatic recovery will run.", lastError);
       recordE2ETrace("show-overlay-failed", {
         categories,
+        failedCategories: lastFailedCategories,
+        retainedFeatureCount: partialFeatures.size,
         reason: lastError instanceof Error ? lastError.message : String(lastError)
       });
-      source.setData(emptyFeatureCollection());
 
       // Recover once without requiring a layer toggle or map movement.
       if (!showOverlayAutomaticRetryUsed) {
