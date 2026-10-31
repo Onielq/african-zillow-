@@ -1946,10 +1946,10 @@ export function MapView({
           paint: {
             "fill-color": [
               "match", ["get", "overlay_category"],
-              "landmarks", "#D6A344",
-              "healthEducation", "#CB605B",
-              "transportation", "#4A89D0",
-              "nature", "#3C9B74",
+              "landmarks", "#899297",
+              "healthEducation", "#899297",
+              "transportation", "#7F898F",
+              "nature", "#858E89",
               "#7A8B80"
             ],
             "fill-opacity": [
@@ -1971,10 +1971,10 @@ export function MapView({
           paint: {
             "line-color": [
               "match", ["get", "overlay_category"],
-              "landmarks", "#B17B20",
-              "healthEducation", "#AA3934",
-              "transportation", "#1F5EA4",
-              "nature", "#23764F",
+              "landmarks", "#687278",
+              "healthEducation", "#687278",
+              "transportation", "#657178",
+              "nature", "#68736D",
               "#53645A"
             ],
             "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 13, 1.8, 17, 2.4],
@@ -2151,7 +2151,7 @@ export function MapView({
         "source-layer": "park",
         minzoom: 8,
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
-        paint: { "fill-color": "#4C9A70", "fill-opacity": 0.17 }
+        paint: { "fill-color": "#89928D", "fill-opacity": 0.17 }
       });
       addLayer({
         id: "context-vector-parks-outline",
@@ -2160,7 +2160,7 @@ export function MapView({
         "source-layer": "park",
         minzoom: 8,
         filter: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
-        paint: { "line-color": "#3B805C", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.45, 15, 1.2], "line-opacity": 0.7 }
+        paint: { "line-color": "#6E7973", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.45, 15, 1.2], "line-opacity": 0.7 }
       });
       addLayer({
         id: "context-vector-industrial-fill",
@@ -2187,7 +2187,7 @@ export function MapView({
         "source-layer": "landcover",
         minzoom: 7.5,
         filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "wood"]],
-        paint: { "fill-color": "#7F8D82", "fill-opacity": 0.20 }
+        paint: { "fill-color": "#858E89", "fill-opacity": 0.20 }
       });
       addLayer({
         id: "context-vector-forest-outline",
@@ -2196,7 +2196,7 @@ export function MapView({
         "source-layer": "landcover",
         minzoom: 7.5,
         filter: ["all", ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]], ["==", ["get", "class"], "wood"]],
-        paint: { "line-color": "#66756A", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 15, 1.0], "line-opacity": 0.75 }
+        paint: { "line-color": "#69746E", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 15, 1.0], "line-opacity": 0.75 }
       });
       addLayer({
         id: "context-vector-water-fill",
