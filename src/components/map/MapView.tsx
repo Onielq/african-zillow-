@@ -1121,6 +1121,7 @@ export function MapView({
     const areaCache = new Map<string, { bounds: ViewBounds; data: MapFeatureCollection }>();
     let hoveredFeature: { source: string; id: string | number } | null = null;
     let selectedFeature: { source: string; id: string | number } | null = null;
+    let selectedFeatureHighlightActive = false;
 
     const refreshMetricBubbles = () => {
       if (!map.isStyleLoaded()) return;
@@ -1356,6 +1357,7 @@ export function MapView({
         const marketStatus = level === "parcel" ? sourceMarketStatus : null;
         const marketStatusSource = sourceMarketStatus ? "source" as const : null;
         const isSelected = level === "parcel" &&
+          selectedFeatureHighlightActive &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
           String(selectedFeature.id) === String(feature.id);
         const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
@@ -1452,6 +1454,7 @@ export function MapView({
     ) => {
       setFeatureFlag(selectedFeature, "selected", false);
       selectedFeature = nextFeature;
+      selectedFeatureHighlightActive = nextFeature !== null;
       setFeatureFlag(selectedFeature, "selected", true);
       refreshMetricBubblesRef.current?.();
     };
@@ -1537,6 +1540,53 @@ export function MapView({
 
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
+        const glowLayerId = layer.outline + "-glow";
+        if (map.getLayer(glowLayerId)) continue;
+
+        map.addLayer({
+          id: glowLayerId,
+          type: "line",
+          source: layer.source,
+          layout: { visibility: level === "district" ? "visible" : "none" },
+          paint: {
+            "line-color": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false],
+              level === "parcel" ? "#00EFFF" : "#59E5A1",
+              ["boolean", ["feature-state", "hover"], false],
+              "#65EBAA",
+              "rgba(0,0,0,0)"
+            ],
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false],
+              level === "parcel" ? 13 : 9.5,
+              ["boolean", ["feature-state", "hover"], false],
+              level === "parcel" ? 0 : 8,
+              0
+            ],
+            "line-blur": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false],
+              level === "parcel" ? 5 : 4,
+              ["boolean", ["feature-state", "hover"], false],
+              3.4,
+              0
+            ],
+            "line-opacity": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false],
+              level === "parcel" ? 0.86 : 0.58,
+              ["boolean", ["feature-state", "hover"], false],
+              0.5,
+              0
+            ]
+          }
+        });
+      }
+
+      for (const level of AREA_LEVELS) {
+        const layer = AREA_LAYERS[level];
         if (map.getLayer(layer.outline)) continue;
 
         map.addLayer({
@@ -1563,12 +1613,12 @@ export function MapView({
             "line-width": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 4.0 : 2.5,
+              level === "parcel" ? 5.8 : 4.8,
               ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 2.5 : 2.6,
+              level === "parcel" ? 1.25 : 4.4,
               level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
             ],
-            "line-opacity": level === "parcel" ? 0.98 : 0.94
+            "line-opacity": level === "parcel" ? 0.98 : 0.98
           }
         });
       }
@@ -1911,11 +1961,16 @@ export function MapView({
     };
 
     const keepParcelBoundariesAndMarkersAboveContext = () => {
-      // Show/road and zoning overlays are added after administrative layers. Move
-      // the cadastral strokes back above those overlays while keeping parcel labels
-      // and price markers as the top-most interactive symbols.
+      // Keep geographic boundaries and their hover glow above roads, POIs and zoning.
+      for (const level of AREA_LEVELS.slice(0, -1)) {
+        const outline = AREA_LAYERS[level].outline;
+        const glow = outline + "-glow";
+        if (map.getLayer(glow)) map.moveLayer(glow);
+        if (map.getLayer(outline)) map.moveLayer(outline);
+      }
       for (const layerId of [
         PARCEL_OUTLINE_CASING_LAYER,
+        AREA_LAYERS.parcel.outline + "-glow",
         AREA_LAYERS.parcel.outline,
         AREA_LAYERS.parcel.label,
         "metric-bubbles-circle",
@@ -1948,6 +2003,10 @@ export function MapView({
         }
         if (map.getLayer(layer.outline)) {
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
+        }
+        const glowLayerId = layer.outline + "-glow";
+        if (map.getLayer(glowLayerId)) {
+          map.setLayoutProperty(glowLayerId, "visibility", showOutline ? "visible" : "none");
         }
         if (level === "parcel" && map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
           map.setLayoutProperty(
@@ -2181,7 +2240,7 @@ export function MapView({
         source.setData(merged);
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
-        if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
+        if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
       };
 
@@ -2335,7 +2394,7 @@ export function MapView({
         refreshMetricBubbles();
 
         updateLayerVisibility();
-        if (selectedFeature) setFeatureFlag(selectedFeature, "selected", true);
+        if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", true);
 
         if (parcelResult && parcelResult.data.features.length > 0) {
@@ -2535,13 +2594,36 @@ export function MapView({
       event: { features?: MapGeoJSONFeature[] }
     ) => {
       const layer = AREA_LAYERS[level];
-      setHover(layer.source, event.features?.[0]);
+      const feature = event.features?.[0];
+      const id = feature ? getFeatureId(feature) : null;
+
+      if (level === "parcel") {
+        const isSelectedParcel = id !== null &&
+          selectedFeature?.source === layer.source &&
+          String(selectedFeature.id) === String(id);
+        if (isSelectedParcel && !selectedFeatureHighlightActive) {
+          selectedFeatureHighlightActive = true;
+          setFeatureFlag(selectedFeature, "selected", true);
+          refreshMetricBubblesRef.current?.();
+        }
+        map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
+        return;
+      }
+
+      setHover(layer.source, feature);
       map.getCanvas().style.cursor = event.features?.length ? "pointer" : "";
     };
 
     const handleLeave = () => {
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
+
+      // Keep the parcel inspector open, but remove its glow after the pointer leaves the plot.
+      if (selectedFeature?.source === AREA_LAYERS.parcel.source && selectedFeatureHighlightActive) {
+        setFeatureFlag(selectedFeature, "selected", false);
+        selectedFeatureHighlightActive = false;
+        refreshMetricBubblesRef.current?.();
+      }
       map.getCanvas().style.cursor = "";
     };
 
