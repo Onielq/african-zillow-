@@ -78,6 +78,29 @@ function intersection(a: Bounds, b: Bounds): Bounds | null {
   return result[0] < result[2] && result[1] < result[3] ? result : null;
 }
 
+function geometryBounds(geometry: AreaGeometry | null): Bounds | null {
+  if (!geometry) return null;
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  const visit = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+      west = Math.min(west, value[0]);
+      south = Math.min(south, value[1]);
+      east = Math.max(east, value[0]);
+      north = Math.max(north, value[1]);
+      return;
+    }
+    for (const child of value) visit(child);
+  };
+  visit(geometry.coordinates);
+  return [west, south, east, north].every(Number.isFinite) && west < east && south < north
+    ? [west, south, east, north]
+    : null;
+}
+
 function queryFor(categories: OverlayCategory[], bounds: Bounds, zoom: number): string {
   const [west, south, east, north] = bounds;
   const box = [south, west, north, east].join(",");
@@ -551,6 +574,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Query each visible official pilot district separately. This keeps the
+    // first Rwanda-wide map request from sending a single huge bbox to Overpass.
+    // The polygons are the same official clipping geometry used for final output.
+    const districtQueryBounds = allowedDistricts.flatMap((feature) => {
+      const boundaryBounds = geometryBounds(feature.geometry);
+      if (!boundaryBounds) return [];
+      const clippedBounds = intersection(boundaryBounds, bounds);
+      return clippedBounds ? [clippedBounds] : [];
+    });
+
     // Keep all point features in one compact query and road geometry
     // separate. A broad combined geometry request used to overload public
     // Overpass services; nwr selectors now make this point query much smaller.
@@ -565,7 +598,7 @@ export async function GET(request: NextRequest) {
     let failedQueries = 0;
     const failedCategories = new Set<OverlayCategory>();
 
-    const collections = await Promise.all(targetBounds.map(async (target) => {
+    const collections = await Promise.all(districtQueryBounds.map(async (target) => {
       // Serialize category requests within each extent. This caps initial
       // concurrency at two queries (Kigali + Bugesera), not every category at once.
       const results: Array<{ categories: OverlayCategory[]; elements: OsmElement[] }> = [];
