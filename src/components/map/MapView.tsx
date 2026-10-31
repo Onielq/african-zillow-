@@ -2697,7 +2697,7 @@ export function MapView({
       lastMapPointerPoint = event.point;
       const level = activeAreaLevel(map.getZoom());
       const layer = AREA_LAYERS[level];
-      const feature = map.queryRenderedFeatures(event.point, { layers: [layer.fill] })[0];
+      const feature = map.queryRenderedFeatures([event.point.x, event.point.y], { layers: [layer.fill] })[0];
       const id = feature ? getFeatureId(feature) : null;
 
       if (level === "parcel") {
@@ -2779,7 +2779,7 @@ export function MapView({
       }
 
       map.on("mousemove", handleMapPointerMove);
-      map.on("mouseleave", handleMapPointerLeave);
+      map.getCanvas().addEventListener("mouseleave", handleMapPointerLeave);
       map.on("zoomend", () => {
         // The pointer often stays still while a user zooms. Re-check that same
         // screen position against the newly active admin level.
@@ -2989,6 +2989,7 @@ export function MapView({
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();
+      map.getCanvas().removeEventListener("mouseleave", handleMapPointerLeave);
       map.remove();
       mapRef.current = null;
       if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {
