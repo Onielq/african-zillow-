@@ -2944,12 +2944,16 @@ export function MapView({
       const partialFeatures = new Map<string, MapFeatureCollection["features"][number]>();
       let lastFailedCategories: string[] = [];
       for (let attempt = 1; attempt <= 2; attempt += 1) {
+        let upstreamProviderExhausted = false;
         try {
           recordE2ETrace("show-overlay-request", { categories, bbox, attempt });
           const response = await fetch("/api/geography/places?" + params.toString(), {
             signal: controller.signal
           });
           if (!response.ok) {
+            upstreamProviderExhausted =
+              response.status === 502 &&
+              response.headers.get("x-overlay-stage") === "overpass-query";
             const body = await response.json().catch(() => null) as {
               error?: string;
               detail?: string;
@@ -3019,6 +3023,14 @@ export function MapView({
         } catch (error) {
           lastError = error;
           if (controller.signal.aborted || sequence !== showOverlaySequence) return;
+          if (upstreamProviderExhausted) {
+            recordE2ETrace("show-overlay-upstream-exhausted", {
+              categories,
+              attempt,
+              reason: "The server already tried its Overpass mirrors."
+            });
+            break;
+          }
           if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 900));
         }
       }
