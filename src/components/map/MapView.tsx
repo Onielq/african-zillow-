@@ -535,7 +535,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
   return [
     "case",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#8AE8B5",
+    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     showPrice
       ? [
           "case",
@@ -1599,7 +1599,7 @@ export function MapView({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00F0FF" : "#125F42",
+              level === "parcel" ? "#00F0FF" : "#126347",
               ["boolean", ["feature-state", "hover"], false],
               "#06482F",
               level === "parcel"
