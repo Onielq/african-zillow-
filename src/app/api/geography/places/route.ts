@@ -83,7 +83,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
     selections.push(
       'way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|track"](' + box + ');'
     );
-    return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
+    return "[out:json][timeout:12];\n(\n" + selections.join("\n") + "\n);\nout geom tags;";
   }
 
   if (categories.includes("landmarks")) {
@@ -127,7 +127,7 @@ function queryFor(categories: OverlayCategory[], bounds: Bounds, roadsOnly: bool
   }
 
   const output = categories.includes("transportation") ? "out geom tags;" : "out center tags;";
-  return "[out:json][timeout:8];\n(\n" + selections.join("\n") + "\n);\n" + output;
+  return "[out:json][timeout:12];\n(\n" + selections.join("\n") + "\n);\n" + output;
 }
 
 const overpassCache = new Map<string, { expiresAt: number; elements: OsmElement[] }>();
