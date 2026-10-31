@@ -46,24 +46,30 @@ page.on("response", async (response) => {
     });
   }
   if (responseUrl.includes("/api/geography/places")) {
-    let summary = {};
+    const entry = {
+      url: responseUrl,
+      status: response.status(),
+      featureCount: null,
+      partial: false,
+      warning: null,
+      failedCategories: [],
+      error: null
+    };
+    diagnostics.placeApiResponses.push(entry);
     try {
       const body = await response.json();
-      summary = {
+      Object.assign(entry, {
         featureCount: Array.isArray(body?.features) ? body.features.length : null,
         partial: body?.partial ?? false,
         warning: body?.warning ?? null,
         failedCategories: body?.failedCategories ?? [],
         error: body?.error ?? null
-      };
+      });
     } catch (error) {
-      summary = { parseError: error instanceof Error ? error.message : String(error) };
+      Object.assign(entry, {
+        parseError: error instanceof Error ? error.message : String(error)
+      });
     }
-    diagnostics.placeApiResponses.push({
-      url: responseUrl,
-      status: response.status(),
-      ...summary
-    });
     return;
   }
   if (!responseUrl.includes("/api/geography/areas")) return;
