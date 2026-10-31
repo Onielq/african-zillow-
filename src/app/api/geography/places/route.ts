@@ -526,15 +526,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Isolate categories so a slow nature or road query cannot suppress all
-    // other places. Health/landmarks remain grouped because their selectors
-    // are small; nature and road geometry use separate requests.
+    // Keep all point features in one compact query and road geometry
+    // separate. A broad combined geometry request used to overload public
+    // Overpass services; nwr selectors now make this point query much smaller.
     const queryGroups: Array<{ categories: OverlayCategory[] }> = [];
-    const landmarkHealth = categories.filter((category) =>
-      category === "landmarks" || category === "healthEducation"
-    );
-    if (landmarkHealth.length > 0) queryGroups.push({ categories: landmarkHealth });
-    if (categories.includes("nature")) queryGroups.push({ categories: ["nature"] });
+    const pointCategories = categories.filter((category) => category !== "transportation");
+    if (pointCategories.length > 0) queryGroups.push({ categories: pointCategories });
     if (categories.includes("transportation")) queryGroups.push({ categories: ["transportation"] });
 
     let successfulQueries = 0;
@@ -591,8 +588,6 @@ export async function GET(request: NextRequest) {
       );
     }));
 
-
-    if (successfulQueries === 0 && failedQueries > 0) {    }));
 
     if (successfulQueries === 0 && failedQueries > 0) {
       return NextResponse.json(
