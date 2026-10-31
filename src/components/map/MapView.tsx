@@ -2845,7 +2845,10 @@ export function MapView({
       updateLayerVisibility();
       applyShowOverlayFilters(map, showLayersRef.current);
       showOverlayAutomaticRetryUsed = false;
-      void refreshShowOverlays();
+      // Wait for the map's initial camera move to settle. Calling the fetch
+      // immediately here lets the first moveend schedule cancel it mid-flight,
+      // which leaves place layers empty until the next manual interaction.
+      scheduleShowOverlayRefresh();
       void refreshZoningOverlay();
       const reportBasemapReadiness = () => {
         if (
