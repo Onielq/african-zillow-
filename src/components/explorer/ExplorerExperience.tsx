@@ -387,9 +387,15 @@ export function ExplorerExperience({ initialAreaPath = [] }: { initialAreaPath?:
   const handleBoundaryStatus = useCallback((status: BoundaryStatus) => {
     setBoundaryStatus(status);
   }, []);
-  const handleMapAreaSelected = useCallback(() => {
-    // The main map workspace remains the place for parcel inspection and map actions.
-  }, []);
+  const handleMapAreaSelected = useCallback((area: SelectedArea | null) => {
+    if (!area) return;
+    const query = area.level === "parcel"
+      ? area.upi ?? area.parcelNumber ?? area.name
+      : area.level === "village"
+        ? [area.district, area.sector, area.cell, area.village].filter(Boolean).join(", ")
+        : area.name;
+    router.push("/?areaSearch=" + encodeURIComponent(query));
+  }, [router]);
   const toggleMapLayer = (layer: MapOverlayCategory) => {
     setMapLayers((current) => current.includes(layer)
       ? current.filter((item) => item !== layer)
