@@ -558,7 +558,9 @@ test("Show uses minimal on-off switches for all four place categories and zoning
   assert.match(mapView, /context-vector-parks-fill/);
   assert.match(mapView, /context-vector-water-fill/);
   assert.match(mapView, /applyVectorContextVisibility/);
-  assert.match(mapView, /Context geometry comes directly from the OpenFreeMap vector tiles/);
+  assert.match(mapView, /showOverlayScheduleTimer = setTimeout\(\(\) => \{[\s\S]*?void refreshShowOverlays\(\)/);
+  assert.match(mapView, /showOverlayScheduleTimer !== null/);
+  assert.match(mapView, /applyVectorContextVisibility\(map, showLayersRef\.current\)/);
   assert.match(mapView, /addContextVectorLayers\(\)/);
   assert.match(experience, /useState<MapOverlayCategory\[]>\(\["landmarks", "healthEducation", "transportation", "nature"\]\)/);
   assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
