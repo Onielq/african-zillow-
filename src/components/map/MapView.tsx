@@ -1783,7 +1783,7 @@ export function MapView({
           id: "show-road-casing",
           type: "line",
           source: "show-overlays",
-          minzoom: 8.6,
+          minzoom: 8.0,
           filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
           paint: {
             "line-color": "#FFFFFF",
@@ -2449,17 +2449,25 @@ export function MapView({
     let showOverlayController: AbortController | null = null;
     let showOverlaySequence = 0;
     let showOverlayTimer: ReturnType<typeof setTimeout> | null = null;
+    let showOverlayRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    let showOverlayRequestKey: string | null = null;
+    let showOverlayAutomaticRetryUsed = false;
 
     const refreshShowOverlays = async () => {
       const source = map.getSource("show-overlays") as GeoJSONSource | undefined;
       // The GeoJSON source is added during style.load. Do not wait for every basemap tile:
       // context data must begin loading on the first view, not after a later map movement.
       if (!source) return;
+      if (showOverlayRecoveryTimer !== null) {
+        clearTimeout(showOverlayRecoveryTimer);
+        showOverlayRecoveryTimer = null;
+      }
       showOverlayController?.abort();
       showOverlayController = null;
       const sequence = ++showOverlaySequence;
       const categories = showLayersRef.current;
       if (categories.length === 0) {
+        showOverlayAutomaticRetryUsed = false;
         source.setData(emptyFeatureCollection());
         return;
       }
@@ -2478,6 +2486,11 @@ export function MapView({
         bbox,
         scope: showScopeRef.current
       });
+      const requestKey = [categories.join(","), bbox, showScopeRef.current].join("|");
+      if (showOverlayRequestKey !== requestKey) {
+        showOverlayRequestKey = requestKey;
+        showOverlayAutomaticRetryUsed = false;
+      }
 
       let lastError: unknown = null;
       for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -2490,6 +2503,7 @@ export function MapView({
           const data = await response.json() as MapFeatureCollection;
           if (sequence !== showOverlaySequence || controller.signal.aborted) return;
           source.setData(data);
+          showOverlayAutomaticRetryUsed = false;
           recordE2ETrace("show-overlay-response", {
             categories,
             featureCount: data.features?.length ?? 0,
@@ -2509,9 +2523,23 @@ export function MapView({
         reason: lastError instanceof Error ? lastError.message : String(lastError)
       });
       source.setData(emptyFeatureCollection());
+
+      // Recover once without requiring a layer toggle or map movement.
+      if (!showOverlayAutomaticRetryUsed) {
+        showOverlayAutomaticRetryUsed = true;
+        showOverlayRecoveryTimer = setTimeout(() => {
+          showOverlayRecoveryTimer = null;
+          void refreshShowOverlays();
+        }, 1800);
+      }
     };
 
     const scheduleShowOverlayRefresh = () => {
+      showOverlayAutomaticRetryUsed = false;
+      if (showOverlayRecoveryTimer !== null) {
+        clearTimeout(showOverlayRecoveryTimer);
+        showOverlayRecoveryTimer = null;
+      }
       applyShowOverlayFilters(map, showLayersRef.current);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
       showOverlayTimer = setTimeout(() => void refreshShowOverlays(), 260);
@@ -2766,6 +2794,7 @@ export function MapView({
       keepParcelBoundariesAndMarkersAboveContext();
       updateLayerVisibility();
       applyShowOverlayFilters(map, showLayersRef.current);
+      showOverlayAutomaticRetryUsed = false;
       void refreshShowOverlays();
       void refreshZoningOverlay();
       const reportBasemapReadiness = () => {
@@ -2899,6 +2928,7 @@ export function MapView({
       if (parcelRefreshRetryTimer !== null) clearTimeout(parcelRefreshRetryTimer);
       if (basemapReadyTimer !== null) clearTimeout(basemapReadyTimer);
       if (showOverlayTimer) clearTimeout(showOverlayTimer);
+      if (showOverlayRecoveryTimer !== null) clearTimeout(showOverlayRecoveryTimer);
       showOverlayController?.abort();
       if (zoningOverlayTimer) clearTimeout(zoningOverlayTimer);
       zoningOverlayController?.abort();
