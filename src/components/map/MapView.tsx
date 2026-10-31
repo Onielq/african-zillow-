@@ -535,7 +535,7 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
   return [
     "case",
     ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#83E8B5",
+    ["boolean", ["feature-state", "hover"], false], "#65D5A1",
     showPrice
       ? [
           "case",
