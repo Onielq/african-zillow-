@@ -485,6 +485,9 @@ test("Show menu exposes sourced overlays and scopes queries to the active pilot 
   assert.match(experience, /show-toggle-track/);
   assert.match(experience, /title: "Zoning"|showZoning/);
   assert.match(mapView, /show-road-lines/);
+  assert.match(mapView, /buildVectorTileOverlayFallback/);
+  assert.match(mapView, /show-overlay-vector-fallback/);
+  assert.match(mapView, /source_type: "openmaptiles-vector-fallback"/);
   assert.match(mapView, /show-poi-circles/);
   assert.match(mapView, /showLayersRef/);
   assert.match(places, /OVERPASS_ENDPOINTS/);
