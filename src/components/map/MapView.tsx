@@ -1797,7 +1797,7 @@ export function MapView({
           id: "show-road-lines",
           type: "line",
           source: "show-overlays",
-          minzoom: 8.6,
+          minzoom: 8.0,
           filter: ["all", ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]], ["==", ["get", "overlay_category"], "transportation"]],
           paint: {
             "line-color": "#2675C7",
