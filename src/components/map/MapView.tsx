@@ -2564,13 +2564,13 @@ export function MapView({
         AREA_LAYERS.parcel.outline + "-glow",
         AREA_LAYERS.parcel.outline,
         AREA_LAYERS.parcel.label,
-        "metric-bubbles-circle",
-        "metric-bubbles-label",
-        "metric-bubbles-parcel-label",
         "project-clusters",
         "project-cluster-count",
         "project-marker-circles",
-        "project-marker-labels"
+        "project-marker-labels",
+        "metric-bubbles-circle",
+        "metric-bubbles-label",
+        "metric-bubbles-parcel-label"
       ]) {
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
@@ -3563,8 +3563,6 @@ export function MapView({
       const level = activeAreaLevel(map.getZoom());
       const layer = AREA_LAYERS[level];
       const feature = map.queryRenderedFeatures([event.point.x, event.point.y], { layers: [layer.fill] })[0];
-      const id = feature ? getFeatureId(feature) : null;
-
       if (level === "parcel") {
         // Parcel hover never fills or selects the polygon.
         // A click selects it; that outline and its price marker stay blue
