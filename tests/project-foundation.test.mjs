@@ -1018,9 +1018,9 @@ test("projects and developers are connected to the in-map register and parcel id
 
   assert.match(directory, /RWANDA_PROJECT_RECORDS/);
   assert.match(directory, /RWANDA_PROJECT_DEVELOPERS/);
-  assert.match(directory, /name: "Inzovu Mall"/);
-  assert.match(directory, /name: "Brilliant Tower"/);
-  assert.match(directory, /parcelUpi: "1\/02\/08\/03\/681"/);
+  assert.match(directory, /"name": "Inzovu Mall"/);
+  assert.match(directory, /"name": "Brilliant Tower"/);
+  assert.match(directory, /"parcelUpi": "1\/02\/08\/03\/681"/);
   assert.match(experience, /projects=\{RWANDA_PROJECT_RECORDS\}/);
   assert.match(experience, /showProjects=\{workspaceMode === "projects" \|\| projectsOpen\}/);
   assert.match(experience, /RWANDA_PROJECT_RECORDS\.length/);
