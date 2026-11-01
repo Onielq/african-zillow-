@@ -18,6 +18,11 @@ import {
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
 import {
+  RWANDA_PROJECT_RECORDS,
+  RWANDA_PROJECT_DEVELOPERS,
+  type RwandaProjectRecord
+} from "@/data/project-directory";
+import {
   DISTRICT_LAND_PRICE_BENCHMARKS,
   getDistrictLandPriceBenchmark,
   LAND_PRICE_BENCHMARK_SOURCE,
@@ -34,6 +39,7 @@ import {
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
 type WorkspaceMode = "areas" | "projects";
+type ProjectDirectoryTab = "projects" | "developers";
 
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
   const code = zone.code?.trim();
@@ -594,6 +600,9 @@ export function MapExperience() {
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [projectDirectoryTab, setProjectDirectoryTab] = useState<ProjectDirectoryTab>("projects");
+  const [projectSearch, setProjectSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks", "healthEducation", "transportation", "nature"]);
   const [showZoning, setShowZoning] = useState(false);
@@ -626,6 +635,7 @@ export function MapExperience() {
   const [mapInstance, setMapInstance] = useState<MapLibreMapInstance | null>(
     null
   );
+  const manualBasemapChoiceRef = useRef<BasemapMode | null>(null);
   const [basemapStatus, setBasemapStatus] =
     useState<BasemapStatus>("loading");
   const [boundaryStatus, setBoundaryStatus] =
@@ -634,6 +644,26 @@ export function MapExperience() {
   const [compactParcelPriceKey, setCompactParcelPriceKey] = useState<string | null>(null);
   const parcelPriceIdentity = selectedArea?.level === "parcel" ? (selectedArea.upi ?? selectedArea.name) : null;
   const isCompactParcelPrice = parcelPriceIdentity !== null && compactParcelPriceKey === parcelPriceIdentity;
+  const selectedParcelProject = selectedArea?.level === "parcel" && selectedArea.upi
+    ? RWANDA_PROJECT_RECORDS.find((project) =>
+        Boolean(project.parcelUpi) &&
+        project.parcelUpi?.replace(/\D/g, "") === selectedArea.upi?.replace(/\D/g, "")
+      ) ?? null
+    : null;
+  const selectedProject = selectedProjectId
+    ? RWANDA_PROJECT_RECORDS.find((project) => project.id === selectedProjectId) ?? null
+    : null;
+  const normalizedProjectSearch = projectSearch.trim().toLocaleLowerCase("en");
+  const filteredProjects = RWANDA_PROJECT_RECORDS.filter((project) =>
+    !normalizedProjectSearch ||
+    [project.name, project.developer, project.owner, project.category, project.district, project.sector]
+      .filter(Boolean).join(" ").toLocaleLowerCase("en").includes(normalizedProjectSearch)
+  );
+  const filteredProjectDevelopers = RWANDA_PROJECT_DEVELOPERS.filter((developer) =>
+    !normalizedProjectSearch ||
+    [developer.name, developer.base, developer.focus].filter(Boolean).join(" ")
+      .toLocaleLowerCase("en").includes(normalizedProjectSearch)
+  );
   const globalSearchMarkerRef = useRef<Marker | null>(null);
   const globalSearchSequenceRef = useRef(0);
   const nearbyAreaLevel = selectedArea?.level ?? null;
