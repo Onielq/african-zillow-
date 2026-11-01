@@ -794,6 +794,8 @@ test("parcel price markers use red baseline, brown public assets, charcoal high 
   assert.match(mapView, /\["#D41A3A", "#B8142E"\]/);
   assert.match(mapView, /sortValue >= 1_000_000_000/);
   assert.match(mapView, /isPublicAssetAt\(markerCenter\)/);
+  assert.match(mapView, /cachedCollection\.features\.length > 0/);
+  assert.match(mapView, /map\.querySourceFeatures\(AREA_LAYERS\[level\]\.source\)/);
   assert.match(mapView, /\["==", \["get", "marker_style"\], "public-asset"\], "#8B5A2B"/);
   assert.match(mapView, /\["==", \["get", "marker_style"\], "high-value"\], "#343A40"/);
   assert.match(mapView, /\["==", \["get", "is_selected"\], true\], "#2563EB"/);
@@ -1022,6 +1024,7 @@ test("projects and developers are connected to the in-map register and parcel id
   assert.match(directory, /RWANDA_PROJECT_DEVELOPERS/);
   assert.match(directory, /"name": "Inzovu Mall"/);
   assert.match(directory, /"name": "Brilliant Tower"/);
+  assert.match(directory, /"name": "Brilliant Tower",[\s\S]*?"district": "Gasabo",[\s\S]*?"sector": "Kimihurura"/);
   assert.match(directory, /"parcelUpi": "1\/02\/08\/03\/681"/);
   assert.match(experience, /projects=\{RWANDA_PROJECT_RECORDS\}/);
   assert.match(experience, /showProjects=\{workspaceMode === "projects" \|\| projectsOpen\}/);
