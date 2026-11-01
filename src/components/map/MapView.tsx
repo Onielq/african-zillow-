@@ -166,6 +166,7 @@ type AreaProperties = {
   name?: string | null;
   detail?: string | null;
   source_id?: string | number | null;
+  map_feature_id?: string;
   zoning?: string | null;
   zoning_source?: string | null;
   label?: string | null;
