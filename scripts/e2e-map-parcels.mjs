@@ -209,7 +209,7 @@ try {
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
+    map.jumpTo({ center: [30.087, -1.953], zoom: 16.6 });
   });
 
   // Cloudflare may need one bounded GIS request plus the Vercel fallback.
@@ -240,7 +240,7 @@ try {
     await page.evaluate(({ zoom }) => {
       const map = window.__RLI_E2E_MAP__;
       if (!map) throw new Error("Opt-in test map was not exposed.");
-      map.jumpTo({ center: [30.133, -2.283], zoom });
+      map.jumpTo({ center: [30.087, -1.953], zoom });
     }, config);
 
     await page.waitForFunction(({ layer, source }) => {
@@ -314,7 +314,7 @@ try {
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 17.4 });
+    map.jumpTo({ center: [30.087, -1.953], zoom: 17.4 });
   });
 
   await page.waitForFunction(() => {
@@ -328,14 +328,37 @@ try {
     }
   }, undefined, { timeout: 50_000 });
 
+  // Find a visible cadastral parcel that actually has a price pill. The
+  // selection rule applies to existing price markers; we do not invent one
+  // for a parcel that has no supported price value.
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return false;
+    return map.querySourceFeatures("metric-bubbles").some((feature) =>
+      feature.properties?.level === "parcel" &&
+      feature.properties?.has_value === true
+    );
+  }, undefined, { timeout: 20_000 });
+
   const parcelHoverTarget = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let y = 150; y < rect.height - 170; y += 14) {
-      for (let x = 390; x < rect.width - 18; x += 14) {
+    const pricedIds = new Set(
+      map.querySourceFeatures("metric-bubbles")
+        .filter((feature) =>
+          feature.properties?.level === "parcel" &&
+          feature.properties?.has_value === true
+        )
+        .map((feature) => String(feature.properties?.area_feature_id ?? ""))
+    );
+    for (let y = 150; y < rect.height - 170; y += 10) {
+      for (let x = 390; x < rect.width - 18; x += 10) {
         const feature = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] })
-          .find((item) => typeof item.id === "string" || typeof item.id === "number");
+          .find((item) =>
+            (typeof item.id === "string" || typeof item.id === "number") &&
+            pricedIds.has(String(item.id))
+          );
         if (feature) {
           return { x: rect.left + x, y: rect.top + y, source: feature.source, id: feature.id };
         }
@@ -343,12 +366,18 @@ try {
     }
     return null;
   });
-  if (!parcelHoverTarget) throw new Error("No rendered parcel polygon was available for the selection glow check.");
+  if (!parcelHoverTarget) throw new Error("No visible parcel with a price marker was available for the selection colour check.");
 
   await page.mouse.click(parcelHoverTarget.x, parcelHoverTarget.y);
   await page.waitForFunction(({ source, id }) => {
     const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).selected === true);
+    if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      feature.properties?.level === "parcel" &&
+      feature.properties?.has_value === true
+    );
+    return Boolean(bubble && bubble.properties?.is_selected === true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
   const parcelBlankPoint = await page.evaluate(() => {
