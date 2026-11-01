@@ -702,6 +702,7 @@ export function MapExperience() {
   );
 
   const focusProjectOnMap = async (project: RwandaProjectRecord) => {
+    setSelectedArea(null);
     setSelectedProjectId(project.id);
     setWorkspaceMode("projects");
     setProjectsOpen(true);
@@ -764,6 +765,7 @@ export function MapExperience() {
   };
 
   const handleProjectMarkerSelected = useCallback((project: RwandaProjectRecord) => {
+    setSelectedArea(null);
     setSelectedProjectId(project.id);
     setWorkspaceMode("projects");
     setProjectsOpen(true);
@@ -775,6 +777,7 @@ export function MapExperience() {
       globalSearchMarkerRef.current?.remove();
       globalSearchMarkerRef.current = null;
       setGlobalSearchOpen(false);
+      setSelectedProjectId(null);
       setSelectedArea(area);
     },
     []
