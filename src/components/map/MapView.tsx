@@ -289,10 +289,11 @@ type MetricPillDimensions = {
 
 const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
 
+type PriceMarkerStyle = "market-default" | "public-asset" | "high-value";
 function metricPillImageName(
   label: string,
   variant: MetricPillVariant,
-  marketStatus: PropertyMarketStatus | null,
+  markerStyle: PriceMarkerStyle,
   isSelected: boolean,
   isNewListing: boolean
 ): string {
@@ -300,7 +301,7 @@ function metricPillImageName(
   for (let index = 0; index < label.length; index += 1) {
     hash = (Math.imul(hash, 33) ^ label.charCodeAt(index)) >>> 0;
   }
-  const state = isSelected ? "selected" : marketStatus ?? "default";
+  const state = isSelected ? "selected" : markerStyle;
   return "metric-price-pill-" + variant + "-" + state + "-" +
     (isNewListing ? "new-" : "standard-") + hash.toString(36);
 }
@@ -346,11 +347,11 @@ function ensureMetricPillImage(
   label: string,
   variant: MetricPillVariant,
   dimensions: MetricPillDimensions,
-  marketStatus: PropertyMarketStatus | null = null,
+  markerStyle: PriceMarkerStyle = "market-default",
   isSelected = false,
   isNewListing = false
 ): string {
-  const imageName = metricPillImageName(label, variant, marketStatus, isSelected, isNewListing);
+  const imageName = metricPillImageName(label, variant, markerStyle, isSelected, isNewListing);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
@@ -364,13 +365,11 @@ function ensureMetricPillImage(
   context.scale(pixelRatio, pixelRatio);
   const fillColor = isSelected
     ? ["#2563EB", "#1D4ED8"]
-    : variant === "parcel" && marketStatus === "available"
-      ? ["#D41A3A", "#B8142E"]
-      : variant === "parcel" && marketStatus === "off-market"
-        ? ["#3A3A42", "#2E2E35"]
-        : variant === "parcel"
-          ? ["#8B9690", "#748079"]
-          : ["#9D2932", "#7F2028"];
+    : variant === "parcel" && markerStyle === "public-asset"
+      ? ["#98612F", "#75451F"]
+      : variant === "parcel" && markerStyle === "high-value"
+        ? ["#454B52", "#30363D"]
+        : ["#D41A3A", "#B8142E"];
   const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
   gradient.addColorStop(0, fillColor[0]);
   gradient.addColorStop(1, fillColor[1]);
@@ -1271,6 +1270,29 @@ export function MapView({
       }
 
       const metric = selectedMetricRef.current;
+      const isPublicAssetAt = (center: [number, number]): boolean => {
+        const candidateLayers = [
+          "context-vector-forest-fill",
+          "context-vector-parks-fill",
+          "context-vector-industrial-fill",
+          "show-poi-fill"
+        ].filter((layerId) => Boolean(map.getLayer(layerId)));
+        if (candidateLayers.length === 0) return false;
+        const hits = map.queryRenderedFeatures(map.project(center), { layers: candidateLayers });
+        return hits.some((hit) => {
+          const layerId = hit.layer.id.toLowerCase();
+          const properties = hit.properties ?? {};
+          const labels = [
+            properties.name, properties.class, properties.subclass,
+            properties.landuse, properties.natural, properties.overlay_category,
+            properties.detail, properties.operator
+          ].filter(Boolean).join(" ").toLowerCase();
+          return layerId.includes("forest") ||
+            layerId.includes("industrial") ||
+            /government|administrative|sector office|public office|landmark authority|protected area|wetland|woodland|forest|industrial/.test(labels);
+        });
+      };
+
       const features = collection.features.flatMap((feature, index) => {
         if (!feature.geometry || !("coordinates" in feature.geometry)) return [];
         const bounds = featureBounds({
@@ -1445,9 +1467,17 @@ export function MapView({
           String(selectedFeature.id) === String(feature.id);
         const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
         const isNewListing = hasVerifiedListingDate && sourceMarketStatus === "available";
+        const markerCenter: [number, number] = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+        const markerStyle: PriceMarkerStyle = level !== "parcel"
+          ? "market-default"
+          : isPublicAssetAt(markerCenter)
+            ? "public-asset"
+            : sortValue >= 1_000_000_000
+              ? "high-value"
+              : "market-default";
         const pillDimensions = hasValue ? measureMetricPill(label, variant, isNewListing) : null;
         const iconImage = hasValue && pillDimensions
-          ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected, isNewListing)
+          ? ensureMetricPillImage(map, label, variant, pillDimensions, markerStyle, isSelected, isNewListing)
           : "";
         return [{
           type: "Feature" as const,
@@ -1470,6 +1500,7 @@ export function MapView({
             metric_detail: detail,
             market_status: marketStatus,
             market_status_source: marketStatusSource,
+            marker_style: markerStyle,
             is_selected: isSelected,
             is_new_listing: isNewListing,
             area_feature_id: String(feature.id ?? index),
@@ -1841,10 +1872,10 @@ export function MapView({
             "circle-color": [
               "case",
               ["==", ["get", "is_selected"], true], "#2563EB",
-              ["==", ["get", "market_status"], "available"], "#9D2932",
-              ["==", ["get", "market_status"], "off-market"], "#343A40",
+              ["==", ["get", "marker_style"], "public-asset"], "#8B5A2B",
+              ["==", ["get", "marker_style"], "high-value"], "#343A40",
+              ["==", ["get", "level"], "parcel"], "#D41A3A",
               ["==", ["get", "has_value"], false], "#8B9690",
-              ["==", ["get", "level"], "parcel"], "#8B9690",
               "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
@@ -3305,13 +3336,6 @@ export function MapView({
       }
     };
 
-    const clearParcelGlow = () => {
-      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
-      setFeatureFlag(selectedFeature, "selected", false);
-      selectedFeatureHighlightActive = false;
-      refreshMetricBubblesRef.current?.();
-    };
-
     // Query the active polygon layer on the map itself. Layer-specific mouseleave
     // events can fire during zoom transitions and clear a highlight while the
     // pointer is still over the newly active administrative level.
@@ -3323,49 +3347,24 @@ export function MapView({
       const id = feature ? getFeatureId(feature) : null;
 
       if (level === "parcel") {
+        // Parcel hover never fills or selects the polygon.
+        // A click selects it; that outline and its price marker stay blue
+        // until another feature or empty map location is clicked.
         setHover(layer.source, undefined);
-        const isSelectedParcel = id !== null &&
-          selectedFeature?.source === layer.source &&
-          String(selectedFeature.id) === String(id);
-
-        if (!isSelectedParcel) clearParcelGlow();
-        if (isSelectedParcel && !selectedFeatureHighlightActive && selectedFeature) {
-          selectedFeatureHighlightActive = true;
-          setFeatureFlag(selectedFeature, "selected", true);
-          refreshMetricBubblesRef.current?.();
-        }
-
         map.getCanvas().style.cursor = feature ? "pointer" : "";
         return;
       }
 
-      clearParcelGlow();
       setHover(layer.source, feature);
       map.getCanvas().style.cursor = feature ? "pointer" : "";
     };
-
-    const handleDocumentPointerMove = (event: PointerEvent) => {
-      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
-      const canvas = map.getCanvas();
-      const target = event.target;
-      const pointerOnCanvas = target === canvas ||
-        (target instanceof Node && canvas.contains(target));
-
-      // The inspector can cover the clicked plot without moving the pointer.
-      // A stationary click must keep the glow; a real move onto the inspector,
-      // toolbar or any other UI surface clears it.
-      if (!pointerOnCanvas) clearParcelGlow();
-    };
-
-    const handleWindowBlur = () => clearParcelGlow();
 
     const handleMapPointerLeave = () => {
       lastMapPointerPoint = null;
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
-      // Do not clear a clicked parcel here. Opening its detail panel may cover
-      // the pointer without the user moving it; document pointer movement below
-      // distinguishes that layout change from an actual pointer leaving.
+      // Leaving the map clears temporary administrative hover only.
+      // Parcel selection is a click state and remains active.
       map.getCanvas().style.cursor = "";
     };
 
@@ -3378,16 +3377,6 @@ export function MapView({
       const id = getFeatureId(feature);
       const area = featureToArea(feature, level);
       if (id === null || !area) return;
-
-      if (
-        level === "parcel" &&
-        selectedFeature?.source === source &&
-        String(selectedFeature.id) === String(id)
-      ) {
-        selectFeatureState(null);
-        onAreaSelected(null);
-        return;
-      }
 
       const properties = feature.properties as AreaProperties | null;
       const suppliedMarketStatus = propertyMarketStatus(properties?.market_status);
@@ -3419,8 +3408,6 @@ export function MapView({
 
       map.on("mousemove", handleMapPointerMove);
       map.getCanvas().addEventListener("mouseleave", handleMapPointerLeave);
-      window.addEventListener("pointermove", handleDocumentPointerMove);
-      window.addEventListener("blur", handleWindowBlur);
       map.on("zoomend", () => {
         // scheduleRefresh changes the visible polygon level on this same event.
         // Re-query only after MapLibre has rendered that new level.
@@ -3686,8 +3673,6 @@ export function MapView({
       activeController?.abort();
       resizeObserver?.disconnect();
       map.getCanvas().removeEventListener("mouseleave", handleMapPointerLeave);
-      window.removeEventListener("pointermove", handleDocumentPointerMove);
-      window.removeEventListener("blur", handleWindowBlur);
       map.remove();
       mapRef.current = null;
       if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {
