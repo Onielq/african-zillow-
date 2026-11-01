@@ -31,10 +31,12 @@ page.on("requestfailed", (request) => {
     });
   }
   if (/ArcGIS\/rest\/services\/(World_Imagery|Reference\/World_Transportation)\/MapServer\/tile\//i.test(url)) {
-    diagnostics.failedBasemapTileRequests.push({
-      url,
-      error: request.failure()?.errorText ?? "request failed"
-    });
+    const error = request.failure()?.errorText ?? "request failed";
+    // MapLibre cancels tile requests that leave the viewport during zoom/pan.
+    // Those are expected cancellations, not failed image responses.
+    if (error !== "net::ERR_ABORTED") {
+      diagnostics.failedBasemapTileRequests.push({ url, error });
+    }
   }
 });
 page.on("response", async (response) => {
