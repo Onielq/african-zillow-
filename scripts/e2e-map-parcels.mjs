@@ -351,17 +351,23 @@ try {
           feature.properties?.level === "parcel" &&
           feature.properties?.has_value === true
         )
-        .map((feature) => String(feature.properties?.area_feature_id ?? ""))
+        .map((feature) => String(feature.properties?.upi ?? ""))
     );
     for (let y = 150; y < rect.height - 170; y += 10) {
       for (let x = 390; x < rect.width - 18; x += 10) {
         const feature = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] })
           .find((item) =>
             (typeof item.id === "string" || typeof item.id === "number") &&
-            pricedIds.has(String(item.id))
+            pricedIds.has(String(item.properties?.upi ?? ""))
           );
         if (feature) {
-          return { x: rect.left + x, y: rect.top + y, source: feature.source, id: feature.id };
+          return {
+            x: rect.left + x,
+            y: rect.top + y,
+            source: feature.source,
+            id: feature.id,
+            upi: String(feature.properties?.upi ?? "")
+          };
         }
       }
     }
@@ -374,7 +380,7 @@ try {
     const map = window.__RLI_E2E_MAP__;
     if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
     const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
-      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      String(feature.properties?.upi ?? "") === String(upi) &&
       feature.properties?.level === "parcel" &&
       feature.properties?.has_value === true
     );
@@ -403,11 +409,11 @@ try {
   }
   await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
 
-  await page.waitForFunction(({ source, id }) => {
+  await page.waitForFunction(({ source, id, upi }) => {
     const map = window.__RLI_E2E_MAP__;
     if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
     const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
-      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      String(feature.properties?.upi ?? "") === String(upi) &&
       feature.properties?.level === "parcel"
     );
     return Boolean(bubble && bubble.properties?.is_selected === true);
@@ -416,11 +422,11 @@ try {
   // Now click an unrelated empty map location. Both the boundary state and
   // the matching price marker must return to their normal state together.
   await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
-  await page.waitForFunction(({ source, id }) => {
+  await page.waitForFunction(({ source, id, upi }) => {
     const map = window.__RLI_E2E_MAP__;
     if (!map || map.getFeatureState({ source, id }).selected === true) return false;
     const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
-      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      String(feature.properties?.upi ?? "") === String(upi) &&
       feature.properties?.level === "parcel"
     );
     return !bubble || bubble.properties?.is_selected !== true;
