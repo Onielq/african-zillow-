@@ -14,6 +14,7 @@ import {
   setWorkerUrl
 } from "maplibre-gl";
 import type { FeatureCollection, Geometry } from "geojson";
+import type { RwandaProjectRecord } from "@/data/project-directory";
 import { formatCompactValue } from "@/lib/format-compact-value";
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
@@ -165,6 +166,7 @@ type AreaProperties = {
   name?: string | null;
   detail?: string | null;
   source_id?: string | number | null;
+  map_feature_id?: string;
   zoning?: string | null;
   zoning_source?: string | null;
   label?: string | null;
@@ -289,10 +291,11 @@ type MetricPillDimensions = {
 
 const metricPillDimensionsCache = new Map<string, MetricPillDimensions>();
 
+type PriceMarkerStyle = "market-default" | "public-asset" | "high-value";
 function metricPillImageName(
   label: string,
   variant: MetricPillVariant,
-  marketStatus: PropertyMarketStatus | null,
+  markerStyle: PriceMarkerStyle,
   isSelected: boolean,
   isNewListing: boolean
 ): string {
@@ -300,7 +303,7 @@ function metricPillImageName(
   for (let index = 0; index < label.length; index += 1) {
     hash = (Math.imul(hash, 33) ^ label.charCodeAt(index)) >>> 0;
   }
-  const state = isSelected ? "selected" : marketStatus ?? "default";
+  const state = isSelected ? "selected" : markerStyle;
   return "metric-price-pill-" + variant + "-" + state + "-" +
     (isNewListing ? "new-" : "standard-") + hash.toString(36);
 }
@@ -346,11 +349,11 @@ function ensureMetricPillImage(
   label: string,
   variant: MetricPillVariant,
   dimensions: MetricPillDimensions,
-  marketStatus: PropertyMarketStatus | null = null,
+  markerStyle: PriceMarkerStyle = "market-default",
   isSelected = false,
   isNewListing = false
 ): string {
-  const imageName = metricPillImageName(label, variant, marketStatus, isSelected, isNewListing);
+  const imageName = metricPillImageName(label, variant, markerStyle, isSelected, isNewListing);
   if (map.hasImage(imageName)) return imageName;
 
   const pixelRatio = 2;
@@ -364,13 +367,11 @@ function ensureMetricPillImage(
   context.scale(pixelRatio, pixelRatio);
   const fillColor = isSelected
     ? ["#2563EB", "#1D4ED8"]
-    : variant === "parcel" && marketStatus === "available"
-      ? ["#D41A3A", "#B8142E"]
-      : variant === "parcel" && marketStatus === "off-market"
-        ? ["#3A3A42", "#2E2E35"]
-        : variant === "parcel"
-          ? ["#8B9690", "#748079"]
-          : ["#9D2932", "#7F2028"];
+    : variant === "parcel" && markerStyle === "public-asset"
+      ? ["#98612F", "#75451F"]
+      : variant === "parcel" && markerStyle === "high-value"
+        ? ["#454B52", "#30363D"]
+        : ["#D41A3A", "#B8142E"];
   const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
   gradient.addColorStop(0, fillColor[0]);
   gradient.addColorStop(1, fillColor[1]);
@@ -506,6 +507,37 @@ function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCo
   };
 }
 
+function withStableAreaFeatureIds(
+  level: AreaLevel,
+  collection: MapFeatureCollection
+): MapFeatureCollection {
+  return {
+    ...collection,
+    features: collection.features.map((feature, index) => {
+      const properties = feature.properties ?? {};
+      const hierarchy = [
+        properties.province_id ?? properties.province,
+        properties.district_id ?? properties.district,
+        properties.sector_id ?? properties.sector,
+        properties.cell_id ?? properties.cell,
+        properties.village_id ?? properties.village,
+        properties.upi ?? feature.id ?? index,
+        properties.source_label
+      ].map((part) => String(part ?? "").trim()).join("|");
+      const stableId = level === "parcel"
+        ? String(properties.upi ?? feature.id ?? index)
+        : level + "|" + hierarchy;
+      return {
+        ...feature,
+        id: stableId,
+        properties: {
+          ...properties,
+          map_feature_id: stableId
+        }
+      };
+    })
+  };
+}
 
 type MapViewProps = {
   basemapMode: BasemapMode;
@@ -515,6 +547,10 @@ type MapViewProps = {
   showZoning: boolean;
   showScope: ShowScope;
   selectedArea: SelectedArea | null;
+  projects?: RwandaProjectRecord[];
+  showProjects?: boolean;
+  selectedProjectId?: string | null;
+  onProjectSelected?: (project: RwandaProjectRecord) => void;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
@@ -1007,10 +1043,21 @@ export function MapView({
   onAreaSelected,
   showLayers,
   showScope,
-  selectedArea
+  selectedArea,
+  projects = [],
+  showProjects = false,
+  selectedProjectId = null,
+  onProjectSelected
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
+  const projectsRef = useRef<RwandaProjectRecord[]>(projects);
+  const showProjectsRef = useRef(showProjects);
+  const selectedProjectIdRef = useRef<string | null>(selectedProjectId);
+  const onProjectSelectedRef = useRef(onProjectSelected);
+  const refreshProjectMarkersRef = useRef<(() => void) | null>(null);
+  const projectCentersRef = useRef(new Map<string, { center: [number, number]; precision: "district" | "sector" | "address-coordinate" | "parcel-upi" }>());
+  const focusedProjectRef = useRef<{ id: string; precision: string } | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const basemapTileErrorRef = useRef(false);
   const basemapStyleSequenceRef = useRef(0);
@@ -1087,6 +1134,15 @@ export function MapView({
     selectedAreaRef.current = selectedArea;
     selectionSyncRef.current?.(selectedArea);
   }, [selectedArea]);
+
+  useEffect(() => {
+    projectsRef.current = projects;
+    showProjectsRef.current = showProjects;
+    selectedProjectIdRef.current = selectedProjectId;
+    onProjectSelectedRef.current = onProjectSelected;
+    if (!selectedProjectId) focusedProjectRef.current = null;
+    refreshProjectMarkersRef.current?.();
+  }, [projects, showProjects, selectedProjectId, onProjectSelected]);
 
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
@@ -1207,12 +1263,26 @@ export function MapView({
     let lastMapPointerPoint: { x: number; y: number } | null = null;
 
     const refreshMetricBubbles = () => {
-      if (!map.isStyleLoaded()) return;
+      // Do not gate marker refresh on map.isStyleLoaded(): MapLibre can report
+      // false while unrelated raster/vector tiles are still loading even when
+      // the GeoJSON parcel and metric sources are already ready. That caused
+      // parcel geometry to render while its price-marker source stayed empty.
       const source = map.getSource("metric-bubbles") as GeoJSONSource | undefined;
       if (!source) return;
 
       const level = activeAreaLevel(map.getZoom());
-      const collection = areaDataRef.current[level] ?? emptyFeatureCollection();
+      const cachedCollection = areaDataRef.current[level] ?? emptyFeatureCollection();
+      // During rapid zoom/source refreshes MapLibre may already have published
+      // the active GeoJSON layer while the React-side viewport cache is still
+      // empty. Reuse rendered source features in that window so selected parcel
+      // outlines and their price markers never get out of sync.
+      const sourceFeatures = cachedCollection.features.length > 0
+        ? cachedCollection.features
+        : map.querySourceFeatures(AREA_LAYERS[level].source) as unknown as MapFeatureCollection["features"];
+      const collection: MapFeatureCollection = {
+        type: "FeatureCollection",
+        features: sourceFeatures
+      };
       const valuesByKey = new Map<string, MetricBubbleValue>();
       for (const value of metricBubbleValuesRef.current) {
         valuesByKey.set(
@@ -1271,6 +1341,29 @@ export function MapView({
       }
 
       const metric = selectedMetricRef.current;
+      const isPublicAssetAt = (center: [number, number]): boolean => {
+        const candidateLayers = [
+          "context-vector-forest-fill",
+          "context-vector-parks-fill",
+          "context-vector-industrial-fill",
+          "show-poi-fill"
+        ].filter((layerId) => Boolean(map.getLayer(layerId)));
+        if (candidateLayers.length === 0) return false;
+        const hits = map.queryRenderedFeatures(map.project(center), { layers: candidateLayers });
+        return hits.some((hit) => {
+          const layerId = hit.layer.id.toLowerCase();
+          const properties = hit.properties ?? {};
+          const labels = [
+            properties.name, properties.class, properties.subclass,
+            properties.landuse, properties.natural, properties.overlay_category,
+            properties.detail, properties.operator
+          ].filter(Boolean).join(" ").toLowerCase();
+          return layerId.includes("forest") ||
+            layerId.includes("industrial") ||
+            /government|administrative|sector office|public office|landmark authority|protected area|wetland|woodland|forest|industrial/.test(labels);
+        });
+      };
+
       const features = collection.features.flatMap((feature, index) => {
         if (!feature.geometry || !("coordinates" in feature.geometry)) return [];
         const bounds = featureBounds({
@@ -1439,15 +1532,26 @@ export function MapView({
         // Cadastral parcels are not assumed to be for sale or off-market.
         const marketStatus = level === "parcel" ? sourceMarketStatus : null;
         const marketStatusSource = sourceMarketStatus ? "source" as const : null;
+        const parcelSelectionId = properties.upi;
+        const featureSelectionId = level === "parcel" ? parcelSelectionId : feature.id;
         const isSelected = level === "parcel" &&
           selectedFeatureHighlightActive &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
-          String(selectedFeature.id) === String(feature.id);
+          typeof featureSelectionId === "string" &&
+          String(selectedFeature.id) === featureSelectionId;
         const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
         const isNewListing = hasVerifiedListingDate && sourceMarketStatus === "available";
+        const markerCenter: [number, number] = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+        const markerStyle: PriceMarkerStyle = level !== "parcel"
+          ? "market-default"
+          : isPublicAssetAt(markerCenter)
+            ? "public-asset"
+            : sortValue >= 1_000_000_000
+              ? "high-value"
+              : "market-default";
         const pillDimensions = hasValue ? measureMetricPill(label, variant, isNewListing) : null;
         const iconImage = hasValue && pillDimensions
-          ? ensureMetricPillImage(map, label, variant, pillDimensions, marketStatus, isSelected, isNewListing)
+          ? ensureMetricPillImage(map, label, variant, pillDimensions, markerStyle, isSelected, isNewListing)
           : "";
         return [{
           type: "Feature" as const,
@@ -1470,6 +1574,7 @@ export function MapView({
             metric_detail: detail,
             market_status: marketStatus,
             market_status_source: marketStatusSource,
+            marker_style: markerStyle,
             is_selected: isSelected,
             is_new_listing: isNewListing,
             area_feature_id: String(feature.id ?? index),
@@ -1518,6 +1623,113 @@ export function MapView({
       source.setData({ type: "FeatureCollection", features: renderedFeatures } as never);
     };
     refreshMetricBubblesRef.current = refreshMetricBubbles;
+
+    const refreshProjectMarkers = () => {
+      const source = map.getSource("project-markers") as GeoJSONSource | undefined;
+      const layerIds = ["project-clusters", "project-cluster-count", "project-marker-circles", "project-marker-labels"];
+      const visibility = showProjectsRef.current ? "visible" : "none";
+      for (const layerId of layerIds) {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visibility);
+      }
+      if (!source) return;
+
+      if (!showProjectsRef.current) {
+        source.setData(emptyFeatureCollection() as never);
+        projectCentersRef.current = new Map();
+        return;
+      }
+
+      const normal = (value: unknown) => normalizeMetricKeyPart(value);
+      const centerOf = (feature: MapFeatureCollection["features"][number]): [number, number] | null => {
+        const bounds = featureBounds(feature as unknown as MapGeoJSONFeature);
+        return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
+      };
+
+      const nextCenters = new Map<string, {
+        center: [number, number];
+        precision: "district" | "sector" | "address-coordinate" | "parcel-upi";
+      }>();
+      const features = projectsRef.current.flatMap((project) => {
+        let center: [number, number] | null = null;
+        let precision: "district" | "sector" | "address-coordinate" | "parcel-upi" = "district";
+
+        if (project.parcelUpi) {
+          const parcels = areaDataRef.current.parcel?.features ?? [];
+          const match = parcels.find((feature) => normal(feature.properties?.upi) === normal(project.parcelUpi));
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "parcel-upi";
+          }
+        }
+
+        if (!center && Number.isFinite(project.latitude) && Number.isFinite(project.longitude)) {
+          center = [project.longitude as number, project.latitude as number];
+          precision = "address-coordinate";
+        }
+
+        if (!center && project.sector && project.district && !/[\/&]|corridor|multiple/i.test(project.sector)) {
+          const sectors = areaDataRef.current.sector?.features ?? [];
+          const match = sectors.find((feature) =>
+            normal(feature.properties?.district) === normal(project.district) &&
+            normal(feature.properties?.sector) === normal(project.sector)
+          );
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "sector";
+          }
+        }
+
+        if (!center && project.district) {
+          const districts = areaDataRef.current.district?.features ?? [];
+          const match = districts.find((feature) => normal(feature.properties?.district) === normal(project.district));
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "district";
+          }
+        }
+
+        if (!center) return [];
+        nextCenters.set(project.id, { center, precision });
+        return [{
+          type: "Feature" as const,
+          id: project.id,
+          geometry: { type: "Point" as const, coordinates: center },
+          properties: {
+            project_id: project.id,
+            name: project.name,
+            developer: project.developer,
+            location_precision: precision,
+            is_selected: project.id === selectedProjectIdRef.current
+          }
+        }];
+      });
+
+      projectCentersRef.current = nextCenters;
+      source.setData({ type: "FeatureCollection", features } as never);
+
+      const selectedId = selectedProjectIdRef.current;
+      if (selectedId) {
+        const target = nextCenters.get(selectedId);
+        if (target) {
+          const previous = focusedProjectRef.current;
+          const rank = { district: 1, sector: 2, "address-coordinate": 3, "parcel-upi": 4 } as const;
+          const shouldRefine = !previous || previous.id !== selectedId ||
+            rank[target.precision] > (rank[previous.precision as keyof typeof rank] ?? 0);
+          if (shouldRefine) {
+            focusedProjectRef.current = { id: selectedId, precision: target.precision };
+            map.flyTo({
+              center: target.center,
+              zoom: target.precision === "parcel-upi" ? 18.1
+                : target.precision === "address-coordinate" ? 16.8
+                  : target.precision === "sector" ? 14.3 : 11.5,
+              duration: 650,
+              essential: true
+            });
+          }
+        }
+      }
+    };
+    refreshProjectMarkersRef.current = refreshProjectMarkers;
 
     const setFeatureFlag = (
       featureRef: { source: string; id: string | number } | null,
@@ -1619,7 +1831,9 @@ export function MapView({
         if (area.level === "village" && normalize(properties.cell) !== normalize(area.cell)) return false;
         return true;
       });
-      const id = match?.id;
+      const id = area.level === "parcel"
+        ? match?.properties?.upi
+        : match?.properties?.map_feature_id;
       if (match && (typeof id === "string" || typeof id === "number")) {
         selectFeatureState({ source: AREA_LAYERS[area.level].source, id }, areaKey);
       } else {
@@ -1636,12 +1850,25 @@ export function MapView({
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
         if (!map.getSource(layer.source)) {
-          map.addSource(layer.source, { type: "geojson", data: empty });
+          map.addSource(layer.source, {
+            type: "geojson",
+            data: empty,
+            promoteId: level === "parcel" ? "upi" : "map_feature_id"
+          });
         }
       }
 
       if (!map.getSource("metric-bubbles")) {
         map.addSource("metric-bubbles", { type: "geojson", data: empty });
+      }
+      if (!map.getSource("project-markers")) {
+        map.addSource("project-markers", {
+          type: "geojson",
+          data: emptyFeatureCollection(),
+          cluster: true,
+          clusterRadius: 42,
+          clusterMaxZoom: 14
+        });
       }
 
       // Add every fill first, then outlines, then labels. This keeps the base
@@ -1841,10 +2068,10 @@ export function MapView({
             "circle-color": [
               "case",
               ["==", ["get", "is_selected"], true], "#2563EB",
-              ["==", ["get", "market_status"], "available"], "#9D2932",
-              ["==", ["get", "market_status"], "off-market"], "#343A40",
+              ["==", ["get", "marker_style"], "public-asset"], "#8B5A2B",
+              ["==", ["get", "marker_style"], "high-value"], "#343A40",
+              ["==", ["get", "level"], "parcel"], "#D41A3A",
               ["==", ["get", "has_value"], false], "#8B9690",
-              ["==", ["get", "level"], "parcel"], "#8B9690",
               "#9D2932"
             ],
             "circle-stroke-color": "#FFFFFF",
@@ -1899,6 +2126,78 @@ export function MapView({
             "icon-ignore-placement": true,
             "symbol-sort-key": ["get", "sort_priority"],
             "visibility": "visible"
+          }
+        });
+      }
+      if (!map.getLayer("project-clusters")) {
+        map.addLayer({
+          id: "project-clusters",
+          type: "circle",
+          source: "project-markers",
+          filter: ["has", "point_count"],
+          layout: { visibility: showProjectsRef.current ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["step", ["get", "point_count"], 15, 8, 19, 20, 23, 50, 27],
+            "circle-color": "#8B5A2B",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("project-cluster-count")) {
+        map.addLayer({
+          id: "project-cluster-count",
+          type: "symbol",
+          source: "project-markers",
+          filter: ["has", "point_count"],
+          layout: {
+            visibility: showProjectsRef.current ? "visible" : "none",
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 11,
+            "text-allow-overlap": true
+          },
+          paint: { "text-color": "#FFFFFF" }
+        });
+      }
+      if (!map.getLayer("project-marker-circles")) {
+        map.addLayer({
+          id: "project-marker-circles",
+          type: "circle",
+          source: "project-markers",
+          filter: ["!", ["has", "point_count"]],
+          layout: { visibility: showProjectsRef.current ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["case", ["==", ["get", "is_selected"], true], 9, 7],
+            "circle-color": ["case", ["==", ["get", "is_selected"], true], "#2563EB", "#8B5A2B"],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2.2,
+            "circle-opacity": 0.98
+          }
+        });
+      }
+      if (!map.getLayer("project-marker-labels")) {
+        map.addLayer({
+          id: "project-marker-labels",
+          type: "symbol",
+          source: "project-markers",
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            visibility: showProjectsRef.current ? "visible" : "none",
+            "text-field": ["get", "name"],
+            "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.25],
+            "text-anchor": "top",
+            "text-max-width": 12,
+            "text-allow-overlap": false,
+            "text-ignore-placement": false
+          },
+          paint: {
+            "text-color": "#4A3420",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.5
           }
         });
       }
@@ -2320,6 +2619,10 @@ export function MapView({
         AREA_LAYERS.parcel.outline + "-glow",
         AREA_LAYERS.parcel.outline,
         AREA_LAYERS.parcel.label,
+        "project-clusters",
+        "project-cluster-count",
+        "project-marker-circles",
+        "project-marker-labels",
         "metric-bubbles-circle",
         "metric-bubbles-label",
         "metric-bubbles-parcel-label"
@@ -2589,10 +2892,13 @@ export function MapView({
         if (!source) return;
         const sourceData = dataByLevel.get(level);
         const merged = mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []);
-        areaDataRef.current[level] = merged;
-        source.setData(merged);
+        // Use the same promoted identifier in normal and idle publication.
+        const withStableFeatureIds = withStableAreaFeatureIds(level, merged);
+        areaDataRef.current[level] = withStableFeatureIds;
+        source.setData(withStableFeatureIds);
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
+        refreshProjectMarkers();
         if (level === activeAreaLevel(map.getZoom()) && lastMapPointerPoint) {
           map.once("idle", refreshHoverAtLastPointer);
         }
@@ -2737,8 +3043,9 @@ export function MapView({
 
         for (const result of results) {
           const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;
-          areaDataRef.current[result.level] = result.data;
-          source.setData(result.data);
+          const stableData = withStableAreaFeatureIds(result.level, result.data);
+          areaDataRef.current[result.level] = stableData;
+          source.setData(stableData);
         }
         const requestedLevelSet = new Set(requestedLevels);
         for (const level of AREA_LEVELS.filter((candidate) => !requestedLevelSet.has(candidate))) {
@@ -2749,6 +3056,7 @@ export function MapView({
         }
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
+        refreshProjectMarkers();
 
         updateLayerVisibility();
         if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
@@ -3305,13 +3613,6 @@ export function MapView({
       }
     };
 
-    const clearParcelGlow = () => {
-      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
-      setFeatureFlag(selectedFeature, "selected", false);
-      selectedFeatureHighlightActive = false;
-      refreshMetricBubblesRef.current?.();
-    };
-
     // Query the active polygon layer on the map itself. Layer-specific mouseleave
     // events can fire during zoom transitions and clear a highlight while the
     // pointer is still over the newly active administrative level.
@@ -3320,52 +3621,25 @@ export function MapView({
       const level = activeAreaLevel(map.getZoom());
       const layer = AREA_LAYERS[level];
       const feature = map.queryRenderedFeatures([event.point.x, event.point.y], { layers: [layer.fill] })[0];
-      const id = feature ? getFeatureId(feature) : null;
-
       if (level === "parcel") {
+        // Parcel hover never fills or selects the polygon.
+        // A click selects it; that outline and its price marker stay blue
+        // until another feature or empty map location is clicked.
         setHover(layer.source, undefined);
-        const isSelectedParcel = id !== null &&
-          selectedFeature?.source === layer.source &&
-          String(selectedFeature.id) === String(id);
-
-        if (!isSelectedParcel) clearParcelGlow();
-        if (isSelectedParcel && !selectedFeatureHighlightActive && selectedFeature) {
-          selectedFeatureHighlightActive = true;
-          setFeatureFlag(selectedFeature, "selected", true);
-          refreshMetricBubblesRef.current?.();
-        }
-
         map.getCanvas().style.cursor = feature ? "pointer" : "";
         return;
       }
 
-      clearParcelGlow();
       setHover(layer.source, feature);
       map.getCanvas().style.cursor = feature ? "pointer" : "";
     };
-
-    const handleDocumentPointerMove = (event: PointerEvent) => {
-      if (selectedFeature?.source !== AREA_LAYERS.parcel.source || !selectedFeatureHighlightActive) return;
-      const canvas = map.getCanvas();
-      const target = event.target;
-      const pointerOnCanvas = target === canvas ||
-        (target instanceof Node && canvas.contains(target));
-
-      // The inspector can cover the clicked plot without moving the pointer.
-      // A stationary click must keep the glow; a real move onto the inspector,
-      // toolbar or any other UI surface clears it.
-      if (!pointerOnCanvas) clearParcelGlow();
-    };
-
-    const handleWindowBlur = () => clearParcelGlow();
 
     const handleMapPointerLeave = () => {
       lastMapPointerPoint = null;
       setFeatureFlag(hoveredFeature, "hover", false);
       hoveredFeature = null;
-      // Do not clear a clicked parcel here. Opening its detail panel may cover
-      // the pointer without the user moving it; document pointer movement below
-      // distinguishes that layout change from an actual pointer leaving.
+      // Leaving the map clears temporary administrative hover only.
+      // Parcel selection is a click state and remains active.
       map.getCanvas().style.cursor = "";
     };
 
@@ -3378,16 +3652,6 @@ export function MapView({
       const id = getFeatureId(feature);
       const area = featureToArea(feature, level);
       if (id === null || !area) return;
-
-      if (
-        level === "parcel" &&
-        selectedFeature?.source === source &&
-        String(selectedFeature.id) === String(id)
-      ) {
-        selectFeatureState(null);
-        onAreaSelected(null);
-        return;
-      }
 
       const properties = feature.properties as AreaProperties | null;
       const suppliedMarketStatus = propertyMarketStatus(properties?.market_status);
@@ -3417,10 +3681,23 @@ export function MapView({
         );
       }
 
+      const selectProjectMarker = (event: { features?: MapGeoJSONFeature[] }) => {
+        const marker = event.features?.[0];
+        const projectId = String(marker?.properties?.project_id ?? "");
+        if (!projectId) return;
+        const project = projectsRef.current.find((candidate) => candidate.id === projectId);
+        if (project) onProjectSelectedRef.current?.(project);
+      };
+      map.on("click", "project-marker-circles", selectProjectMarker);
+      map.on("click", "project-marker-labels", selectProjectMarker);
+      map.on("click", "project-clusters", (event) => {
+        const cluster = event.features?.[0];
+        const coordinates = (cluster?.geometry as { coordinates?: [number, number] } | undefined)?.coordinates;
+        if (coordinates) map.easeTo({ center: coordinates, zoom: Math.min(map.getZoom() + 3, 17), duration: 500 });
+      });
+
       map.on("mousemove", handleMapPointerMove);
       map.getCanvas().addEventListener("mouseleave", handleMapPointerLeave);
-      window.addEventListener("pointermove", handleDocumentPointerMove);
-      window.addEventListener("blur", handleWindowBlur);
       map.on("zoomend", () => {
         // scheduleRefresh changes the visible polygon level on this same event.
         // Re-query only after MapLibre has rendered that new level.
@@ -3459,6 +3736,10 @@ export function MapView({
           "metric-bubbles-circle",
           "metric-bubbles-label",
           "metric-bubbles-parcel-label",
+          "project-clusters",
+          "project-cluster-count",
+          "project-marker-circles",
+          "project-marker-labels"
         ].filter((layerId) => Boolean(map.getLayer(layerId)));
 
         const hits = clickableLayers.length
@@ -3686,8 +3967,6 @@ export function MapView({
       activeController?.abort();
       resizeObserver?.disconnect();
       map.getCanvas().removeEventListener("mouseleave", handleMapPointerLeave);
-      window.removeEventListener("pointermove", handleDocumentPointerMove);
-      window.removeEventListener("blur", handleWindowBlur);
       map.remove();
       mapRef.current = null;
       if (e2eEnabled && e2eMapWindow.__RLI_E2E_MAP__ === map) {

@@ -4124,3 +4124,336 @@ input {
     transition: none;
   }
 }
+
+/* In-map project register: map remains visible while people inspect records. */
+.projects-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 360px;
+}
+
+.project-directory-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.project-directory-search input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.project-directory-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.project-directory-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.project-directory-tab.is-active {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(24 42 31 / 7%);
+}
+
+.project-directory-tab span {
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.project-record-list,
+.project-developer-list {
+  display: grid;
+  gap: 3px;
+  min-height: 0;
+  max-height: min(54vh, 590px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.project-record-item,
+.project-developer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-record-item:hover,
+.project-developer-item:hover {
+  background: var(--surface-muted);
+}
+
+.project-record-item > img,
+.project-record-monogram,
+.project-developer-monogram {
+  display: flex;
+  width: 60px;
+  height: 48px;
+  flex: 0 0 60px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #E9EEE9;
+  color: #425C4A;
+  object-fit: cover;
+}
+
+.project-record-monogram,
+.project-developer-monogram {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-record-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.project-record-copy strong,
+.project-developer-item strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-record-copy small,
+.project-developer-item small {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-record-arrow {
+  flex: 0 0 auto;
+  color: var(--brand);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.project-directory-empty {
+  margin: 0;
+  padding: 16px 8px;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.project-directory-detail {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.project-directory-back {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.project-detail-image {
+  width: 100%;
+  height: 142px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  object-fit: cover;
+}
+
+.project-directory-detail h3 {
+  margin: -4px 0 2px;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 780;
+  letter-spacing: -.035em;
+  line-height: 1.2;
+}
+
+.project-detail-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-detail-row span {
+  flex: 0 0 92px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.project-detail-row strong {
+  flex: 1;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.project-detail-precision {
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--ink-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.project-locate-button {
+  min-height: 40px;
+  border: 1px solid var(--brand);
+  border-radius: 9px;
+  background: var(--brand);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.project-source-link,
+.project-source-note {
+  justify-self: center;
+  color: var(--ink-secondary);
+  font-size: 10px;
+}
+
+.project-source-link {
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.project-source-link:hover {
+  text-decoration: underline;
+}
+
+.project-directory-footnote {
+  margin: auto 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--ink-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.parcel-details > .project-identity-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #D7E6DC;
+}
+
+.project-identity-inline > img,
+.project-identity-monogram {
+  display: flex;
+  width: 66px;
+  height: 50px;
+  flex: 0 0 66px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #E9EEE9;
+  color: #425C4A;
+  object-fit: cover;
+}
+
+.project-identity-monogram {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-identity-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-identity-copy span {
+  color: #63736A;
+  font-size: 9px;
+  font-weight: 740;
+}
+
+.project-identity-copy strong {
+  color: #243B30;
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.project-identity-copy small {
+  color: #63736A;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+@media (max-width: 720px) {
+  .project-record-list,
+  .project-developer-list {
+    max-height: min(45vh, 440px);
+  }
+
+  .project-record-item > img,
+  .project-record-monogram,
+  .project-developer-monogram {
+    width: 54px;
+    flex-basis: 54px;
+  }
+}

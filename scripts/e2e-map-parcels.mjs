@@ -31,10 +31,12 @@ page.on("requestfailed", (request) => {
     });
   }
   if (/ArcGIS\/rest\/services\/(World_Imagery|Reference\/World_Transportation)\/MapServer\/tile\//i.test(url)) {
-    diagnostics.failedBasemapTileRequests.push({
-      url,
-      error: request.failure()?.errorText ?? "request failed"
-    });
+    const error = request.failure()?.errorText ?? "request failed";
+    // MapLibre cancels tile requests that leave the viewport during zoom/pan.
+    // Those are expected cancellations, not failed image responses.
+    if (error !== "net::ERR_ABORTED") {
+      diagnostics.failedBasemapTileRequests.push({ url, error });
+    }
   }
 });
 page.on("response", async (response) => {
@@ -209,7 +211,7 @@ try {
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
+    map.jumpTo({ center: [30.087, -1.953], zoom: 16.6 });
   });
 
   // Cloudflare may need one bounded GIS request plus the Vercel fallback.
@@ -240,7 +242,7 @@ try {
     await page.evaluate(({ zoom }) => {
       const map = window.__RLI_E2E_MAP__;
       if (!map) throw new Error("Opt-in test map was not exposed.");
-      map.jumpTo({ center: [30.133, -2.283], zoom });
+      map.jumpTo({ center: [30.087, -1.953], zoom });
     }, config);
 
     await page.waitForFunction(({ layer, source }) => {
@@ -249,7 +251,8 @@ try {
         map &&
         map.getLayer(layer) &&
         map.getLayoutProperty(layer, "visibility") === "visible" &&
-        map.querySourceFeatures(source).length > 0
+        map.querySourceFeatures(source).length > 0 &&
+        map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
       );
     }, config, { timeout: 35_000 });
 
@@ -309,13 +312,12 @@ try {
     });
   }
 
-  // A parcel is different: click selects it and creates a strong glow. The
-  // glow disappears when the cursor leaves that parcel, while its detail
-  // selection can remain open.
+  // A parcel is different: hover does not fill it. Clicking selects
+  // the outline and price marker together; pointer exit must not clear either.
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 17.4 });
+    map.jumpTo({ center: [30.087, -1.953], zoom: 17.4 });
   });
 
   await page.waitForFunction(() => {
@@ -329,27 +331,62 @@ try {
     }
   }, undefined, { timeout: 50_000 });
 
+  // Find a visible cadastral parcel that actually has a price pill. The
+  // selection rule applies to existing price markers; we do not invent one
+  // for a parcel that has no supported price value.
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return false;
+    return map.querySourceFeatures("metric-bubbles").some((feature) =>
+      feature.properties?.level === "parcel" &&
+      feature.properties?.has_value === true
+    );
+  }, undefined, { timeout: 20_000 });
+
   const parcelHoverTarget = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) return null;
     const rect = map.getCanvas().getBoundingClientRect();
-    for (let y = 150; y < rect.height - 170; y += 14) {
-      for (let x = 390; x < rect.width - 18; x += 14) {
+    const pricedIds = new Set(
+      map.querySourceFeatures("metric-bubbles")
+        .filter((feature) =>
+          feature.properties?.level === "parcel" &&
+          feature.properties?.has_value === true
+        )
+        .map((feature) => String(feature.properties?.upi ?? ""))
+    );
+    for (let y = 150; y < rect.height - 170; y += 10) {
+      for (let x = 390; x < rect.width - 18; x += 10) {
         const feature = map.queryRenderedFeatures([x, y], { layers: ["parcel-fill"] })
-          .find((item) => typeof item.id === "string" || typeof item.id === "number");
+          .find((item) =>
+            (typeof item.id === "string" || typeof item.id === "number") &&
+            pricedIds.has(String(item.properties?.upi ?? ""))
+          );
         if (feature) {
-          return { x: rect.left + x, y: rect.top + y, source: feature.source, id: feature.id };
+          return {
+            x: rect.left + x,
+            y: rect.top + y,
+            source: feature.source,
+            id: feature.id,
+            upi: String(feature.properties?.upi ?? "")
+          };
         }
       }
     }
     return null;
   });
-  if (!parcelHoverTarget) throw new Error("No rendered parcel polygon was available for the selection glow check.");
+  if (!parcelHoverTarget) throw new Error("No visible parcel with a price marker was available for the selection colour check.");
 
   await page.mouse.click(parcelHoverTarget.x, parcelHoverTarget.y);
-  await page.waitForFunction(({ source, id }) => {
+  await page.waitForFunction(({ source, id, upi }) => {
     const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).selected === true);
+    if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.upi ?? "") === String(upi) &&
+      feature.properties?.level === "parcel" &&
+      feature.properties?.has_value === true
+    );
+    return Boolean(bubble && bubble.properties?.is_selected === true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
   const parcelBlankPoint = await page.evaluate(() => {
@@ -369,17 +406,36 @@ try {
   if (parcelBlankPoint) await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
   else await page.mouse.move(12, 12);
 
-  await page.waitForFunction(({ source, id }) => {
+  if (!parcelBlankPoint) {
+    throw new Error("Could not find a blank map location to test persistent parcel selection.");
+  }
+  await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
+
+  await page.waitForFunction(({ source, id, upi }) => {
     const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).selected !== true);
+    if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.upi ?? "") === String(upi) &&
+      feature.properties?.level === "parcel"
+    );
+    return Boolean(bubble && bubble.properties?.is_selected === true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
-  // Clear the selected parcel after the interaction assertion, then return to
-  // village zoom so the existing cadastral-boundary screenshot remains a
-  // village-level diagnostic rather than a parcel-level screenshot.
-  if (parcelBlankPoint) {
-    await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
-  }
+  // Now click an unrelated empty map location. Both the boundary state and
+  // the matching price marker must return to their normal state together.
+  await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
+  await page.waitForFunction(({ source, id, upi }) => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map || map.getFeatureState({ source, id }).selected === true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.upi ?? "") === String(upi) &&
+      feature.properties?.level === "parcel"
+    );
+    return !bubble || bubble.properties?.is_selected !== true;
+  }, parcelHoverTarget, { timeout: 8_000 });
+
+  // Restore village zoom so the cadastral-boundary screenshot is a village
+  // diagnostic rather than a parcel-level screenshot.
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
@@ -405,7 +461,9 @@ try {
     source: parcelHoverTarget.source,
     featureId: parcelHoverTarget.id,
     glowActivatedOnClick: true,
-    glowRemovedOnLeave: true,
+    glowPersistedAfterPointerLeave: true,
+    priceMarkerTurnedBlueWithParcel: true,
+    bothResetAfterUnrelatedClick: true,
     parcelFillOpacity,
     pointerStayedOnMapForLeave: Boolean(parcelBlankPoint)
   };
