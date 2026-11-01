@@ -1500,10 +1500,13 @@ export function MapView({
         // Cadastral parcels are not assumed to be for sale or off-market.
         const marketStatus = level === "parcel" ? sourceMarketStatus : null;
         const marketStatusSource = sourceMarketStatus ? "source" as const : null;
+        const parcelSelectionId = properties.upi;
+        const featureSelectionId = level === "parcel" ? parcelSelectionId : feature.id;
         const isSelected = level === "parcel" &&
           selectedFeatureHighlightActive &&
           selectedFeature?.source === AREA_LAYERS.parcel.source &&
-          String(selectedFeature.id) === String(feature.id);
+          typeof featureSelectionId === "string" &&
+          String(selectedFeature.id) === featureSelectionId;
         const hasVerifiedListingDate = level === "parcel" && isRecentlyListed(properties.listing_created_at);
         const isNewListing = hasVerifiedListingDate && sourceMarketStatus === "available";
         const markerCenter: [number, number] = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
@@ -1796,7 +1799,9 @@ export function MapView({
         if (area.level === "village" && normalize(properties.cell) !== normalize(area.cell)) return false;
         return true;
       });
-      const id = match?.id;
+      const id = area.level === "parcel"
+        ? match?.properties?.upi
+        : match?.id;
       if (match && (typeof id === "string" || typeof id === "number")) {
         selectFeatureState({ source: AREA_LAYERS[area.level].source, id }, areaKey);
       } else {
@@ -1813,7 +1818,11 @@ export function MapView({
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
         if (!map.getSource(layer.source)) {
-          map.addSource(layer.source, { type: "geojson", data: empty });
+          map.addSource(layer.source, {
+            type: "geojson",
+            data: empty,
+            ...(level === "parcel" ? { promoteId: "upi" } : {})
+          });
         }
       }
 
