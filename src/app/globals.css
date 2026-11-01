@@ -4354,7 +4354,7 @@ input {
   line-height: 1.45;
 }
 
-.project-focus-button {
+.project-locate-button {
   min-height: 40px;
   border: 1px solid var(--brand);
   border-radius: 9px;
