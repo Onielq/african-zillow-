@@ -1006,10 +1006,21 @@ export function MapView({
   onAreaSelected,
   showLayers,
   showScope,
-  selectedArea
+  selectedArea,
+  projects = [],
+  showProjects = false,
+  selectedProjectId = null,
+  onProjectSelected
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
+  const projectsRef = useRef<RwandaProjectRecord[]>(projects);
+  const showProjectsRef = useRef(showProjects);
+  const selectedProjectIdRef = useRef<string | null>(selectedProjectId);
+  const onProjectSelectedRef = useRef(onProjectSelected);
+  const refreshProjectMarkersRef = useRef<(() => void) | null>(null);
+  const projectCentersRef = useRef(new Map<string, { center: [number, number]; precision: "district" | "sector" | "address-coordinate" | "parcel-upi" }>());
+  const focusedProjectRef = useRef<{ id: string; precision: string } | null>(null);
   const activeBasemapModeRef = useRef<BasemapMode>("map");
   const basemapTileErrorRef = useRef(false);
   const basemapStyleSequenceRef = useRef(0);
@@ -1086,6 +1097,15 @@ export function MapView({
     selectedAreaRef.current = selectedArea;
     selectionSyncRef.current?.(selectedArea);
   }, [selectedArea]);
+
+  useEffect(() => {
+    projectsRef.current = projects;
+    showProjectsRef.current = showProjects;
+    selectedProjectIdRef.current = selectedProjectId;
+    onProjectSelectedRef.current = onProjectSelected;
+    if (!selectedProjectId) focusedProjectRef.current = null;
+    refreshProjectMarkersRef.current?.();
+  }, [projects, showProjects, selectedProjectId, onProjectSelected]);
 
   useEffect(() => {
     showLandPriceHeatmapRef.current = showLandPriceHeatmap;
