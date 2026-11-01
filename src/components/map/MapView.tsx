@@ -14,6 +14,7 @@ import {
   setWorkerUrl
 } from "maplibre-gl";
 import type { FeatureCollection, Geometry } from "geojson";
+import type { RwandaProjectRecord } from "@/data/project-directory";
 import { formatCompactValue } from "@/lib/format-compact-value";
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
 
@@ -514,6 +515,10 @@ type MapViewProps = {
   showZoning: boolean;
   showScope: ShowScope;
   selectedArea: SelectedArea | null;
+  projects?: RwandaProjectRecord[];
+  showProjects?: boolean;
+  selectedProjectId?: string | null;
+  onProjectSelected?: (project: RwandaProjectRecord) => void;
   onMapReady: (map: MapLibreMapInstance | null) => void;
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
