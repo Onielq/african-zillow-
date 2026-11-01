@@ -1801,7 +1801,7 @@ export function MapView({
       });
       const id = area.level === "parcel"
         ? match?.properties?.upi
-        : match?.id;
+        : match?.properties?.map_feature_id;
       if (match && (typeof id === "string" || typeof id === "number")) {
         selectFeatureState({ source: AREA_LAYERS[area.level].source, id }, areaKey);
       } else {
@@ -1821,7 +1821,7 @@ export function MapView({
           map.addSource(layer.source, {
             type: "geojson",
             data: empty,
-            ...(level === "parcel" ? { promoteId: "upi" } : {})
+            promoteId: level === "parcel" ? "upi" : "map_feature_id"
           });
         }
       }
@@ -2860,8 +2860,34 @@ export function MapView({
         if (!source) return;
         const sourceData = dataByLevel.get(level);
         const merged = mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []);
-        areaDataRef.current[level] = merged;
-        source.setData(merged);
+        // GeoJSON tile queries can expose a generated ID (often 0) instead of
+        // the original feature.id. Promote a hierarchy-aware key so feature
+        // state always targets one administrative polygon, never every
+        // polygon that happens to share a tile-generated ID.
+        const withStableFeatureIds: MapFeatureCollection = {
+          ...merged,
+          features: merged.features.map((feature, index) => {
+            const properties = feature.properties ?? {};
+            const hierarchy = [
+              properties.province_id ?? properties.province,
+              properties.district_id ?? properties.district,
+              properties.sector_id ?? properties.sector,
+              properties.cell_id ?? properties.cell,
+              properties.village_id ?? properties.village,
+              properties.upi ?? feature.id ?? index,
+              properties.source_label
+            ].map((part) => String(part ?? "").trim()).join("|");
+            return {
+              ...feature,
+              properties: {
+                ...properties,
+                map_feature_id: level + "|" + hierarchy
+              }
+            };
+          })
+        };
+        areaDataRef.current[level] = withStableFeatureIds;
+        source.setData(withStableFeatureIds);
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
         refreshProjectMarkers();
