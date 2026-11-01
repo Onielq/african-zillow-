@@ -309,9 +309,8 @@ try {
     });
   }
 
-  // A parcel is different: click selects it and creates a strong glow. The
-  // glow disappears when the cursor leaves that parcel, while its detail
-  // selection can remain open.
+  // A parcel is different: hover does not fill it. Clicking selects
+  // the outline and price marker together; pointer exit must not clear either.
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
@@ -369,17 +368,36 @@ try {
   if (parcelBlankPoint) await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
   else await page.mouse.move(12, 12);
 
+  if (!parcelBlankPoint) {
+    throw new Error("Could not find a blank map location to test persistent parcel selection.");
+  }
+  await page.mouse.move(parcelBlankPoint.x, parcelBlankPoint.y);
+
   await page.waitForFunction(({ source, id }) => {
     const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.getFeatureState({ source, id }).selected !== true);
+    if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      feature.properties?.level === "parcel"
+    );
+    return Boolean(bubble && bubble.properties?.is_selected === true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
-  // Clear the selected parcel after the interaction assertion, then return to
-  // village zoom so the existing cadastral-boundary screenshot remains a
-  // village-level diagnostic rather than a parcel-level screenshot.
-  if (parcelBlankPoint) {
-    await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
-  }
+  // Now click an unrelated empty map location. Both the boundary state and
+  // the matching price marker must return to their normal state together.
+  await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
+  await page.waitForFunction(({ source, id }) => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map || map.getFeatureState({ source, id }).selected === true) return false;
+    const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
+      String(feature.properties?.area_feature_id ?? "") === String(id) &&
+      feature.properties?.level === "parcel"
+    );
+    return !bubble || bubble.properties?.is_selected !== true;
+  }, parcelHoverTarget, { timeout: 8_000 });
+
+  // Restore village zoom so the cadastral-boundary screenshot is a village
+  // diagnostic rather than a parcel-level screenshot.
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
@@ -405,7 +423,9 @@ try {
     source: parcelHoverTarget.source,
     featureId: parcelHoverTarget.id,
     glowActivatedOnClick: true,
-    glowRemovedOnLeave: true,
+    glowPersistedAfterPointerLeave: true,
+    priceMarkerTurnedBlueWithParcel: true,
+    bothResetAfterUnrelatedClick: true,
     parcelFillOpacity,
     pointerStayedOnMapForLeave: Boolean(parcelBlankPoint)
   };
