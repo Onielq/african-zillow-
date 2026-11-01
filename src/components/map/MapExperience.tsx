@@ -717,10 +717,8 @@ export function MapExperience() {
 
     // Resolve the most precise existing geography record for this project.
     // Inzovu Mall's UPI is checked first; other projects use their known area.
-    const query = project.parcelUpi ??
-      [project.sector, project.district].filter(Boolean).join(" ") ??
-      project.district ??
-      project.name;
+    const areaQuery = [project.sector, project.district].filter(Boolean).join(" ");
+    const query = project.parcelUpi ?? (areaQuery || project.district || project.name);
     try {
       const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(query));
       if (!response.ok) throw new Error("Project area search failed.");
@@ -2057,7 +2055,6 @@ export function MapExperience() {
                     </article>
                   ))}
                 </div>
-                <Link className="directory-full-link" href="/developers">Open full developer directory ↗</Link>
               </>
             ) : null}
             {directoryTab === "agencies" ? (
