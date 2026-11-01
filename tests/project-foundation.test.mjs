@@ -788,6 +788,9 @@ test("parcel price markers use red baseline, brown public assets, charcoal high 
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /type PriceMarkerStyle = "market-default" \| "public-asset" \| "high-value"/);
+  assert.match(mapView, /promoteId: "upi"/);
+  assert.match(mapView, /const id = area\.level === "parcel"\s*\?\s*match\?\.properties\?\.upi/);
+  assert.match(mapView, /const featureSelectionId = level === "parcel" \? parcelSelectionId : feature\.id/);
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
   assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
