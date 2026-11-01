@@ -376,7 +376,7 @@ try {
   if (!parcelHoverTarget) throw new Error("No visible parcel with a price marker was available for the selection colour check.");
 
   await page.mouse.click(parcelHoverTarget.x, parcelHoverTarget.y);
-  await page.waitForFunction(({ source, id }) => {
+  await page.waitForFunction(({ source, id, upi }) => {
     const map = window.__RLI_E2E_MAP__;
     if (!map || map.getFeatureState({ source, id }).selected !== true) return false;
     const bubble = map.querySourceFeatures("metric-bubbles").find((feature) =>
