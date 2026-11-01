@@ -1694,6 +1694,15 @@ export function MapView({
       if (!map.getSource("metric-bubbles")) {
         map.addSource("metric-bubbles", { type: "geojson", data: empty });
       }
+      if (!map.getSource("project-markers")) {
+        map.addSource("project-markers", {
+          type: "geojson",
+          data: emptyFeatureCollection(),
+          cluster: true,
+          clusterRadius: 42,
+          clusterMaxZoom: 14
+        });
+      }
 
       // Add every fill first, then outlines, then labels. This keeps the base
       // road map visible underneath and makes boundary lines crisp at every level.
@@ -1950,6 +1959,78 @@ export function MapView({
             "icon-ignore-placement": true,
             "symbol-sort-key": ["get", "sort_priority"],
             "visibility": "visible"
+          }
+        });
+      }
+      if (!map.getLayer("project-clusters")) {
+        map.addLayer({
+          id: "project-clusters",
+          type: "circle",
+          source: "project-markers",
+          filter: ["has", "point_count"],
+          layout: { visibility: showProjectsRef.current ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["step", ["get", "point_count"], 15, 8, 19, 20, 23, 50, 27],
+            "circle-color": "#8B5A2B",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("project-cluster-count")) {
+        map.addLayer({
+          id: "project-cluster-count",
+          type: "symbol",
+          source: "project-markers",
+          filter: ["has", "point_count"],
+          layout: {
+            visibility: showProjectsRef.current ? "visible" : "none",
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 11,
+            "text-allow-overlap": true
+          },
+          paint: { "text-color": "#FFFFFF" }
+        });
+      }
+      if (!map.getLayer("project-marker-circles")) {
+        map.addLayer({
+          id: "project-marker-circles",
+          type: "circle",
+          source: "project-markers",
+          filter: ["!", ["has", "point_count"]],
+          layout: { visibility: showProjectsRef.current ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["case", ["==", ["get", "is_selected"], true], 9, 7],
+            "circle-color": ["case", ["==", ["get", "is_selected"], true], "#2563EB", "#8B5A2B"],
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2.2,
+            "circle-opacity": 0.98
+          }
+        });
+      }
+      if (!map.getLayer("project-marker-labels")) {
+        map.addLayer({
+          id: "project-marker-labels",
+          type: "symbol",
+          source: "project-markers",
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            visibility: showProjectsRef.current ? "visible" : "none",
+            "text-field": ["get", "name"],
+            "text-font": ["Noto Sans Medium", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.25],
+            "text-anchor": "top",
+            "text-max-width": 12,
+            "text-allow-overlap": false,
+            "text-ignore-placement": false
+          },
+          paint: {
+            "text-color": "#4A3420",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.5
           }
         });
       }
