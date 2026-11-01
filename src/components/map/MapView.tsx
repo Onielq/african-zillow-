@@ -1231,7 +1231,10 @@ export function MapView({
     let lastMapPointerPoint: { x: number; y: number } | null = null;
 
     const refreshMetricBubbles = () => {
-      if (!map.isStyleLoaded()) return;
+      // Do not gate marker refresh on map.isStyleLoaded(): MapLibre can report
+      // false while unrelated raster/vector tiles are still loading even when
+      // the GeoJSON parcel and metric sources are already ready. That caused
+      // parcel geometry to render while its price-marker source stayed empty.
       const source = map.getSource("metric-bubbles") as GeoJSONSource | undefined;
       if (!source) return;
 
