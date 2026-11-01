@@ -783,15 +783,22 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
 
-test("price bubbles retain collision behavior and style property markers by market status and selection", async () => {
+test("parcel price markers use red baseline, brown public assets, charcoal high values and blue selected state", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.match(mapView, /function measureMetricPill/);
+  assert.match(mapView, /type PriceMarkerStyle = "market-default" \| "public-asset" \| "high-value"/);
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
-  assert.match(mapView, /marketStatus === "off-market"\s*\?\s*\["#3A3A42", "#2E2E35"\]/);
-  assert.match(mapView, /marketStatus === "available"/);
-  assert.match(mapView, /variant === "parcel"\s*\?\s*\["#8B9690", "#748079"\]/);
-  assert.doesNotMatch(mapView.slice(mapView.indexOf("function ensureMetricPillImage"), mapView.indexOf("type MetricLabelCollisionBox")), /strokeStyle|context\.stroke\(\)/);
+  assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
+  assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
+  assert.match(mapView, /\["D41A3A", "#B8142E"\]/);
+  assert.match(mapView, /sortValue >= 1_000_000_000/);
+  assert.match(mapView, /isPublicAssetAt\(markerCenter\)/);
+  assert.match(mapView, /\["==", \["get", "marker_style"\], "public-asset"\], "#8B5A2B"/);
+  assert.match(mapView, /\["==", \["get", "marker_style"\], "high-value"\], "#343A40"/);
+  assert.match(mapView, /\["==", \["get", "is_selected"\], true\], "#2563EB"/);
+  assert.doesNotMatch(mapView, /clearParcelGlow|handleDocumentPointerMove|handleWindowBlur/);
+  assert.match(mapView, /Parcel hover never fills or selects the polygon/);
+  assert.match(mapView, /Parcel selection is a click state and remains active/);
   assert.match(mapView, /export function findCrowdedMetricLabelIndexes/);
   assert.match(mapView, /minimumCrowdedGroupSize = 3/);
   assert.match(mapView, /component\.length >= minimumCrowdedGroupSize/);
@@ -992,28 +999,47 @@ test("global search returns navigable areas, resolves addresses on submit and hi
 });
 
 
-test("projects can group multiple UPIs while preserving unverified links and per-parcel zoning", async () => {
+test("village zoom defaults to satellite but manual basemap choice remains in control", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  assert.match(mapView, /const VILLAGE_ZOOM = 16\.2/);
+  assert.match(experience, /mapInstance\.getZoom\(\) >= 16\.2 \? "satellite" : "map"/);
+  assert.match(experience, /manualBasemapChoiceRef\.current !== null/);
+  assert.match(experience, /manualBasemapChoiceRef\.current = "map"/);
+  assert.match(experience, /manualBasemapChoiceRef\.current = "satellite"/);
+  assert.match(experience, /manualBasemapChoiceRef\.current = "hybrid"/);
+});
+
+test("projects and developers are connected to the in-map register and parcel identity uses an exact UPI", async () => {
+  const directory = await readProjectFile("src/data/project-directory.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const css = await readProjectFile("src/app/globals.css");
 
-  assert.match(experience, /type ProjectParcelRecord =/);
-  assert.match(experience, /projectParcelUpis\?: string\[\]/);
-  assert.match(experience, /projectParcelLinkStatus\?: "user-supplied-unverified" \| "source-verified"/);
-  assert.match(experience, /function parseProjectUpis/);
-  assert.match(experience, /\^\\d\{1,2\}\(\?:\[\/.\\-\]\\d\{1,2\}\)\{3\}/);
-  assert.match(experience, /upis\.length > 20/);
-  assert.match(experience, /resolveProjectParcel/);
-  assert.match(experience, /\/api\/geography\/areas\/search\?q=/);
-  assert.match(experience, /\/api\/geography\/parcel-zoning\?/);
-  assert.match(experience, /projectParcelRecords/);
-  assert.match(experience, /Project-to-parcel link: user supplied · unverified/);
-  assert.match(experience, /Project parcel UPIs \/ zoning/);
-  assert.match(experience, /PROJECT_NAME_SUGGESTIONS/);
-  assert.match(experience, /"Gisa"/);
-  assert.match(experience, /"Kigali Heights"/);
-  assert.match(css, /\.comparison-project-upis/);
-  assert.match(css, /\.project-parcel-link-item/);
-  assert.match(css, /\.project-parcel-zones/);
+  assert.match(directory, /RWANDA_PROJECT_RECORDS/);
+  assert.match(directory, /RWANDA_PROJECT_DEVELOPERS/);
+  assert.match(directory, /name: "Inzovu Mall"/);
+  assert.match(directory, /name: "Brilliant Tower"/);
+  assert.match(directory, /parcelUpi: "1\/02\/08\/03\/681"/);
+  assert.match(experience, /projects=\{RWANDA_PROJECT_RECORDS\}/);
+  assert.match(experience, /showProjects=\{workspaceMode === "projects" \|\| projectsOpen\}/);
+  assert.match(experience, /RWANDA_PROJECT_RECORDS\.length/);
+  assert.match(experience, /RWANDA_PROJECT_DEVELOPERS\.length/);
+  assert.match(experience, /projectParcelUpis|selectedParcelProject/);
+  assert.match(experience, /selectedParcelProject\.parcelUpi|selectedParcelProject/);
+  assert.match(experience, /project-identity-inline/);
+  assert.match(experience, /projectDirectoryTab/);
+  assert.match(experience, /focusProjectOnMap/);
+  assert.doesNotMatch(experience, /Verified project feed not connected/);
+  assert.doesNotMatch(experience, /Open projects workspace/);
+  assert.doesNotMatch(experience, /Open full developer directory/);
+  assert.match(mapView, /project-markers/);
+  assert.match(mapView, /project-clusters/);
+  assert.match(mapView, /project-marker-circles/);
+  assert.match(mapView, /onProjectSelectedRef\.current/);
+  assert.match(css, /\.project-record-list/);
+  assert.match(css, /\.project-directory-detail/);
+  assert.match(css, /\.project-identity-inline/);
 });
 
 
