@@ -700,6 +700,78 @@ export function MapExperience() {
     },
     []
   );
+
+  const focusProjectOnMap = async (project: RwandaProjectRecord) => {
+    setSelectedProjectId(project.id);
+    setWorkspaceMode("projects");
+    setProjectsOpen(true);
+    setProjectDirectoryTab("projects");
+    setGlobalSearchOpen(false);
+    setMetricsOpen(false);
+    setDevelopersOpen(false);
+    setSourcesOpen(false);
+    setShowOpen(false);
+    setMetricInfoOpen(false);
+
+    if (!mapInstance) return;
+
+    // Resolve the most precise existing geography record for this project.
+    // Inzovu Mall's UPI is checked first; other projects use their known area.
+    const query = project.parcelUpi ??
+      [project.sector, project.district].filter(Boolean).join(" ") ??
+      project.district ??
+      project.name;
+    try {
+      const response = await fetch("/api/geography/areas/search?q=" + encodeURIComponent(query));
+      if (!response.ok) throw new Error("Project area search failed.");
+      const payload = await response.json() as AreaSearchResponse;
+      const normalize = (value: string | null | undefined) => (value ?? "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
+      const exactParcel = project.parcelUpi
+        ? (payload.areas ?? []).find((area) =>
+            area.level === "parcel" &&
+            normalize(area.upi) === normalize(project.parcelUpi)
+          )
+        : undefined;
+      const exactSector = project.sector && !/[\/&]|corridor|multiple/i.test(project.sector)
+        ? (payload.areas ?? []).find((area) =>
+            area.level === "sector" &&
+            normalize(area.district) === normalize(project.district) &&
+            normalize(area.name) === normalize(project.sector)
+          )
+        : undefined;
+      const districtArea = (payload.areas ?? []).find((area) =>
+        area.level === "district" && normalize(area.name) === normalize(project.district)
+      );
+      const target = exactParcel ?? exactSector ?? districtArea;
+      if (target) {
+        setSelectedArea(target);
+        if (target.bounds) {
+          const [west, south, east, north] = target.bounds;
+          mapInstance.fitBounds([[west, south], [east, north]], {
+            padding: { top: 132, bottom: 100, left: 340, right: 90 },
+            maxZoom: target.level === "parcel" ? 19.3 : target.level === "sector" ? 14.8 : 11.7,
+            duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
+          });
+        } else if (target.center) {
+          mapInstance.flyTo({ center: target.center, zoom: target.level === "parcel" ? 19 : 14, duration: 650 });
+        }
+      } else if (typeof project.latitude === "number" && typeof project.longitude === "number") {
+        mapInstance.flyTo({ center: [project.longitude, project.latitude], zoom: 16.8, duration: 650 });
+      }
+    } catch {
+      // MapView's project layer still shows the best available district/sector marker.
+    }
+  };
+
+  const handleProjectMarkerSelected = useCallback((project: RwandaProjectRecord) => {
+    setSelectedProjectId(project.id);
+    setWorkspaceMode("projects");
+    setProjectsOpen(true);
+    setProjectDirectoryTab("projects");
+  }, []);
+
   const handleAreaSelected = useCallback(
     (area: SelectedArea | null) => {
       globalSearchMarkerRef.current?.remove();
@@ -717,6 +789,20 @@ export function MapExperience() {
     (status: BoundaryStatus) => setBoundaryStatus(status),
     []
   );
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    const applyVillageBasemapDefault = () => {
+      if (manualBasemapChoiceRef.current !== null) return;
+      const next: BasemapMode = mapInstance.getZoom() >= 16.2 ? "satellite" : "map";
+      setBasemapMode((current) => current === next ? current : next);
+    };
+    mapInstance.on("zoomend", applyVillageBasemapDefault);
+    applyVillageBasemapDefault();
+    return () => {
+      mapInstance.off("zoomend", applyVillageBasemapDefault);
+    };
+  }, [mapInstance]);
 
   const searchGlobalAddress = async (query: string) => {
     const requestId = ++globalSearchSequenceRef.current;
