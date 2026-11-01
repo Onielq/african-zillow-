@@ -198,7 +198,8 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /aria-label="Property type"/);
   assert.match(experience, /aria-label="Analysis period"/);
   assert.match(experience, /time series is not connected and validated here/i);
-  assert.match(experience, /No project markers\s+or prices are fabricated/);
+  assert.match(experience, /Project register/);
+  assert.match(experience, /RWANDA_PROJECT_RECORDS\.length/);
 });
 
 test("area comparison supports an unrestricted mixed set without fabricating unavailable metrics", async () => {
@@ -790,7 +791,7 @@ test("parcel price markers use red baseline, brown public assets, charcoal high 
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
   assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
-  assert.match(mapView, /\["D41A3A", "#B8142E"\]/);
+  assert.match(mapView, /\["#D41A3A", "#B8142E"\]/);
   assert.match(mapView, /sortValue >= 1_000_000_000/);
   assert.match(mapView, /isPublicAssetAt\(markerCenter\)/);
   assert.match(mapView, /\["==", \["get", "marker_style"\], "public-asset"\], "#8B5A2B"/);
@@ -829,7 +830,8 @@ test("parcel price markers match the compact reference and combine NEW with pric
   assert.match(mapView, /const isNewListing = hasVerifiedListingDate && sourceMarketStatus === "available"/);
   assert.doesNotMatch(mapView, /demoParcelIsNewListing|demoParcelMarketStatus|isNewListingDemo/);
   assert.ok(mapView.includes('map.on("click", "metric-bubbles-parcel-label", selectParcelFromMarker)'));
-  assert.ok(mapView.includes("String(selectedFeature.id) === String(id)"));
+  assert.match(mapView, /selectedFeatureHighlightActive = nextFeature !== null/);
+  assert.doesNotMatch(mapView, /clearParcelGlow|handleDocumentPointerMove|handleWindowBlur/);
   assert.ok(experience.includes("Availability unverified"));
   assert.ok(mapView.includes("refreshMetricBubblesRef.current?.()"));
   assert.ok(mapView.includes("selectFeatureState(null)"));
