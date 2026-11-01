@@ -1236,7 +1236,18 @@ export function MapView({
       if (!source) return;
 
       const level = activeAreaLevel(map.getZoom());
-      const collection = areaDataRef.current[level] ?? emptyFeatureCollection();
+      const cachedCollection = areaDataRef.current[level] ?? emptyFeatureCollection();
+      // During rapid zoom/source refreshes MapLibre may already have published
+      // the active GeoJSON layer while the React-side viewport cache is still
+      // empty. Reuse rendered source features in that window so selected parcel
+      // outlines and their price markers never get out of sync.
+      const sourceFeatures = cachedCollection.features.length > 0
+        ? cachedCollection.features
+        : map.querySourceFeatures(AREA_LAYERS[level].source) as unknown as MapFeatureCollection["features"];
+      const collection: MapFeatureCollection = {
+        type: "FeatureCollection",
+        features: sourceFeatures
+      };
       const valuesByKey = new Map<string, MetricBubbleValue>();
       for (const value of metricBubbleValuesRef.current) {
         valuesByKey.set(
