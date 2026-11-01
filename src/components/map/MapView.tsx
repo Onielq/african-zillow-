@@ -1570,6 +1570,113 @@ export function MapView({
     };
     refreshMetricBubblesRef.current = refreshMetricBubbles;
 
+    const refreshProjectMarkers = () => {
+      const source = map.getSource("project-markers") as GeoJSONSource | undefined;
+      const layerIds = ["project-clusters", "project-cluster-count", "project-marker-circles", "project-marker-labels"];
+      const visibility = showProjectsRef.current ? "visible" : "none";
+      for (const layerId of layerIds) {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visibility);
+      }
+      if (!source) return;
+
+      if (!showProjectsRef.current) {
+        source.setData(emptyFeatureCollection() as never);
+        projectCentersRef.current = new Map();
+        return;
+      }
+
+      const normal = (value: unknown) => normalizeMetricKeyPart(value);
+      const centerOf = (feature: MapFeatureCollection["features"][number]): [number, number] | null => {
+        const bounds = featureBounds(feature as unknown as MapGeoJSONFeature);
+        return bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null;
+      };
+
+      const nextCenters = new Map<string, {
+        center: [number, number];
+        precision: "district" | "sector" | "address-coordinate" | "parcel-upi";
+      }>();
+      const features = projectsRef.current.flatMap((project) => {
+        let center: [number, number] | null = null;
+        let precision: "district" | "sector" | "address-coordinate" | "parcel-upi" = "district";
+
+        if (project.parcelUpi) {
+          const parcels = areaDataRef.current.parcel?.features ?? [];
+          const match = parcels.find((feature) => normal(feature.properties?.upi) === normal(project.parcelUpi));
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "parcel-upi";
+          }
+        }
+
+        if (!center && Number.isFinite(project.latitude) && Number.isFinite(project.longitude)) {
+          center = [project.longitude as number, project.latitude as number];
+          precision = "address-coordinate";
+        }
+
+        if (!center && project.sector && project.district && !/[\/&]|corridor|multiple/i.test(project.sector)) {
+          const sectors = areaDataRef.current.sector?.features ?? [];
+          const match = sectors.find((feature) =>
+            normal(feature.properties?.district) === normal(project.district) &&
+            normal(feature.properties?.sector) === normal(project.sector)
+          );
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "sector";
+          }
+        }
+
+        if (!center && project.district) {
+          const districts = areaDataRef.current.district?.features ?? [];
+          const match = districts.find((feature) => normal(feature.properties?.district) === normal(project.district));
+          if (match) {
+            center = centerOf(match);
+            if (center) precision = "district";
+          }
+        }
+
+        if (!center) return [];
+        nextCenters.set(project.id, { center, precision });
+        return [{
+          type: "Feature" as const,
+          id: project.id,
+          geometry: { type: "Point" as const, coordinates: center },
+          properties: {
+            project_id: project.id,
+            name: project.name,
+            developer: project.developer,
+            location_precision: precision,
+            is_selected: project.id === selectedProjectIdRef.current
+          }
+        }];
+      });
+
+      projectCentersRef.current = nextCenters;
+      source.setData({ type: "FeatureCollection", features } as never);
+
+      const selectedId = selectedProjectIdRef.current;
+      if (selectedId) {
+        const target = nextCenters.get(selectedId);
+        if (target) {
+          const previous = focusedProjectRef.current;
+          const rank = { district: 1, sector: 2, "address-coordinate": 3, "parcel-upi": 4 } as const;
+          const shouldRefine = !previous || previous.id !== selectedId ||
+            rank[target.precision] > (rank[previous.precision as keyof typeof rank] ?? 0);
+          if (shouldRefine) {
+            focusedProjectRef.current = { id: selectedId, precision: target.precision };
+            map.flyTo({
+              center: target.center,
+              zoom: target.precision === "parcel-upi" ? 18.1
+                : target.precision === "address-coordinate" ? 16.8
+                  : target.precision === "sector" ? 14.3 : 11.5,
+              duration: 650,
+              essential: true
+            });
+          }
+        }
+      }
+    };
+    refreshProjectMarkersRef.current = refreshProjectMarkers;
+
     const setFeatureFlag = (
       featureRef: { source: string; id: string | number } | null,
       key: "hover" | "selected",
@@ -2454,7 +2561,11 @@ export function MapView({
         AREA_LAYERS.parcel.label,
         "metric-bubbles-circle",
         "metric-bubbles-label",
-        "metric-bubbles-parcel-label"
+        "metric-bubbles-parcel-label",
+        "project-clusters",
+        "project-cluster-count",
+        "project-marker-circles",
+        "project-marker-labels"
       ]) {
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
@@ -2725,6 +2836,7 @@ export function MapView({
         source.setData(merged);
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
+        refreshProjectMarkers();
         if (level === activeAreaLevel(map.getZoom()) && lastMapPointerPoint) {
           map.once("idle", refreshHoverAtLastPointer);
         }
@@ -2881,6 +2993,7 @@ export function MapView({
         }
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
+        refreshProjectMarkers();
 
         updateLayerVisibility();
         if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
@@ -3507,6 +3620,21 @@ export function MapView({
         );
       }
 
+      const selectProjectMarker = (event: { features?: MapGeoJSONFeature[] }) => {
+        const marker = event.features?.[0];
+        const projectId = String(marker?.properties?.project_id ?? "");
+        if (!projectId) return;
+        const project = projectsRef.current.find((candidate) => candidate.id === projectId);
+        if (project) onProjectSelectedRef.current?.(project);
+      };
+      map.on("click", "project-marker-circles", selectProjectMarker);
+      map.on("click", "project-marker-labels", selectProjectMarker);
+      map.on("click", "project-clusters", (event) => {
+        const cluster = event.features?.[0];
+        const coordinates = (cluster?.geometry as { coordinates?: [number, number] } | undefined)?.coordinates;
+        if (coordinates) map.easeTo({ center: coordinates, zoom: Math.min(map.getZoom() + 3, 17), duration: 500 });
+      });
+
       map.on("mousemove", handleMapPointerMove);
       map.getCanvas().addEventListener("mouseleave", handleMapPointerLeave);
       map.on("zoomend", () => {
@@ -3547,6 +3675,10 @@ export function MapView({
           "metric-bubbles-circle",
           "metric-bubbles-label",
           "metric-bubbles-parcel-label",
+          "project-clusters",
+          "project-cluster-count",
+          "project-marker-circles",
+          "project-marker-labels"
         ].filter((layerId) => Boolean(map.getLayer(layerId)));
 
         const hits = clickableLayers.length
