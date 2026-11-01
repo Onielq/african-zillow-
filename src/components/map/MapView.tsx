@@ -507,6 +507,37 @@ function mergeAreaCollections(collections: MapFeatureCollection[]): MapFeatureCo
   };
 }
 
+function withStableAreaFeatureIds(
+  level: AreaLevel,
+  collection: MapFeatureCollection
+): MapFeatureCollection {
+  return {
+    ...collection,
+    features: collection.features.map((feature, index) => {
+      const properties = feature.properties ?? {};
+      const hierarchy = [
+        properties.province_id ?? properties.province,
+        properties.district_id ?? properties.district,
+        properties.sector_id ?? properties.sector,
+        properties.cell_id ?? properties.cell,
+        properties.village_id ?? properties.village,
+        properties.upi ?? feature.id ?? index,
+        properties.source_label
+      ].map((part) => String(part ?? "").trim()).join("|");
+      const stableId = level === "parcel"
+        ? String(properties.upi ?? feature.id ?? index)
+        : level + "|" + hierarchy;
+      return {
+        ...feature,
+        id: stableId,
+        properties: {
+          ...properties,
+          map_feature_id: stableId
+        }
+      };
+    })
+  };
+}
 
 type MapViewProps = {
   basemapMode: BasemapMode;
@@ -2861,32 +2892,8 @@ export function MapView({
         if (!source) return;
         const sourceData = dataByLevel.get(level);
         const merged = mergeAreaCollections(sourceData ? Array.from(sourceData.values()) : []);
-        // GeoJSON tile queries can expose a generated ID (often 0) instead of
-        // the original feature.id. Promote a hierarchy-aware key so feature
-        // state always targets one administrative polygon, never every
-        // polygon that happens to share a tile-generated ID.
-        const withStableFeatureIds: MapFeatureCollection = {
-          ...merged,
-          features: merged.features.map((feature, index) => {
-            const properties = feature.properties ?? {};
-            const hierarchy = [
-              properties.province_id ?? properties.province,
-              properties.district_id ?? properties.district,
-              properties.sector_id ?? properties.sector,
-              properties.cell_id ?? properties.cell,
-              properties.village_id ?? properties.village,
-              properties.upi ?? feature.id ?? index,
-              properties.source_label
-            ].map((part) => String(part ?? "").trim()).join("|");
-            return {
-              ...feature,
-              properties: {
-                ...properties,
-                map_feature_id: level + "|" + hierarchy
-              }
-            };
-          })
-        };
+        // Use the same promoted identifier in normal and idle publication.
+        const withStableFeatureIds = withStableAreaFeatureIds(level, merged);
         areaDataRef.current[level] = withStableFeatureIds;
         source.setData(withStableFeatureIds);
         selectionSyncRef.current?.(selectedAreaRef.current);
@@ -3036,8 +3043,9 @@ export function MapView({
 
         for (const result of results) {
           const source = map.getSource(AREA_LAYERS[result.level].source) as GeoJSONSource;
-          areaDataRef.current[result.level] = result.data;
-          source.setData(result.data);
+          const stableData = withStableAreaFeatureIds(result.level, result.data);
+          areaDataRef.current[result.level] = stableData;
+          source.setData(stableData);
         }
         const requestedLevelSet = new Set(requestedLevels);
         for (const level of AREA_LEVELS.filter((candidate) => !requestedLevelSet.has(candidate))) {
