@@ -1551,6 +1551,10 @@ export function MapExperience() {
             onClick={() => {
               setWorkspaceMode("projects");
               setSelectedArea(null);
+              setSelectedProjectId(null);
+              setProjectSearch("");
+              setProjectDirectoryTab("projects");
+              setProjectsOpen(true);
             }}
             type="button"
           >
@@ -1572,6 +1576,10 @@ export function MapExperience() {
           onBoundaryStatusChange={handleBoundaryStatus}
           onAreaSelected={handleAreaSelected}
           selectedArea={selectedArea}
+          projects={RWANDA_PROJECT_RECORDS}
+          showProjects={workspaceMode === "projects" || projectsOpen}
+          selectedProjectId={selectedProjectId}
+          onProjectSelected={handleProjectMarkerSelected}
         />
 
         <div className="map-vignette" aria-hidden="true" />
@@ -1581,7 +1589,7 @@ export function MapExperience() {
           <button
             aria-pressed={basemapMode === "map"}
             className={basemapMode === "map" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setBasemapMode("map")}
+            onClick={() => { manualBasemapChoiceRef.current = "map"; setBasemapMode("map"); }}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -1593,7 +1601,7 @@ export function MapExperience() {
           <button
             aria-pressed={basemapMode === "satellite"}
             className={basemapMode === "satellite" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setBasemapMode("satellite")}
+            onClick={() => { manualBasemapChoiceRef.current = "satellite"; setBasemapMode("satellite"); }}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
@@ -1605,7 +1613,7 @@ export function MapExperience() {
           </button>
           <button aria-pressed={basemapMode === "hybrid"}
             className={basemapMode === "hybrid" ? "basemap-button basemap-button-active" : "basemap-button"}
-            onClick={() => setBasemapMode("hybrid")} type="button">
+            onClick={() => { manualBasemapChoiceRef.current = "hybrid"; setBasemapMode("hybrid"); }} type="button">
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
               <path d="M2.5 5.4 10 2.2l7.5 3.2L10 8.6 2.5 5.4Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
               <path d="M2.5 10 10 13.2l7.5-3.2M2.5 14.5 10 17.7l7.5-3.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -1791,7 +1799,11 @@ export function MapExperience() {
                 setSourcesOpen(false);
                 setShowOpen(false);
                 setMetricInfoOpen(false);
-                setProjectsOpen((open) => !open);
+                setProjectsOpen((open) => {
+                  const next = !open;
+                  if (next) setSelectedProjectId(null);
+                  return next;
+                });
               }}
               type="button"
             >
@@ -2080,21 +2092,81 @@ export function MapExperience() {
         ) : null}
 
         {projectsOpen ? (
-          <aside aria-label="Projects directory panel" className="directory-drawer projects-drawer">
+          <aside aria-label="Projects and developers on the map" className="directory-drawer projects-drawer">
             <div className="directory-drawer-header">
               <div>
-                <p className="panel-eyebrow">PROJECT INTELLIGENCE / RWANDA</p>
-                <h2>Buildings &amp; off-plan projects</h2>
-                <p className="directory-drawer-subtitle">Named developments, apartments, villas, construction stages and future handovers.</p>
+                <p className="panel-eyebrow">TAISEEL / PROJECT INTELLIGENCE</p>
+                <h2>Projects on the map</h2>
+                <p className="directory-drawer-subtitle">{RWANDA_PROJECT_RECORDS.length} developments · {RWANDA_PROJECT_DEVELOPERS.length} developers</p>
               </div>
               <button aria-label="Close projects panel" className="panel-close" onClick={() => setProjectsOpen(false)} type="button">×</button>
             </div>
-            <div className="projects-panel-empty">
-              <div className="projects-panel-icon" aria-hidden="true">⌂</div>
-              <strong>Verified project feed not connected</strong>
-              <p>Projects such as residential estates and off-plan buildings will appear here only after their identity, developer, location, stage, current unit availability and publication permission have been checked.</p>
-              <Link className="directory-full-link" href="/projects">Open projects workspace ↗</Link>
+
+            <label className="project-directory-search">
+              <span className="sr-only">Search projects or developers</span>
+              <input
+                aria-label="Search projects or developers"
+                onChange={(event) => { setProjectSearch(event.target.value); setSelectedProjectId(null); }}
+                placeholder="Search a project or developer"
+                type="search"
+                value={projectSearch}
+              />
+            </label>
+
+            <div className="project-directory-tabs" role="tablist" aria-label="Project directory sections">
+              <button aria-selected={projectDirectoryTab === "projects"} className={projectDirectoryTab === "projects" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} role="tab" type="button">Projects <span>{filteredProjects.length}</span></button>
+              <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setSelectedProjectId(null); }} role="tab" type="button">Developers <span>{filteredProjectDevelopers.length}</span></button>
             </div>
+
+            {selectedProject ? (
+              <div className="project-directory-detail">
+                <button className="project-directory-back" onClick={() => setSelectedProjectId(null)} type="button">← All projects</button>
+                {selectedProject.imageUrl ? (
+                  <img className="project-detail-image" src={selectedProject.imageUrl} alt={selectedProject.name + " project"} loading="lazy"/>
+                ) : null}
+                <p className="panel-eyebrow">{selectedProject.category}</p>
+                <h3>{selectedProject.name}</h3>
+                <div className="project-detail-row"><span>Developer</span><strong>{selectedProject.developer}</strong></div>
+                <div className="project-detail-row"><span>Owner / client</span><strong>{selectedProject.owner || "Not stated in the project record"}</strong></div>
+                <div className="project-detail-row"><span>Location</span><strong>{[selectedProject.sector, selectedProject.district].filter(Boolean).join(" · ") || "Location not recorded"}</strong></div>
+                <div className="project-detail-row"><span>Project status</span><strong>{selectedProject.status}</strong></div>
+                {selectedProject.units !== null ? <div className="project-detail-row"><span>Recorded units</span><strong>{new Intl.NumberFormat("en-RW").format(selectedProject.units)}</strong></div> : null}
+                {selectedProject.landHa !== null ? <div className="project-detail-row"><span>Land area in record</span><strong>{selectedProject.landHa} ha</strong></div> : null}
+                {selectedProject.start || selectedProject.completion ? <div className="project-detail-row"><span>Timeline in source</span><strong>{[selectedProject.start ? "Start " + selectedProject.start : null, selectedProject.completion ? "Delivery " + selectedProject.completion : null].filter(Boolean).join(" · ")}</strong></div> : null}
+                <div className="project-detail-precision">
+                  Map location: {selectedProject.locationPrecision === "parcel-upi" ? "Exact parcel identifier" : selectedProject.locationPrecision === "address-coordinate" ? "Address coordinate" : selectedProject.locationPrecision === "administrative-area" ? "Sector-level location" : selectedProject.locationPrecision === "district" ? "District-level location" : "No map location recorded"}
+                </div>
+                <button className="project-focus-button" onClick={() => void focusProjectOnMap(selectedProject)} type="button">Locate on map</button>
+                {selectedProject.sourceUrl ? <a className="project-source-link" href={selectedProject.sourceUrl} rel="noreferrer" target="_blank">Open project source ↗</a> : <small className="project-source-note">This ledger entry has no source link.</small>}
+              </div>
+            ) : projectDirectoryTab === "projects" ? (
+              <div className="project-record-list">
+                {filteredProjects.map((project) => (
+                  <button className="project-record-item" key={project.id} onClick={() => void focusProjectOnMap(project)} type="button">
+                    {project.imageUrl ? <img src={project.imageUrl} alt="" loading="lazy"/> : <span className="project-record-monogram">{initialsForName(project.name)}</span>}
+                    <span className="project-record-copy">
+                      <strong>{project.name}</strong>
+                      <small>{project.developer}</small>
+                      <small>{[project.sector, project.district].filter(Boolean).join(" · ") || project.category}</small>
+                    </span>
+                    <span className="project-record-arrow">↗</span>
+                  </button>
+                ))}
+                {filteredProjects.length === 0 ? <p className="project-directory-empty">No project matches that search.</p> : null}
+              </div>
+            ) : (
+              <div className="project-developer-list">
+                {filteredProjectDevelopers.map((developer) => (
+                  <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(developer.name); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
+                    <span className="project-developer-monogram">{initialsForName(developer.name)}</span>
+                    <span><strong>{developer.name}</strong><small>{developer.focus || developer.base || "Developer record"}</small></span>
+                    <span className="project-record-arrow">→</span>
+                  </button>
+                ))}
+                {filteredProjectDevelopers.length === 0 ? <p className="project-directory-empty">No developer matches that search.</p> : null}
+              </div>
+            )}
+            <p className="project-directory-footnote">A project marker uses the best location currently recorded. Selecting the project takes you to its parcel, address, sector or district when that geography is connected.</p>
           </aside>
         ) : null}
 
@@ -2121,20 +2193,18 @@ export function MapExperience() {
             </div>
             <p className="metric-info-description">
               {workspaceMode === "projects"
-                ? "Project mode is ready for a verified project feed. This panel brings the map status and publication limits together in one place."
+                ? "Explore the Rwanda project register on the map. Select any development to see its developer, recorded location and source."
                 : activeMetric.description}
             </p>
             {workspaceMode === "projects" ? (
               <div className="metric-info-status">
-                <strong>Project data status</strong>
+                <strong>Project register</strong>
                 <p>
-                  Developer launches, starting prices, payment plans, construction progress and
-                  unit availability are not connected yet. No project markers or prices are fabricated.
+                  {RWANDA_PROJECT_RECORDS.length} project records and {RWANDA_PROJECT_DEVELOPERS.length} developer records are connected to this workspace. Pins use parcel, address, sector or district precision according to the record.
                 </p>
-                <div className="directory-route-links">
-                  <Link href="/projects">Open project directory ↗</Link>
-                  <Link href="/developers">Developers &amp; agents directory ↗</Link>
-                </div>
+                <p>
+                  Select Projects in the map toolbar to search and inspect the full register without leaving the map.
+                </p>
               </div>
             ) : (
               <>
@@ -2297,6 +2367,20 @@ export function MapExperience() {
             {selectedArea.level === "parcel" ? (
               <>
               <div className="parcel-details">
+                {selectedParcelProject ? (
+                  <div className="project-identity-inline">
+                    {selectedParcelProject.imageUrl ? (
+                      <img src={selectedParcelProject.imageUrl} alt={selectedParcelProject.name + " project image"} loading="lazy" />
+                    ) : (
+                      <span className="project-identity-monogram">{initialsForName(selectedParcelProject.name)}</span>
+                    )}
+                    <div className="project-identity-copy">
+                      <span>Development on this parcel</span>
+                      <strong>{selectedParcelProject.name}</strong>
+                      <small>{selectedParcelProject.developer}</small>
+                    </div>
+                  </div>
+                ) : null}
                 <div>
                   <span>Unique parcel identifier (UPI)</span>
                   <strong>{selectedArea.upi ?? "Not published"}</strong>
