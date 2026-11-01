@@ -2136,7 +2136,7 @@ export function MapExperience() {
                 <div className="project-detail-precision">
                   Map location: {selectedProject.locationPrecision === "parcel-upi" ? "Exact parcel identifier" : selectedProject.locationPrecision === "address-coordinate" ? "Address coordinate" : selectedProject.locationPrecision === "administrative-area" ? "Sector-level location" : selectedProject.locationPrecision === "district" ? "District-level location" : "No map location recorded"}
                 </div>
-                <button className="project-focus-button" onClick={() => void focusProjectOnMap(selectedProject)} type="button">Locate on map</button>
+                <button className="project-locate-button" onClick={() => void focusProjectOnMap(selectedProject)} type="button">Locate on map</button>
                 {selectedProject.sourceUrl ? <a className="project-source-link" href={selectedProject.sourceUrl} rel="noreferrer" target="_blank">Open project source ↗</a> : <small className="project-source-note">This ledger entry has no source link.</small>}
               </div>
             ) : projectDirectoryTab === "projects" ? (
