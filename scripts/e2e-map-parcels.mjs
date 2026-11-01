@@ -249,7 +249,8 @@ try {
         map &&
         map.getLayer(layer) &&
         map.getLayoutProperty(layer, "visibility") === "visible" &&
-        map.querySourceFeatures(source).length > 0
+        map.querySourceFeatures(source).length > 0 &&
+        map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
       );
     }, config, { timeout: 35_000 });
 
