@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/diagnose-parcel-sources.mjs"
+      - "scripts/diagnose-kigali-sample-upi.mjs"
       - "scripts/smoke-test-parcel-api.mjs"
       - "scripts/smoke-test-admin-path-search.mjs"
       - "src/app/api/geography/areas/search/route.ts"
@@ -44,6 +45,9 @@ jobs:
       # Run the public GIS probes even if the production smoke test fails;
       # otherwise the first HTTP 502 masks whether the upstream parcel services
       # themselves are slow, unavailable, or returning a different schema.
+      - name: Check sample Kigali UPI across published parcel layers (read-only)
+        if: always()
+        run: node scripts/diagnose-kigali-sample-upi.mjs
       - name: Probe public parcel endpoints (read-only)
         if: always()
         run: node scripts/diagnose-parcel-sources.mjs

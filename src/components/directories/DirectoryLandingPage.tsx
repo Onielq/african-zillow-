@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { BrandImage } from "@/components/directories/BrandImage";
+import { websiteFaviconUrl } from "@/lib/brand-assets";
 import styles from "./directory-landing-page.module.css";
 
 type EvidenceItem = {
@@ -19,6 +21,8 @@ type CandidateRecord = {
   segment: string;
   sourceMetrics: [string, string, string, string, string, string];
   status: string;
+  website?: string;
+  logoUrl?: string;
 };
 
 type DirectoryKind = "projects" | "developers";
@@ -169,7 +173,12 @@ export function DirectoryLandingPage({
                 <tbody>
                   {candidateRecords.map((record) => (
                     <tr key={record.id}>
-                      <th scope="row">{record.name}</th>
+                      <th scope="row">
+                        <span className={styles.candidateOrganization}>
+                          <BrandImage name={record.name} source={record.logoUrl ?? websiteFaviconUrl(record.website)} className={styles.candidateLogo} width={96} height={96} />
+                          <span>{record.name}</span>
+                        </span>
+                      </th>
                       <td>{record.segment}</td>
                       {record.sourceMetrics.map((value, index) => (
                         <td className={styles.candidateMetric} key={index}>{value}</td>

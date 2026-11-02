@@ -8,8 +8,8 @@ const KIGALI_PARCELS =
 const BUGESERA_PARCELS =
   "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0";
 const ALLOWED_DISTRICTS = new Set(["gasabo", "kicukiro", "nyarugenge", "bugesera"]);
-const MAX_PARCELS_PER_CELL = 10000;
-const BATCH_SIZE = 250;
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 250;
 
 type ArcGisFeature = {
   attributes?: Record<string, unknown>;
@@ -109,7 +109,15 @@ async function requestArcGis(
   return payload;
 }
 
+function compareObjectIds(a: number | string, b: number | string): number {
+  const numericA = Number(a);
+  const numericB = Number(b);
+  if (Number.isFinite(numericA) && Number.isFinite(numericB)) return numericA - numericB;
+  return String(a).localeCompare(String(b), undefined, { numeric: true });
+}
+
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const params = request.nextUrl.searchParams;
   const district = clean(params.get("district"));
   const sector = clean(params.get("sector"));
@@ -121,16 +129,25 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const requestedPage = Number.parseInt(params.get("page") ?? "1", 10);
+  const requestedPageSize = Number.parseInt(params.get("pageSize") ?? String(DEFAULT_PAGE_SIZE), 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const pageSize = Number.isFinite(requestedPageSize)
+    ? Math.min(MAX_PAGE_SIZE, Math.max(1, requestedPageSize))
+    : DEFAULT_PAGE_SIZE;
+
   const layerUrl = district.toLowerCase() === "bugesera" ? BUGESERA_PARCELS : KIGALI_PARCELS;
-  // The map search accepts any casing. Use the same rule for the parcel-list
-  // lookup so a canonical result does not become empty when the user typed lowercase.
+  // Match the same case-insensitive geography used by map search.
   const where = [
     "UPPER(district) = '" + escapeSql(district.toLocaleUpperCase("en")) + "'",
     "UPPER(sector) = '" + escapeSql(sector.toLocaleUpperCase("en")) + "'",
     "UPPER(cell) = '" + escapeSql(cell.toLocaleUpperCase("en")) + "'",
     "upi IS NOT NULL"
   ].join(" AND ");
-  const outFields = "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on";
+
+  // Request only the fields shown in the parcel list. One page requests
+  // geometry for at most 250 object IDs, never a full cell in serial batches.
+  const outFields = "upi,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on";
 
   try {
     const idPayload = await requestArcGis(layerUrl, {
@@ -138,21 +155,19 @@ export async function GET(request: NextRequest) {
       returnIdsOnly: "true",
       returnGeometry: "false"
     });
-    const ids = idPayload.objectIds ?? [];
-    const selectedIds = ids.slice(0, MAX_PARCELS_PER_CELL);
-    const features: ArcGisFeature[] = [];
-    for (let offset = 0; offset < selectedIds.length; offset += BATCH_SIZE) {
-      const batch = selectedIds.slice(offset, offset + BATCH_SIZE);
-      const payload = await requestArcGis(layerUrl, {
-        objectIds: batch.join(","),
-        outFields,
-        returnGeometry: "true",
-        outSR: "4326"
-      });
-      features.push(...(payload.features ?? []));
-    }
+    const ids = [...(idPayload.objectIds ?? [])].sort(compareObjectIds);
+    const start = (page - 1) * pageSize;
+    const selectedIds = ids.slice(start, start + pageSize);
+    const featurePayload = selectedIds.length
+      ? await requestArcGis(layerUrl, {
+          objectIds: selectedIds.join(","),
+          outFields,
+          returnGeometry: "true",
+          outSR: "4326"
+        })
+      : { features: [] as ArcGisFeature[] };
 
-    const parcels = features.flatMap((feature) => {
+    const parcels = (featurePayload.features ?? []).flatMap((feature) => {
       const attributes = feature.attributes ?? {};
       const upi = textValue(attributeValue(attributes, "upi"));
       const actualDistrict = textValue(attributeValue(attributes, "district"));
@@ -160,8 +175,8 @@ export async function GET(request: NextRequest) {
       const actualCell = textValue(attributeValue(attributes, "cell"));
       const bounds = parcelBounds(feature);
       if (!upi || !bounds || !actualDistrict || !actualSector || !actualCell) return [];
-      // Apply the exact requested geography again after the upstream query.
-      // This prevents a permissive upstream where-clause from leaking adjacent plots.
+
+      // Re-check the exact geography so adjacent plots cannot leak through.
       const normalise = (value: string) =>
         value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
       if (
@@ -187,24 +202,30 @@ export async function GET(request: NextRequest) {
       (a.parcelNumber ?? a.upi).localeCompare(b.parcelNumber ?? b.upi, undefined, { numeric: true })
     );
 
-    const capped = ids.length > MAX_PARCELS_PER_CELL;
+    const hasMore = start + selectedIds.length < ids.length;
     return NextResponse.json(
       {
         district,
         sector,
         cell,
+        page,
+        pageSize,
+        nextPage: hasMore ? page + 1 : null,
+        hasMore,
         totalSourceRecords: ids.length,
         returnedRecords: parcels.length,
-        capped,
         parcels
       },
       {
         headers: {
           "Cache-Control": "public, max-age=0, s-maxage=180, stale-while-revalidate=900",
+          "Server-Timing": "cell-parcels;dur=" + (Date.now() - startedAt),
+          "X-Cell-Parcel-Page": String(page),
+          "X-Cell-Parcel-Page-Size": String(pageSize),
           "X-Data-Source": district.toLowerCase() === "bugesera"
             ? "National Land Authority LAIS Bugesera_Parcels FeatureServer"
             : "City of Kigali Master Plan Kigali Parcels FeatureServer",
-          "X-Parcel-List-Basis": "Geographic-name query with stable UPI per returned parcel; not proof of legal ownership"
+          "X-Parcel-List-Basis": "Paginated cadastral records with stable UPI; not proof of legal ownership"
         }
       }
     );
