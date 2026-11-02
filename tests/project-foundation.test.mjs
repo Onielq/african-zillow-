@@ -785,7 +785,7 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
 
-test("parcel price markers use maroon baseline, brown public assets, charcoal high values and blue selected state", async () => {
+test("parcel price markers use district red baseline, brown public assets, charcoal high values and blue selected state", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /type PriceMarkerStyle = "market-default" \| "public-asset" \| "high-value"/);
@@ -802,8 +802,10 @@ test("parcel price markers use maroon baseline, brown public assets, charcoal hi
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
   assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
-  assert.match(mapView, /const fillColor = isSelected[\\s\\S]*?: \\[ "#D41A3A", "#B8142E" \\]/);
+  assert.match(mapView, /const fillColor = isSelected/);
   assert.match(mapView, /\["==", \["get", "level"\], "parcel"\], "#D41A3A"/);
+  assert.ok(mapView.includes('["#D41A3A", "#B8142E"]'));
+  assert.doesNotMatch(mapView, /#800000|#660000/);
   assert.match(mapView, /"#9D2932"/);
   assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /"#149DB0"/);
