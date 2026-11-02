@@ -877,7 +877,6 @@ function geometryContainsPoint(geometry: Geometry, point: [number, number]): boo
   return polygonRingsContainingPoint(geometry, point) !== null;
 }
 
-const EARTH_RADIUS_METRES = 6_371_008.8;
 
 function haversineDistanceMeters(
   first: [number, number],
