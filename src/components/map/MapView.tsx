@@ -827,7 +827,11 @@ function ringContainsPoint(point: [number, number], ring: number[][]): boolean {
   for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
     const [x1, y1] = ring[previous] ?? [];
     const [x2, y2] = ring[index] ?? [];
-    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    if (
+      typeof x1 !== "number" || typeof y1 !== "number" ||
+      typeof x2 !== "number" || typeof y2 !== "number" ||
+      ![x1, y1, x2, y2].every(Number.isFinite)
+    ) continue;
 
     const cross = (longitude - x1) * (y2 - y1) - (latitude - y1) * (x2 - x1);
     const withinSegment =
@@ -852,16 +856,18 @@ function geometryContainsPoint(geometry: Geometry, point: [number, number]): boo
       ? geometry.coordinates as unknown as number[][][][]
       : [];
 
-  return polygons.some((rings) =>
-    rings.length > 0 &&
-    ringContainsPoint(point, rings[0]) &&
-    !rings.slice(1).some((hole) => ringContainsPoint(point, hole))
-  );
+  return polygons.some((rings) => {
+    const outerRing = rings[0];
+    return Boolean(
+      outerRing &&
+      ringContainsPoint(point, outerRing) &&
+      !rings.slice(1).some((hole) => ringContainsPoint(point, hole))
+    );
+  });
 }
 
 function verticalFeatureViewportRatio(
   map: MapLibreMapInstance,
-  level: AreaLevel,
   collection: MapFeatureCollection | undefined
 ): number | null {
   const mapHeight = map.getContainer().clientHeight;
@@ -906,15 +912,15 @@ function activeAreaLevelForMap(
       ? ADMIN_FOOTPRINT_EXIT_RATIO
       : ADMIN_FOOTPRINT_ENTER_RATIO;
 
-  const districtRatio = verticalFeatureViewportRatio(map, "district", collections.district);
+  const districtRatio = verticalFeatureViewportRatio(map, collections.district);
   if (districtRatio === null) return activeAreaLevel(zoom);
   if (districtRatio < transitionThreshold("sector")) return "district";
 
-  const sectorRatio = verticalFeatureViewportRatio(map, "sector", collections.sector);
+  const sectorRatio = verticalFeatureViewportRatio(map, collections.sector);
   if (sectorRatio === null) return "district";
   if (sectorRatio < transitionThreshold("cell")) return "sector";
 
-  const cellRatio = verticalFeatureViewportRatio(map, "cell", collections.cell);
+  const cellRatio = verticalFeatureViewportRatio(map, collections.cell);
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
@@ -1318,7 +1324,7 @@ export function MapView({
 
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
-    activeAreaLevelRef.current = getActiveAreaLevel();
+    activeAreaLevelRef.current = activeAreaLevel(map.getZoom());
 
     const getActiveAreaLevel = () => {
       const level = activeAreaLevelForMap(map, areaDataRef.current, activeAreaLevelRef.current);
@@ -2861,7 +2867,6 @@ export function MapView({
       const nextLevel = AREA_LEVELS[activeIndex + 1];
       const activeFootprintRatio = verticalFeatureViewportRatio(
         map,
-        activeLevel,
         areaDataRef.current[activeLevel]
       );
       if (
