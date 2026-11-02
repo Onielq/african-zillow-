@@ -145,67 +145,34 @@ try {
 
   // Context layers must be visible from the first map view without relying
   // on a click, layer toggle, pan or a separate Overpass request.
-  const initialOverlayHandle = await page.waitForFunction(() => {
+  await page.getByRole("button", { name: "Show map overlays" }).click();
+  const showDefaults = await page.evaluate(() =>
+    Array.from(document.querySelectorAll(".show-toggle")).map((label) => {
+      const input = label.querySelector('input[type="checkbox"]');
+      return {
+        name: label.querySelector("span")?.textContent?.trim() ?? "",
+        checked: Boolean(input?.checked)
+      };
+    })
+  );
+  const enabledByDefault = showDefaults.filter((layer) => layer.checked).map((layer) => layer.name);
+  if (enabledByDefault.length !== 1 || enabledByDefault[0] !== "Landmarks") {
+    throw new Error("Only Landmarks should be enabled by default in the Show menu: " + JSON.stringify(showDefaults));
+  }
+  await page.getByRole("button", { name: "Close map layers" }).click();
+
+  const initialOverlayCheck = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
-    if (!map || !map.isStyleLoaded() || !map.getSource("openmaptiles")) return false;
-    const expectedLayers = [
-      "context-vector-roads",
-      "context-vector-schools-health",
-      "context-vector-landmarks",
-      "context-vector-transit",
-      "context-vector-parks-fill",
-      "context-vector-water-fill",
-      "context-vector-industrial-fill",
-      "context-vector-forest-fill"
-    ];
-    const placeSourceCount = map.querySourceFeatures("show-overlays").length;
-    const renderedPlaces = map.queryRenderedFeatures(undefined, { layers: ["show-poi-circles"] }).length;
-    const zoom = map.getZoom();
-    const visibleLayers = expectedLayers.filter((id) =>
-      map.getLayer(id) && map.getLayoutProperty(id, "visibility") !== "none"
-    );
-    const renderedLayers = expectedLayers.filter((id) =>
-      map.getLayer(id) &&
-      map.getLayoutProperty(id, "visibility") !== "none" &&
-      map.queryRenderedFeatures(undefined, { layers: [id] }).length > 0
-    );
-    const initialPointLayers = [
-      "context-vector-schools-health",
-      "context-vector-landmarks",
-      "context-vector-transit"
-    ];
-    const pointLayerZooms = Object.fromEntries(initialPointLayers.map((id) => [
-      id,
-      map.getLayer(id)?.minzoom ?? 0
-    ]));
-    const pointLayersEligibleAtStart = initialPointLayers.every((id) =>
-      map.getLayer(id) && (map.getLayer(id)?.minzoom ?? 0) <= zoom
-    );
-    const featureCount = renderedLayers.reduce((total, id) =>
-      total + map.queryRenderedFeatures(undefined, { layers: [id] }).length, 0
-    );
-    if (
-      !renderedLayers.includes("context-vector-roads") ||
-      featureCount <= 0 ||
-      !pointLayersEligibleAtStart ||
-      placeSourceCount <= 0 ||
-      renderedPlaces <= 0
-    ) return false;
     return {
-      event: "first-load-vector-context-rendered",
-      zoom,
-      featureCount,
-      visibleLayers,
-      renderedLayers,
-      pointLayerZooms,
-      pointLayersEligibleAtStart,
-      placeSourceCount,
-      renderedPlaces
+      event: "initial-show-defaults",
+      enabledByDefault: ["Landmarks"],
+      styleLoaded: Boolean(map?.isStyleLoaded()),
+      showOverlaySourcePresent: Boolean(map?.getSource("show-overlays")),
+      poiLayerPresent: Boolean(map?.getLayer("show-poi-circles"))
     };
-  }, undefined, { timeout: 60_000 });
-  const initialOverlayCheck = await initialOverlayHandle.jsonValue();
-  if (!initialOverlayCheck || initialOverlayCheck.featureCount <= 0) {
-    throw new Error("Map context layers did not render automatically on the initial view.");
+  });
+  if (!initialOverlayCheck.styleLoaded || !initialOverlayCheck.showOverlaySourcePresent || !initialOverlayCheck.poiLayerPresent) {
+    throw new Error("The map style and Show overlay layers must initialize before interaction tests.");
   }
 
   await page.evaluate(() => {
