@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandImage } from "@/components/directories/BrandImage";
+import { ProjectReport } from "@/components/map/ProjectReport";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
 import { Marker, type Map as MapLibreMapInstance } from "maplibre-gl";
@@ -2320,50 +2321,15 @@ export function MapExperience() {
             </div>
 
             {selectedProject ? (
-              <div className="project-directory-detail">
-                <button className="project-directory-back" onClick={() => setSelectedProjectId(null)} type="button">← All projects</button>
-                <BrandImage
-                  name={selectedProject.name}
-                  source={selectedProject.imageUrl ?? developerBrandImage(selectedProject.developer)}
-                  className="project-detail-image"
-                  fit={selectedProject.imageUrl ? "cover" : "contain"}
-                  width={720}
-                  height={320}
-                />
-                <p className="panel-eyebrow">{selectedProject.category}</p>
-                <h3>{selectedProject.name}</h3>
-                <div className="project-detail-row"><span>Developer</span><strong>{selectedProject.developer}</strong></div>
-                <div className="project-detail-row"><span>Owner / client</span><strong>{selectedProject.owner || "Not stated in the project record"}</strong></div>
-                <div className="project-detail-row"><span>Location</span><strong>{[selectedProject.sector, selectedProject.district].filter(Boolean).join(" · ") || "Location not recorded"}</strong></div>
-                <div className="project-detail-row"><span>Project status</span><strong>{selectedProject.status}</strong></div>
-                {selectedProject.units !== null ? <div className="project-detail-row"><span>Recorded units</span><strong>{new Intl.NumberFormat("en-RW").format(selectedProject.units)}</strong></div> : null}
-                {selectedProject.landHa !== null ? <div className="project-detail-row"><span>Land area in record</span><strong>{selectedProject.landHa} ha</strong></div> : null}
-                {selectedProject.start || selectedProject.completion ? <div className="project-detail-row"><span>Timeline in source</span><strong>{[selectedProject.start ? "Start " + selectedProject.start : null, selectedProject.completion ? "Delivery " + selectedProject.completion : null].filter(Boolean).join(" · ")}</strong></div> : null}
-                <div className="project-detail-precision">
-                  Map location: {selectedProject.locationPrecision === "parcel-upi" ? "Exact parcel identifier" : selectedProject.locationPrecision === "address-coordinate" ? "Address coordinate" : selectedProject.locationPrecision === "administrative-area" ? "Sector-level location" : selectedProject.locationPrecision === "district" ? "District-level location" : "No map location recorded"}
-                </div>
-                <button className="project-locate-button" onClick={() => void focusProjectOnMap(selectedProject)} type="button">Locate on map</button>
-                {selectedProject.sourceUrl ? <a className="project-source-link" href={selectedProject.sourceUrl} rel="noreferrer" target="_blank">Open project source ↗</a> : <small className="project-source-note">This ledger entry has no source link.</small>}
-              </div>
+              <ProjectReport
+                project={selectedProject}
+                projects={RWANDA_PROJECT_RECORDS}
+                onBack={() => setSelectedProjectId(null)}
+                onLocate={() => void focusProjectOnMap(selectedProject)}
+              />
             ) : projectDirectoryTab === "projects" ? (
               <>
-                <section className="project-repository-section" aria-label="Other software projects">
-                  <p className="project-repository-label">SOFTWARE PROJECT</p>
-                  <a
-                    aria-label="Valia Deck GitHub repository"
-                    className="project-repository-link"
-                    href="https://github.com/Onielq/valia-deck"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <span aria-hidden="true" className="project-repository-mark">GH</span>
-                    <span className="project-repository-copy">
-                      <strong>Valia Deck</strong>
-                      <small>Open GitHub repository</small>
-                    </span>
-                    <span aria-hidden="true" className="project-record-arrow">↗</span>
-                  </a>
-                </section>
+                
                 <div className="project-record-list">
                 {visibleProjects.map((project) => (
                   <button className="project-record-item" key={project.id} onClick={() => void focusProjectOnMap(project)} type="button">
