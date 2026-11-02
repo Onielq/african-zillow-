@@ -4564,14 +4564,19 @@ input {
   position: absolute;
   z-index: 18;
   top: 70px;
-  bottom: 18px;
   left: 18px;
+  right: auto;
+  bottom: auto;
   display: flex;
   width: min(1120px, calc(100% - 456px));
+  height: calc(100% - 88px);
   min-width: min(760px, calc(100% - 36px));
-  min-height: 0;
+  min-height: 320px;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
   flex-direction: column;
   overflow: hidden;
+  resize: both;
   border: 1px solid rgb(220 228 222 / 96%);
   border-radius: 16px;
   background: #fff;
@@ -4589,6 +4594,13 @@ input {
   padding: 11px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.valia-project-report-window-header-dragging {
+  cursor: grabbing;
 }
 
 .valia-project-report-window-title {
@@ -4622,6 +4634,14 @@ input {
   line-height: 1.35;
 }
 
+.valia-project-report-window-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.valia-project-report-window-minimize,
 .valia-project-report-window-close {
   display: grid;
   width: 34px;
@@ -4635,8 +4655,10 @@ input {
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
+.valia-project-report-window-minimize:hover,
 .valia-project-report-window-close:hover {
   border-color: var(--border-strong);
   background: var(--surface-muted);
@@ -4668,10 +4690,33 @@ input {
   transform-origin: top left;
 }
 
+.valia-project-report-window-minimized {
+  width: min(320px, calc(100% - 16px)) !important;
+  height: 68px !important;
+  min-width: min(260px, calc(100% - 16px)) !important;
+  min-height: 68px !important;
+  max-width: calc(100% - 16px) !important;
+  max-height: 68px !important;
+  resize: none !important;
+  border-radius: 14px;
+}
+
+.valia-project-report-window-minimized .valia-project-report-window-header {
+  height: 66px;
+  min-height: 66px;
+  padding: 9px 12px;
+  border-bottom: 0;
+}
+
+.valia-project-report-window-minimized .valia-project-report-window-title span,
+.valia-project-report-window-minimized .valia-project-report-scroll {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .valia-project-report-window {
     width: min(1000px, calc(100% - 36px));
-    min-width: 0;
+    min-width: min(560px, calc(100% - 36px));
   }
 }
 
@@ -4682,7 +4727,12 @@ input {
     bottom: 8px;
     left: 8px;
     width: auto;
+    height: auto;
     min-width: 0;
+    min-height: 260px;
+    max-width: none;
+    max-height: none;
+    resize: none;
     border-radius: 12px;
   }
 
