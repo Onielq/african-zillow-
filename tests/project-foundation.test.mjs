@@ -435,8 +435,10 @@ test("developer drawer renders only sourced logo assets and expands public agent
   const developerData = await readProjectFile("src/data/developer-directory.ts");
   const directoryData = await readProjectFile("src/data/real-estate-directory.ts");
 
-  assert.match(experience, /directory-logo-image/);
+  assert.match(experience, /BrandImage/);
   assert.match(experience, /candidate\.logoUrl/);
+  assert.match(experience, /websiteFaviconUrl/);
+  assert.match(experience, /loading="lazy"/);
   assert.match(developerData, /https:\/\/delta-rwanda\.com\/assets\/delta-developers/);
   assert.match(developerData, /pbs\.twimg\.com\/profile_images/);
   assert.match(directoryData, /Arstide Yves Horimbere/);
@@ -541,7 +543,14 @@ test("cell selection offers UPI parcel inventory and zoom-to-parcel navigation",
   assert.match(experience, /parcel\.upi/);
   assert.match(parcelRoute, /returnIdsOnly: "true"/);
   assert.match(parcelRoute, /upi IS NOT NULL/);
-  assert.match(parcelRoute, /MAX_PARCELS_PER_CELL/);
+  assert.match(parcelRoute, /DEFAULT_PAGE_SIZE/);
+  assert.match(parcelRoute, /MAX_PAGE_SIZE/);
+  assert.match(parcelRoute, /nextPage/);
+  assert.match(parcelRoute, /hasMore/);
+  assert.doesNotMatch(parcelRoute, /for \(let offset = 0; offset < selectedIds.length/);
+  assert.match(experience, /loadMoreCellParcels/);
+  assert.match(experience, /cell-parcel-load-more/);
+  assert.match(experience, /cell-parcel-skeleton-list/);
   assert.match(parcelRoute, /returnGeometry: "true"/);
   assert.match(mapView, /const showOutline = index === activeIndex/);
   assert.match(css, /\.cell-parcel-row/);
@@ -1104,4 +1113,39 @@ test("place search is case-insensitive for administrative names and cell parcel 
   assert.match(areasRoute, /if \(features\.length >= 25 && depth < 3 && budget\.remaining >= 64/);
   assert.match(areasRoute, /if \(depth >= 2 \|\| area <= 0\.00002\)/);
   assert.match(areasRoute, /Retrying cadastral parcel GIS tile with smaller bounds/);
+});
+
+
+test("directory images are lazy, optimized and have honest visual fallbacks", async () => {
+  const imageComponent = await readProjectFile("src/components/directories/BrandImage.tsx");
+  const imageRoute = await readProjectFile("src/app/api/images/transform/route.ts");
+  const assets = await readProjectFile("src/lib/brand-assets.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const directory = await readProjectFile("src/components/directories/DirectoryLandingPage.tsx");
+  const css = await readProjectFile("src/app/globals.css");
+  assert.match(imageComponent, /loading="lazy"/);
+  assert.match(imageComponent, /decoding="async"/);
+  assert.match(imageComponent, /brand-image-skeleton/);
+  assert.match(imageComponent, /brand-image-initials/);
+  assert.match(imageRoute, /ALLOWED_IMAGE_HOSTS/);
+  assert.match(imageRoute, /cf:/);
+  assert.match(imageRoute, /format/);
+  assert.match(imageRoute, /s-maxage=2592000/);
+  assert.match(assets, /optimizedBrandImageUrl/);
+  assert.match(experience, /developerBrandImage/);
+  assert.match(experience, /visibleProjects/);
+  assert.match(experience, /visibleProjectDevelopers/);
+  assert.match(directory, /candidateOrganization/);
+  assert.match(css, /brand-image-skeleton/);
+  assert.match(css, /prefers-reduced-motion/);
+});
+
+test("dense final parcel tiles retrieve object IDs in bounded concurrent batches", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/route.ts");
+  assert.match(route, /queryParcelObjectIds/);
+  assert.match(route, /queryParcelFeaturesByIds/);
+  assert.match(route, /objectIds\?: string/);
+  assert.match(route, /batchSize = 100/);
+  assert.match(route, /workerCount = Math.min\(4/);
+  assert.match(route, /remaining: 1600/);
 });
