@@ -53,6 +53,106 @@ type PropertyScope = "all" | "land" | "apartment" | "villa";
 type AnalysisPeriod = "3m" | "6m" | "12m";
 type DirectoryTab = "developers" | "agencies" | "agents";
 
+type UnifiedDeveloperRecord = {
+  id: string;
+  name: string;
+  base: string | null;
+  focus: string | null;
+  logoUrl?: string;
+  website?: string;
+  projectIds: string[];
+};
+
+function developerIdentityKey(value: string): string | null {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  if (!normalized || normalized.includes("multiple developers") || normalized === "government housing program") {
+    return null;
+  }
+  if (normalized.includes("remote group")) return "remote-group-remote-estate";
+  if (normalized.includes("ultimate developers")) return "ultimate-developers-ltd";
+  if (normalized.includes("rwanda housing authority") || normalized === "rha") return "rwanda-housing-authority-rha";
+  if (normalized.includes("rwanda social security board") || normalized === "rssb" || normalized.startsWith("rssb ")) {
+    return "rwanda-social-security-board-rssb";
+  }
+  if (normalized.includes("gc investment")) return "gc-investment-ltd";
+  if (normalized.includes("reportage")) return "reportage-rwanda-reportage-properties";
+  if (normalized.includes("delta developers") || normalized.includes("fortico")) return "delta-developers-fortico-group";
+  if (normalized.includes("groupe palmeraie")) return "groupe-palmeraie-developpement";
+  if (normalized.includes("duval great lakes") || normalized.includes("groupe duval")) return "duval-great-lakes-groupe-duval";
+  if (normalized.includes("brilliant development")) return "brilliant-development-co-ltd";
+  if (normalized.includes("belle ville")) return "belle-ville-groupe";
+  if (normalized.includes("homart")) return "homart-properties";
+  if (normalized.includes("adhi rwanda")) return "adhi-rwanda-ltd";
+  if (normalized.includes("imara properties")) return "imara-properties";
+  if (normalized.includes("see far housing")) return "see-far-housing-ltd";
+  if (normalized.includes("fortis green")) return "fortis-green-housing";
+  if (normalized.includes("savannah creek")) return "savannah-creek-development-company";
+  if (normalized.includes("ramba real estate")) return "ramba-real-estate-ltd";
+  if (normalized.includes("evergreen investment")) return "evergreen-investment";
+  if (normalized.includes("urukumbuzi")) return "urukumbuzi-ltd";
+  if (normalized.includes("abadahigwa kuntego")) return "abadahigwa-kuntego-ltd";
+  if (normalized.includes("nextgen developers")) return "nextgen-developers";
+  return normalized.replace(/\s+/g, "-");
+}
+
+const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
+  const records = new Map<string, UnifiedDeveloperRecord>();
+  const add = (
+    name: string,
+    details: { base?: string | null; focus?: string | null; logoUrl?: string; website?: string; preferName?: boolean } = {}
+  ) => {
+    const id = developerIdentityKey(name);
+    if (!id) return null;
+    const existing = records.get(id);
+    if (existing) {
+      if (details.preferName) existing.name = name;
+      existing.base = existing.base ?? details.base ?? null;
+      existing.focus = existing.focus ?? details.focus ?? null;
+      existing.logoUrl = existing.logoUrl ?? details.logoUrl;
+      existing.website = existing.website ?? details.website;
+      return existing;
+    }
+    const record: UnifiedDeveloperRecord = {
+      id,
+      name,
+      base: details.base ?? null,
+      focus: details.focus ?? null,
+      logoUrl: details.logoUrl,
+      website: details.website,
+      projectIds: []
+    };
+    records.set(id, record);
+    return record;
+  };
+
+  add("Taiseel Development", { focus: "Real estate development", preferName: true });
+  for (const developer of RWANDA_PROJECT_DEVELOPERS) {
+    add(developer.name, { base: developer.base, focus: developer.focus });
+  }
+  for (const developer of RWANDA_DEVELOPER_CANDIDATES) {
+    add(developer.name, {
+      focus: developer.segment,
+      logoUrl: developer.logoUrl,
+      website: developer.website,
+      preferName: true
+    });
+  }
+  for (const project of RWANDA_PROJECT_RECORDS) {
+    const developer = add(project.developer);
+    if (developer && !developer.projectIds.includes(project.id)) developer.projectIds.push(project.id);
+  }
+
+  return [...records.values()].sort((a, b) => a.name.localeCompare(b.name, "en"));
+})();
+
 type LandPriceRow = {
   sourceLine: number;
   province: string | null;
@@ -602,9 +702,10 @@ export function MapExperience() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [projectDirectoryTab, setProjectDirectoryTab] = useState<ProjectDirectoryTab>("projects");
   const [projectSearch, setProjectSearch] = useState("");
+  const [selectedProjectDeveloperId, setSelectedProjectDeveloperId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
-  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks", "healthEducation", "transportation", "nature"]);
+  const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks"]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [directorySearch, setDirectorySearch] = useState("");
@@ -654,12 +755,15 @@ export function MapExperience() {
     ? RWANDA_PROJECT_RECORDS.find((project) => project.id === selectedProjectId) ?? null
     : null;
   const normalizedProjectSearch = projectSearch.trim().toLocaleLowerCase("en");
-  const filteredProjects = RWANDA_PROJECT_RECORDS.filter((project) =>
-    !normalizedProjectSearch ||
-    [project.name, project.developer, project.owner, project.category, project.district, project.sector]
-      .filter(Boolean).join(" ").toLocaleLowerCase("en").includes(normalizedProjectSearch)
-  );
-  const filteredProjectDevelopers = RWANDA_PROJECT_DEVELOPERS.filter((developer) =>
+  const filteredProjects = RWANDA_PROJECT_RECORDS.filter((project) => {
+    if (selectedProjectDeveloperId) {
+      return developerIdentityKey(project.developer) === selectedProjectDeveloperId;
+    }
+    return !normalizedProjectSearch ||
+      [project.name, project.developer, project.owner, project.category, project.district, project.sector]
+        .filter(Boolean).join(" ").toLocaleLowerCase("en").includes(normalizedProjectSearch);
+  });
+  const filteredProjectDevelopers = UNIFIED_DEVELOPER_DIRECTORY.filter((developer) =>
     !normalizedProjectSearch ||
     [developer.name, developer.base, developer.focus].filter(Boolean).join(" ")
       .toLocaleLowerCase("en").includes(normalizedProjectSearch)
@@ -1083,10 +1187,10 @@ export function MapExperience() {
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
   const visibleComparisonSearchResults = comparisonSearchResults;
   const normalizedDirectorySearch = directorySearch.trim().toLocaleLowerCase();
-  const visibleDeveloperCandidates = [
-    { id: "taiseel-development", name: "Taiseel Development", logoUrl: undefined },
-    ...RWANDA_DEVELOPER_CANDIDATES
-  ].filter((candidate) => candidate.name.toLocaleLowerCase().includes(normalizedDirectorySearch));
+  const visibleDeveloperCandidates = UNIFIED_DEVELOPER_DIRECTORY.filter((developer) =>
+    [developer.name, developer.focus, developer.base].filter(Boolean).join(" ")
+      .toLocaleLowerCase("en").includes(normalizedDirectorySearch)
+  );
   const visibleAgencies = [
     { id: "taiseel-resident", name: "Taiseel Resident" },
     ...RWANDA_REAL_ESTATE_AGENCIES
@@ -1787,7 +1891,7 @@ export function MapExperience() {
               }}
               type="button"
             >
-              Developers <span className="toolbar-count">20</span>
+              Developers <span className="toolbar-count">{UNIFIED_DEVELOPER_DIRECTORY.length}</span>
             </button>
             <button
               aria-expanded={projectsOpen}
@@ -2084,10 +2188,6 @@ export function MapExperience() {
                 ))}
               </div>
             ) : null}
-            <p className="directory-evidence-note">
-              Public websites are discovery leads, not verification of current licensing, affiliation, or availability.
-              No “top agent” ranking published.
-            </p>
           </aside>
         ) : null}
 
@@ -2097,7 +2197,6 @@ export function MapExperience() {
               <div>
                 <p className="panel-eyebrow">TAISEEL / PROJECT INTELLIGENCE</p>
                 <h2>Projects on the map</h2>
-                <p className="directory-drawer-subtitle">{RWANDA_PROJECT_RECORDS.length} developments · {RWANDA_PROJECT_DEVELOPERS.length} developers</p>
               </div>
               <button aria-label="Close projects panel" className="panel-close" onClick={() => setProjectsOpen(false)} type="button">×</button>
             </div>
@@ -2106,7 +2205,7 @@ export function MapExperience() {
               <span className="sr-only">Search projects or developers</span>
               <input
                 aria-label="Search projects or developers"
-                onChange={(event) => { setProjectSearch(event.target.value); setSelectedProjectId(null); }}
+                onChange={(event) => { setProjectSearch(event.target.value); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }}
                 placeholder="Search a project or developer"
                 type="search"
                 value={projectSearch}
@@ -2114,8 +2213,8 @@ export function MapExperience() {
             </label>
 
             <div className="project-directory-tabs" role="tablist" aria-label="Project directory sections">
-              <button aria-selected={projectDirectoryTab === "projects"} className={projectDirectoryTab === "projects" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} role="tab" type="button">Projects <span>{filteredProjects.length}</span></button>
-              <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setSelectedProjectId(null); }} role="tab" type="button">Developers <span>{filteredProjectDevelopers.length}</span></button>
+              <button aria-selected={projectDirectoryTab === "projects"} className={projectDirectoryTab === "projects" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("projects"); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Projects</button>
+              <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Developers</button>
             </div>
 
             {selectedProject ? (
@@ -2157,16 +2256,15 @@ export function MapExperience() {
             ) : (
               <div className="project-developer-list">
                 {filteredProjectDevelopers.map((developer) => (
-                  <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(developer.name); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
+                  <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(""); setSelectedProjectDeveloperId(developer.id); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
                     <span className="project-developer-monogram">{initialsForName(developer.name)}</span>
-                    <span><strong>{developer.name}</strong><small>{developer.focus || developer.base || "Developer record"}</small></span>
+                    <span><strong>{developer.name}</strong><small>{developer.projectIds.length ? developer.projectIds.length + " linked projects" : developer.focus || developer.base || "Developer record"}</small></span>
                     <span className="project-record-arrow">→</span>
                   </button>
                 ))}
                 {filteredProjectDevelopers.length === 0 ? <p className="project-directory-empty">No developer matches that search.</p> : null}
               </div>
             )}
-            <p className="project-directory-footnote">A project marker uses the best location currently recorded. Selecting the project takes you to its parcel, address, sector or district when that geography is connected.</p>
           </aside>
         ) : null}
 
@@ -2200,7 +2298,7 @@ export function MapExperience() {
               <div className="metric-info-status">
                 <strong>Project register</strong>
                 <p>
-                  {RWANDA_PROJECT_RECORDS.length} project records and {RWANDA_PROJECT_DEVELOPERS.length} developer records are connected to this workspace. Pins use parcel, address, sector or district precision according to the record.
+                  Project and developer profiles share one directory. Pins use parcel, address, sector or district precision according to each project record.
                 </p>
                 <p>
                   Select Projects in the map toolbar to search and inspect the full register without leaving the map.

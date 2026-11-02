@@ -455,13 +455,28 @@ try {
     return map?.getPaintProperty("parcel-fill", "fill-opacity") ?? null;
   });
   if (parcelFillOpacity !== 0.006) {
-    throw new Error("Selected parcel fills must remain transparent; the selection glow belongs on its outline only.");
+    throw new Error("Selected parcel fills must remain transparent; the thin cyan outline indicates selection.");
   }
-  const parcelGlowCheck = {
+  const parcelOutlineWidth = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return map?.getPaintProperty("parcel-outline", "line-width") ?? null;
+  });
+  const hasParcelGlowLayer = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map?.getLayer("parcel-outline-glow"));
+  });
+  if (parcelOutlineWidth !== 1.05) {
+    throw new Error("Parcel outlines must use the same thin 1.05px stroke as administrative boundaries.");
+  }
+  if (hasParcelGlowLayer) {
+    throw new Error("Parcel glow layer must be removed.");
+  }
+  const parcelHighlightCheck = {
     source: parcelHoverTarget.source,
     featureId: parcelHoverTarget.id,
-    glowActivatedOnClick: true,
-    glowPersistedAfterPointerLeave: true,
+    selectionPersistsAfterPointerLeave: true,
+    outlineWidth: parcelOutlineWidth,
+    glowLayerPresent: hasParcelGlowLayer,
     priceMarkerTurnedBlueWithParcel: true,
     bothResetAfterUnrelatedClick: true,
     parcelFillOpacity,
@@ -563,7 +578,7 @@ try {
       };
     };
     const boundaryLayers = map.getStyle().layers
-      .filter((layer) => /^(district|sector|cell|village|parcel)-(fill|outline|label)$/.test(layer.id) || layer.id === "parcel-outline-casing")
+      .filter((layer) => /^(district|sector|cell|village|parcel)-(fill|outline|label)$/.test(layer.id))
       .map((layer) => ({
         id: layer.id,
         type: layer.type,
@@ -608,7 +623,7 @@ try {
     ...result,
     initialOverlayCheck,
     hierarchyHoverChecks,
-    parcelGlowCheck,
+    parcelHighlightCheck,
     directParcelApi,
     removedPanelCount,
     exploreAreaTextCount,
