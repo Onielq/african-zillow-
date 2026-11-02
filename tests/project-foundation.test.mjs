@@ -723,7 +723,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
   assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
-  assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.92 : 0\.90/);
+  assert.match(mapView, /"line-opacity": \[\s*"case"[\s\S]*?level === "parcel" \? 0\.95 : 0\.92/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
