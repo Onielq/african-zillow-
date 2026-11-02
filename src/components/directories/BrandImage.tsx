@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { optimizedBrandImageUrl, type BrandImageFit } from "@/lib/brand-assets";
 
 type BrandImageProps = {
@@ -22,7 +22,13 @@ function initialsForName(name: string): string {
     .toUpperCase();
 }
 
-export function BrandImage({
+export function BrandImage(props: BrandImageProps) {
+  // Remount the small visual state when an item changes instead of resetting
+  // React state in an effect. This avoids an extra render for every recycled row.
+  return <BrandImageContent key={props.name + "|" + (props.source ?? "")} {...props} />;
+}
+
+function BrandImageContent({
   name,
   source,
   className,
@@ -32,11 +38,6 @@ export function BrandImage({
 }: BrandImageProps) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(!source);
-
-  useEffect(() => {
-    setLoaded(false);
-    setFailed(!source);
-  }, [source]);
 
   return (
     <span

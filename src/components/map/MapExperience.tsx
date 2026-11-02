@@ -1517,11 +1517,6 @@ export function MapExperience() {
   }, [directorySearch]);
 
   useEffect(() => {
-    setProjectVisibleCount(24);
-    setProjectDeveloperVisibleCount(24);
-  }, [debouncedProjectSearch, selectedProjectDeveloperId, projectDirectoryTab]);
-
-  useEffect(() => {
     const level = selectedArea?.level;
     const district = selectedArea?.district;
     const sector = selectedArea?.sector;
@@ -1532,14 +1527,6 @@ export function MapExperience() {
     const lookupKey = [district, sector, cell].join("|");
     cellParcelsMoreRequestRef.current?.abort();
     cellParcelsMoreRequestRef.current = null;
-    setCellParcelsLookupKey(lookupKey);
-    setCellParcels([]);
-    setCellParcelsPage(1);
-    setCellParcelsHasMore(false);
-    setCellParcelsLoadingMore(false);
-    setCellParcelsMoreError(false);
-    setCellParcelsStatus("loading");
-
     const loadCellParcels = async () => {
       try {
         const params = new URLSearchParams({ district, sector, cell, page: "1", pageSize: "100" });
@@ -1551,8 +1538,10 @@ export function MapExperience() {
         if (controller.signal.aborted) return;
         setCellParcels(payload.parcels ?? []);
         setCellParcelsTotal(payload.totalSourceRecords ?? payload.returnedRecords ?? 0);
+        setCellParcelsLookupKey(lookupKey);
         setCellParcelsPage(payload.page ?? 1);
         setCellParcelsHasMore(payload.hasMore ?? false);
+        setCellParcelsMoreError(false);
         setCellParcelsStatus("loaded");
       } catch {
         if (controller.signal.aborted) return;
@@ -1611,14 +1600,14 @@ export function MapExperience() {
     } finally {
       if (cellParcelsMoreRequestRef.current === controller) {
         cellParcelsMoreRequestRef.current = null;
-        setCellParcelsLoadingMore(false);
       }
+      setCellParcelsLoadingMore(false);
     }
   }, [
     selectedArea?.level,
     selectedArea?.district,
     selectedArea?.sector,
-    selectedArea?.name,
+    selectedArea,
     cellParcelsPage,
     cellParcelsHasMore,
     cellParcelsLoadingMore
@@ -2311,7 +2300,13 @@ export function MapExperience() {
               <span className="sr-only">Search projects or developers</span>
               <input
                 aria-label="Search projects or developers"
-                onChange={(event) => { setProjectSearch(event.target.value); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }}
+                onChange={(event) => {
+                  setProjectSearch(event.target.value);
+                  setProjectVisibleCount(24);
+                  setProjectDeveloperVisibleCount(24);
+                  setSelectedProjectDeveloperId(null);
+                  setSelectedProjectId(null);
+                }}
                 placeholder="Search a project or developer"
                 type="search"
                 value={projectSearch}
@@ -2319,8 +2314,8 @@ export function MapExperience() {
             </label>
 
             <div className="project-directory-tabs" role="tablist" aria-label="Project directory sections">
-              <button aria-selected={projectDirectoryTab === "projects"} className={projectDirectoryTab === "projects" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("projects"); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Projects</button>
-              <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Developers</button>
+              <button aria-selected={projectDirectoryTab === "projects"} className={projectDirectoryTab === "projects" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("projects"); setProjectVisibleCount(24); setProjectDeveloperVisibleCount(24); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Projects</button>
+              <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setProjectVisibleCount(24); setProjectDeveloperVisibleCount(24); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Developers</button>
             </div>
 
             {selectedProject ? (
@@ -2383,7 +2378,7 @@ export function MapExperience() {
             ) : (
               <div className="project-developer-list">
                 {visibleProjectDevelopers.map((developer) => (
-                  <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(""); setSelectedProjectDeveloperId(developer.id); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
+                  <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(""); setProjectVisibleCount(24); setProjectDeveloperVisibleCount(24); setSelectedProjectDeveloperId(developer.id); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
                     <BrandImage
                       name={developer.name}
                       source={developer.imageUrl}
