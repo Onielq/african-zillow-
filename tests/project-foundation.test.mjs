@@ -1114,6 +1114,9 @@ test("projects and developers share one linked in-map directory and parcel ident
   assert.match(css, /\.project-record-list/);
   assert.match(css, /\.project-directory-detail/);
   assert.match(css, /\.project-identity-inline/);
+  assert.match(experience, /aria-label="Valia Deck GitHub repository"/);
+  assert.match(experience, /https:\/\/github\.com\/Onielq\/valia-deck/);
+  assert.match(css, /\.project-repository-section/);
 });
 
 
