@@ -99,7 +99,7 @@ test("the map view progressively switches administrative levels and increases bo
 test("cadastral outlines and parcel geometry are active from village zoom", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.match(mapView, /featureViewportVerticalRatio\(map, collections\.village\)/);
+  assert.match(mapView, /villageMeasurement\.areaSpanMeters \/ villageMeasurement\.viewportSpanMeters/);
   assert.match(mapView, /villageRatio < parcelThreshold/);
   assert.match(mapView, /parcelThreshold = previousIndex >= AREA_LEVELS\.indexOf\("parcel"\)/);
   assert.match(mapView, /const showParcelBoundaries = activeIndex >= villageIndex/);
@@ -772,7 +772,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
-  assert.match(mapView, /featureViewportVerticalRatio\(map, collections\.village\)/);
+  assert.match(mapView, /villageMeasurement\.areaSpanMeters \/ villageMeasurement\.viewportSpanMeters/);
   assert.match(mapView, /activeIndex <= AREA_LEVELS\.indexOf\("village"\)/);
   assert.match(mapView, /shouldPrefetchNextLevel\(map, activeLevel, areaDataRef\.current\[activeLevel\]\)/);
   assert.match(mapView, /shouldPrefetchNextLevel\(map, settledLevel, areaDataRef\.current\[settledLevel\]\)/);
