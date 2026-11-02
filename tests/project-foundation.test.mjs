@@ -57,8 +57,8 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /fitBounds/);
   assert.match(mapView, /setFeatureState/);
   assert.match(mapView, /0\.2/);
-  assert.match(mapView, /0\.46/);
-  assert.match(mapView, /0\.44/);
+  assert.match(mapView, /0\.18/);
+  assert.match(mapView, /0\.14/);
   assert.match(mapView, /0\.10/);
   assert.match(mapView, /0\.5/);
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
@@ -112,7 +112,7 @@ test("parcel boundary requests preserve source vertices and use a precise viewpo
   assert.match(route, /do not set maxAllowableOffset/i);
   assert.match(route, /returnGeometry: "true"/);
   assert.match(mapView, /toFixed\(6\)\)\.join\(","\)/);
-  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85/);
+  assert.match(mapView, /"line-width": 1\.05/);
   assert.match(mapView, /feature-state.*selected/s);
 });
 
@@ -199,7 +199,7 @@ test("the investment workspace exposes six metrics, property scope, and period f
   assert.match(experience, /aria-label="Analysis period"/);
   assert.match(experience, /time series is not connected and validated here/i);
   assert.match(experience, /Project register/);
-  assert.match(experience, /RWANDA_PROJECT_RECORDS\.length/);
+  assert.match(experience, /Project and developer profiles share one directory/);
 });
 
 test("area comparison supports an unrestricted mixed set without fabricating unavailable metrics", async () => {
@@ -398,8 +398,8 @@ test("developer popup separates developer candidates, agencies and public agent 
   assert.match(experience, /Developers &amp; agents/);
   assert.match(experience, /RWANDA_REAL_ESTATE_AGENCIES/);
   assert.match(experience, /RWANDA_PUBLIC_AGENT_CANDIDATES/);
-  assert.match(experience, /Public websites are discovery leads/);
-  assert.match(experience, /No “top agent” ranking published/);
+  assert.match(experience, /UNIFIED_DEVELOPER_DIRECTORY/);
+  assert.doesNotMatch(experience, /directory-evidence-note/);
   assert.match(developerData, /https:\/\/delta-rwanda\.com/);
   assert.match(agencyData, /https:\/\/homeland\.rw/);
 });
@@ -419,7 +419,8 @@ test("developer drawer renders only sourced logo assets and expands public agent
   assert.match(directoryData, /Yassin Musabyimana/);
   assert.match(directoryData, /Gustave Niyonkuru/);
   assert.match(directoryData, /IZERE IRAKIZA Aime Johnson/);
-  assert.match(experience, /No “top agent” ranking published/);
+  assert.match(experience, /UNIFIED_DEVELOPER_DIRECTORY/);
+  assert.doesNotMatch(experience, /directory-evidence-note/);
 });
 
 
@@ -659,7 +660,8 @@ test("map hover and metric bubbles follow the selected indicator at each adminis
   const metrics = await readProjectFile("src/app/api/geography/metric-bubbles/route.ts");
 
   assert.match(mapView, /feature-state.*hover/s);
-  assert.match(mapView, /#4FD58A/);
+  assert.match(mapView, /#63BECE/);
+  assert.match(mapView, /#35B5CA/);
   assert.match(mapView, /VILLAGE_ZOOM = 16\.2/);
   assert.match(mapView, /metric-bubbles-circle/);
   assert.match(mapView, /selectedMetricRef/);
@@ -720,9 +722,8 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.doesNotMatch(mapView, /"circle-radius": \[\s*"case"[\s\S]{0,200}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
-  assert.match(mapView, /"line-width": \[\s*"case",\s*\["boolean", \["feature-state", "selected"\], false\]/);
   assert.match(mapView, /"line-width": 1\.05/);
-  assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.98 : 0\.94/);
+  assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.92 : 0\.90/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
@@ -872,17 +873,13 @@ test("parcel availability is never invented when no verified listing source is c
   assert.match(css, /\.parcel-market-status-inline-off-market/);
 });
 
-test("parcel outlines keep a high-contrast casing above road and zoning overlays", async () => {
+test("parcel outlines stay thin and have no glow or casing above road and zoning overlays", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing/);
-  assert.match(mapView, /"line-color": \[/);
-  assert.match(mapView, /"#1C2935"/);
-  assert.match(mapView, /"line-width": \[/);
-  assert.match(mapView, /VILLAGE_ZOOM, 1\.8/);
-  assert.match(mapView, /PARCEL_ZOOM \+ 3\.85, 3\.2/);
+  assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
+  assert.match(mapView, /"line-width": 1\.05/);
+  assert.match(mapView, /"#35B5CA"/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
-  assert.doesNotMatch(mapView, /"line-width": \[\s*"case"[\s\S]{0,500}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
   assert.match(mapView, /map\.moveLayer\(layerId\)/);
   assert.match(mapView, /keepParcelBoundariesAndMarkersAboveContext\(\);/);
@@ -962,14 +959,10 @@ test("the geography API uses build-time transaction rows, not request-time files
   assert.match(generator, /Generated/);
 });
 
-test("optional parcel casing is added only after required outline layers", async () => {
+test("parcel boundary styling uses one thin stroke and does not create a casing layer", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  const outlineLoop = mapView.indexOf("if (map.getLayer(layer.outline)) continue;");
-  const casingAttempt = mapView.indexOf("Optional parcel outline casing unavailable; primary parcel outlines remain active.");
-
-  assert.ok(outlineLoop >= 0, "primary administrative and parcel outlines must be created");
-  assert.ok(casingAttempt > outlineLoop, "optional casing is initialized after the primary outline loop");
-  assert.match(mapView, /if \(!map\.getLayer\(PARCEL_OUTLINE_CASING_LAYER\) && map\.getLayer\(AREA_LAYERS\.parcel\.outline\)\)/);
+  assert.match(mapView, /"line-width": 1\.05/);
+  assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
 });
 
 test("global search returns navigable areas, resolves addresses on submit and highlights selected parcels cyan", async () => {
@@ -1011,8 +1004,8 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(experience.includes("mapInstance.flyTo"));
   assert.ok(experience.includes("selectedArea={selectedArea}"));
   assert.ok(!experience.includes('href="/contact"'));
-  assert.ok(mapView.includes('"#00F0FF"'));
-  assert.ok(mapView.includes('"#126347"'));
+  assert.ok(mapView.includes('"#35B5CA"'));
+  assert.ok(mapView.includes('"#40B5C9"'));
   assert.ok(mapView.includes("selectionSyncRef.current?.(selectedAreaRef.current)"));
   assert.ok(css.includes(".global-area-search-field"));
   assert.ok(css.includes(".global-area-search-results"));
