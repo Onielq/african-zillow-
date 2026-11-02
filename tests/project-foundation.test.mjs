@@ -36,8 +36,9 @@ test("administrative detail uses the dominant width-or-height footprint and pref
   assert.match(mapView, /function geometryContainsPoint\(/);
   assert.match(mapView, /function polygonRingsContainingPoint\(/);
   assert.match(mapView, /function featureViewportFootprintRatio\(/);
-  assert.match(mapView, /map\.getContainer\(\)\.clientWidth/);
-  assert.match(mapView, /map\.getContainer\(\)\.clientHeight/);
+  assert.match(mapView, /const container = map\.getContainer\(\)/);
+  assert.match(mapView, /const mapWidth = container\.clientWidth/);
+  assert.match(mapView, /const mapHeight = container\.clientHeight/);
   assert.match(mapView, /map\.project\(position\)\.x/);
   assert.match(mapView, /map\.project\(position\)\.y/);
   assert.match(mapView, /const featureWidth = Math\.max\(0, maxX - minX\)/);
