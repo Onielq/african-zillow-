@@ -903,8 +903,6 @@ function activeAreaLevelForMap(
   previousLevel: AreaLevel
 ): AreaLevel {
   const zoom = map.getZoom();
-  if (zoom >= PARCEL_ZOOM) return "parcel";
-  if (zoom >= VILLAGE_ZOOM) return "village";
 
   const previousIndex = AREA_LEVELS.indexOf(previousLevel);
   const transitionThreshold = (childLevel: AreaLevel) =>
@@ -924,7 +922,7 @@ function activeAreaLevelForMap(
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
-  return "village";
+  return zoom >= PARCEL_ZOOM ? "parcel" : "village";
 }
 
 function zoomForLevel(level: AreaLevel): number {
@@ -1326,11 +1324,12 @@ export function MapView({
     activeBasemapModeRef.current = "map";
     activeAreaLevelRef.current = activeAreaLevel(map.getZoom());
 
-    const getActiveAreaLevel = () => {
+    const resolveActiveAreaLevel = () => {
       const level = activeAreaLevelForMap(map, areaDataRef.current, activeAreaLevelRef.current);
       activeAreaLevelRef.current = level;
       return level;
     };
+    const getActiveAreaLevel = () => activeAreaLevelRef.current;
 
     // Read-only browser smoke-test hook. It is enabled only for an explicit
     // e2e query parameter and is removed when this map instance is disposed.
@@ -2677,6 +2676,7 @@ export function MapView({
     };
 
     const updateLayerVisibility = () => {
+      resolveActiveAreaLevel();
       const activeLevel = getActiveAreaLevel();
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const villageIndex = AREA_LEVELS.indexOf("village");
