@@ -43,7 +43,10 @@ test("administrative detail advances at 110% vertical viewport fill and prefetch
   assert.match(mapView, /transitionThreshold\("sector"\)/);
   assert.match(mapView, /transitionThreshold\("cell"\)/);
   assert.match(mapView, /transitionThreshold\("village"\)/);
+  assert.doesNotMatch(mapView, /if \(zoom >= VILLAGE_ZOOM\) return "village"/);
   assert.match(mapView, /activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
+  assert.match(mapView, /settledFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
+  assert.match(mapView, /!requestedLevels\.includes\(settledNextLevel\)/);
   assert.match(mapView, /requestedLevels\.push\(nextLevel\)/);
 });
 
