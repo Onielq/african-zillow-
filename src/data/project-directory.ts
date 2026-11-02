@@ -44,9 +44,11 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "units": 247,
     "landHa": null,
     "start": "2020",
-    "completion": "2022",
+    "completion": "May 2024",
     "sourceUrl": "https://www.rha.gov.rw/updates/news-details/ten-projects-expected-to-boost-efforts-meant-to-address-housing-units-demand-in-kigali",
+    "secondarySourceUrl": "https://bwiza.adhicorp.com/about-us/",
     "route": "Purchase and rental",
+    "imageUrl": "https://www.newtimes.co.rw/thenewtimes/uploads/images/2024/06/15/50760.jpg",
     "locationPrecision": "administrative-area"
   },
   {

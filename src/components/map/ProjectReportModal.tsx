@@ -49,16 +49,16 @@ export function ProjectReportModal({ projectName, onClose }: ProjectReportModalP
 
   return (
     <aside
-      aria-label={projectName + " project presentation"}
+      aria-label={projectName + " project study"}
       aria-modal="false"
       className="valia-project-report-window"
       role="dialog"
     >
       <header className="valia-project-report-window-header">
         <div className="valia-project-report-window-title">
-          <p>TAISEEL / PROJECT PRESENTATION</p>
+          <p>TAISEEL / PROJECT STUDY</p>
           <h2>{projectName}</h2>
-          <span>Original Valia Deck layout · embedded without redesign</span>
+          <span>Integrated five-page project study</span>
         </div>
         <button
           aria-label="Close project presentation"
@@ -88,7 +88,7 @@ export function ProjectReportModal({ projectName, onClose }: ProjectReportModalP
               height: deckHeight,
               transform: "scale(" + scale + ")"
             }}
-            title="Original five-page Valia project presentation"
+            title={projectName + " five-page project study"}
           />
         </div>
       </div>
