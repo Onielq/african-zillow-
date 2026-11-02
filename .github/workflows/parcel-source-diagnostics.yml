@@ -1,18 +1,9 @@
 name: Parcel source diagnostics
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "scripts/diagnose-parcel-sources.mjs"
-      - "scripts/diagnose-kigali-sample-upi.mjs"
-      - "scripts/smoke-test-parcel-api.mjs"
-      - "scripts/smoke-test-admin-path-search.mjs"
-      - "src/app/api/geography/areas/search/route.ts"
-      - "src/components/map/MapExperience.tsx"
-      - "src/app/api/geography/areas/route.ts"
-      - "src/components/map/MapView.tsx"
-      - ".github/workflows/parcel-source-diagnostics.yml"
+  workflow_run:
+    workflows: ["Cloudflare Workers"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -20,45 +11,38 @@ permissions:
 
 jobs:
   inspect-public-gis:
-    name: Inspect parcel service metadata and production API
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success') }}
+    name: Verify deployed parcel APIs and public GIS sources
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Check out source
+      - name: Check out the exact deployed commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
+
+      - name: Install application dependencies
         run: npm install --no-audit --no-fund
-      - name: Build production app
-        run: npm run build
-      - name: Smoke-test production APIs
+
+      - name: Smoke-test deployed administrative path search
         env:
-          APP_BASE_URL: http://127.0.0.1:3000
-        run: |
-          npm run start -- --hostname 127.0.0.1 > /tmp/parcel-app.log 2>&1 &
-          sleep 4
-          admin_status=0
-          parcel_status=0
-          node scripts/smoke-test-admin-path-search.mjs || admin_status=$?
-          node scripts/smoke-test-parcel-api.mjs || parcel_status=$?
-          if [ "$parcel_status" -ne 0 ]; then
-            tail -n 160 /tmp/parcel-app.log
-            exit "$parcel_status"
-          fi
-          if [ "$admin_status" -ne 0 ]; then
-            echo "::warning::Administrative path search smoke failed; parcel API smoke passed independently."
-            tail -n 160 /tmp/parcel-app.log
-            exit "$admin_status"
-          fi
-      # Run the public GIS probes even if the production smoke test fails;
-      # otherwise the first HTTP 502 masks whether the upstream parcel services
-      # themselves are slow, unavailable, or returning a different schema.
+          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+        run: node scripts/smoke-test-admin-path-search.mjs
+
+      - name: Smoke-test deployed parcel API
+        env:
+          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+        run: node scripts/smoke-test-parcel-api.mjs
+
       - name: Check sample Kigali UPI across published parcel layers (read-only)
         if: always()
         run: node scripts/diagnose-kigali-sample-upi.mjs
+
       - name: Probe public parcel endpoints (read-only)
         if: always()
         run: node scripts/diagnose-parcel-sources.mjs
