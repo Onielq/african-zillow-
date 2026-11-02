@@ -738,10 +738,10 @@ const HYBRID_STYLE: StyleSpecification = {
   ]
 };
 
-// Administrative detail advances when the parent polygon's dominant
-// screen-space dimension fills the matching map dimension. Wide areas use
-// map width; tall areas use map height. Child layers are prefetched at 85%.
-// Fixed zoom thresholds remain a fallback only while geometry is unavailable.
+// Administrative detail advances when the parent polygon's vertical
+// screen-space extent fills the map's vertical dimension. Measure only the
+// connected polygon containing the map centre. Child layers are prefetched
+// at 85%; fixed zoom thresholds are fallback only when geometry is unavailable.
 const ADMIN_FOOTPRINT_ENTER_RATIO = 1.10;
 const ADMIN_FOOTPRINT_EXIT_RATIO = 1.0;
 const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0.85;
@@ -873,14 +873,13 @@ function geometryContainsPoint(geometry: Geometry, point: [number, number]): boo
   return polygonRingsContainingPoint(geometry, point) !== null;
 }
 
-function featureViewportFootprintRatio(
+function featureViewportVerticalRatio(
   map: MapLibreMapInstance,
   collection: MapFeatureCollection | undefined
 ): number | null {
   const container = map.getContainer();
-  const mapWidth = container.clientWidth;
   const mapHeight = container.clientHeight;
-  if (!collection || mapWidth <= 0 || mapHeight <= 0) return null;
+  if (!collection || mapHeight <= 0) return null;
 
   const center = map.getCenter();
   const point: [number, number] = [center.lng, center.lat];
@@ -890,8 +889,7 @@ function featureViewportFootprintRatio(
   if (!feature?.geometry) return null;
 
   // For a MultiPolygon, measure only the connected polygon containing the
-  // map centre. A remote island must not make the whole administrative area
-  // appear larger than the visible region.
+  // map centre. A remote island must not distort the vertical footprint.
   const rings = polygonRingsContainingPoint(feature.geometry, point);
   if (!rings) return null;
 
@@ -899,32 +897,19 @@ function featureViewportFootprintRatio(
   collectPositions(rings, positions);
   if (positions.length === 0) return null;
 
-  let minX = Infinity;
-  let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
   for (const position of positions) {
     const projected = map.project(position);
-    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
-    minX = Math.min(minX, projected.x);
-    maxX = Math.max(maxX, projected.x);
+    if (!Number.isFinite(projected.y)) continue;
     minY = Math.min(minY, projected.y);
     maxY = Math.max(maxY, projected.y);
   }
 
-  if (![minX, maxX, minY, maxY].every(Number.isFinite)) return null;
+  if (![minY, maxY].every(Number.isFinite)) return null;
 
-  const featureWidth = Math.max(0, maxX - minX);
   const featureHeight = Math.max(0, maxY - minY);
-  // Choose the area's longer screen-space axis, then compare it with the
-  // matching viewport dimension. This keeps the threshold fair for both
-  // east-west and north-south administrative shapes.
-  const useWidth = featureWidth >= featureHeight;
-  const featureExtent = useWidth ? featureWidth : featureHeight;
-  const viewportExtent = useWidth ? mapWidth : mapHeight;
-  if (viewportExtent <= 0) return null;
-
-  return featureExtent / viewportExtent;
+  return featureHeight / mapHeight;
 }
 
 function activeAreaLevelForMap(
@@ -940,21 +925,21 @@ function activeAreaLevelForMap(
       ? ADMIN_FOOTPRINT_EXIT_RATIO
       : ADMIN_FOOTPRINT_ENTER_RATIO;
 
-  const districtRatio = featureViewportFootprintRatio(map, collections.district);
+  const districtRatio = featureViewportVerticalRatio(map, collections.district);
   if (districtRatio === null) return activeAreaLevel(zoom);
   if (districtRatio < transitionThreshold("sector")) return "district";
 
-  const sectorRatio = featureViewportFootprintRatio(map, collections.sector);
+  const sectorRatio = featureViewportVerticalRatio(map, collections.sector);
   if (sectorRatio === null) return "district";
   if (sectorRatio < transitionThreshold("cell")) return "sector";
 
-  const cellRatio = featureViewportFootprintRatio(map, collections.cell);
+  const cellRatio = featureViewportVerticalRatio(map, collections.cell);
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
   // Village polygons also vary in aspect ratio. Use their own dominant
   // dimension for the final parcel-detail handoff, with the same hysteresis.
-  const villageRatio = featureViewportFootprintRatio(map, collections.village);
+  const villageRatio = featureViewportVerticalRatio(map, collections.village);
   if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
   if (villageRatio < transitionThreshold("parcel")) return "village";
 
@@ -2901,7 +2886,7 @@ export function MapView({
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const requestedLevels: AreaLevel[] = AREA_LEVELS.slice(0, activeIndex + 1);
       const nextLevel = AREA_LEVELS[activeIndex + 1];
-      const activeFootprintRatio = featureViewportFootprintRatio(
+      const activeFootprintRatio = featureViewportVerticalRatio(
         map,
         areaDataRef.current[activeLevel]
       );
@@ -3193,7 +3178,7 @@ export function MapView({
           const settledLevel = getActiveAreaLevel();
           const settledIndex = AREA_LEVELS.indexOf(settledLevel);
           const settledNextLevel = AREA_LEVELS[settledIndex + 1];
-          const settledFootprintRatio = featureViewportFootprintRatio(
+          const settledFootprintRatio = featureViewportVerticalRatio(
             map,
             areaDataRef.current[settledLevel]
           );
