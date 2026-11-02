@@ -199,30 +199,71 @@ try {
   // highlight to the newly active district/sector/cell/village polygon.
   const hierarchyHoverChecks = [];
   const hoverLevels = [
-    { level: "district", zoom: 8.35, layer: "district-fill", source: "admin-districts" },
-    { level: "sector", zoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
-    { level: "cell", zoom: 15.5, layer: "cell-fill", source: "admin-cells" },
-    { level: "village", zoom: 16.6, layer: "village-fill", source: "admin-villages" }
+    { level: "district", startZoom: 8.35, layer: "district-fill", source: "admin-districts" },
+    { level: "sector", startZoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
+    { level: "cell", startZoom: 15.5, layer: "cell-fill", source: "admin-cells" },
+    { level: "village", startZoom: 16.6, layer: "village-fill", source: "admin-villages" }
   ];
 
+  // These transitions follow the dominant ground dimension of the polygon
+  // containing the map centre. Therefore, one fixed zoom per admin level is
+  // not a valid assertion for districts/sectors/cells/villages of different shapes.
+  async function findVisibleLevelZoom(config) {
+    const step = 0.2;
+    const maxZoom = 20.5;
+    let lastState = null;
+    for (
+      let zoom = config.startZoom;
+      zoom <= maxZoom;
+      zoom = Number((zoom + step).toFixed(2))
+    ) {
+      await page.evaluate(({ zoom }) => {
+        const map = window.__RLI_E2E_MAP__;
+        if (!map) throw new Error("Opt-in test map was not exposed.");
+        map.jumpTo({ center: [30.087, -1.953], zoom });
+      }, { zoom });
+
+      const visible = await page.waitForFunction(({ layer, source }) => {
+        const map = window.__RLI_E2E_MAP__;
+        return Boolean(
+          map &&
+          map.isStyleLoaded() &&
+          map.getLayer(layer) &&
+          map.getLayoutProperty(layer, "visibility") === "visible" &&
+          map.querySourceFeatures(source).length > 0 &&
+          map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
+        );
+      }, config, { timeout: 1_500 }).then(() => true).catch((error) => {
+        if (!String(error?.message ?? error).includes("Timeout")) throw error;
+        return false;
+      });
+
+      if (visible) return zoom;
+      lastState = await page.evaluate(({ layer, source, zoom }) => {
+        const map = window.__RLI_E2E_MAP__;
+        if (!map) return null;
+        return {
+          zoom,
+          mapZoom: Number(map.getZoom().toFixed(2)),
+          visibility: map.getLayer(layer)
+            ? map.getLayoutProperty(layer, "visibility") ?? "visible"
+            : "missing-layer",
+          sourceFeatures: map.querySourceFeatures(source).length,
+          renderedFeatures: map.getLayer(layer)
+            ? map.queryRenderedFeatures(undefined, { layers: [layer] }).length
+            : 0
+        };
+      }, { ...config, zoom });
+    }
+
+    throw new Error(
+      "No rendered " + config.level + " boundaries became visible by zoom " + maxZoom +
+      " while testing dominant-dimension transitions. Last state: " + JSON.stringify(lastState)
+    );
+  }
+
   for (const config of hoverLevels) {
-    await page.evaluate(({ zoom }) => {
-      const map = window.__RLI_E2E_MAP__;
-      if (!map) throw new Error("Opt-in test map was not exposed.");
-      map.jumpTo({ center: [30.087, -1.953], zoom });
-    }, config);
-
-    await page.waitForFunction(({ layer, source }) => {
-      const map = window.__RLI_E2E_MAP__;
-      return Boolean(
-        map &&
-        map.getLayer(layer) &&
-        map.getLayoutProperty(layer, "visibility") === "visible" &&
-        map.querySourceFeatures(source).length > 0 &&
-        map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
-      );
-    }, config, { timeout: 35_000 });
-
+    config.transitionZoom = await findVisibleLevelZoom(config);
     const target = await page.evaluate(({ layer }) => {
       const map = window.__RLI_E2E_MAP__;
       if (!map) return null;
@@ -271,6 +312,7 @@ try {
 
     hierarchyHoverChecks.push({
       level: config.level,
+      transitionZoom: config.transitionZoom,
       source: target.source,
       featureId: target.id,
       highlightActivated: true,
