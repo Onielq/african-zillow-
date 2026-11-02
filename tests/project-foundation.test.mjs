@@ -27,16 +27,27 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /f: "json"/);
 });
 
-test("administrative detail advances at 110% vertical viewport fill and prefetches children", async () => {
+test("administrative detail uses the dominant width-or-height footprint and prefetches children", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /const ADMIN_FOOTPRINT_ENTER_RATIO = 1\.10/);
   assert.match(mapView, /const ADMIN_FOOTPRINT_EXIT_RATIO = 1\.0/);
   assert.match(mapView, /const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0\.85/);
   assert.match(mapView, /function geometryContainsPoint\(/);
-  assert.match(mapView, /function verticalFeatureViewportRatio\(/);
+  assert.match(mapView, /function polygonRingsContainingPoint\(/);
+  assert.match(mapView, /function featureViewportFootprintRatio\(/);
+  assert.match(mapView, /map\.getContainer\(\)\.clientWidth/);
   assert.match(mapView, /map\.getContainer\(\)\.clientHeight/);
+  assert.match(mapView, /map\.project\(position\)\.x/);
   assert.match(mapView, /map\.project\(position\)\.y/);
+  assert.match(mapView, /const featureWidth = Math\.max\(0, maxX - minX\)/);
+  assert.match(mapView, /const featureHeight = Math\.max\(0, maxY - minY\)/);
+  assert.match(mapView, /const useWidth = featureWidth >= featureHeight/);
+  assert.match(mapView, /const viewportExtent = useWidth \? mapWidth : mapHeight/);
+  assert.match(mapView, /const featureExtent = useWidth \? featureWidth : featureHeight/);
+  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.district\)/);
+  assert.match(mapView, /featureViewportFootprintRatio\(map, areaDataRef\.current\[activeLevel\]/);
+  assert.doesNotMatch(mapView, /verticalFeatureViewportRatio/);
   assert.match(mapView, /function activeAreaLevelForMap\(/);
   assert.match(mapView, /const resolveActiveAreaLevel = \(\) =>/);
   assert.match(mapView, /const updateLayerVisibility = \(\) => \{\s*resolveActiveAreaLevel\(\);/);
