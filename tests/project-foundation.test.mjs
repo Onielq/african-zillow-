@@ -1193,7 +1193,7 @@ test("every selected project opens the same evidence-led project dossier", async
   assert.match(report, /project\.parcelUpi/);
   assert.match(report, /project\.locationPrecision/);
   assert.match(report, /Not reported in the current project record/);
-  assert.match(report, /not verified market comparables/);
+  assert.match(report, /not confirmed nearby developments, a complete district census, or verified market comparables/);
   assert.match(report, /No sale price, rental rate or live unit availability is being inferred/);
   assert.doesNotMatch(report, /estimated yield|investment score|risk score/i);
 });
