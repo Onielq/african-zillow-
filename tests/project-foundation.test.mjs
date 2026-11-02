@@ -68,7 +68,7 @@ test("administrative boundaries render per GIS source and reuse cached viewport 
 test("the map view progressively switches administrative levels and increases boundary opacity", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /SECTOR_ZOOM/);
-  assert.match(mapView, /ADMIN_FOOTPRINT_ENTER_RATIO = 1\\.10/);
+  assert.match(mapView, /ADMIN_FOOTPRINT_ENTER_RATIO = 1\.10/);
   assert.match(mapView, /CELL_ZOOM/);
   assert.match(mapView, /VILLAGE_ZOOM/);
   assert.match(mapView, /PARCEL_ZOOM/);
