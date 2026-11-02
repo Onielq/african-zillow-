@@ -370,9 +370,7 @@ function ensureMetricPillImage(
       ? ["#98612F", "#75451F"]
       : variant === "parcel" && markerStyle === "high-value"
         ? ["#454B52", "#30363D"]
-        : variant === "parcel"
-          ? ["#800000", "#660000"]
-          : ["#D41A3A", "#B8142E"];
+        : ["#D41A3A", "#B8142E"];
   const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
   gradient.addColorStop(0, fillColor[0]);
   gradient.addColorStop(1, fillColor[1]);
@@ -586,8 +584,8 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
-  ["boolean", ["feature-state", "selected"], false], 0.18,
-  ["boolean", ["feature-state", "hover"], false], 0.14,
+  ["boolean", ["feature-state", "selected"], false], 0.20,
+  ["boolean", ["feature-state", "hover"], false], 0.16,
   0.10
 ] as never;
 
@@ -1909,17 +1907,27 @@ export function MapView({
           paint: {
             "line-color": [
               "case",
-              ["boolean", ["feature-state", "selected"], false], "#35B5CA",
-              ["boolean", ["feature-state", "hover"], false], "#35B5CA",
+              ["boolean", ["feature-state", "selected"], false], "#149DB0",
+              ["boolean", ["feature-state", "hover"], false], "#2CAFC1",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
                   ? "#A68A56"
                   : "#668878"
             ],
-            // Keep the same fine boundary weight in every interaction state.
-            "line-width": 1.05,
-            "line-opacity": level === "parcel" ? 0.92 : 0.90
+            // Give active boundaries a clearer edge without a glow or blurred casing.
+            "line-width": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false], level === "parcel" ? 2.0 : 1.9,
+              ["boolean", ["feature-state", "hover"], false], level === "parcel" ? 1.75 : 1.65,
+              level === "parcel" ? 1.2 : 1.05
+            ],
+            "line-opacity": [
+              "case",
+              ["boolean", ["feature-state", "selected"], false], 0.98,
+              ["boolean", ["feature-state", "hover"], false], 0.96,
+              level === "parcel" ? 0.95 : 0.92
+            ]
           }
         });
       }
@@ -1988,7 +1996,7 @@ export function MapView({
               ["==", ["get", "is_selected"], true], "#2563EB",
               ["==", ["get", "marker_style"], "public-asset"], "#8B5A2B",
               ["==", ["get", "marker_style"], "high-value"], "#343A40",
-              ["==", ["get", "level"], "parcel"], "#800000",
+              ["==", ["get", "level"], "parcel"], "#D41A3A",
               ["==", ["get", "has_value"], false], "#8B9690",
               "#9D2932"
             ],

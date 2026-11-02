@@ -58,7 +58,7 @@ test("the map view progressively switches administrative levels and increases bo
   assert.match(mapView, /setFeatureState/);
   assert.match(mapView, /0\.2/);
   assert.match(mapView, /0\.18/);
-  assert.match(mapView, /0\.14/);
+  assert.match(mapView, /0\.16/);
   assert.match(mapView, /0\.10/);
   assert.match(mapView, /0\.5/);
   assert.match(mapView, /if \(zoom >= PARCEL_ZOOM\) return "parcel"/);
@@ -112,7 +112,7 @@ test("parcel boundary requests preserve source vertices and use a precise viewpo
   assert.match(route, /do not set maxAllowableOffset/i);
   assert.match(route, /returnGeometry: "true"/);
   assert.match(mapView, /toFixed\(6\)\)\.join\(","\)/);
-  assert.match(mapView, /"line-width": 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /feature-state.*selected/s);
 });
 
@@ -661,7 +661,7 @@ test("map hover and metric bubbles follow the selected indicator at each adminis
 
   assert.match(mapView, /feature-state.*hover/s);
   assert.match(mapView, /#63BECE/);
-  assert.match(mapView, /#35B5CA/);
+  assert.match(mapView, /#149DB0/);
   assert.match(mapView, /VILLAGE_ZOOM = 16\.2/);
   assert.match(mapView, /metric-bubbles-circle/);
   assert.match(mapView, /selectedMetricRef/);
@@ -722,8 +722,8 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.doesNotMatch(mapView, /"circle-radius": \[\s*"case"[\s\S]{0,200}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
-  assert.match(mapView, /"line-width": 1\.05/);
-  assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.92 : 0\.90/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-opacity": \[\s*"case"[\s\S]*?level === "parcel" \? 0\.95 : 0\.92/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
@@ -785,7 +785,7 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
 
-test("parcel price markers use maroon baseline, brown public assets, charcoal high values and blue selected state", async () => {
+test("parcel price markers use district red baseline, brown public assets, charcoal high values and blue selected state", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /type PriceMarkerStyle = "market-default" \| "public-asset" \| "high-value"/);
@@ -802,11 +802,13 @@ test("parcel price markers use maroon baseline, brown public assets, charcoal hi
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
   assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
-  assert.match(mapView, /variant === "parcel"\s*\? \["#800000", "#660000"\]\s*: \["#D41A3A", "#B8142E"\]/);
-  assert.match(mapView, /\["==", \["get", "level"\], "parcel"\], "#800000"/);
+  assert.match(mapView, /const fillColor = isSelected/);
+  assert.match(mapView, /\["==", \["get", "level"\], "parcel"\], "#D41A3A"/);
+  assert.ok(mapView.includes('["#D41A3A", "#B8142E"]'));
+  assert.doesNotMatch(mapView, /#800000|#660000/);
   assert.match(mapView, /"#9D2932"/);
-  assert.match(mapView, /"line-width": 1\.05/);
-  assert.match(mapView, /"#35B5CA"/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"#149DB0"/);
   assert.match(mapView, /"feature-state", "hover"/);
   assert.doesNotMatch(mapView, /-glow|line-blur|PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing/);
   assert.match(mapView, /sortValue >= 1_000_000_000/);
@@ -877,8 +879,8 @@ test("parcel outlines stay thin and have no glow or casing above road and zoning
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
-  assert.match(mapView, /"line-width": 1\.05/);
-  assert.match(mapView, /"#35B5CA"/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"#149DB0"/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
   assert.match(mapView, /map\.moveLayer\(layerId\)/);
@@ -961,7 +963,7 @@ test("the geography API uses build-time transaction rows, not request-time files
 
 test("parcel boundary styling uses one thin stroke and does not create a casing layer", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  assert.match(mapView, /"line-width": 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?level === "parcel" \? 2\.0 : 1\.9,[\s\S]*?level === "parcel" \? 1\.75 : 1\.65,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
 });
 
@@ -1004,7 +1006,7 @@ test("global search returns navigable areas, resolves addresses on submit and hi
   assert.ok(experience.includes("mapInstance.flyTo"));
   assert.ok(experience.includes("selectedArea={selectedArea}"));
   assert.ok(!experience.includes('href="/contact"'));
-  assert.ok(mapView.includes('"#35B5CA"'));
+  assert.ok(mapView.includes('"#149DB0"'));
   assert.ok(mapView.includes('"#40B5C9"'));
   assert.ok(mapView.includes("selectionSyncRef.current?.(selectedAreaRef.current)"));
   assert.ok(css.includes(".global-area-search-field"));

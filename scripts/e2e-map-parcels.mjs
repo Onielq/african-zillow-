@@ -432,8 +432,14 @@ try {
     const map = window.__RLI_E2E_MAP__;
     return Boolean(map?.getLayer("parcel-outline-glow"));
   });
-  if (parcelOutlineWidth !== 1.05) {
-    throw new Error("Parcel outlines must use the same thin 1.05px stroke as administrative boundaries.");
+  const parcelOutlineWidthValues = Array.isArray(parcelOutlineWidth) ? parcelOutlineWidth : [];
+  if (
+    parcelOutlineWidthValues[0] !== "case" ||
+    !parcelOutlineWidthValues.includes(2.0) ||
+    !parcelOutlineWidthValues.includes(1.75) ||
+    !parcelOutlineWidthValues.includes(1.2)
+  ) {
+    throw new Error("Parcel outlines must use a clearer selected (2px), hover (1.75px), and resting (1.2px) border.");
   }
   if (hasParcelGlowLayer) {
     throw new Error("Parcel glow layer must be removed.");
