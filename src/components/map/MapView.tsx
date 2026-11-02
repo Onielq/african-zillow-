@@ -738,11 +738,12 @@ const HYBRID_STYLE: StyleSpecification = {
   ]
 };
 
-// Administrative boundaries are real geographic polygons, not routes.
-// The thresholds reveal one progressively finer level at a time.
-// The click-to-fit zooms below aim to bring each parent polygon close to
-// the usable map viewport before showing its children: district → sector,
-// sector → cell, then selected-cell parcel outlines.
+// Administrative detail advances when the parent polygon fills the map
+// vertically. Child layers are prefetched at 85% so they are ready at the
+// 110% handoff. Fixed zoom thresholds remain as a fallback while data loads.
+const ADMIN_FOOTPRINT_ENTER_RATIO = 1.10;
+const ADMIN_FOOTPRINT_EXIT_RATIO = 1.0;
+const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0.85;
 const SECTOR_ZOOM = 12.0;
 const CELL_ZOOM = 15.1;
 // Keep every requested geography level visible in sequence before individual plots.
@@ -816,6 +817,108 @@ function activeAreaLevel(zoom: number): AreaLevel {
   if (zoom >= CELL_ZOOM) return "cell";
   if (zoom >= SECTOR_ZOOM) return "sector";
   return "district";
+}
+
+function ringContainsPoint(point: [number, number], ring: number[][]): boolean {
+  if (ring.length < 3) return false;
+  const [longitude, latitude] = point;
+  let inside = false;
+
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
+    const [x1, y1] = ring[previous] ?? [];
+    const [x2, y2] = ring[index] ?? [];
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+
+    const cross = (longitude - x1) * (y2 - y1) - (latitude - y1) * (x2 - x1);
+    const withinSegment =
+      longitude >= Math.min(x1, x2) - 1e-10 &&
+      longitude <= Math.max(x1, x2) + 1e-10 &&
+      latitude >= Math.min(y1, y2) - 1e-10 &&
+      latitude <= Math.max(y1, y2) + 1e-10;
+    if (Math.abs(cross) <= 1e-10 && withinSegment) return true;
+
+    const crossesLatitude = (y1 > latitude) !== (y2 > latitude);
+    if (crossesLatitude && longitude < ((x2 - x1) * (latitude - y1)) / (y2 - y1) + x1) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function geometryContainsPoint(geometry: Geometry, point: [number, number]): boolean {
+  const polygons = geometry.type === "Polygon"
+    ? [geometry.coordinates as unknown as number[][][]]
+    : geometry.type === "MultiPolygon"
+      ? geometry.coordinates as unknown as number[][][][]
+      : [];
+
+  return polygons.some((rings) =>
+    rings.length > 0 &&
+    ringContainsPoint(point, rings[0]) &&
+    !rings.slice(1).some((hole) => ringContainsPoint(point, hole))
+  );
+}
+
+function verticalFeatureViewportRatio(
+  map: MapLibreMapInstance,
+  level: AreaLevel,
+  collection: MapFeatureCollection | undefined
+): number | null {
+  const mapHeight = map.getContainer().clientHeight;
+  if (!collection || mapHeight <= 0) return null;
+
+  const center = map.getCenter();
+  const point: [number, number] = [center.lng, center.lat];
+  const feature = collection.features.find((candidate) =>
+    candidate.geometry ? geometryContainsPoint(candidate.geometry, point) : false
+  );
+  if (!feature?.geometry || !("coordinates" in feature.geometry)) return null;
+
+  const positions: Array<[number, number]> = [];
+  collectPositions(feature.geometry.coordinates, positions);
+  if (positions.length === 0) return null;
+
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const position of positions) {
+    const screenY = map.project(position).y;
+    if (!Number.isFinite(screenY)) continue;
+    minY = Math.min(minY, screenY);
+    maxY = Math.max(maxY, screenY);
+  }
+
+  if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null;
+  return Math.max(0, maxY - minY) / mapHeight;
+}
+
+function activeAreaLevelForMap(
+  map: MapLibreMapInstance,
+  collections: Partial<Record<AreaLevel, MapFeatureCollection>>,
+  previousLevel: AreaLevel
+): AreaLevel {
+  const zoom = map.getZoom();
+  if (zoom >= PARCEL_ZOOM) return "parcel";
+  if (zoom >= VILLAGE_ZOOM) return "village";
+
+  const previousIndex = AREA_LEVELS.indexOf(previousLevel);
+  const transitionThreshold = (childLevel: AreaLevel) =>
+    previousIndex >= AREA_LEVELS.indexOf(childLevel)
+      ? ADMIN_FOOTPRINT_EXIT_RATIO
+      : ADMIN_FOOTPRINT_ENTER_RATIO;
+
+  const districtRatio = verticalFeatureViewportRatio(map, "district", collections.district);
+  if (districtRatio === null) return activeAreaLevel(zoom);
+  if (districtRatio < transitionThreshold("sector")) return "district";
+
+  const sectorRatio = verticalFeatureViewportRatio(map, "sector", collections.sector);
+  if (sectorRatio === null) return "district";
+  if (sectorRatio < transitionThreshold("cell")) return "sector";
+
+  const cellRatio = verticalFeatureViewportRatio(map, "cell", collections.cell);
+  if (cellRatio === null) return "sector";
+  if (cellRatio < transitionThreshold("village")) return "cell";
+
+  return "village";
 }
 
 function zoomForLevel(level: AreaLevel): number {
@@ -1064,6 +1167,7 @@ export function MapView({
   const selectedMetricRef = useRef<MapMetric>(selectedMetric);
   const metricBubbleValuesRef = useRef<MetricBubbleValue[]>([]);
   const areaDataRef = useRef<Partial<Record<AreaLevel, MapFeatureCollection>>>({});
+  const activeAreaLevelRef = useRef<AreaLevel>("district");
   const selectedAreaRef = useRef<SelectedArea | null>(selectedArea);
   const selectionSyncRef = useRef<((area: SelectedArea | null) => void) | null>(null);
   const refreshMetricBubblesRef = useRef<(() => void) | null>(null);
@@ -1095,8 +1199,14 @@ export function MapView({
     selectedMetricRef.current = selectedMetric;
     const currentMap = mapRef.current;
     if (currentMap?.isStyleLoaded() && currentMap.getLayer(AREA_LAYERS.parcel.label)) {
+      const resolvedLevel = activeAreaLevelForMap(
+        currentMap,
+        areaDataRef.current,
+        activeAreaLevelRef.current
+      );
+      activeAreaLevelRef.current = resolvedLevel;
       const showParcelNumber =
-        activeAreaLevel(currentMap.getZoom()) === "parcel" &&
+        resolvedLevel === "parcel" &&
         selectedMetric !== "averageLandPricePerM2";
       currentMap.setLayoutProperty(
         AREA_LAYERS.parcel.label,
@@ -1208,6 +1318,13 @@ export function MapView({
 
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
+    activeAreaLevelRef.current = getActiveAreaLevel();
+
+    const getActiveAreaLevel = () => {
+      const level = activeAreaLevelForMap(map, areaDataRef.current, activeAreaLevelRef.current);
+      activeAreaLevelRef.current = level;
+      return level;
+    };
 
     // Read-only browser smoke-test hook. It is enabled only for an explicit
     // e2e query parameter and is removed when this map instance is disposed.
@@ -1269,7 +1386,7 @@ export function MapView({
       const source = map.getSource("metric-bubbles") as GeoJSONSource | undefined;
       if (!source) return;
 
-      const level = activeAreaLevel(map.getZoom());
+      const level = getActiveAreaLevel();
       const cachedCollection = areaDataRef.current[level] ?? emptyFeatureCollection();
       // During rapid zoom/source refreshes MapLibre may already have published
       // the active GeoJSON layer while the React-side viewport cache is still
@@ -1747,7 +1864,7 @@ export function MapView({
       const point = lastMapPointerPoint;
       if (!point) return;
 
-      const level = activeAreaLevel(map.getZoom());
+      const level = getActiveAreaLevel();
       if (level === "parcel") {
         if (hoveredFeature) setFeatureFlag(hoveredFeature, "hover", false);
         hoveredFeature = null;
@@ -1915,11 +2032,11 @@ export function MapView({
                   ? "#A68A56"
                   : "#668878"
             ],
-            // Give active boundaries a clearer edge without a glow or blurred casing.
+            // Keep active boundaries distinct with one crisp stroke and no glow or casing.
             "line-width": [
               "case",
-              ["boolean", ["feature-state", "selected"], false], 4.0,
-              ["boolean", ["feature-state", "hover"], false], 4.0,
+              ["boolean", ["feature-state", "selected"], false], level === "parcel" ? 3.0 : 3.5,
+              ["boolean", ["feature-state", "hover"], false], level === "parcel" ? 4.0 : 3.0,
               level === "parcel" ? 1.2 : 1.05
             ],
             "line-opacity": [
@@ -2554,7 +2671,7 @@ export function MapView({
     };
 
     const updateLayerVisibility = () => {
-      const activeLevel = activeAreaLevel(map.getZoom());
+      const activeLevel = getActiveAreaLevel();
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const villageIndex = AREA_LEVELS.indexOf("village");
       // Show cadastral outlines as soon as village boundaries appear. Parcel
@@ -2677,7 +2794,7 @@ export function MapView({
             attempt
           });
 
-          const isActiveGeographyLevel = level === activeAreaLevel(map.getZoom());
+          const isActiveGeographyLevel = level === getActiveAreaLevel();
           if ((level === "parcel" || isActiveGeographyLevel) && featureCount === 0 && attempt < maxAttempts) {
             recordE2ETrace("area-api-retry", {
               level,
@@ -2727,7 +2844,7 @@ export function MapView({
         styleLoaded,
         districtSourceExists,
         zoom: Number(map.getZoom().toFixed(2)),
-        activeLevel: activeAreaLevel(map.getZoom())
+        activeLevel: getActiveAreaLevel()
       });
       // This function is called from style.load after we create the GeoJSON
       // sources. isStyleLoaded() can still be false while basemap tiles are
@@ -2738,12 +2855,25 @@ export function MapView({
         return;
       }
 
-      const activeLevel = activeAreaLevel(map.getZoom());
+      const activeLevel = getActiveAreaLevel();
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const requestedLevels: AreaLevel[] = AREA_LEVELS.slice(0, activeIndex + 1);
+      const nextLevel = AREA_LEVELS[activeIndex + 1];
+      const activeFootprintRatio = verticalFeatureViewportRatio(
+        map,
+        activeLevel,
+        areaDataRef.current[activeLevel]
+      );
+      if (
+        nextLevel &&
+        activeIndex <= AREA_LEVELS.indexOf("cell") &&
+        activeFootprintRatio !== null &&
+        activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO
+      ) {
+        requestedLevels.push(nextLevel);
+      }
       // At village zoom, request the parcel geometry as well as administrative
-      // geometry. Previously this request stopped at "village", so the parcel
-      // outline layer had no data at the zoom level where users need it most.
+      // geometry. Parcel outlines remain an additional detail layer.
       if (activeLevel === "village") requestedLevels.push("parcel");
       const bounds = map.getBounds();
       const viewBounds: ViewBounds = [
@@ -2807,10 +2937,11 @@ export function MapView({
         const withStableFeatureIds = withStableAreaFeatureIds(level, merged);
         areaDataRef.current[level] = withStableFeatureIds;
         source.setData(withStableFeatureIds);
+        updateLayerVisibility();
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
         refreshProjectMarkers();
-        if (level === activeAreaLevel(map.getZoom()) && lastMapPointerPoint) {
+        if (level === getActiveAreaLevel() && lastMapPointerPoint) {
           map.once("idle", refreshHoverAtLastPointer);
         }
         if (selectedFeature && selectedFeatureHighlightActive) setFeatureFlag(selectedFeature, "selected", true);
@@ -3529,7 +3660,7 @@ export function MapView({
     // pointer is still over the newly active administrative level.
     const handleMapPointerMove = (event: { point: { x: number; y: number } }) => {
       lastMapPointerPoint = event.point;
-      const level = activeAreaLevel(map.getZoom());
+      const level = getActiveAreaLevel();
       const layer = AREA_LAYERS[level];
       const feature = map.queryRenderedFeatures([event.point.x, event.point.y], { layers: [layer.fill] })[0];
       if (level === "parcel") {
@@ -3752,7 +3883,7 @@ export function MapView({
         }
 
         const isFirstIdleFrame = !initialMapIdleReached;
-        const level = activeAreaLevel(map.getZoom());
+        const level = getActiveAreaLevel();
         const activeFeatures = areaDataRef.current[level]?.features.length ?? 0;
         const parcelFeatures = areaDataRef.current.parcel?.features.length ?? 0;
         const needsRefresh = activeFeatures === 0 || (level === "village" && parcelFeatures === 0);
