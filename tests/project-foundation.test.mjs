@@ -34,6 +34,7 @@ test("administrative zoom uses the dominant polygon dimension and adaptive groun
   assert.match(mapView, /cell: 1_000/);
   assert.match(mapView, /village: 500/);
   assert.match(mapView, /function haversineDistanceMeters\(/);
+  assert.equal((mapView.match(/const EARTH_RADIUS_METRES =/g) ?? []).length, 1);
   assert.match(mapView, /type AdministrativeFootprintAxis = "width" \| "height"/);
   assert.match(mapView, /function featureGroundFootprintMeasurement\(/);
   assert.match(mapView, /const areaWidthMeters = haversineDistanceMeters\(/);
