@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { BrandImage } from "@/components/directories/BrandImage";
+import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
 import { Marker, type Map as MapLibreMapInstance } from "maplibre-gl";
 import {
@@ -59,6 +61,7 @@ type UnifiedDeveloperRecord = {
   base: string | null;
   focus: string | null;
   logoUrl?: string;
+  imageUrl?: string;
   website?: string;
   projectIds: string[];
 };
@@ -107,7 +110,7 @@ const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
   const records = new Map<string, UnifiedDeveloperRecord>();
   const add = (
     name: string,
-    details: { base?: string | null; focus?: string | null; logoUrl?: string; website?: string; preferName?: boolean } = {}
+    details: { base?: string | null; focus?: string | null; logoUrl?: string; imageUrl?: string; website?: string; preferName?: boolean } = {}
   ) => {
     const id = developerIdentityKey(name);
     if (!id) return null;
@@ -117,6 +120,7 @@ const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
       existing.base = existing.base ?? details.base ?? null;
       existing.focus = existing.focus ?? details.focus ?? null;
       existing.logoUrl = existing.logoUrl ?? details.logoUrl;
+      existing.imageUrl = existing.imageUrl ?? details.imageUrl ?? details.logoUrl ?? websiteFaviconUrl(details.website);
       existing.website = existing.website ?? details.website;
       return existing;
     }
@@ -126,6 +130,7 @@ const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
       base: details.base ?? null,
       focus: details.focus ?? null,
       logoUrl: details.logoUrl,
+      imageUrl: details.imageUrl ?? details.logoUrl ?? websiteFaviconUrl(details.website),
       website: details.website,
       projectIds: []
     };
@@ -141,6 +146,7 @@ const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
     add(developer.name, {
       focus: developer.segment,
       logoUrl: developer.logoUrl,
+      imageUrl: developer.logoUrl ?? websiteFaviconUrl(developer.website),
       website: developer.website,
       preferName: true
     });
@@ -152,6 +158,13 @@ const UNIFIED_DEVELOPER_DIRECTORY: UnifiedDeveloperRecord[] = (() => {
 
   return [...records.values()].sort((a, b) => a.name.localeCompare(b.name, "en"));
 })();
+
+function developerBrandImage(name: string): string | undefined {
+  const identity = developerIdentityKey(name);
+  return identity
+    ? UNIFIED_DEVELOPER_DIRECTORY.find((developer) => developer.id === identity)?.imageUrl
+    : undefined;
+}
 
 type LandPriceRow = {
   sourceLine: number;
@@ -185,9 +198,12 @@ type CellParcelRecord = {
 };
 
 type CellParcelResponse = {
+  page: number;
+  pageSize: number;
+  nextPage: number | null;
+  hasMore: boolean;
   totalSourceRecords: number;
   returnedRecords: number;
-  capped: boolean;
   parcels: CellParcelRecord[];
 };
 
@@ -702,6 +718,9 @@ export function MapExperience() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [projectDirectoryTab, setProjectDirectoryTab] = useState<ProjectDirectoryTab>("projects");
   const [projectSearch, setProjectSearch] = useState("");
+  const [debouncedProjectSearch, setDebouncedProjectSearch] = useState("");
+  const [projectVisibleCount, setProjectVisibleCount] = useState(24);
+  const [projectDeveloperVisibleCount, setProjectDeveloperVisibleCount] = useState(24);
   const [selectedProjectDeveloperId, setSelectedProjectDeveloperId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
@@ -709,6 +728,7 @@ export function MapExperience() {
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
   const [directorySearch, setDirectorySearch] = useState("");
+  const [debouncedDirectorySearch, setDebouncedDirectorySearch] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
@@ -719,7 +739,11 @@ export function MapExperience() {
   const [cellParcelsLookupKey, setCellParcelsLookupKey] = useState<string | null>(null);
   const [cellParcelsStatus, setCellParcelsStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [cellParcelsTotal, setCellParcelsTotal] = useState(0);
-  const [cellParcelsCapped, setCellParcelsCapped] = useState(false);
+  const [cellParcelsPage, setCellParcelsPage] = useState(1);
+  const [cellParcelsHasMore, setCellParcelsHasMore] = useState(false);
+  const [cellParcelsLoadingMore, setCellParcelsLoadingMore] = useState(false);
+  const [cellParcelsMoreError, setCellParcelsMoreError] = useState(false);
+  const cellParcelsMoreRequestRef = useRef<AbortController | null>(null);
   const [metricInfoOpen, setMetricInfoOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSearch, setCompareSearch] = useState("");
@@ -754,7 +778,7 @@ export function MapExperience() {
   const selectedProject = selectedProjectId
     ? RWANDA_PROJECT_RECORDS.find((project) => project.id === selectedProjectId) ?? null
     : null;
-  const normalizedProjectSearch = projectSearch.trim().toLocaleLowerCase("en");
+  const normalizedProjectSearch = debouncedProjectSearch.trim().toLocaleLowerCase("en");
   const filteredProjects = RWANDA_PROJECT_RECORDS.filter((project) => {
     if (selectedProjectDeveloperId) {
       return developerIdentityKey(project.developer) === selectedProjectDeveloperId;
@@ -768,6 +792,8 @@ export function MapExperience() {
     [developer.name, developer.base, developer.focus].filter(Boolean).join(" ")
       .toLocaleLowerCase("en").includes(normalizedProjectSearch)
   );
+  const visibleProjects = filteredProjects.slice(0, projectVisibleCount);
+  const visibleProjectDevelopers = filteredProjectDevelopers.slice(0, projectDeveloperVisibleCount);
   const globalSearchMarkerRef = useRef<Marker | null>(null);
   const globalSearchSequenceRef = useRef(0);
   const nearbyAreaLevel = selectedArea?.level ?? null;
@@ -1186,7 +1212,7 @@ export function MapExperience() {
   const landPriceDiagnostics = getLandPriceDiagnostics(landPriceRows);
   const normalizedComparisonSearch = compareSearch.trim().toLocaleLowerCase();
   const visibleComparisonSearchResults = comparisonSearchResults;
-  const normalizedDirectorySearch = directorySearch.trim().toLocaleLowerCase();
+  const normalizedDirectorySearch = debouncedDirectorySearch.trim().toLocaleLowerCase();
   const visibleDeveloperCandidates = UNIFIED_DEVELOPER_DIRECTORY.filter((developer) =>
     [developer.name, developer.focus, developer.base].filter(Boolean).join(" ")
       .toLocaleLowerCase("en").includes(normalizedDirectorySearch)
@@ -1481,6 +1507,21 @@ export function MapExperience() {
   }, [selectedArea?.level, selectedArea?.district, selectedArea?.upi]);
 
   useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedProjectSearch(projectSearch), 180);
+    return () => window.clearTimeout(handle);
+  }, [projectSearch]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedDirectorySearch(directorySearch), 180);
+    return () => window.clearTimeout(handle);
+  }, [directorySearch]);
+
+  useEffect(() => {
+    setProjectVisibleCount(24);
+    setProjectDeveloperVisibleCount(24);
+  }, [debouncedProjectSearch, selectedProjectDeveloperId, projectDirectoryTab]);
+
+  useEffect(() => {
     const level = selectedArea?.level;
     const district = selectedArea?.district;
     const sector = selectedArea?.sector;
@@ -1489,29 +1530,99 @@ export function MapExperience() {
 
     const controller = new AbortController();
     const lookupKey = [district, sector, cell].join("|");
+    cellParcelsMoreRequestRef.current?.abort();
+    cellParcelsMoreRequestRef.current = null;
+    setCellParcelsLookupKey(lookupKey);
+    setCellParcels([]);
+    setCellParcelsPage(1);
+    setCellParcelsHasMore(false);
+    setCellParcelsLoadingMore(false);
+    setCellParcelsMoreError(false);
+    setCellParcelsStatus("loading");
+
     const loadCellParcels = async () => {
       try {
-        const params = new URLSearchParams({ district, sector, cell });
+        const params = new URLSearchParams({ district, sector, cell, page: "1", pageSize: "100" });
         const response = await fetch("/api/geography/cell-parcels?" + params.toString(), {
           signal: controller.signal
         });
         if (!response.ok) throw new Error("Cell parcel list request failed.");
         const payload = await response.json() as CellParcelResponse;
         if (controller.signal.aborted) return;
-        setCellParcelsLookupKey(lookupKey);
         setCellParcels(payload.parcels ?? []);
         setCellParcelsTotal(payload.totalSourceRecords ?? payload.returnedRecords ?? 0);
-        setCellParcelsCapped(payload.capped ?? false);
+        setCellParcelsPage(payload.page ?? 1);
+        setCellParcelsHasMore(payload.hasMore ?? false);
         setCellParcelsStatus("loaded");
       } catch {
         if (controller.signal.aborted) return;
-        setCellParcelsLookupKey(lookupKey);
         setCellParcelsStatus("error");
       }
     };
     void loadCellParcels();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      cellParcelsMoreRequestRef.current?.abort();
+      cellParcelsMoreRequestRef.current = null;
+    };
   }, [selectedArea?.level, selectedArea?.district, selectedArea?.sector, selectedArea?.name]);
+
+  const loadMoreCellParcels = useCallback(async () => {
+    const selectedCell = selectedArea?.level === "cell" ? selectedArea : null;
+    if (
+      !selectedCell ||
+      !selectedCell.district ||
+      !selectedCell.sector ||
+      !cellParcelsHasMore ||
+      cellParcelsLoadingMore
+    ) return;
+
+    const nextPage = cellParcelsPage + 1;
+    const controller = new AbortController();
+    cellParcelsMoreRequestRef.current?.abort();
+    cellParcelsMoreRequestRef.current = controller;
+    setCellParcelsLoadingMore(true);
+    setCellParcelsMoreError(false);
+
+    try {
+      const params = new URLSearchParams({
+        district: selectedCell.district,
+        sector: selectedCell.sector,
+        cell: selectedCell.name,
+        page: String(nextPage),
+        pageSize: "100"
+      });
+      const response = await fetch("/api/geography/cell-parcels?" + params.toString(), {
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error("Cell parcel page request failed.");
+      const payload = await response.json() as CellParcelResponse;
+      if (controller.signal.aborted) return;
+      setCellParcels((current) => {
+        const records = new Map(current.map((parcel) => [parcel.id, parcel]));
+        for (const parcel of payload.parcels ?? []) records.set(parcel.id, parcel);
+        return [...records.values()];
+      });
+      setCellParcelsPage(payload.page ?? nextPage);
+      setCellParcelsHasMore(payload.hasMore ?? false);
+    } catch {
+      if (controller.signal.aborted) return;
+      setCellParcelsMoreError(true);
+    } finally {
+      if (cellParcelsMoreRequestRef.current === controller) {
+        cellParcelsMoreRequestRef.current = null;
+        setCellParcelsLoadingMore(false);
+      }
+    }
+  }, [
+    selectedArea?.level,
+    selectedArea?.district,
+    selectedArea?.sector,
+    selectedArea?.name,
+    cellParcelsPage,
+    cellParcelsHasMore,
+    cellParcelsLoadingMore
+  ]);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -2142,18 +2253,13 @@ export function MapExperience() {
                 <div className="directory-record-list" role="tabpanel">
                   {visibleDeveloperCandidates.map((candidate) => (
                     <article className="directory-record" key={candidate.id}>
-                      <div aria-label={candidate.logoUrl ? candidate.name + " logo" : "Organization initials"} className="directory-monogram">
-                        <span className="directory-logo-fallback">{initialsForName(candidate.name)}</span>
-                        {candidate.logoUrl ? (
-                          <img
-                            alt={candidate.name + " logo"}
-                            className="directory-logo-image"
-                            loading="lazy"
-                            onError={(event) => { event.currentTarget.style.display = "none"; }}
-                            src={candidate.logoUrl}
-                          />
-                        ) : null}
-                      </div>
+                      <BrandImage
+                        name={candidate.name}
+                        source={candidate.logoUrl ?? websiteFaviconUrl(candidate.website)}
+                        className="directory-monogram"
+                        width={96}
+                        height={96}
+                      />
                       <div className="directory-record-copy">
                         <div className="directory-record-title">
                           <strong>{candidate.name}</strong>
@@ -2220,9 +2326,14 @@ export function MapExperience() {
             {selectedProject ? (
               <div className="project-directory-detail">
                 <button className="project-directory-back" onClick={() => setSelectedProjectId(null)} type="button">← All projects</button>
-                {selectedProject.imageUrl ? (
-                  <img className="project-detail-image" src={selectedProject.imageUrl} alt={selectedProject.name + " project"} loading="lazy"/>
-                ) : null}
+                <BrandImage
+                  name={selectedProject.name}
+                  source={selectedProject.imageUrl ?? developerBrandImage(selectedProject.developer)}
+                  className="project-detail-image"
+                  fit={selectedProject.imageUrl ? "cover" : "contain"}
+                  width={720}
+                  height={320}
+                />
                 <p className="panel-eyebrow">{selectedProject.category}</p>
                 <h3>{selectedProject.name}</h3>
                 <div className="project-detail-row"><span>Developer</span><strong>{selectedProject.developer}</strong></div>
@@ -2240,9 +2351,16 @@ export function MapExperience() {
               </div>
             ) : projectDirectoryTab === "projects" ? (
               <div className="project-record-list">
-                {filteredProjects.map((project) => (
+                {visibleProjects.map((project) => (
                   <button className="project-record-item" key={project.id} onClick={() => void focusProjectOnMap(project)} type="button">
-                    {project.imageUrl ? <img src={project.imageUrl} alt="" loading="lazy"/> : <span className="project-record-monogram">{initialsForName(project.name)}</span>}
+                    <BrandImage
+                      name={project.name}
+                      source={project.imageUrl ?? developerBrandImage(project.developer)}
+                      className="project-record-monogram"
+                      fit={project.imageUrl ? "cover" : "contain"}
+                      width={120}
+                      height={96}
+                    />
                     <span className="project-record-copy">
                       <strong>{project.name}</strong>
                       <small>{project.developer}</small>
@@ -2252,17 +2370,41 @@ export function MapExperience() {
                   </button>
                 ))}
                 {filteredProjects.length === 0 ? <p className="project-directory-empty">No project matches that search.</p> : null}
+                {visibleProjects.length < filteredProjects.length ? (
+                  <button
+                    className="project-load-more"
+                    onClick={() => setProjectVisibleCount((count) => count + 24)}
+                    type="button"
+                  >
+                    Load 24 more projects
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="project-developer-list">
-                {filteredProjectDevelopers.map((developer) => (
+                {visibleProjectDevelopers.map((developer) => (
                   <button className="project-developer-item" key={developer.id} onClick={() => { setProjectSearch(""); setSelectedProjectDeveloperId(developer.id); setProjectDirectoryTab("projects"); setSelectedProjectId(null); }} type="button">
-                    <span className="project-developer-monogram">{initialsForName(developer.name)}</span>
+                    <BrandImage
+                      name={developer.name}
+                      source={developer.imageUrl}
+                      className="project-developer-monogram"
+                      width={120}
+                      height={96}
+                    />
                     <span><strong>{developer.name}</strong><small>{developer.projectIds.length ? developer.projectIds.length + " linked projects" : developer.focus || developer.base || "Developer record"}</small></span>
                     <span className="project-record-arrow">→</span>
                   </button>
                 ))}
                 {filteredProjectDevelopers.length === 0 ? <p className="project-directory-empty">No developer matches that search.</p> : null}
+                {visibleProjectDevelopers.length < filteredProjectDevelopers.length ? (
+                  <button
+                    className="project-load-more"
+                    onClick={() => setProjectDeveloperVisibleCount((count) => count + 24)}
+                    type="button"
+                  >
+                    Load 24 more developers
+                  </button>
+                ) : null}
               </div>
             )}
           </aside>
@@ -2745,7 +2887,14 @@ export function MapExperience() {
                       </span>
                     </div>
                     {activeCellParcelsStatus === "loading" ? (
-                      <p className="cell-parcel-message" role="status">Loading parcel identifiers and areas from the connected cadastral source…</p>
+                      <div className="cell-parcel-skeleton-list" role="status" aria-label="Loading parcel records">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <div className="cell-parcel-skeleton-row" key={index}>
+                            <span />
+                            <span />
+                          </div>
+                        ))}
+                      </div>
                     ) : activeCellParcelsStatus === "error" ? (
                       <p className="cell-parcel-message" role="status">The parcel list could not be loaded. The administrative cell and its market indicators remain available.</p>
                     ) : activeCellParcelsStatus === "loaded" && cellParcels.length === 0 ? (
@@ -2818,10 +2967,22 @@ export function MapExperience() {
                           ))}
                         </div>
                         <p className="cell-parcel-message">
-                          {cellParcelsTotal.toLocaleString("en-RW")} source records matched this cell.
-                          {cellParcelsCapped ? " The API response limit was reached; this list may not be complete." : ""}
+                          Showing {cellParcels.length.toLocaleString("en-RW")} of {cellParcelsTotal.toLocaleString("en-RW")} parcel records matched to this cell.
                           Parcel shapes identify land records but do not prove legal title or current ownership.
                         </p>
+                        {cellParcelsMoreError ? (
+                          <p className="cell-parcel-message" role="alert">The next page could not be loaded. Your current parcel records are still available; try again.</p>
+                        ) : null}
+                        {cellParcelsHasMore ? (
+                          <button
+                            className="cell-parcel-load-more"
+                            disabled={cellParcelsLoadingMore}
+                            onClick={() => void loadMoreCellParcels()}
+                            type="button"
+                          >
+                            {cellParcelsLoadingMore ? "Loading parcels…" : "Load more parcels"}
+                          </button>
+                        ) : null}
                       </>
                     ) : null}
                   </section>
