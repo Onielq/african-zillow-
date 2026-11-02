@@ -813,7 +813,6 @@ const AREA_LAYERS: Record<
 
 function activeAreaLevel(zoom: number): AreaLevel {
   if (zoom >= PARCEL_ZOOM) return "parcel";
-  if (zoom >= VILLAGE_ZOOM) return "village";
   if (zoom >= CELL_ZOOM) return "cell";
   if (zoom >= SECTOR_ZOOM) return "sector";
   return "district";
@@ -3155,6 +3154,27 @@ export function MapView({
         if (activeController === controller) {
           activeController = null;
           activeRefreshKey = null;
+        }
+        if (!controller.signal.aborted) {
+          const settledLevel = getActiveAreaLevel();
+          const settledIndex = AREA_LEVELS.indexOf(settledLevel);
+          const settledNextLevel = AREA_LEVELS[settledIndex + 1];
+          const settledFootprintRatio = verticalFeatureViewportRatio(
+            map,
+            areaDataRef.current[settledLevel]
+          );
+          const needsChildPrefetch =
+            settledNextLevel &&
+            settledIndex <= AREA_LEVELS.indexOf("cell") &&
+            !requestedLevels.includes(settledNextLevel) &&
+            settledFootprintRatio !== null &&
+            settledFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO;
+          if (needsChildPrefetch && refreshTimer === null) {
+            refreshTimer = setTimeout(() => {
+              refreshTimer = null;
+              void refreshAreas();
+            }, 0);
+          }
         }
       }
     };
