@@ -782,7 +782,8 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
   assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.village\)/);
-  assert.match(mapView, /villageRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
+  assert.match(mapView, /activeIndex <= AREA_LEVELS\.indexOf\("village"\)/);
+  assert.match(mapView, /activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
   assert.match(mapView, /requestedLevels\.push\(nextLevel\)/);
   assert.match(mapView, /status = "calculated-asking-price"/);
   assert.match(mapView, /properties\.parcel_size_m2/);
