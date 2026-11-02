@@ -738,9 +738,10 @@ const HYBRID_STYLE: StyleSpecification = {
   ]
 };
 
-// Administrative detail advances when the parent polygon fills the map
-// vertically. Child layers are prefetched at 85% so they are ready at the
-// 110% handoff. Fixed zoom thresholds remain as a fallback while data loads.
+// Administrative detail advances when the parent polygon's dominant
+// screen-space dimension fills the matching map dimension. Wide areas use
+// map width; tall areas use map height. Child layers are prefetched at 85%.
+// Fixed zoom thresholds remain a fallback only while geometry is unavailable.
 const ADMIN_FOOTPRINT_ENTER_RATIO = 1.10;
 const ADMIN_FOOTPRINT_EXIT_RATIO = 1.0;
 const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0.85;
@@ -848,52 +849,82 @@ function ringContainsPoint(point: [number, number], ring: number[][]): boolean {
   return inside;
 }
 
-function geometryContainsPoint(geometry: Geometry, point: [number, number]): boolean {
+function polygonRingsContainingPoint(
+  geometry: Geometry,
+  point: [number, number]
+): number[][][] | null {
   const polygons = geometry.type === "Polygon"
     ? [geometry.coordinates as unknown as number[][][]]
     : geometry.type === "MultiPolygon"
       ? geometry.coordinates as unknown as number[][][][]
       : [];
 
-  return polygons.some((rings) => {
+  return polygons.find((rings) => {
     const outerRing = rings[0];
     return Boolean(
       outerRing &&
       ringContainsPoint(point, outerRing) &&
       !rings.slice(1).some((hole) => ringContainsPoint(point, hole))
     );
-  });
+  }) ?? null;
 }
 
-function verticalFeatureViewportRatio(
+function geometryContainsPoint(geometry: Geometry, point: [number, number]): boolean {
+  return polygonRingsContainingPoint(geometry, point) !== null;
+}
+
+function featureViewportFootprintRatio(
   map: MapLibreMapInstance,
   collection: MapFeatureCollection | undefined
 ): number | null {
-  const mapHeight = map.getContainer().clientHeight;
-  if (!collection || mapHeight <= 0) return null;
+  const container = map.getContainer();
+  const mapWidth = container.clientWidth;
+  const mapHeight = container.clientHeight;
+  if (!collection || mapWidth <= 0 || mapHeight <= 0) return null;
 
   const center = map.getCenter();
   const point: [number, number] = [center.lng, center.lat];
   const feature = collection.features.find((candidate) =>
     candidate.geometry ? geometryContainsPoint(candidate.geometry, point) : false
   );
-  if (!feature?.geometry || !("coordinates" in feature.geometry)) return null;
+  if (!feature?.geometry) return null;
+
+  // For a MultiPolygon, measure only the connected polygon containing the
+  // map centre. A remote island must not make the whole administrative area
+  // appear larger than the visible region.
+  const rings = polygonRingsContainingPoint(feature.geometry, point);
+  if (!rings) return null;
 
   const positions: Array<[number, number]> = [];
-  collectPositions(feature.geometry.coordinates, positions);
+  collectPositions(rings, positions);
   if (positions.length === 0) return null;
 
+  let minX = Infinity;
+  let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
   for (const position of positions) {
-    const screenY = map.project(position).y;
-    if (!Number.isFinite(screenY)) continue;
-    minY = Math.min(minY, screenY);
-    maxY = Math.max(maxY, screenY);
+    const projected = map.project(position);
+    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
+    minX = Math.min(minX, projected.x);
+    maxX = Math.max(maxX, projected.x);
+    minY = Math.min(minY, projected.y);
+    maxY = Math.max(maxY, projected.y);
   }
 
-  if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null;
-  return Math.max(0, maxY - minY) / mapHeight;
+  if (![minX, maxX, minY, maxY].every(Number.isFinite)) return null;
+
+  const featureWidth = Math.max(0, maxX - minX);
+  const featureHeight = Math.max(0, maxY - minY);
+  // Choose the area's longer screen-space axis, then compare it with the
+  // matching viewport dimension. This keeps the threshold fair for both
+  // east-west and north-south administrative shapes.
+  const useWidth = featureWidth >= featureHeight;
+  const featureExtent = useWidth ? featureWidth : featureHeight;
+  const viewportExtent = useWidth ? mapWidth : mapHeight;
+  if (viewportExtent <= 0) return null;
+
+  return featureExtent / viewportExtent;
 }
 
 function activeAreaLevelForMap(
@@ -909,15 +940,15 @@ function activeAreaLevelForMap(
       ? ADMIN_FOOTPRINT_EXIT_RATIO
       : ADMIN_FOOTPRINT_ENTER_RATIO;
 
-  const districtRatio = verticalFeatureViewportRatio(map, collections.district);
+  const districtRatio = featureViewportFootprintRatio(map, collections.district);
   if (districtRatio === null) return activeAreaLevel(zoom);
   if (districtRatio < transitionThreshold("sector")) return "district";
 
-  const sectorRatio = verticalFeatureViewportRatio(map, collections.sector);
+  const sectorRatio = featureViewportFootprintRatio(map, collections.sector);
   if (sectorRatio === null) return "district";
   if (sectorRatio < transitionThreshold("cell")) return "sector";
 
-  const cellRatio = verticalFeatureViewportRatio(map, collections.cell);
+  const cellRatio = featureViewportFootprintRatio(map, collections.cell);
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
@@ -2864,7 +2895,7 @@ export function MapView({
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
       const requestedLevels: AreaLevel[] = AREA_LEVELS.slice(0, activeIndex + 1);
       const nextLevel = AREA_LEVELS[activeIndex + 1];
-      const activeFootprintRatio = verticalFeatureViewportRatio(
+      const activeFootprintRatio = featureViewportFootprintRatio(
         map,
         areaDataRef.current[activeLevel]
       );
@@ -3159,7 +3190,7 @@ export function MapView({
           const settledLevel = getActiveAreaLevel();
           const settledIndex = AREA_LEVELS.indexOf(settledLevel);
           const settledNextLevel = AREA_LEVELS[settledIndex + 1];
-          const settledFootprintRatio = verticalFeatureViewportRatio(
+          const settledFootprintRatio = featureViewportFootprintRatio(
             map,
             areaDataRef.current[settledLevel]
           );
