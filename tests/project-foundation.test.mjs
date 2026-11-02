@@ -574,7 +574,7 @@ test("Show uses minimal on-off switches for all four place categories and zoning
   assert.match(mapView, /showOverlayScheduleTimer !== null/);
   assert.match(mapView, /applyVectorContextVisibility\(map, showLayersRef\.current\)/);
   assert.match(mapView, /addContextVectorLayers\(\)/);
-  assert.match(experience, /useState<MapOverlayCategory\[]>\(\["landmarks", "healthEducation", "transportation", "nature"\]\)/);
+  assert.match(experience, /useState<MapOverlayCategory\[]>\(\["landmarks"\]\)/);
   assert.match(zoning, /Proposed_Zoning_Plan|MapServer\/117/);
   assert.match(zoning, /Bugesera_DLUP/);
 });
@@ -784,7 +784,7 @@ test("parcel price estimates exhaust existing price snapshots and use mapped geo
   assert.match(experience, /uses the currently connected district transaction-price snapshot where finer-level data is missing/i);
 });
 
-test("parcel price markers use red baseline, brown public assets, charcoal high values and blue selected state", async () => {
+test("parcel price markers use maroon baseline, brown public assets, charcoal high values and blue selected state", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.match(mapView, /type PriceMarkerStyle = "market-default" \| "public-asset" \| "high-value"/);
@@ -801,7 +801,13 @@ test("parcel price markers use red baseline, brown public assets, charcoal high 
   assert.match(mapView, /const fillColor = isSelected\s*\?\s*\["#2563EB", "#1D4ED8"\]/);
   assert.match(mapView, /markerStyle === "public-asset"\s*\?\s*\["#98612F", "#75451F"\]/);
   assert.match(mapView, /markerStyle === "high-value"\s*\?\s*\["#454B52", "#30363D"\]/);
-  assert.match(mapView, /\["#D41A3A", "#B8142E"\]/);
+  assert.match(mapView, /\["#800000", "#660000"\]/);
+  assert.match(mapView, /"#800000"/);
+  assert.doesNotMatch(mapView, /#D41A3A|#B8142E|#9D2932/);
+  assert.match(mapView, /"line-width": 1\.05/);
+  assert.match(mapView, /"#35B5CA"/);
+  assert.match(mapView, /"feature-state", "hover"/);
+  assert.doesNotMatch(mapView, /-glow|line-blur|PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing/);
   assert.match(mapView, /sortValue >= 1_000_000_000/);
   assert.match(mapView, /isPublicAssetAt\(markerCenter\)/);
   assert.match(mapView, /cachedCollection\.features\.length > 0/);
@@ -1024,7 +1030,7 @@ test("village zoom defaults to satellite but manual basemap choice remains in co
   assert.match(experience, /manualBasemapChoiceRef\.current = "hybrid"/);
 });
 
-test("projects and developers are connected to the in-map register and parcel identity uses an exact UPI", async () => {
+test("projects and developers share one linked in-map directory and parcel identity uses an exact UPI", async () => {
   const directory = await readProjectFile("src/data/project-directory.ts");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
@@ -1038,8 +1044,11 @@ test("projects and developers are connected to the in-map register and parcel id
   assert.match(directory, /"parcelUpi": "1\/02\/08\/03\/681"/);
   assert.match(experience, /projects=\{RWANDA_PROJECT_RECORDS\}/);
   assert.match(experience, /showProjects=\{workspaceMode === "projects" \|\| projectsOpen\}/);
-  assert.match(experience, /RWANDA_PROJECT_RECORDS\.length/);
-  assert.match(experience, /RWANDA_PROJECT_DEVELOPERS\.length/);
+  assert.match(experience, /UNIFIED_DEVELOPER_DIRECTORY/);
+  assert.match(experience, /developerIdentityKey\(project\.developer\)/);
+  assert.match(experience, /developer\.projectIds\.length/);
+  assert.match(experience, /setSelectedProjectDeveloperId\(developer\.id\)/);
+  assert.doesNotMatch(experience, /project-directory-footnote|directory-evidence-note|developments · .* developers/);
   assert.match(experience, /projectParcelUpis|selectedParcelProject/);
   assert.match(experience, /selectedParcelProject\.parcelUpi|selectedParcelProject/);
   assert.match(experience, /project-identity-inline/);
