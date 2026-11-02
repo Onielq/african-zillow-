@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandImage } from "@/components/directories/BrandImage";
-import { ProjectReport } from "@/components/map/ProjectReport";
+import { ProjectReportModal } from "@/components/map/ProjectReportModal";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
 import { Marker, type Map as MapLibreMapInstance } from "maplibre-gl";
@@ -2320,14 +2320,7 @@ export function MapExperience() {
               <button aria-selected={projectDirectoryTab === "developers"} className={projectDirectoryTab === "developers" ? "project-directory-tab is-active" : "project-directory-tab"} onClick={() => { setProjectDirectoryTab("developers"); setProjectVisibleCount(24); setProjectDeveloperVisibleCount(24); setSelectedProjectDeveloperId(null); setSelectedProjectId(null); }} role="tab" type="button">Developers</button>
             </div>
 
-            {selectedProject ? (
-              <ProjectReport
-                project={selectedProject}
-                projects={RWANDA_PROJECT_RECORDS}
-                onBack={() => setSelectedProjectId(null)}
-                onLocate={() => void focusProjectOnMap(selectedProject)}
-              />
-            ) : projectDirectoryTab === "projects" ? (
+            {projectDirectoryTab === "projects" ? (
               <>
                 
                 <div className="project-record-list">
@@ -2389,6 +2382,13 @@ export function MapExperience() {
               </div>
             )}
           </aside>
+        ) : null}
+
+        {selectedProject ? (
+          <ProjectReportModal
+            projectName={selectedProject.name}
+            onClose={() => setSelectedProjectId(null)}
+          />
         ) : null}
 
         {metricInfoOpen ? (

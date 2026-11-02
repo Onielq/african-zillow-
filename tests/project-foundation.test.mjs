@@ -1114,11 +1114,12 @@ test("projects and developers share one linked in-map directory and parcel ident
   assert.match(css, /\.project-record-list/);
   assert.match(css, /\.project-directory-detail/);
   assert.match(css, /\.project-identity-inline/);
-  assert.match(experience, /import \{ ProjectReport \} from "@\/components\/map\/ProjectReport"/);
-  assert.match(experience, /<ProjectReport[\s\S]*?projects=\{RWANDA_PROJECT_RECORDS\}/);
-  assert.doesNotMatch(experience, /Valia Deck GitHub repository|project-repository-section/);
-  assert.match(css, /\.project-report-cover/);
-  assert.match(css, /\.project-report-section/);
+  assert.match(experience, /import \{ ProjectReportModal \} from "@\/components\/map\/ProjectReportModal"/);
+  assert.match(experience, /<ProjectReportModal[\s\S]*?projectName=\{selectedProject\.name\}/);
+  assert.match(experience, /projectDirectoryTab === "projects"/);
+  assert.doesNotMatch(experience, /import \{ ProjectReport \}|Valia Deck GitHub repository/);
+  assert.match(css, /\.valia-project-report-window/);
+  assert.match(css, /\.valia-project-report-scroll/);
 });
 
 
@@ -1177,23 +1178,29 @@ test("dense final parcel tiles retrieve object IDs in bounded concurrent batches
 });
 
 
-test("every selected project opens the same evidence-led project dossier", async () => {
-  const report = await readProjectFile("src/components/map/ProjectReport.tsx");
+test("project selection opens the original five-page Valia HTML in a separate window", async () => {
+  const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
+  const html = await readProjectFile("public/valia-deck/index.html");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const css = await readProjectFile("src/app/globals.css");
 
-  assert.match(experience, /<ProjectReport/);
-  assert.match(experience, /project=\{selectedProject\}/);
-  assert.match(report, /PROJECT PROFILE/);
-  assert.match(report, /Project status & timeline/);
-  assert.match(report, /Where the project is recorded/);
-  assert.match(report, /Other projects in the same district/);
-  assert.match(report, /What is not yet established/);
-  assert.match(report, /Where the record comes from/);
-  assert.match(report, /project\.secondarySourceUrl/);
-  assert.match(report, /project\.parcelUpi/);
-  assert.match(report, /project\.locationPrecision/);
-  assert.match(report, /Not reported in the current project record/);
-  assert.match(report, /not confirmed nearby developments, a complete district census, or verified market comparables/);
-  assert.match(report, /No sale price, rental rate or live unit availability is being inferred/);
-  assert.doesNotMatch(report, /estimated yield|investment score|risk score/i);
+  assert.match(experience, /<ProjectReportModal/);
+  assert.match(experience, /projectName=\{selectedProject\.name\}/);
+  assert.match(experience, /onClose=\{\(\) => setSelectedProjectId\(null\)\}/);
+  assert.match(experience, /projectDirectoryTab === "projects"/);
+  assert.match(modal, /src="\/valia-deck\/index\.html"/);
+  assert.match(modal, /document\.querySelectorAll\("\.page"\)/);
+  assert.match(modal, /transform: "scale\(" \+ scale \+ "\)"/);
+  assert.match(css, /\.valia-project-report-window/);
+  assert.match(css, /left: 18px/);
+  assert.match(css, /z-index: 18/);
+
+  assert.match(html, /@page \{ size: 13\.333in 7\.5in; margin: 0; \}/);
+  assert.match(html, /class="page cover"/);
+  assert.match(html, /class="page p2"/);
+  assert.match(html, /class="page p3"/);
+  assert.match(html, /class="page p4"/);
+  assert.match(html, /class="page p5"/);
+  assert.equal((html.match(/class="page /g) ?? []).length, 5);
+  assert.match(html, /src="data:image\/png;base64,/);
 });
