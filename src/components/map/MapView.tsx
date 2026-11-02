@@ -877,44 +877,6 @@ function geometryContainsPoint(geometry: Geometry, point: [number, number]): boo
   return polygonRingsContainingPoint(geometry, point) !== null;
 }
 
-function featureViewportVerticalRatio(
-  map: MapLibreMapInstance,
-  collection: MapFeatureCollection | undefined
-): number | null {
-  const container = map.getContainer();
-  const mapHeight = container.clientHeight;
-  if (!collection || mapHeight <= 0) return null;
-
-  const center = map.getCenter();
-  const point: [number, number] = [center.lng, center.lat];
-  const feature = collection.features.find((candidate) =>
-    candidate.geometry ? geometryContainsPoint(candidate.geometry, point) : false
-  );
-  if (!feature?.geometry) return null;
-
-  // For a MultiPolygon, measure only the connected polygon containing the
-  // map centre. A remote island must not distort the vertical footprint.
-  const rings = polygonRingsContainingPoint(feature.geometry, point);
-  if (!rings) return null;
-
-  const positions: Array<[number, number]> = [];
-  collectPositions(rings, positions);
-  if (positions.length === 0) return null;
-
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const position of positions) {
-    const projected = map.project(position);
-    if (!Number.isFinite(projected.y)) continue;
-    minY = Math.min(minY, projected.y);
-    maxY = Math.max(maxY, projected.y);
-  }
-
-  if (![minY, maxY].every(Number.isFinite)) return null;
-
-  const featureHeight = Math.max(0, maxY - minY);
-  return featureHeight / mapHeight;
-}
 
 function haversineDistanceMeters(
   first: [number, number],
@@ -930,18 +892,22 @@ function haversineDistanceMeters(
   return 2 * EARTH_RADIUS_METRES * Math.asin(Math.sqrt(Math.min(1, Math.max(0, haversine))));
 }
 
-type VerticalGroundMeasurement = {
-  areaHeightMeters: number;
-  viewportHeightMeters: number;
+type AdministrativeFootprintAxis = "width" | "height";
+
+type AdministrativeFootprintMeasurement = {
+  axis: AdministrativeFootprintAxis;
+  areaSpanMeters: number;
+  viewportSpanMeters: number;
 };
 
-function featureVerticalGroundMeasurement(
+function featureGroundFootprintMeasurement(
   map: MapLibreMapInstance,
   collection: MapFeatureCollection | undefined
-): VerticalGroundMeasurement | null {
+): AdministrativeFootprintMeasurement | null {
   const container = map.getContainer();
+  const mapWidth = container.clientWidth;
   const mapHeight = container.clientHeight;
-  if (!collection || mapHeight <= 0 || container.clientWidth <= 0) return null;
+  if (!collection || mapWidth <= 0 || mapHeight <= 0) return null;
 
   const center = map.getCenter();
   const point: [number, number] = [center.lng, center.lat];
@@ -950,8 +916,8 @@ function featureVerticalGroundMeasurement(
   );
   if (!feature?.geometry) return null;
 
-  // Measure only the connected polygon containing the map centre. Remote
-  // islands must not distort the vertical ground size of this administrative area.
+  // Only measure the connected polygon containing the map centre. Islands
+  // elsewhere in a MultiPolygon must not change this area's zoom threshold.
   const rings = polygonRingsContainingPoint(feature.geometry, point);
   if (!rings) return null;
 
@@ -959,58 +925,75 @@ function featureVerticalGroundMeasurement(
   collectPositions(rings, positions);
   if (positions.length === 0) return null;
 
+  let minLongitude = Infinity;
+  let maxLongitude = -Infinity;
   let minLatitude = Infinity;
   let maxLatitude = -Infinity;
   for (const [longitude, latitude] of positions) {
     if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) continue;
+    minLongitude = Math.min(minLongitude, longitude);
+    maxLongitude = Math.max(maxLongitude, longitude);
     minLatitude = Math.min(minLatitude, latitude);
     maxLatitude = Math.max(maxLatitude, latitude);
   }
-  if (![minLatitude, maxLatitude].every(Number.isFinite)) return null;
+  if (![minLongitude, maxLongitude, minLatitude, maxLatitude].every(Number.isFinite)) {
+    return null;
+  }
 
-  // The area's fixed north-south size is measured on the ground in metres.
+  // Compare the polygon's real ground width and height. A wide district uses
+  // its east-west length; a tall district uses its north-south length. The
+  // same check runs independently for sectors, cells and villages.
+  const areaWidthMeters = haversineDistanceMeters(
+    [minLongitude, center.lat],
+    [maxLongitude, center.lat]
+  );
   const areaHeightMeters = haversineDistanceMeters(
     [center.lng, minLatitude],
     [center.lng, maxLatitude]
   );
+  const axis: AdministrativeFootprintAxis =
+    areaWidthMeters >= areaHeightMeters ? "width" : "height";
+  const areaSpanMeters = axis === "width" ? areaWidthMeters : areaHeightMeters;
 
-  // Convert the current map's visible vertical span to ground metres. Using
-  // unproject keeps the measurement tied to the actual viewport and camera.
-  const centerX = container.clientWidth / 2;
-  const viewportTop = map.unproject([centerX, 0]);
-  const viewportBottom = map.unproject([centerX, mapHeight]);
-  const viewportHeightMeters = haversineDistanceMeters(
-    [viewportTop.lng, viewportTop.lat],
-    [viewportBottom.lng, viewportBottom.lat]
+  // Compare like with like. Wide polygons use the horizontal viewport span;
+  // tall polygons use its vertical span.
+  const viewportStart = axis === "width"
+    ? map.unproject([0, mapHeight / 2])
+    : map.unproject([mapWidth / 2, 0]);
+  const viewportEnd = axis === "width"
+    ? map.unproject([mapWidth, mapHeight / 2])
+    : map.unproject([mapWidth / 2, mapHeight]);
+  const viewportSpanMeters = haversineDistanceMeters(
+    [viewportStart.lng, viewportStart.lat],
+    [viewportEnd.lng, viewportEnd.lat]
   );
 
   if (
-    !Number.isFinite(areaHeightMeters) ||
-    !Number.isFinite(viewportHeightMeters) ||
-    areaHeightMeters <= 0 ||
-    viewportHeightMeters <= 0
+    !Number.isFinite(areaSpanMeters) ||
+    !Number.isFinite(viewportSpanMeters) ||
+    areaSpanMeters <= 0 ||
+    viewportSpanMeters <= 0
   ) return null;
 
-  return { areaHeightMeters, viewportHeightMeters };
+  return { axis, areaSpanMeters, viewportSpanMeters };
 }
 
 function adaptiveTransitionDistances(
-  measurement: VerticalGroundMeasurement,
+  measurement: AdministrativeFootprintMeasurement,
   childLevel: AreaLevel
 ): { enterMeters: number; exitMeters: number; prefetchMeters: number } | null {
   const targetDistanceMeters = ADMIN_TRANSITION_DISTANCE_METRES[childLevel];
   if (targetDistanceMeters === undefined) return null;
 
-  // Large areas use the requested scale threshold. Smaller areas use their
-  // own measured height so the next level appears only once the parent fills
-  // the vertical viewport (110% on entry, 100% on exit).
+  // Larger areas keep the existing 3 km / 1 km / 500 m trigger. Smaller areas
+  // use their dominant dimension: 110% to enter and 100% to return.
   const enterMeters = Math.min(
     targetDistanceMeters,
-    measurement.areaHeightMeters / ADMIN_FOOTPRINT_ENTER_RATIO
+    measurement.areaSpanMeters / ADMIN_FOOTPRINT_ENTER_RATIO
   );
   const exitMeters = Math.min(
     targetDistanceMeters * ADMIN_FOOTPRINT_ENTER_RATIO / ADMIN_FOOTPRINT_EXIT_RATIO,
-    measurement.areaHeightMeters / ADMIN_FOOTPRINT_EXIT_RATIO
+    measurement.areaSpanMeters / ADMIN_FOOTPRINT_EXIT_RATIO
   );
 
   return {
@@ -1021,7 +1004,7 @@ function adaptiveTransitionDistances(
 }
 
 function shouldAdvanceToChildLevel(
-  measurement: VerticalGroundMeasurement,
+  measurement: AdministrativeFootprintMeasurement,
   childLevel: AreaLevel,
   previousLevel: AreaLevel
 ): boolean {
@@ -1032,7 +1015,7 @@ function shouldAdvanceToChildLevel(
   const thresholdMeters = previousIndex >= childIndex
     ? distances.exitMeters
     : distances.enterMeters;
-  return measurement.viewportHeightMeters <= thresholdMeters;
+  return measurement.viewportSpanMeters <= thresholdMeters;
 }
 
 function shouldPrefetchNextLevel(
@@ -1043,17 +1026,17 @@ function shouldPrefetchNextLevel(
   const nextLevel = AREA_LEVELS[AREA_LEVELS.indexOf(level) + 1];
   if (!nextLevel) return false;
 
-  // Village → parcel retains the footprint handoff because no ground-distance
-  // threshold was specified for parcel detail.
+  const measurement = featureGroundFootprintMeasurement(map, collection);
+  if (!measurement) return false;
+
+  // Village → parcel has no separate ground-distance target. Prefetch it
+  // when its dominant dimension reaches the existing 85% viewport ratio.
   if (level === "village") {
-    const villageRatio = featureViewportVerticalRatio(map, collection);
-    return villageRatio !== null && villageRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO;
+    return measurement.areaSpanMeters / measurement.viewportSpanMeters >= ADMIN_FOOTPRINT_PREFETCH_RATIO;
   }
 
-  const measurement = featureVerticalGroundMeasurement(map, collection);
-  if (!measurement) return false;
   const distances = adaptiveTransitionDistances(measurement, nextLevel);
-  return Boolean(distances && measurement.viewportHeightMeters <= distances.prefetchMeters);
+  return Boolean(distances && measurement.viewportSpanMeters <= distances.prefetchMeters);
 }
 
 function activeAreaLevelForMap(
@@ -1063,22 +1046,23 @@ function activeAreaLevelForMap(
 ): AreaLevel {
   const zoom = map.getZoom();
 
-  const districtMeasurement = featureVerticalGroundMeasurement(map, collections.district);
+  const districtMeasurement = featureGroundFootprintMeasurement(map, collections.district);
   if (!districtMeasurement) return activeAreaLevel(zoom);
   if (!shouldAdvanceToChildLevel(districtMeasurement, "sector", previousLevel)) return "district";
 
-  const sectorMeasurement = featureVerticalGroundMeasurement(map, collections.sector);
+  const sectorMeasurement = featureGroundFootprintMeasurement(map, collections.sector);
   if (!sectorMeasurement) return "sector";
   if (!shouldAdvanceToChildLevel(sectorMeasurement, "cell", previousLevel)) return "sector";
 
-  const cellMeasurement = featureVerticalGroundMeasurement(map, collections.cell);
+  const cellMeasurement = featureGroundFootprintMeasurement(map, collections.cell);
   if (!cellMeasurement) return "cell";
   if (!shouldAdvanceToChildLevel(cellMeasurement, "village", previousLevel)) return "cell";
 
-  // Village → parcel keeps the existing vertical screen-footprint rule because
-  // no separate ground-distance threshold has been specified for parcel detail.
-  const villageRatio = featureViewportVerticalRatio(map, collections.village);
-  if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
+  // Village → parcel follows the same dominant-width-or-height measurement.
+  const villageMeasurement = featureGroundFootprintMeasurement(map, collections.village);
+  if (!villageMeasurement) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
+  const villageRatio =
+    villageMeasurement.areaSpanMeters / villageMeasurement.viewportSpanMeters;
   const previousIndex = AREA_LEVELS.indexOf(previousLevel);
   const parcelThreshold = previousIndex >= AREA_LEVELS.indexOf("parcel")
     ? ADMIN_FOOTPRINT_EXIT_RATIO
