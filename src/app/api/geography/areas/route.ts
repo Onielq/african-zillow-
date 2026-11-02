@@ -428,7 +428,8 @@ async function queryArcGisLayer(
   outFields = "*",
   revalidateSeconds = 300,
   timeoutMs = 15_000,
-  includeViewportGeometry = true
+  includeViewportGeometry = true,
+  objectIds?: string
 ): Promise<UpstreamFeature[]> {
   const upstreamUrl = new URL(`${layerUrl}/query`);
   // Request the provider's full polygon geometry. Do not set maxAllowableOffset
@@ -454,6 +455,7 @@ async function queryArcGisLayer(
   if (typeof resultRecordCount === "number") {
     params.set("resultRecordCount", String(resultRecordCount));
   }
+  if (objectIds) params.set("objectIds", objectIds);
 
   upstreamUrl.search = params.toString();
 
@@ -819,6 +821,84 @@ function uniqueUpiFeatures(features: UpstreamFeature[]): UpstreamFeature[] {
   return Array.from(unique.values());
 }
 
+async function queryParcelObjectIds(provider: ParcelProvider, bounds: Bounds): Promise<Array<number | string>> {
+  const upstreamUrl = new URL(`${provider.layerUrl}/query`);
+  upstreamUrl.search = new URLSearchParams({
+    where: "upi IS NOT NULL",
+    geometry: bounds.join(","),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "4326",
+    spatialRel: "esriSpatialRelIntersects",
+    returnIdsOnly: "true",
+    returnGeometry: "false",
+    f: "json"
+  }).toString();
+
+  const response = await fetch(upstreamUrl, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 180 },
+    signal: AbortSignal.timeout(12_000)
+  });
+  if (!response.ok) throw new Error("ArcGIS parcel ID query failed (" + response.status + ")");
+  const payload = await response.json() as {
+    objectIds?: Array<number | string>;
+    error?: { code?: number; message?: string };
+  };
+  if (payload.error) {
+    throw new Error("ArcGIS parcel ID error " + (payload.error.code ?? "unknown") + ": " + (payload.error.message ?? "query failed"));
+  }
+  return (payload.objectIds ?? []).sort((a, b) => Number(a) - Number(b));
+}
+
+async function queryParcelFeaturesByIds(
+  provider: ParcelProvider,
+  bounds: Bounds,
+  objectIds: Array<number | string>,
+  budget: { remaining: number }
+): Promise<{ features: UpstreamFeature[]; failed: boolean }> {
+  const selectedIds = objectIds.slice(0, budget.remaining);
+  if (selectedIds.length === 0) return { features: [], failed: true };
+
+  const batchSize = 100;
+  const batches: Array<Array<number | string>> = [];
+  for (let offset = 0; offset < selectedIds.length; offset += batchSize) {
+    batches.push(selectedIds.slice(offset, offset + batchSize));
+  }
+
+  const results: UpstreamFeature[][] = new Array(batches.length);
+  let nextBatch = 0;
+  const workerCount = Math.min(4, batches.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextBatch++;
+      if (index >= batches.length) return;
+      const batch = batches[index];
+      try {
+        results[index] = await queryArcGisLayer(
+          provider.layerUrl,
+          bounds,
+          batch.length,
+          "upi IS NOT NULL",
+          "upi,province,district,sector,cell,village,parcel_number,size,area_in_wetland,last_updated_on",
+          180,
+          15_000,
+          false,
+          batch.join(",")
+        );
+      } catch (error) {
+        console.warn("Parcel object-ID batch failed for " + provider.id + ".", error);
+        results[index] = [];
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  const uniqueFeatures = uniqueUpiFeatures(results.flat());
+  const boundedFeatures = uniqueFeatures.slice(0, budget.remaining);
+  budget.remaining = Math.max(0, budget.remaining - boundedFeatures.length);
+  return { features: boundedFeatures, failed: boundedFeatures.length === 0 };
+}
+
 async function queryParcelChildren(
   provider: ParcelProvider,
   children: Bounds[],
@@ -877,6 +957,21 @@ async function queryParcelBounds(
       180,
       15_000
     );
+
+    // At the deepest viewport subdivision, a 25-feature response may only be
+    // the first transfer page. Fetch matching object IDs and retrieve their
+    // geometries in bounded concurrent batches instead of dropping parcel lines.
+    if (features.length >= 25 && depth >= 3 && budget.remaining > 0) {
+      try {
+        const objectIds = await queryParcelObjectIds(provider, bounds);
+        if (objectIds.length > features.length) {
+          const completeTile = await queryParcelFeaturesByIds(provider, bounds, objectIds, budget);
+          if (completeTile.features.length > 0) return completeTile;
+        }
+      } catch (paginationError) {
+        console.warn("Parcel object-ID pagination could not complete for " + provider.id + ".", paginationError);
+      }
+    }
 
     // Keep each full-geometry response small enough for the public Bugesera
     // service to answer reliably. A 25-feature query is consistently faster
@@ -1095,7 +1190,7 @@ async function getParcels(
     ? fetchVercelParcelFallback(bounds, sourceFilter, [], true)
     : Promise.resolve<ParcelFallbackOutcome | null>(null);
 
-  const parcelBudget = { remaining: 900 };
+  const parcelBudget = { remaining: 1600 };
   const results = [];
   for (const provider of providers) {
     if (parcelBudget.remaining <= 0) break;
@@ -1235,8 +1330,9 @@ async function getParcels(
           ? `Some parcel source(s) unavailable: ${failedProviders.join(", ")}`
           : "Bugesera source reuse terms, completeness, and current survey accuracy still need confirmation",
         "X-Parcel-Record-Fields": "UPI, parcel number, area, wetland overlap, last update, and administrative names where exposed",
-        "X-Parcel-Request-Budget": "900 full-geometry parcel records maximum per viewport request",
-        "X-Parcel-Request-Budget-Reached": parcelBudget.remaining <= 0 ? "true" : "false"
+        "X-Parcel-Request-Budget": "1600 full-geometry parcel records maximum per viewport request",
+        "X-Parcel-Request-Budget-Reached": parcelBudget.remaining <= 0 ? "true" : "false",
+        "X-Parcel-ObjectId-Pagination": "deep viewport tiles fetched in concurrent batches of 100"
       }
     }
   );
