@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
   try {
     response = await fetch(source.toString(), {
       headers,
+      signal: AbortSignal.timeout(8_000),
       cf: {
         image: {
           format,
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
     optimized = Boolean(response.headers.get("cf-resized"));
   } catch {
     // Keep the directory usable when image transformations are unavailable.
-    response = await fetch(source.toString(), { headers });
+    response = await fetch(source.toString(), { headers, signal: AbortSignal.timeout(8_000) });
   }
 
   if (!response.ok) {
