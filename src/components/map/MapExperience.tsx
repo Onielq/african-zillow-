@@ -2346,7 +2346,25 @@ export function MapExperience() {
                 {selectedProject.sourceUrl ? <a className="project-source-link" href={selectedProject.sourceUrl} rel="noreferrer" target="_blank">Open project source ↗</a> : <small className="project-source-note">This ledger entry has no source link.</small>}
               </div>
             ) : projectDirectoryTab === "projects" ? (
-              <div className="project-record-list">
+              <>
+                <section className="project-repository-section" aria-label="Other software projects">
+                  <p className="project-repository-label">SOFTWARE PROJECT</p>
+                  <a
+                    aria-label="Valia Deck GitHub repository"
+                    className="project-repository-link"
+                    href="https://github.com/Onielq/valia-deck"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <span aria-hidden="true" className="project-repository-mark">GH</span>
+                    <span className="project-repository-copy">
+                      <strong>Valia Deck</strong>
+                      <small>Open GitHub repository</small>
+                    </span>
+                    <span aria-hidden="true" className="project-record-arrow">↗</span>
+                  </a>
+                </section>
+                <div className="project-record-list">
                 {visibleProjects.map((project) => (
                   <button className="project-record-item" key={project.id} onClick={() => void focusProjectOnMap(project)} type="button">
                     <BrandImage
@@ -2375,7 +2393,8 @@ export function MapExperience() {
                     Load 24 more projects
                   </button>
                 ) : null}
-              </div>
+                </div>
+              </>
             ) : (
               <div className="project-developer-list">
                 {visibleProjectDevelopers.map((developer) => (
