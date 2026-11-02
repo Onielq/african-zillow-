@@ -1178,7 +1178,7 @@ test("dense final parcel tiles retrieve object IDs in bounded concurrent batches
 });
 
 
-test("project selection opens the original five-page Valia HTML in a separate window", async () => {
+test("project selection opens the five-page Giza study in a draggable, resizable and dockable window", async () => {
   const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
   const html = await readProjectFile("public/valia-deck/index.html");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
@@ -1191,16 +1191,36 @@ test("project selection opens the original five-page Valia HTML in a separate wi
   assert.match(modal, /src="\/valia-deck\/index\.html"/);
   assert.match(modal, /document\.querySelectorAll\("\.page"\)/);
   assert.match(modal, /transform: "scale\(" \+ scale \+ "\)"/);
+  assert.match(modal, /onPointerDown=\{handleHeaderPointerDown\}/);
+  assert.match(modal, /onPointerMove=\{handleHeaderPointerMove\}/);
+  assert.match(modal, /toggleMinimized/);
   assert.match(css, /\.valia-project-report-window/);
   assert.match(css, /left: 18px/);
   assert.match(css, /z-index: 18/);
+  assert.match(css, /resize: both/);
+  assert.match(css, /valia-project-report-window-minimized/);
 
   assert.match(html, /@page \{ size: 13\.333in 7\.5in; margin: 0; \}/);
-  assert.match(html, /class="page cover"/);
-  assert.match(html, /class="page p2"/);
-  assert.match(html, /class="page p3"/);
-  assert.match(html, /class="page p4"/);
-  assert.match(html, /class="page p5"/);
+  assert.match(html, /class="page cover(?:\s+[^"]*)?"/);
+  assert.match(html, /class="page p2(?:\s+[^"]*)?"/);
+  assert.match(html, /class="page p3(?:\s+[^"]*)?"/);
+  assert.match(html, /class="page p4(?:\s+[^"]*)?"/);
+  assert.match(html, /class="page p5(?:\s+[^"]*)?"/);
   assert.equal((html.match(/class="page /g) ?? []).length, 5);
-  assert.match(html, /src="data:image\/png;base64,/);
+
+  const cover = html.slice(0, html.indexOf('<div class="page p2'));
+  assert.match(cover, /class="project-name">Giza<\/div>/);
+  assert.match(cover, /class="locality">RIVERSIDE HOMES<\/div>/);
+  assert.match(cover, /font-size: 52pt/);
+  assert.match(cover, /font-size: 12pt/);
+  assert.equal((cover.match(/<div class="icon-badge"><img src="data:image\/png;base64,/g) ?? []).length, 4);
+  assert.match(cover, /class="stat-value">247<\/div>/);
+  assert.match(cover, /Total residences across 1, 2, 3 &amp; 4-bedroom collections/);
+  assert.match(cover, /class="stat-value">10 meters<\/div>/);
+  assert.match(cover, /Ground floor and first floor/);
+  assert.match(cover, /class="stat-value">2 nearby bus stops<\/div>/);
+  assert.match(cover, /Serving the district, moments from the Iconic Station/);
+  assert.match(cover, /class="stat-value">Q4 2024<\/div>/);
+  assert.match(cover, /class="stat-label">Phase I completion<\/div>/);
+  assert.match(cover, /class="label">STARTING FROM<\/div>/);
 });
