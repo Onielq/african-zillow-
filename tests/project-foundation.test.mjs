@@ -27,45 +27,39 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /f: "json"/);
 });
 
-test("administrative detail uses the dominant width-or-height footprint and prefetches children", async () => {
+test("administrative detail uses the vertical screen-space footprint and prefetches children", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.match(mapView, /const ADMIN_FOOTPRINT_ENTER_RATIO = 1\.10/);
-  assert.match(mapView, /const ADMIN_FOOTPRINT_EXIT_RATIO = 1\.0/);
-  assert.match(mapView, /const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0\.85/);
-  assert.match(mapView, /function geometryContainsPoint\(/);
-  assert.match(mapView, /function polygonRingsContainingPoint\(/);
-  assert.match(mapView, /function featureViewportFootprintRatio\(/);
-  assert.match(mapView, /const container = map\.getContainer\(\)/);
-  assert.match(mapView, /const mapWidth = container\.clientWidth/);
-  assert.match(mapView, /const mapHeight = container\.clientHeight/);
-  assert.match(mapView, /const projected = map\.project\(position\)/);
-  assert.match(mapView, /projected\.x/);
-  assert.match(mapView, /projected\.y/);
-  assert.match(mapView, /const featureWidth = Math\.max\(0, maxX - minX\)/);
-  assert.match(mapView, /const featureHeight = Math\.max\(0, maxY - minY\)/);
-  assert.match(mapView, /const useWidth = featureWidth >= featureHeight/);
-  assert.match(mapView, /const viewportExtent = useWidth \? mapWidth : mapHeight/);
-  assert.match(mapView, /const featureExtent = useWidth \? featureWidth : featureHeight/);
-  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.district\)/);
-  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.village\)/);
-  assert.match(mapView, /transitionThreshold\("parcel"\)/);
-  assert.match(mapView, /featureViewportFootprintRatio\(\s*map,\s*areaDataRef\.current\[activeLevel\]/);
-  assert.match(mapView, /activeIndex <= AREA_LEVELS\.indexOf\("village"\)/);
-  assert.match(mapView, /settledIndex <= AREA_LEVELS\.indexOf\("village"\)/);
-  assert.doesNotMatch(mapView, /if \(activeLevel === "village"\) requestedLevels\.push\("parcel"\)/);
-  assert.doesNotMatch(mapView, /verticalFeatureViewportRatio/);
-  assert.match(mapView, /function activeAreaLevelForMap\(/);
-  assert.match(mapView, /const resolveActiveAreaLevel = \(\) =>/);
-  assert.match(mapView, /const updateLayerVisibility = \(\) => \{\s*resolveActiveAreaLevel\(\);/);
-  assert.match(mapView, /transitionThreshold\("sector"\)/);
-  assert.match(mapView, /transitionThreshold\("cell"\)/);
-  assert.match(mapView, /transitionThreshold\("village"\)/);
-  assert.doesNotMatch(mapView, /if \(zoom >= VILLAGE_ZOOM\) return "village"/);
+  assert.match(mapView, /const ADMIN_FOOTPRINT_ENTER_RATIO = 1\\.10/);
+  assert.match(mapView, /const ADMIN_FOOTPRINT_EXIT_RATIO = 1\\.0/);
+  assert.match(mapView, /const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0\\.85/);
+  assert.match(mapView, /function geometryContainsPoint\\(/);
+  assert.match(mapView, /function polygonRingsContainingPoint\\(/);
+  assert.match(mapView, /function featureViewportVerticalRatio\\(/);
+  assert.match(mapView, /const mapHeight = container\\.clientHeight/);
+  assert.match(mapView, /const projected = map\\.project\\(position\\)/);
+  assert.match(mapView, /projected\\.y/);
+  assert.match(mapView, /const featureHeight = Math\\.max\\(0, maxY - minY\\)/);
+  assert.match(mapView, /return featureHeight \/ mapHeight/);
+  assert.doesNotMatch(mapView, /const mapWidth = container\\.clientWidth/);
+  assert.doesNotMatch(mapView, /projected\\.x/);
+  assert.doesNotMatch(mapView, /featureViewportFootprintRatio|useWidth|featureWidth/);
+  assert.match(mapView, /featureViewportVerticalRatio\\(map, collections\\.district\\)/);
+  assert.match(mapView, /featureViewportVerticalRatio\\(map, collections\\.village\\)/);
+  assert.match(mapView, /transitionThreshold\\("parcel"\\)/);
+  assert.match(mapView, /featureViewportVerticalRatio\\(\\s*map,\\s*areaDataRef\\.current\\[activeLevel\\]/);
+  assert.match(mapView, /activeIndex <= AREA_LEVELS\\.indexOf\\("village"\\)/);
+  assert.match(mapView, /settledIndex <= AREA_LEVELS\\.indexOf\\("village"\\)/);
+  assert.doesNotMatch(mapView, /if \\(activeLevel === "village"\\) requestedLevels\\.push\\("parcel"\\)/);
+  assert.match(mapView, /function activeAreaLevelForMap\\(/);
+  assert.match(mapView, /const resolveActiveAreaLevel = \\(\\) =>/);
+  assert.match(mapView, /transitionThreshold\\("sector"\\)/);
+  assert.match(mapView, /transitionThreshold\\("cell"\\)/);
+  assert.match(mapView, /transitionThreshold\\("village"\\)/);
   assert.match(mapView, /activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
   assert.match(mapView, /settledFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
-  assert.match(mapView, /!requestedLevels\.includes\(settledNextLevel\)/);
-  assert.match(mapView, /requestedLevels\.push\(nextLevel\)/);
+  assert.match(mapView, /!requestedLevels\\.includes\\(settledNextLevel\\)/);
+  assert.match(mapView, /requestedLevels\\.push\\(nextLevel\\)/);
 });
 
 test("administrative boundaries render per GIS source and reuse cached viewport geometry", async () => {
@@ -109,7 +103,7 @@ test("the map view progressively switches administrative levels and increases bo
 test("cadastral outlines and parcel geometry are active from village zoom", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.village\)/);
+  assert.match(mapView, /featureViewportVerticalRatio\(map, collections\.village\)/);
   assert.match(mapView, /villageRatio < transitionThreshold\("parcel"\)/);
   assert.match(mapView, /const showParcelBoundaries = activeIndex >= villageIndex/);
   assert.match(mapView, /const showParcelBoundaries = activeIndex >= villageIndex/);
@@ -781,7 +775,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
   assert.match(mapView, /const requestedLevels: AreaLevel\[\] = AREA_LEVELS\.slice\(0, activeIndex \+ 1\)/);
-  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.village\)/);
+  assert.match(mapView, /featureViewportVerticalRatio\(map, collections\.village\)/);
   assert.match(mapView, /activeIndex <= AREA_LEVELS\.indexOf\("village"\)/);
   assert.match(mapView, /activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
   assert.match(mapView, /requestedLevels\.push\(nextLevel\)/);
