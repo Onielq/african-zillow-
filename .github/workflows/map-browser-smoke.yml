@@ -43,11 +43,17 @@ jobs:
           APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
         run: node scripts/smoke-test-admin-path-search.mjs
 
+      - name: Verify developer imagery on a throttled mobile connection
+        if: always()
+        env:
+          APP_BASE_URL: https://rwanda-land-intelligence.taiseel.workers.dev
+        run: node scripts/e2e-directory-slow-network.mjs
+
       - name: Upload village-level map screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: village-parcel-boundaries
-          path: artifacts/village-parcel-boundaries.png
+          name: mobile-and-parcel-browser-smoke
+          path: artifacts/*.png
           if-no-files-found: warn
           retention-days: 7

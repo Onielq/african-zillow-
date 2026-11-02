@@ -174,8 +174,8 @@ export function DirectoryLandingPage({
                   {candidateRecords.map((record) => (
                     <tr key={record.id}>
                       <th scope="row">
-                        <span className={styles.candidateOrganization}>
-                          <BrandImage name={record.name} source={record.logoUrl ?? websiteFaviconUrl(record.website)} className={styles.candidateLogo} width={96} height={96} />
+                        <span className={styles.candidateOrganization} data-testid="candidate-organization">
+                          <BrandImage name={record.name} source={record.logoUrl ?? websiteFaviconUrl(record.website)} className={styles.candidateLogo + " directory-candidate-logo"} width={96} height={96} />
                           <span>{record.name}</span>
                         </span>
                       </th>
