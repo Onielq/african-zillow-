@@ -937,8 +937,8 @@ function activeAreaLevelForMap(
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
-  // Village polygons also vary in aspect ratio. Use their own dominant
-  // dimension for the final parcel-detail handoff, with the same hysteresis.
+  // Use the village's vertical footprint for the final parcel-detail
+  // handoff as well, with the same hysteresis.
   const villageRatio = featureViewportVerticalRatio(map, collections.village);
   if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
   if (villageRatio < transitionThreshold("parcel")) return "village";
