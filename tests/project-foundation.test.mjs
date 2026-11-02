@@ -48,7 +48,12 @@ test("administrative detail uses the dominant width-or-height footprint and pref
   assert.match(mapView, /const viewportExtent = useWidth \? mapWidth : mapHeight/);
   assert.match(mapView, /const featureExtent = useWidth \? featureWidth : featureHeight/);
   assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.district\)/);
+  assert.match(mapView, /featureViewportFootprintRatio\(map, collections\.village\)/);
+  assert.match(mapView, /transitionThreshold\("parcel"\)/);
   assert.match(mapView, /featureViewportFootprintRatio\(\s*map,\s*areaDataRef\.current\[activeLevel\]/);
+  assert.match(mapView, /activeIndex <= AREA_LEVELS\.indexOf\("village"\)/);
+  assert.match(mapView, /settledIndex <= AREA_LEVELS\.indexOf\("village"\)/);
+  assert.doesNotMatch(mapView, /if \(activeLevel === "village"\) requestedLevels\.push\("parcel"\)/);
   assert.doesNotMatch(mapView, /verticalFeatureViewportRatio/);
   assert.match(mapView, /function activeAreaLevelForMap\(/);
   assert.match(mapView, /const resolveActiveAreaLevel = \(\) =>/);

@@ -952,7 +952,13 @@ function activeAreaLevelForMap(
   if (cellRatio === null) return "sector";
   if (cellRatio < transitionThreshold("village")) return "cell";
 
-  return zoom >= PARCEL_ZOOM ? "parcel" : "village";
+  // Village polygons also vary in aspect ratio. Use their own dominant
+  // dimension for the final parcel-detail handoff, with the same hysteresis.
+  const villageRatio = featureViewportFootprintRatio(map, collections.village);
+  if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
+  if (villageRatio < transitionThreshold("parcel")) return "village";
+
+  return "parcel";
 }
 
 function zoomForLevel(level: AreaLevel): number {
@@ -2901,15 +2907,12 @@ export function MapView({
       );
       if (
         nextLevel &&
-        activeIndex <= AREA_LEVELS.indexOf("cell") &&
+        activeIndex <= AREA_LEVELS.indexOf("village") &&
         activeFootprintRatio !== null &&
         activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO
       ) {
         requestedLevels.push(nextLevel);
       }
-      // At village zoom, request the parcel geometry as well as administrative
-      // geometry. Parcel outlines remain an additional detail layer.
-      if (activeLevel === "village") requestedLevels.push("parcel");
       const bounds = map.getBounds();
       const viewBounds: ViewBounds = [
         bounds.getWest(),
@@ -3196,7 +3199,7 @@ export function MapView({
           );
           const needsChildPrefetch =
             settledNextLevel &&
-            settledIndex <= AREA_LEVELS.indexOf("cell") &&
+            settledIndex <= AREA_LEVELS.indexOf("village") &&
             !requestedLevels.includes(settledNextLevel) &&
             settledFootprintRatio !== null &&
             settledFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO;
