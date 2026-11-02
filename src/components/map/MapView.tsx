@@ -190,7 +190,6 @@ type AreaProperties = {
 type MapFeatureCollection = FeatureCollection<Geometry, AreaProperties>;
 type AdminSourceId = "kigali" | "bugesera";
 type ViewBounds = [number, number, number, number];
-const PARCEL_OUTLINE_CASING_LAYER = "parcel-outline-casing";
 
 const ADMIN_SOURCE_EXTENTS: Record<AdminSourceId, ViewBounds> = {
   kigali: [29.58, -2.12, 30.32, -1.47],
@@ -371,7 +370,7 @@ function ensureMetricPillImage(
       ? ["#98612F", "#75451F"]
       : variant === "parcel" && markerStyle === "high-value"
         ? ["#454B52", "#30363D"]
-        : ["#D41A3A", "#B8142E"];
+        : ["#800000", "#660000"];
   const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
   gradient.addColorStop(0, fillColor[0]);
   gradient.addColorStop(1, fillColor[1]);
@@ -570,8 +569,8 @@ const LAND_PRICE_RAMP = [
 function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel = false) {
   return [
     "case",
-    ["boolean", ["feature-state", "selected"], false], isParcel ? "#00DDF5" : "#FFE3A1",
-    ["boolean", ["feature-state", "hover"], false], "#4FD58A",
+    ["boolean", ["feature-state", "selected"], false], "#40B5C9",
+    ["boolean", ["feature-state", "hover"], false], "#63BECE",
     showPrice
       ? [
           "case",
@@ -585,8 +584,8 @@ function areaFillColorExpression(showPrice: boolean, baseColor: string, isParcel
 
 const AREA_FILL_OPACITY_EXPRESSION = [
   "case",
-  ["boolean", ["feature-state", "selected"], false], 0.44,
-  ["boolean", ["feature-state", "hover"], false], 0.46,
+  ["boolean", ["feature-state", "selected"], false], 0.18,
+  ["boolean", ["feature-state", "hover"], false], 0.14,
   0.10
 ] as never;
 
@@ -1898,53 +1897,6 @@ export function MapView({
 
       for (const level of AREA_LEVELS) {
         const layer = AREA_LAYERS[level];
-        const glowLayerId = layer.outline + "-glow";
-        if (map.getLayer(glowLayerId)) continue;
-
-        map.addLayer({
-          id: glowLayerId,
-          type: "line",
-          source: layer.source,
-          layout: { visibility: level === "district" ? "visible" : "none" },
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00EFFF" : "#45EFAF",
-              ["boolean", ["feature-state", "hover"], false],
-              "#26D978",
-              "rgba(0,0,0,0)"
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 15 : 9,
-              ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 0 : level === "district" ? 11 : level === "sector" ? 9 : level === "cell" ? 8 : 7,
-              0
-            ],
-            "line-blur": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 6.2 : 4.2,
-              ["boolean", ["feature-state", "hover"], false],
-              level === "district" ? 4.8 : level === "sector" ? 4.2 : level === "cell" ? 3.8 : 3.4,
-              0
-            ],
-            "line-opacity": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 1 : 0.96,
-              ["boolean", ["feature-state", "hover"], false],
-              0.98,
-              0
-            ]
-          }
-        });
-      }
-
-      for (const level of AREA_LEVELS) {
-        const layer = AREA_LAYERS[level];
         if (map.getLayer(layer.outline)) continue;
 
         map.addLayer({
@@ -1955,55 +1907,19 @@ export function MapView({
           paint: {
             "line-color": [
               "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? "#00F0FF" : "#126347",
-              ["boolean", ["feature-state", "hover"], false],
-              "#06482F",
+              ["boolean", ["feature-state", "selected"], false], "#35B5CA",
+              ["boolean", ["feature-state", "hover"], false], "#35B5CA",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
                   ? "#A68A56"
                   : "#668878"
             ],
-            // Keep style expressions valid: feature-state logic must not wrap a
-            // zoom-interpolation expression in a "case" expression. The map uses
-            // crisp fixed-width strokes; selected/hovered boundaries get emphasis.
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "selected"], false],
-              level === "parcel" ? 5.0 : 4.0,
-              ["boolean", ["feature-state", "hover"], false],
-              level === "parcel" ? 1.6 : level === "district" ? 4.8 : level === "sector" ? 4.4 : level === "cell" ? 4.0 : 3.6,
-              level === "parcel" ? 1.25 : level === "village" ? 1.35 : 1.05
-            ],
-            "line-opacity": level === "parcel" ? 0.98 : 0.94
+            // Keep the same fine boundary weight in every interaction state.
+            "line-width": 1.05,
+            "line-opacity": level === "parcel" ? 0.92 : 0.90
           }
         });
-      }
-
-      // Optional contrast casing. Primary boundaries exist before this enhancement,
-      // so a casing-style failure cannot prevent village or parcel lines from loading.
-      if (!map.getLayer(PARCEL_OUTLINE_CASING_LAYER) && map.getLayer(AREA_LAYERS.parcel.outline)) {
-        try {
-          map.addLayer({
-            id: PARCEL_OUTLINE_CASING_LAYER,
-            type: "line",
-            source: AREA_LAYERS.parcel.source,
-            layout: { visibility: "none" },
-            paint: {
-              "line-color": "#1C2935",
-              "line-width": [
-                "interpolate", ["linear"], ["zoom"],
-                VILLAGE_ZOOM, 1.8,
-                PARCEL_ZOOM, 2.2,
-                PARCEL_ZOOM + 3.85, 3.2
-              ],
-              "line-opacity": 0.96
-            }
-          }, AREA_LAYERS.parcel.outline);
-        } catch (error) {
-          console.warn("Optional parcel outline casing unavailable; primary parcel outlines remain active.", error);
-        }
       }
 
       for (const level of AREA_LEVELS) {
@@ -2070,9 +1986,9 @@ export function MapView({
               ["==", ["get", "is_selected"], true], "#2563EB",
               ["==", ["get", "marker_style"], "public-asset"], "#8B5A2B",
               ["==", ["get", "marker_style"], "high-value"], "#343A40",
-              ["==", ["get", "level"], "parcel"], "#D41A3A",
+              ["==", ["get", "level"], "parcel"], "#800000",
               ["==", ["get", "has_value"], false], "#8B9690",
-              "#9D2932"
+              "#800000"
             ],
             "circle-stroke-color": "#FFFFFF",
             "circle-stroke-width": 1,
@@ -2607,16 +2523,12 @@ export function MapView({
     };
 
     const keepParcelBoundariesAndMarkersAboveContext = () => {
-      // Keep geographic boundaries and their hover glow above roads, POIs and zoning.
+      // Keep geographic boundaries above roads, POIs and zoning.
       for (const level of AREA_LEVELS.slice(0, -1)) {
         const outline = AREA_LAYERS[level].outline;
-        const glow = outline + "-glow";
-        if (map.getLayer(glow)) map.moveLayer(glow);
         if (map.getLayer(outline)) map.moveLayer(outline);
       }
       for (const layerId of [
-        PARCEL_OUTLINE_CASING_LAYER,
-        AREA_LAYERS.parcel.outline + "-glow",
         AREA_LAYERS.parcel.outline,
         AREA_LAYERS.parcel.label,
         "project-clusters",
@@ -2653,17 +2565,6 @@ export function MapView({
         }
         if (map.getLayer(layer.outline)) {
           map.setLayoutProperty(layer.outline, "visibility", showOutline ? "visible" : "none");
-        }
-        const glowLayerId = layer.outline + "-glow";
-        if (map.getLayer(glowLayerId)) {
-          map.setLayoutProperty(glowLayerId, "visibility", showOutline ? "visible" : "none");
-        }
-        if (level === "parcel" && map.getLayer(PARCEL_OUTLINE_CASING_LAYER)) {
-          map.setLayoutProperty(
-            PARCEL_OUTLINE_CASING_LAYER,
-            "visibility",
-            showParcelBoundaries ? "visible" : "none"
-          );
         }
         if (map.getLayer(layer.label)) {
           const showLabel =
@@ -3666,7 +3567,7 @@ export function MapView({
       });
       // Parcel selection already happens at cadastral zoom. Fitting the clicked
       // polygon would move it away from the pointer and instantly fire mouseleave,
-      // removing the glow before the person can inspect the selected shape.
+      // moving the map would remove the selected shape from the user's view.
       if (level !== "parcel") fitFeature(map, feature, level);
     };
 
