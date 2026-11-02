@@ -1918,8 +1918,8 @@ export function MapView({
             // Give active boundaries a clearer edge without a glow or blurred casing.
             "line-width": [
               "case",
-              ["boolean", ["feature-state", "selected"], false], level === "parcel" ? 2.0 : 1.9,
-              ["boolean", ["feature-state", "hover"], false], level === "parcel" ? 1.75 : 1.65,
+              ["boolean", ["feature-state", "selected"], false], 4.0,
+              ["boolean", ["feature-state", "hover"], false], 4.0,
               level === "parcel" ? 1.2 : 1.05
             ],
             "line-opacity": [
