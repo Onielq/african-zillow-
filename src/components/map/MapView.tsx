@@ -370,9 +370,7 @@ function ensureMetricPillImage(
       ? ["#98612F", "#75451F"]
       : variant === "parcel" && markerStyle === "high-value"
         ? ["#454B52", "#30363D"]
-        : variant === "parcel"
-          ? ["#800000", "#660000"]
-          : ["#D41A3A", "#B8142E"];
+        : ["#D41A3A", "#B8142E"];
   const gradient = context.createLinearGradient(0, 0, 0, bodyHeight);
   gradient.addColorStop(0, fillColor[0]);
   gradient.addColorStop(1, fillColor[1]);
@@ -1998,7 +1996,7 @@ export function MapView({
               ["==", ["get", "is_selected"], true], "#2563EB",
               ["==", ["get", "marker_style"], "public-asset"], "#8B5A2B",
               ["==", ["get", "marker_style"], "high-value"], "#343A40",
-              ["==", ["get", "level"], "parcel"], "#800000",
+              ["==", ["get", "level"], "parcel"], "#D41A3A",
               ["==", ["get", "has_value"], false], "#8B9690",
               "#9D2932"
             ],
