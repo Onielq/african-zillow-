@@ -34,14 +34,25 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build production app
         run: npm run build
-      - name: Smoke-test production parcel API
+      - name: Smoke-test production APIs
         env:
           APP_BASE_URL: http://127.0.0.1:3000
         run: |
           npm run start -- --hostname 127.0.0.1 > /tmp/parcel-app.log 2>&1 &
           sleep 4
-          node scripts/smoke-test-admin-path-search.mjs || { tail -n 160 /tmp/parcel-app.log; exit 1; }
-          node scripts/smoke-test-parcel-api.mjs
+          admin_status=0
+          parcel_status=0
+          node scripts/smoke-test-admin-path-search.mjs || admin_status=$?
+          node scripts/smoke-test-parcel-api.mjs || parcel_status=$?
+          if [ "$parcel_status" -ne 0 ]; then
+            tail -n 160 /tmp/parcel-app.log
+            exit "$parcel_status"
+          fi
+          if [ "$admin_status" -ne 0 ]; then
+            echo "::warning::Administrative path search smoke failed; parcel API smoke passed independently."
+            tail -n 160 /tmp/parcel-app.log
+            exit "$admin_status"
+          fi
       # Run the public GIS probes even if the production smoke test fails;
       # otherwise the first HTTP 502 masks whether the upstream parcel services
       # themselves are slow, unavailable, or returning a different schema.
