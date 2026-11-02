@@ -1114,9 +1114,11 @@ test("projects and developers share one linked in-map directory and parcel ident
   assert.match(css, /\.project-record-list/);
   assert.match(css, /\.project-directory-detail/);
   assert.match(css, /\.project-identity-inline/);
-  assert.match(experience, /aria-label="Valia Deck GitHub repository"/);
-  assert.match(experience, /https:\/\/github\.com\/Onielq\/valia-deck/);
-  assert.match(css, /\.project-repository-section/);
+  assert.match(experience, /import \{ ProjectReport \} from "@\/components\/map\/ProjectReport"/);
+  assert.match(experience, /<ProjectReport[\s\S]*?projects=\{RWANDA_PROJECT_RECORDS\}/);
+  assert.doesNotMatch(experience, /Valia Deck GitHub repository|project-repository-section/);
+  assert.match(css, /\.project-report-cover/);
+  assert.match(css, /\.project-report-section/);
 });
 
 
@@ -1172,4 +1174,26 @@ test("dense final parcel tiles retrieve object IDs in bounded concurrent batches
   assert.match(route, /batchSize = 100/);
   assert.match(route, /workerCount = Math.min\(4/);
   assert.match(route, /remaining: 1600/);
+});
+
+
+test("every selected project opens the same evidence-led project dossier", async () => {
+  const report = await readProjectFile("src/components/map/ProjectReport.tsx");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(experience, /<ProjectReport/);
+  assert.match(experience, /project=\{selectedProject\}/);
+  assert.match(report, /PROJECT PROFILE/);
+  assert.match(report, /Project status & timeline/);
+  assert.match(report, /Where the project is recorded/);
+  assert.match(report, /Other projects in the same district/);
+  assert.match(report, /What is not yet established/);
+  assert.match(report, /Where the record comes from/);
+  assert.match(report, /project\.secondarySourceUrl/);
+  assert.match(report, /project\.parcelUpi/);
+  assert.match(report, /project\.locationPrecision/);
+  assert.match(report, /Not reported in the current project record/);
+  assert.match(report, /not confirmed nearby developments, a complete district census, or verified market comparables/);
+  assert.match(report, /No sale price, rental rate or live unit availability is being inferred/);
+  assert.doesNotMatch(report, /estimated yield|investment score|risk score/i);
 });
