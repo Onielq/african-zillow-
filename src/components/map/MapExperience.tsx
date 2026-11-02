@@ -1545,6 +1545,7 @@ export function MapExperience() {
         setCellParcelsStatus("loaded");
       } catch {
         if (controller.signal.aborted) return;
+        setCellParcelsLookupKey(lookupKey);
         setCellParcelsStatus("error");
       }
     };
