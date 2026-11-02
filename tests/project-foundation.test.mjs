@@ -27,6 +27,24 @@ test("the administrative API restricts requests to the four pilot districts", as
   assert.match(route, /f: "json"/);
 });
 
+test("administrative detail advances at 110% vertical viewport fill and prefetches children", async () => {
+  const mapView = await readProjectFile("src/components/map/MapView.tsx");
+
+  assert.match(mapView, /const ADMIN_FOOTPRINT_ENTER_RATIO = 1\.10/);
+  assert.match(mapView, /const ADMIN_FOOTPRINT_EXIT_RATIO = 1\.0/);
+  assert.match(mapView, /const ADMIN_FOOTPRINT_PREFETCH_RATIO = 0\.85/);
+  assert.match(mapView, /function geometryContainsPoint\(/);
+  assert.match(mapView, /function verticalFeatureViewportRatio\(/);
+  assert.match(mapView, /map\.getContainer\(\)\.clientHeight/);
+  assert.match(mapView, /map\.project\(position\)\.y/);
+  assert.match(mapView, /function activeAreaLevelForMap\(/);
+  assert.match(mapView, /transitionThreshold\("sector"\)/);
+  assert.match(mapView, /transitionThreshold\("cell"\)/);
+  assert.match(mapView, /transitionThreshold\("village"\)/);
+  assert.match(mapView, /activeFootprintRatio >= ADMIN_FOOTPRINT_PREFETCH_RATIO/);
+  assert.match(mapView, /requestedLevels\.push\(nextLevel\)/);
+});
+
 test("administrative boundaries render per GIS source and reuse cached viewport geometry", async () => {
   const route = await readProjectFile("src/app/api/geography/areas/route.ts");
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
@@ -45,6 +63,7 @@ test("administrative boundaries render per GIS source and reuse cached viewport 
 test("the map view progressively switches administrative levels and increases boundary opacity", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   assert.match(mapView, /SECTOR_ZOOM/);
+  assert.match(mapView, /ADMIN_FOOTPRINT_ENTER_RATIO = 1\\.10/);
   assert.match(mapView, /CELL_ZOOM/);
   assert.match(mapView, /VILLAGE_ZOOM/);
   assert.match(mapView, /PARCEL_ZOOM/);
@@ -112,7 +131,7 @@ test("parcel boundary requests preserve source vertices and use a precise viewpo
   assert.match(route, /do not set maxAllowableOffset/i);
   assert.match(route, /returnGeometry: "true"/);
   assert.match(mapView, /toFixed\(6\)\)\.join\(","\)/);
-  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], 4\.0,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], 4\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], level === "parcel" \? 3\.0 : 3\.5,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], level === "parcel" \? 4\.0 : 3\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /feature-state.*selected/s);
 });
 
@@ -723,7 +742,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.doesNotMatch(mapView, /"circle-radius": \[\s*"case"[\s\S]{0,200}\["interpolate", \["linear"\], \["zoom"\]/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
-  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], 4\.0,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], 4\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], level === "parcel" \? 3\.0 : 3\.5,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], level === "parcel" \? 4\.0 : 3\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /"line-opacity": \[\s*"case"[\s\S]*?level === "parcel" \? 0\.95 : 0\.92/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
@@ -808,7 +827,7 @@ test("parcel price markers use district red baseline, brown public assets, charc
   assert.ok(mapView.includes('["#D41A3A", "#B8142E"]'));
   assert.doesNotMatch(mapView, /#800000|#660000/);
   assert.match(mapView, /"#9D2932"/);
-  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], 4\.0,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], 4\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], level === "parcel" \? 3\.0 : 3\.5,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], level === "parcel" \? 4\.0 : 3\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /"#149DB0"/);
   assert.match(mapView, /"feature-state", "hover"/);
   assert.doesNotMatch(mapView, /-glow|line-blur|PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing/);
@@ -880,7 +899,7 @@ test("parcel outlines use strong active borders without glow or casing above roa
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
   assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
-  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], 4\.0,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], 4\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], level === "parcel" \? 3\.0 : 3\.5,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], level === "parcel" \? 4\.0 : 3\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.match(mapView, /"#149DB0"/);
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /const keepParcelBoundariesAndMarkersAboveContext = \(\) =>/);
@@ -964,7 +983,7 @@ test("the geography API uses build-time transaction rows, not request-time files
 
 test("parcel boundary styling uses a single active-state stroke and does not create a casing layer", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
-  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], 4\.0,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], 4\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
+  assert.match(mapView, /"line-width": \[\s*"case"[\s\S]*?\["boolean", \["feature-state", "selected"\], false\], level === "parcel" \? 3\.0 : 3\.5,[\s\S]*?\["boolean", \["feature-state", "hover"\], false\], level === "parcel" \? 4\.0 : 3\.0,[\s\S]*?level === "parcel" \? 1\.2 : 1\.05/);
   assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing|-glow|line-blur/);
 });
 
