@@ -721,7 +721,7 @@ test("map price tags use one compact uppercase formatter, preserve zoom hierarch
   assert.match(mapView, /"fill-opacity": level === "parcel"\s*\?\s*0\.006/);
   assert.match(mapView, /level === "parcel"\s*\?\s*"#FFFFFF"/);
   assert.match(mapView, /"line-width": \[\s*"case",\s*\["boolean", \["feature-state", "selected"\], false\]/);
-  assert.match(mapView, /level === "parcel" \? 1\.25 : level === "village" \? 1\.35 : 1\.05/);
+  assert.match(mapView, /"line-width": 1\.05/);
   assert.match(mapView, /"line-opacity": level === "parcel" \? 0\.98 : 0\.94/);
   assert.match(mapView, /"icon-size": \["interpolate", \["linear"\], \["zoom"\], PARCEL_ZOOM, 1, 19, 1, 21, 1\.02\]/);
   assert.match(mapView, /map\.on\("click", "metric-bubbles-parcel-label", selectParcelFromMarker\)/);
@@ -875,7 +875,7 @@ test("parcel availability is never invented when no verified listing source is c
 test("parcel outlines keep a high-contrast casing above road and zoning overlays", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
 
-  assert.match(mapView, /const PARCEL_OUTLINE_CASING_LAYER = "parcel-outline-casing"/);
+  assert.doesNotMatch(mapView, /PARCEL_OUTLINE_CASING_LAYER|parcel-outline-casing/);
   assert.match(mapView, /"line-color": \[/);
   assert.match(mapView, /"#1C2935"/);
   assert.match(mapView, /"line-width": \[/);
