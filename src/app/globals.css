@@ -4556,3 +4556,73 @@ input {
     flex-basis: 54px;
   }
 }
+
+
+/* External software repositories stay distinct from mapped property developments. */
+.project-repository-section {
+  flex-shrink: 0;
+  margin: 3px 0 10px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-repository-label {
+  margin: 0 0 7px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+
+.project-repository-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.project-repository-link:hover {
+  border-color: var(--focus);
+  background: var(--surface-muted);
+}
+
+.project-repository-mark {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #E9EEE9;
+  color: #425C4A;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.project-repository-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.project-repository-copy strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.project-repository-copy small {
+  color: var(--ink-muted);
+  font-size: 10px;
+}
