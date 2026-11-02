@@ -38,6 +38,8 @@ test("administrative detail advances at 110% vertical viewport fill and prefetch
   assert.match(mapView, /map\.getContainer\(\)\.clientHeight/);
   assert.match(mapView, /map\.project\(position\)\.y/);
   assert.match(mapView, /function activeAreaLevelForMap\(/);
+  assert.match(mapView, /const resolveActiveAreaLevel = \(\) =>/);
+  assert.match(mapView, /const updateLayerVisibility = \(\) => \{\s*resolveActiveAreaLevel\(\);/);
   assert.match(mapView, /transitionThreshold\("sector"\)/);
   assert.match(mapView, /transitionThreshold\("cell"\)/);
   assert.match(mapView, /transitionThreshold\("village"\)/);
