@@ -618,10 +618,10 @@ body { background:#e9e7e1; }
 .bwiza-p2 table.unit-table thead th { padding:.09in .09in; font-size:7.9pt; }
 .bwiza-p2 table.unit-table tbody td { padding:.12in .09in; font-size:8.35pt; }
 .bwiza-p2 .table-foot { font-size:7.35pt; line-height:1.45; margin-top:.075in; }
-.bwiza-p2 .pp-row { gap:.08in; margin-top:.09in; }
-.bwiza-p2 .pp-chip { padding:.12in .04in .1in; }
-.bwiza-p2 .pp-chip .pct { font-size:13pt; }
-.bwiza-p2 .pp-chip .when { font-size:7pt; line-height:1.3; }
+.bwiza-p2 .pp-row { gap:.09in; margin-top:.1in; }
+.bwiza-p2 .pp-chip { padding:.11in .03in .08in; }
+.bwiza-p2 .pp-chip .pct { font-size:12.5pt; }
+.bwiza-p2 .pp-chip .when { font-size:6.6pt; line-height:1.2; }
 .bwiza-p2 .pp-note { font-size:7.15pt; line-height:1.45; margin-top:.075in; }
 .bwiza-p2 .metrics-row { gap:.16in; margin-top:.15in; }
 .bwiza-p2 .metric-box { padding:.14in .16in; }
@@ -683,9 +683,11 @@ body { background:#e9e7e1; }
 .bwiza-p2 .pp-title,
 .bwiza-p2 .pp-note { flex:0 0 auto; }
 .bwiza-p2 .pp-row {
-  flex:1.1 1 0;
-  min-height:.7in;
+  flex:0 0 auto;
+  min-height:0;
   align-items:stretch;
+  gap:.09in;
+  margin-top:.1in;
 }
 .bwiza-p2 .pp-chip {
   display:flex;
@@ -790,24 +792,24 @@ body { background:#e9e7e1; }
 .bwiza-p4 table.comp-table thead th { padding: .09in .14in; font-size: 8.6pt; }
 .bwiza-p4 table.comp-table tbody td { padding: .1in .14in; line-height: 1.35; }
 .bwiza-p4 .table-note { font-size: 7.8pt; line-height: 1.4; margin-top: .1in; }
-.bwiza-p4 .bar-title { margin-top: .2in; font-size: 9.3pt; }
+.bwiza-p4 .bar-title { margin-top:.16in; font-size:8.4pt; line-height:1.2; letter-spacing:1.2px; }
 .bwiza-p4 .bwiza-rate-chart {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  justify-content: space-evenly;
-  min-height: 2in;
-  margin-top: .1in;
+  display:flex;
+  flex:0 0 auto;
+  flex-direction:column;
+  justify-content:flex-start;
+  min-height:0;
+  margin-top:.07in;
 }
 .bwiza-p4 .bwiza-rate-chart .rate-row {
-  grid-template-columns: 1.62in 1fr .52in;
-  gap: .1in;
-  margin: .07in 0;
-  font-size: 8pt;
+  grid-template-columns:1.55in 1fr .48in;
+  gap:.08in;
+  margin:.045in 0;
+  font-size:7.2pt;
 }
-.bwiza-p4 .bwiza-rate-chart .rate-track { height: .13in; }
-.bwiza-p4 .bwiza-rate-chart .rate-row b { font-size: 7.7pt; }
-.bwiza-p4 .bwiza-rate-chart .rate-scale { font-size: 7pt; margin-top: .05in; }
+.bwiza-p4 .bwiza-rate-chart .rate-track { height:.105in; }
+.bwiza-p4 .bwiza-rate-chart .rate-row b { font-size:7pt; }
+.bwiza-p4 .bwiza-rate-chart .rate-scale { font-size:6.3pt; margin-top:.04in; }
 .bwiza-p4 .bwiza-source-line { font-size: 6.8pt; line-height: 1.4; margin-top: .1in; }
 .bwiza-p4 .bwiza-analysis-panel {
   display: flex;
@@ -852,14 +854,20 @@ body { background:#e9e7e1; }
 .bwiza-p5 .district-mini-map { top: .18in; bottom: .18in; }
 .bwiza-nearby-heading { font-size: 9.5pt; margin-bottom: .1in; }
 .bwiza-nearby-grid {
-  display: grid;
-  flex: 1 1 auto;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: space-evenly;
-  column-gap: .3in;
-  row-gap: .18in;
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  align-content:stretch;
+  justify-content:flex-start;
+  gap:0;
 }
-.bwiza-p5 .nearby-item { align-items: flex-start; gap: .14in; padding: .1in 0; }
+.bwiza-p5 .nearby-item {
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:.14in;
+  padding:.075in 0;
+}
 .bwiza-p5 .nearby-item .badge { width: .36in; height: .36in; flex: 0 0 .36in; }
 .bwiza-p5 .nearby-item .badge img { width: .22in; height: .22in; }
 .bwiza-p5 .nearby-item .txt { font-size: 9.3pt; line-height: 1.35; }
@@ -1029,8 +1037,8 @@ body { background:#e9e7e1; }
 </div>
 
 <div class="page p4 bwiza-p4">
-  <div class="headline">How Bwiza Prices Against the Market</div>
-  <div class="subhead">Price per square metre — Bwiza vs Heza Estate vs Masaka Views vs Greenland Plaza</div>
+  <div class="headline">How Giza Prices Against the Market</div>
+  <div class="subhead">Price per square metre — Giza vs Heza Estate vs Masaka Views vs Greenland Plaza</div>
   <div class="body">
     <div class="col-left">
       <table class="comp-table bwiza-comp-table">
@@ -1040,16 +1048,16 @@ body { background:#e9e7e1; }
           <col style="width:31%">
         </colgroup>
         <thead>
-          <tr><th>Segment</th><th>RWF / m²</th><th>vs Bwiza</th></tr>
+          <tr><th>Segment</th><th>RWF / m²</th><th>vs Giza</th></tr>
         </thead>
         <tbody>
-          <tr><td>Heza Estate — 3-bedroom apartment</td><td class="num">973,684</td><td>Bwiza priced 42% below</td></tr>
-<tr><td>Masaka Views — 3-bedroom townhouse</td><td class="num">912,179</td><td>Bwiza priced 38% below</td></tr>
-<tr><td>Greenland Plaza — 3-bedroom apartment</td><td class="num">1,950,023</td><td>Bwiza priced 71% below</td></tr>
-<tr class="hi"><td>BWIZA — blended 3-bedroom pricing</td><td class="num">568,026</td><td>Benchmark</td></tr>
+          <tr><td>Heza Estate — 3-bedroom apartment</td><td class="num">973,684</td><td>Giza priced 42% below</td></tr>
+<tr><td>Masaka Views — 3-bedroom townhouse</td><td class="num">912,179</td><td>Giza priced 38% below</td></tr>
+<tr><td>Greenland Plaza — 3-bedroom apartment</td><td class="num">1,950,023</td><td>Giza priced 71% below</td></tr>
+<tr class="hi"><td>GIZA — blended 3-bedroom pricing</td><td class="num">568,026</td><td>Benchmark</td></tr>
         </tbody>
       </table>
-      <div class="bar-title" style="margin-top:.16in">BWIZA — RWF / M² BY UNIT TYPE</div>
+      <div class="bar-title" style="margin-top:.16in">GIZA — RWF / M² BY UNIT TYPE</div>
       <div class="bwiza-rate-chart">
         <div class="rate-row"><span>Ivy · 2BR · 43 m²</span><div class="rate-track"><i style="width:62.5%"></i></div><b>500K</b></div>
         <div class="rate-row"><span>Lily · 2BR · 65 m²</span><div class="rate-track"><i style="width:65%"></i></div><b>520K</b></div>
@@ -1061,7 +1069,7 @@ body { background:#e9e7e1; }
       </div>
       <div class="table-note">Asking-price comparison using published or supplied unit prices divided by advertised floor area. These are not verified transaction prices; confirm current prices, areas and specifications before relying on the comparison.</div>
       <div class="bwiza-source-line">
-        Sources: <a href="https://bwiza.adhicorp.com/about-us/" target="_blank" rel="noopener">ADHI · Bwiza unit mix and Phase 1</a> ·
+        Sources: <a href="https://bwiza.adhicorp.com/about-us/" target="_blank" rel="noopener">ADHI · Giza unit mix and Phase 1</a> ·
         <a href="https://hezaestate.rssb.rw/" target="_blank" rel="noopener">Heza Estate</a> ·
         <a href="https://www.scribd.com/document/1056230030/Heza-Estate-Brochure" target="_blank" rel="noopener">Heza Estate brochure</a> ·
         <a href="https://www.ktpress.rw/2026/10/tura-neza-105-by-ncba-bank-rwanda-offers-105-mortgage-financing-for-25-million-housing-project-in-masaka/" target="_blank" rel="noopener">KT Press · Masaka Views</a> ·
@@ -1073,19 +1081,19 @@ body { background:#e9e7e1; }
         <div class="eyebrow">THE OPPORTUNITY</div>
         <div class="opp-stat">
           <div class="num">38–71%</div>
-          <div class="body">The price-per-square-metre discount Bwiza offers against the selected three-bedroom competitors.</div>
+          <div class="body">The price-per-square-metre discount Giza offers against the selected three-bedroom competitors.</div>
         </div>
         <hr class="opp-rule">
         <div class="opp-stat">
           <div class="num">69%</div>
-          <div class="body">The price-per-square-metre spread between Bwiza's lowest-priced and highest-priced three-bedroom models, Jade and Sofia.</div>
+          <div class="body">The price-per-square-metre spread between Giza's lowest-priced and highest-priced three-bedroom models, Jade and Sofia.</div>
         </div>
-        <div class="opp-note bwiza-decision-note"><b>The pattern:</b> Bwiza's blended three-bedroom asking rate is below all three selected competitors. Its lower entry pricing creates a clear price advantage, while its different unit models offer a range of price points within the same development.</div>
+        <div class="opp-note bwiza-decision-note"><b>The pattern:</b> Giza's blended three-bedroom asking rate is below all three selected competitors. Its lower entry pricing creates a clear price advantage, while its different unit models offer a range of price points within the same development.</div>
       </div>
     </div>
   </div>
   <div class="footer">
-    <div>BWIZA RIVERSIDE HOMES · KIGALI COMPARABLES</div>
+    <div>GIZA RIVERSIDE HOMES · KIGALI COMPARABLES</div>
     <div class="pageno">04 / PRICE PER M²</div>
   </div>
 </div>
@@ -1095,8 +1103,8 @@ body { background:#e9e7e1; }
   <div class="hero-imgs">
     <div class="mall-col">
       <div class="mall-img bwiza-neighbourhood-photo">
-        <img src="https://www.ippmedia.co.tz/storage/post-feature-images/01J73V69APDZ897TJC7SVZEY8K.webp" alt="Bwiza Riverside Homes townhouse street in Karama">
-        <div class="cap">Completed townhouse street · Bwiza Riverside Homes</div>
+        <img src="https://www.ippmedia.co.tz/storage/post-feature-images/01J73V69APDZ897TJC7SVZEY8K.webp" alt="Giza Riverside Homes townhouse street in Karama">
+        <div class="cap">Completed townhouse street · Giza Riverside Homes</div>
       </div>
       <div class="mall-stats">
         <div class="stat"><div class="val">Karama</div><div class="lbl">Sector / neighbourhood</div></div>
@@ -1129,7 +1137,7 @@ body { background:#e9e7e1; }
       </div>
     </div>
   </div>
-  <div class="footer"><div>BWIZA RIVERSIDE HOMES · KARAMA, KIGALI</div><div class="pageno">05 / LOCATION &amp; ACCESS</div></div>
+  <div class="footer"><div>GIZA RIVERSIDE HOMES · KARAMA, KIGALI</div><div class="pageno">05 / LOCATION &amp; ACCESS</div></div>
 </div>
 
 </main>
