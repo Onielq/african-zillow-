@@ -4568,7 +4568,7 @@ input {
   right: auto;
   bottom: auto;
   display: flex;
-  width: min(1120px, calc(100% - 456px));
+  width: min(1320px, calc(100% - 36px));
   height: calc(100% - 88px);
   min-width: min(760px, calc(100% - 36px));
   min-height: 320px;
@@ -4715,7 +4715,7 @@ input {
 
 @media (max-width: 1100px) {
   .valia-project-report-window {
-    width: min(1000px, calc(100% - 36px));
+    width: min(1320px, calc(100% - 36px));
     min-width: min(560px, calc(100% - 36px));
   }
 }
