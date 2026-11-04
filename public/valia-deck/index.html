@@ -705,6 +705,168 @@ body { background:#e9e7e1; }
 }
 .bwiza-p2 .bwiza-source-line { flex:0 0 auto; margin-top:auto; }
 
+
+/* Reference-sized page layout: keep the original 13.333in × 7.5in frame. */
+/* Page 3 — restore the masterplan page to the reference proportions. */
+.bwiza-p3 .p3-hero { height: 1.7in; }
+.bwiza-p3 .p3-hero h1 { font-size: 21pt; line-height: 1.28; }
+.bwiza-p3 .p3-body {
+  height: 5.4in;
+  padding: .2in .5in 0;
+  display: flex;
+  flex-direction: column;
+}
+.bwiza-p3 .cols {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+  gap: .4in;
+}
+.bwiza-p3 .col-map {
+  flex: 0 0 3.5in;
+  display: flex;
+  flex-direction: column;
+}
+.bwiza-p3 .map-img { height: 1.7in; }
+.bwiza-p3 .districts-title { font-size: 14.5pt; margin-top: .13in; }
+.bwiza-p3 .districts-body { font-size: 8.4pt; line-height: 1.5; margin-top: .08in; }
+.bwiza-p3 .live-today { font-size: 8.2pt; line-height: 1.4; margin-top: .13in; }
+.bwiza-p3 .note-gold { font-size: 8.2pt; margin-top: auto; padding-top: .1in; }
+.bwiza-p3 .col-jewels { display: flex; flex-direction: column; min-height: 0; }
+.bwiza-p3 .jewels-intro { font-size: 8.6pt; line-height: 1.5; margin-top: .08in; }
+.bwiza-p3 .jewels-grid {
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: .2in;
+  row-gap: .14in;
+  margin-top: .14in;
+  align-content: space-evenly;
+}
+.bwiza-p3 .jewel-item { align-items: center; gap: .09in; font-size: 9pt; line-height: 1.3; }
+.bwiza-p3 .jewel-item .jewel-icon { width: .21in; height: .21in; flex: 0 0 .21in; }
+.bwiza-p3 .jewel-item b { font-size: 8.8pt; line-height: 1.25; }
+.bwiza-p3 .jewel-item small { font-size: 7.4pt; line-height: 1.3; margin-top: .025in; }
+.bwiza-p3 .bwiza-phase-total { margin-top: .14in; padding: .12in .14in; gap: .14in; }
+.bwiza-p3 .bwiza-phase-total strong { font-size: 15pt; }
+.bwiza-p3 .bwiza-phase-total span { font-size: 7pt; line-height: 1.3; }
+.bwiza-p3 .district-cards { margin-top: .15in; gap: .2in; }
+.bwiza-p3 .district-card { padding: .14in .17in; min-height: .72in; }
+.bwiza-p3 .district-card h4 { font-size: 8.4pt; }
+.bwiza-p3 .district-card p { font-size: 7.8pt; line-height: 1.4; }
+.bwiza-p3 .around-title { margin-top: .13in; font-size: 9.5pt; }
+.bwiza-p3 .around-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .25in;
+  margin-top: .08in;
+}
+.bwiza-p3 .around-item { gap: .12in; }
+.bwiza-p3 .around-item .badge { width: .42in; height: .42in; flex: 0 0 .42in; }
+.bwiza-p3 .around-item .badge img { width: .23in; height: .23in; }
+.bwiza-p3 .around-item .num { font-size: 15pt; }
+.bwiza-p3 .around-item .lbl { font-size: 7.4pt; line-height: 1.3; white-space: normal; max-width: none; }
+.bwiza-p3 .around-caption { font-size: 7.4pt; line-height: 1.35; margin-top: .08in; }
+
+/* Page 4 — restore the reference heading, table and panel scale. */
+.bwiza-p4 { padding: .42in .5in 0; }
+.bwiza-p4 .headline { font-size: 25pt; }
+.bwiza-p4 .subhead { font-size: 11.5pt; }
+.bwiza-p4 .body {
+  height: 5.85in;
+  display: flex;
+  align-items: stretch;
+  gap: .3in;
+  margin-top: .2in;
+}
+.bwiza-p4 .col-left {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.bwiza-p4 .col-right { display: flex; flex: 0 0 3.25in; min-width: 0; }
+.bwiza-p4 table.comp-table { font-size: 8.7pt; }
+.bwiza-p4 table.comp-table thead th { padding: .1in .11in; font-size: 8.4pt; }
+.bwiza-p4 table.comp-table tbody td { padding: .11in .11in; font-size: 8.4pt; line-height: 1.35; }
+.bwiza-p4 .table-note { font-size: 7.8pt; line-height: 1.4; margin-top: .1in; }
+.bwiza-p4 .bar-title { margin-top: .2in; font-size: 9.3pt; }
+.bwiza-p4 .bwiza-rate-chart {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-evenly;
+  min-height: 2in;
+  margin-top: .1in;
+}
+.bwiza-p4 .bwiza-rate-chart .rate-row {
+  grid-template-columns: 1.62in 1fr .52in;
+  gap: .1in;
+  margin: .07in 0;
+  font-size: 8pt;
+}
+.bwiza-p4 .bwiza-rate-chart .rate-track { height: .13in; }
+.bwiza-p4 .bwiza-rate-chart .rate-row b { font-size: 7.7pt; }
+.bwiza-p4 .bwiza-rate-chart .rate-scale { font-size: 7pt; margin-top: .05in; }
+.bwiza-p4 .bwiza-source-line { font-size: 6.8pt; line-height: 1.4; margin-top: .1in; }
+.bwiza-p4 .bwiza-analysis-panel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: .24in .26in !important;
+}
+.bwiza-p4 .bwiza-analysis-panel .eyebrow { font-size: 9pt; }
+.bwiza-p4 .bwiza-analysis-panel .opp-stat { margin-top: .18in; }
+.bwiza-p4 .bwiza-analysis-panel .opp-stat .num { font-size: 25pt; }
+.bwiza-p4 .bwiza-analysis-panel .opp-stat .body { font-size: 8.4pt; line-height: 1.5; }
+.bwiza-p4 .bwiza-analysis-panel .opp-note { font-size: 8.4pt; line-height: 1.55; margin-top: auto; }
+
+/* Page 5 — use the full page width and height after removing the enquiry panel. */
+.bwiza-p5 { padding: .4in .5in 0; }
+.bwiza-p5 .headline { font-size: 25pt; }
+.bwiza-p5 .subhead { font-size: 11.5pt; }
+.bwiza-p5 .hero-imgs { gap: .22in; margin-top: .18in; }
+.bwiza-p5 .mall-col { flex: 0 0 7.1in; }
+.bwiza-p5 .mall-img,
+.bwiza-p5 .map-img { height: 2in; }
+.bwiza-p5 .mall-stats { gap: .5in; margin-top: .15in; }
+.bwiza-p5 .mall-stats .stat .val { font-size: 16pt; }
+.bwiza-p5 .mall-stats .stat .lbl { font-size: 7.6pt; }
+.bwiza-p5 .map-caption { font-size: 7.6pt; line-height: 1.35; margin-top: .08in; }
+.bwiza-p5 .bottom-band {
+  display: flex;
+  height: 3.15in;
+  gap: .3in;
+  margin-top: .16in;
+}
+.bwiza-p5 .nearby-panel {
+  flex: 1 1 100%;
+  width: 100%;
+  min-height: 3.15in;
+  padding: .18in .22in .18in 1.95in;
+  display: flex;
+  flex-direction: column;
+}
+.bwiza-p5 .district-mini-map { top: .18in; bottom: .18in; }
+.bwiza-nearby-heading { font-size: 9.5pt; margin-bottom: .1in; }
+.bwiza-nearby-grid {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: space-evenly;
+  column-gap: .3in;
+  row-gap: .18in;
+}
+.bwiza-p5 .nearby-item { align-items: flex-start; gap: .14in; padding: .1in 0; }
+.bwiza-p5 .nearby-item .badge { width: .36in; height: .36in; flex: 0 0 .36in; }
+.bwiza-p5 .nearby-item .badge img { width: .22in; height: .22in; }
+.bwiza-p5 .nearby-item .txt { font-size: 9.3pt; line-height: 1.35; }
+.bwiza-p5 .nearby-item .txt small { font-size: 7.6pt; line-height: 1.4; margin-top: .035in; }
+.bwiza-nearby-note { font-size: 7.4pt; line-height: 1.4; padding-top: .09in; margin-top: .08in; }
+.bwiza-p5 .bwiza-source-line { font-size: 6.8pt; line-height: 1.35; margin-top: .08in; }
+
 </style>
 </head>
 <body>
@@ -965,14 +1127,6 @@ body { background:#e9e7e1; }
         <a href="https://mapcarta.com/N11387241024" target="_blank" rel="noopener">Karama kumidugugu bus stop</a> ·
         <a href="https://mapcarta.com/N11386160448" target="_blank" rel="noopener">GS Karama bus stop</a>
       </div>
-    </div>
-    <div class="contact-card bwiza-contact-card">
-      <div class="eyebrow">DEVELOPER ENQUIRIES</div>
-      <div class="name">ADHI Africa Holding</div>
-      <div class="sub">Bwiza Riverside Homes · Sales &amp; Marketing</div>
-      <div class="bwiza-contact-detail">+250 791 446 400</div>
-      <div class="bwiza-contact-detail">bwiza@adhicorp.com</div>
-      <a href="https://bwiza.adhicorp.com/" target="_blank" rel="noopener" class="bwiza-contact-link">Official project website</a>
     </div>
   </div>
   <div class="footer"><div>BWIZA RIVERSIDE HOMES · KARAMA, KIGALI</div><div class="pageno">05 / LOCATION &amp; ACCESS</div></div>
