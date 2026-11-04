@@ -1209,8 +1209,15 @@ test("project selection opens the five-page Giza study in a draggable, resizable
   assert.equal((html.match(/class="page /g) ?? []).length, 5);
 
   const cover = html.slice(0, html.indexOf('<div class="page p2'));
-  assert.match(cover, /class="project-name">Giza<\/div>/);
-  assert.match(cover, /class="locality">RIVERSIDE HOMES<\/div>/);
+  assert.match(cover, /class="project-name">Giza Riverside Homes<\/div>/);
+  assert.match(cover, /class="locality">NYARUGENGE DISTRICT<\/div>/);
+  assert.match(html, /GIZA RIVERSIDE HOMES MASTER PLAN/);
+  assert.match(html, /NYARUGENGE DISTRICT/);
+  assert.doesNotMatch(html, /GIZA RIVERSIDE HOUSE/);
+  assert.match(html, /\.bwiza-p2 \.col-right \{ flex:0 0 3\.05in/);
+  assert.match(html, /\.bwiza-p3 \.col-map \{ flex:0 0 3\.3in/);
+  assert.match(html, /\.bwiza-p4 \.col-right \{ flex:0 0 2\.95in/);
+  assert.match(html, /\.bwiza-p5 \.mall-col \{ flex:0 0 6\.9in/);
   assert.match(cover, /font-size: 52pt/);
   assert.match(cover, /font-size: 12pt/);
   assert.equal((cover.match(/<div class="icon-badge"><img src="data:image\/png;base64,/g) ?? []).length, 4);
