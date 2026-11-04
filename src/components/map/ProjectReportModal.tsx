@@ -35,28 +35,13 @@ export function ProjectReportModal({ projectName, onClose }: ProjectReportModalP
   const restorePositionRef = useRef<WindowPosition | null>(null);
   const restoreSizeRef = useRef<WindowSize | null>(null);
 
-  const [scale, setScale] = useState(0.75);
+  // Keep the 1,280 × 720 reference page at its native size; narrow screens scroll instead of shrinking it.
+  const scale = 1;
   const [deckHeight, setDeckHeight] = useState(DECK_PAGE_HEIGHT * FALLBACK_DECK_PAGES);
   const [windowPosition, setWindowPosition] = useState<WindowPosition | null>(null);
   const [windowSize, setWindowSize] = useState<WindowSize | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-
-    const measure = () => {
-      const availableWidth = Math.max(240, viewport.clientWidth - 28);
-      setScale(Math.min(1, availableWidth / DECK_WIDTH));
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(viewport);
-
-    return () => observer.disconnect();
-  }, []);
 
   // Keep the window and its title bar reachable after a browser resize or a
   // manual resize of the window itself.
