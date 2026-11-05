@@ -192,11 +192,13 @@ export function ProjectReportModal({ projectName, projectId, developer, district
     source: sourceUrl ?? "",
     completion: completion ?? ""
   });
-  const deckSrc = projectId === "bwiza-riverside-homes"
-    ? "/valia-deck/index.html"
-    : projectId === "heza-estate-batsinda-project"
-      ? "/valia-deck/projects/heza-estate-batsinda-project.html"
-      : "/valia-deck/projects/project-profile.html?" + genericParams.toString();
+  const projectDecks: Record<string, string> = {
+    "bwiza-riverside-homes": "/valia-deck/index.html",
+    "heza-estate-batsinda-project": "/valia-deck/projects/heza-estate-batsinda-project.html",
+    "masaka-views-eco-estate": "/valia-deck/projects/masaka-views-eco-estate.html",
+    "rugarama-park-estate": "/valia-deck/projects/rugarama-park-estate.html"
+  };
+  const deckSrc = projectDecks[projectId] ?? "/valia-deck/projects/project-profile.html?" + genericParams.toString();
 
   const windowStyle = {
     ...(windowPosition
