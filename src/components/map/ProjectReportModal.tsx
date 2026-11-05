@@ -4,6 +4,15 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 
 type ProjectReportModalProps = {
   projectName: string;
+  projectId: string;
+  developer: string;
+  district: string | null;
+  sector: string | null;
+  status: string;
+  units: number | null;
+  category: string;
+  sourceUrl: string | null;
+  completion: string | null;
   onClose: () => void;
 };
 
@@ -27,7 +36,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
-export function ProjectReportModal({ projectName, onClose }: ProjectReportModalProps) {
+export function ProjectReportModal({ projectName, projectId, developer, district, sector, status, units, category, sourceUrl, completion, onClose }: ProjectReportModalProps) {
   const windowRef = useRef<HTMLElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -172,6 +181,23 @@ export function ProjectReportModal({ projectName, onClose }: ProjectReportModalP
     setDeckHeight(measuredHeight);
   };
 
+  const genericParams = new URLSearchParams({
+    name: projectName,
+    developer,
+    district: district ?? "",
+    sector: sector ?? "",
+    status,
+    units: units == null ? "" : String(units),
+    category,
+    source: sourceUrl ?? "",
+    completion: completion ?? ""
+  });
+  const deckSrc = projectId === "bwiza-riverside-homes"
+    ? "/valia-deck/index.html"
+    : projectId === "heza-estate-batsinda-project"
+      ? "/valia-deck/projects/heza-estate-batsinda-project.html"
+      : "/valia-deck/projects/project-profile.html?" + genericParams.toString();
+
   const windowStyle = {
     ...(windowPosition
       ? {
@@ -251,7 +277,7 @@ export function ProjectReportModal({ projectName, onClose }: ProjectReportModalP
             className="valia-project-report-frame"
             onLoad={handleFrameLoad}
             ref={frameRef}
-            src="/valia-deck/index.html"
+            src={deckSrc}
             style={{
               width: DECK_WIDTH,
               height: deckHeight,
