@@ -2726,20 +2726,24 @@ export function MapExperience() {
                 <div className="parcel-fact">
                   <ParcelFactIcon name="district" />
                   <div className="parcel-fact-copy">
-                    <span>District / sector</span>
+                    <span>District / ID · Sector / ID</span>
                     <strong>
                       {selectedArea.district}
+                      {selectedArea.districtId ? " · ID " + selectedArea.districtId : ""}
                       {selectedArea.sector ? " · " + selectedArea.sector : ""}
+                      {selectedArea.sectorId ? " · ID " + selectedArea.sectorId : ""}
                     </strong>
                   </div>
                 </div>
                 <div className="parcel-fact">
                   <ParcelFactIcon name="cell" />
                   <div className="parcel-fact-copy">
-                    <span>Cell / village</span>
+                    <span>Cell / ID · Village / ID</span>
                     <strong>
                       {selectedArea.cell ?? "Not published"}
+                      {selectedArea.cellId ? " · ID " + selectedArea.cellId : ""}
                       {selectedArea.village ? " · " + selectedArea.village : ""}
+                      {selectedArea.villageId ? " · ID " + selectedArea.villageId : ""}
                     </strong>
                   </div>
                 </div>
