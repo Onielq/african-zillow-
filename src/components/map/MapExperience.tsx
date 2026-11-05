@@ -52,6 +52,93 @@ function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): st
     : name;
 }
 
+type ParcelFactIconName =
+  | "identifier"
+  | "number"
+  | "district"
+  | "sector"
+  | "cell"
+  | "village"
+  | "zoning"
+  | "area"
+  | "wetlands"
+  | "date";
+
+const PARCEL_FACT_ICON_CONTENT = {
+  identifier: (
+    <>
+      <path d="M7.5 3.75h6.7l4.3 4.3v12.2H7.5z" />
+      <path d="M14 3.9v4.3h4.3M10.2 12h5.6M10.2 15.3h5.6" />
+    </>
+  ),
+  number: <path d="M8 4 6.5 20M17.5 4 16 20M4.5 9h15M3.5 15h15" />,
+  district: (
+    <>
+      <path d="M4 20V8.5L12 4l8 4.5V20z" />
+      <path d="M9 20v-4h6v4M8 10.5h1M12 10.5h1M16 10.5h1" />
+    </>
+  ),
+  sector: (
+    <>
+      <path d="m3.5 6 5.5-2 6 2 5.5-2v14l-5.5 2-6-2-5.5 2z" />
+      <path d="M9 4v14M15 6v14" />
+    </>
+  ),
+  cell: (
+    <>
+      <path d="M19 10.2c0 5.1-7 10.1-7 10.1S5 15.3 5 10.2a7 7 0 1 1 14 0Z" />
+      <circle cx="12" cy="10" r="2.2" />
+    </>
+  ),
+  village: <path d="m3.5 10 8.5-6.5 8.5 6.5M5.5 9.5V20h13V9.5M9.5 20v-6h5v6" />,
+  zoning: (
+    <>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+    </>
+  ),
+  area: (
+    <>
+      <path d="M4 7h16v10H4z" />
+      <path d="M8 7v4m4-4v2m4-2v4" />
+    </>
+  ),
+  wetlands: (
+    <>
+      <path d="M3.5 9c2.8-2.5 5.5-2.5 8.5 0s5.7 2.5 8.5 0" />
+      <path d="M3.5 14c2.8-2.5 5.5-2.5 8.5 0s5.7 2.5 8.5 0" />
+      <path d="M5 18.5c2.3-1.8 4.6-1.8 7 0 2.3-1.8 4.7-1.8 7 0" />
+    </>
+  ),
+  date: (
+    <>
+      <rect x="4" y="5.5" width="16" height="15" rx="2" />
+      <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+    </>
+  )
+};
+
+function ParcelFactIcon({ name }: { name: ParcelFactIconName }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="parcel-fact-icon"
+      fill="none"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <g
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.85"
+      >
+        {PARCEL_FACT_ICON_CONTENT[name]}
+      </g>
+    </svg>
+  );
+}
+
 type PropertyScope = "all" | "land" | "apartment" | "villa";
 type AnalysisPeriod = "3m" | "6m" | "12m";
 type DirectoryTab = "developers" | "agencies" | "agents";
@@ -2596,7 +2683,7 @@ export function MapExperience() {
 
             {selectedArea.level === "parcel" ? (
               <>
-              <div className="parcel-details">
+              <div className="parcel-details" aria-label="Selected parcel information">
                 {selectedParcelProject ? (
                   <div className="project-identity-inline">
                     {selectedParcelProject.imageUrl ? (
@@ -2611,104 +2698,133 @@ export function MapExperience() {
                     </div>
                   </div>
                 ) : null}
-                <div>
-                  <span>Unique parcel identifier (UPI)</span>
-                  <strong>{selectedArea.upi ?? "Not published"}</strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="identifier" />
+                  <div className="parcel-fact-copy">
+                    <span>Unique parcel identifier (UPI)</span>
+                    <strong>{selectedArea.upi ?? "Not published"}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Parcel number</span>
-                  <strong>{selectedArea.parcelNumber ?? "Not published"}</strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="number" />
+                  <div className="parcel-fact-copy">
+                    <span>Parcel number</span>
+                    <strong>{selectedArea.parcelNumber ?? "Not published"}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>District / ID</span>
-                  <strong>
-                    {selectedArea.district}
-                    {selectedArea.districtId ? ` · ID ${selectedArea.districtId}` : ""}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="district" />
+                  <div className="parcel-fact-copy">
+                    <span>District / ID</span>
+                    <strong>
+                      {selectedArea.district}
+                      {selectedArea.districtId ? " · ID " + selectedArea.districtId : ""}
+                    </strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Sector / ID</span>
-                  <strong>
-                    {selectedArea.sector
-                      ? `${selectedArea.sector}${selectedArea.sectorId ? ` · ID ${selectedArea.sectorId}` : ""}`
-                      : "Not published"}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="sector" />
+                  <div className="parcel-fact-copy">
+                    <span>Sector / ID</span>
+                    <strong>
+                      {selectedArea.sector
+                        ? selectedArea.sector + (selectedArea.sectorId ? " · ID " + selectedArea.sectorId : "")
+                        : "Not published"}
+                    </strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Cell / ID</span>
-                  <strong>
-                    {selectedArea.cell
-                      ? `${selectedArea.cell}${selectedArea.cellId ? ` · ID ${selectedArea.cellId}` : ""}`
-                      : "Not published"}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="cell" />
+                  <div className="parcel-fact-copy">
+                    <span>Cell / ID</span>
+                    <strong>
+                      {selectedArea.cell
+                        ? selectedArea.cell + (selectedArea.cellId ? " · ID " + selectedArea.cellId : "")
+                        : "Not published"}
+                    </strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Village / ID</span>
-                  <strong>
-                    {selectedArea.village
-                      ? `${selectedArea.village}${selectedArea.villageId ? ` · ID ${selectedArea.villageId}` : ""}`
-                      : "Not published"}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="village" />
+                  <div className="parcel-fact-copy">
+                    <span>Village / ID</span>
+                    <strong>
+                      {selectedArea.village
+                        ? selectedArea.village + (selectedArea.villageId ? " · ID " + selectedArea.villageId : "")
+                        : "Not published"}
+                    </strong>
+                  </div>
                 </div>
-                <div className="parcel-zoning-row">
-                  <span>Zoning / planning designation</span>
-                  {!selectedArea.upi ? (
-                    <strong>Zoning unavailable — parcel identifier is missing</strong>
-                  ) : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus ? (
-                    <strong>Checking mapped zoning…</strong>
-                  ) : selectedArea.zoningStatus === "found" ? (
-                    selectedArea.zoning?.length ? (
-                      selectedArea.zoning.length === 1 ? (
-                        <strong>{zoningEntryLabel(selectedArea.zoning[0])}</strong>
-                      ) : (
-                        <div className="parcel-zoning-results">
-                          <strong>Multiple mapped designations</strong>
-                          <ul className="parcel-zoning-list">
-                            {selectedArea.zoning.map((zone, index) => (
-                              <li key={(zone.code ?? zone.name) + "-" + index}>
-                                <span>{zoningEntryLabel(zone)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <small className="parcel-zoning-note">
-                            {selectedArea.zoning.some((zone) => zone.sourceListsMultipleCodes)
-                              ? "The source lists several codes in one record. Confirm which designation applies with the planning authority."
-                              : "This parcel intersects multiple zoning areas. The map cannot determine which rule takes precedence."}
-                          </small>
-                        </div>
-                      )
-                    ) : (
-                      <strong>Mapped area found, but no zoning label was supplied</strong>
-                    )
-                  ) : selectedArea.zoningStatus === "not-covered" ? (
-                    <strong>No zoning designation mapped for this parcel</strong>
-                  ) : (
-                    <strong>Zoning data unavailable</strong>
-                  )}
-                </div>
-                <div>
-                  <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>
-                  <strong>
-                    {typeof selectedArea.parcelSizeM2 === "number"
-                      ? `${new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2)} m²`
-                      : "Not published"}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="area" />
+                  <div className="parcel-fact-copy">
+                    <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>
+                    <strong>
+                      {typeof selectedArea.parcelSizeM2 === "number"
+                        ? new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.parcelSizeM2) + " m²"
+                        : "Not published"}
+                    </strong>
+                  </div>
                 </div>
                 {typeof selectedArea.wetlandAreaM2 === "number" && selectedArea.wetlandAreaM2 > 0 ? (
-                  <div>
-                    <span>Area intersecting wetlands</span>
-                    <strong>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.wetlandAreaM2)} m²</strong>
+                  <div className="parcel-fact">
+                    <ParcelFactIcon name="wetlands" />
+                    <div className="parcel-fact-copy">
+                      <span>Area intersecting wetlands</span>
+                      <strong>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.wetlandAreaM2)} m²</strong>
+                    </div>
                   </div>
                 ) : null}
-                <div>
-                  <span>Last updated in source</span>
-                  <strong>
-                    {typeof selectedArea.lastUpdatedOn === "number"
-                      ? new Date(selectedArea.lastUpdatedOn).toLocaleDateString("en-RW")
-                      : "Date not supplied"}
-                  </strong>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="date" />
+                  <div className="parcel-fact-copy">
+                    <span>Last updated in source</span>
+                    <strong>
+                      {typeof selectedArea.lastUpdatedOn === "number"
+                        ? new Date(selectedArea.lastUpdatedOn).toLocaleDateString("en-RW")
+                        : "Date not supplied"}
+                    </strong>
+                  </div>
                 </div>
-
+                <div className="parcel-fact parcel-fact-zoning">
+                  <ParcelFactIcon name="zoning" />
+                  <div className="parcel-fact-copy">
+                    <span>Zoning / planning designation</span>
+                    {!selectedArea.upi ? (
+                      <strong>Zoning unavailable — parcel identifier is missing</strong>
+                    ) : selectedArea.zoningStatus === "loading" || !selectedArea.zoningStatus ? (
+                      <strong>Checking mapped zoning…</strong>
+                    ) : selectedArea.zoningStatus === "found" ? (
+                      selectedArea.zoning?.length ? (
+                        selectedArea.zoning.length === 1 ? (
+                          <strong>{zoningEntryLabel(selectedArea.zoning[0])}</strong>
+                        ) : (
+                          <div className="parcel-zoning-results">
+                            <strong>Multiple mapped designations</strong>
+                            <ul className="parcel-zoning-list">
+                              {selectedArea.zoning.map((zone, index) => (
+                                <li key={(zone.code ?? zone.name) + "-" + index}>
+                                  <span>{zoningEntryLabel(zone)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <small className="parcel-zoning-note">
+                              {selectedArea.zoning.some((zone) => zone.sourceListsMultipleCodes)
+                                ? "The source lists several codes in one record. Confirm which designation applies with the planning authority."
+                                : "This parcel intersects multiple zoning areas. The map cannot determine which rule takes precedence."}
+                            </small>
+                          </div>
+                        )
+                      ) : (
+                        <strong>Mapped area found, but no zoning label was supplied</strong>
+                      )
+                    ) : selectedArea.zoningStatus === "not-covered" ? (
+                      <strong>No zoning designation mapped for this parcel</strong>
+                    ) : (
+                      <strong>Zoning data unavailable</strong>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
                 <div>
