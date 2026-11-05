@@ -170,7 +170,8 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "completion": null,
     "sourceUrl": "https://www.newtimes.co.rw/article/28275/news/housing/why-some-key-housing-projects-in-kigali-remain-incomplete/amp",
     "route": "Current sales and availability unverified",
-    "locationPrecision": "administrative-area",
+    "locationPrecision": "administrative-area"
+  },
   {
     "id": "masaka-views-eco-estate",
     "name": "Masaka Views Eco Estate",
@@ -190,7 +191,6 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "route": "84 family homes and townhouses for sale; 302 apartments planned for rental",
     "imageUrl": "https://www.newtimes.co.rw/thenewtimes/uploads/images/2025/10/29/91024.jpg",
     "locationPrecision": "administrative-area"
-  }
   },
   {
     "id": "gahanga-riverside-city-estate",
