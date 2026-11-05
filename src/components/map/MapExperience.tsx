@@ -2713,49 +2713,6 @@ export function MapExperience() {
                   </div>
                 </div>
                 <div className="parcel-fact">
-                  <ParcelFactIcon name="district" />
-                  <div className="parcel-fact-copy">
-                    <span>District / ID</span>
-                    <strong>
-                      {selectedArea.district}
-                      {selectedArea.districtId ? " · ID " + selectedArea.districtId : ""}
-                    </strong>
-                  </div>
-                </div>
-                <div className="parcel-fact">
-                  <ParcelFactIcon name="sector" />
-                  <div className="parcel-fact-copy">
-                    <span>Sector / ID</span>
-                    <strong>
-                      {selectedArea.sector
-                        ? selectedArea.sector + (selectedArea.sectorId ? " · ID " + selectedArea.sectorId : "")
-                        : "Not published"}
-                    </strong>
-                  </div>
-                </div>
-                <div className="parcel-fact">
-                  <ParcelFactIcon name="cell" />
-                  <div className="parcel-fact-copy">
-                    <span>Cell / ID</span>
-                    <strong>
-                      {selectedArea.cell
-                        ? selectedArea.cell + (selectedArea.cellId ? " · ID " + selectedArea.cellId : "")
-                        : "Not published"}
-                    </strong>
-                  </div>
-                </div>
-                <div className="parcel-fact">
-                  <ParcelFactIcon name="village" />
-                  <div className="parcel-fact-copy">
-                    <span>Village / ID</span>
-                    <strong>
-                      {selectedArea.village
-                        ? selectedArea.village + (selectedArea.villageId ? " · ID " + selectedArea.villageId : "")
-                        : "Not published"}
-                    </strong>
-                  </div>
-                </div>
-                <div className="parcel-fact">
                   <ParcelFactIcon name="area" />
                   <div className="parcel-fact-copy">
                     <span>{selectedArea.parcelSizeSource === "geometry-estimate" ? "Approx. area from mapped boundary" : "Parcel area"}</span>
@@ -2766,23 +2723,23 @@ export function MapExperience() {
                     </strong>
                   </div>
                 </div>
-                {typeof selectedArea.wetlandAreaM2 === "number" && selectedArea.wetlandAreaM2 > 0 ? (
-                  <div className="parcel-fact">
-                    <ParcelFactIcon name="wetlands" />
-                    <div className="parcel-fact-copy">
-                      <span>Area intersecting wetlands</span>
-                      <strong>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.wetlandAreaM2)} m²</strong>
-                    </div>
-                  </div>
-                ) : null}
                 <div className="parcel-fact">
-                  <ParcelFactIcon name="date" />
+                  <ParcelFactIcon name="district" />
                   <div className="parcel-fact-copy">
-                    <span>Last updated in source</span>
+                    <span>District / sector</span>
                     <strong>
-                      {typeof selectedArea.lastUpdatedOn === "number"
-                        ? new Date(selectedArea.lastUpdatedOn).toLocaleDateString("en-RW")
-                        : "Date not supplied"}
+                      {selectedArea.district}
+                      {selectedArea.sector ? " · " + selectedArea.sector : ""}
+                    </strong>
+                  </div>
+                </div>
+                <div className="parcel-fact">
+                  <ParcelFactIcon name="cell" />
+                  <div className="parcel-fact-copy">
+                    <span>Cell / village</span>
+                    <strong>
+                      {selectedArea.cell ?? "Not published"}
+                      {selectedArea.village ? " · " + selectedArea.village : ""}
                     </strong>
                   </div>
                 </div>
@@ -2824,6 +2781,22 @@ export function MapExperience() {
                       <strong>Zoning data unavailable</strong>
                     )}
                   </div>
+                </div>
+              </div>
+              <div className="parcel-extra-details">
+                {typeof selectedArea.wetlandAreaM2 === "number" && selectedArea.wetlandAreaM2 > 0 ? (
+                  <div>
+                    <span>Area intersecting wetlands</span>
+                    <strong>{new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(selectedArea.wetlandAreaM2)} m²</strong>
+                  </div>
+                ) : null}
+                <div>
+                  <span>Last updated in source</span>
+                  <strong>
+                    {typeof selectedArea.lastUpdatedOn === "number"
+                      ? new Date(selectedArea.lastUpdatedOn).toLocaleDateString("en-RW")
+                      : "Date not supplied"}
+                  </strong>
                 </div>
               </div>
               <div className="parcel-valuation-comparison" aria-label="Transaction and reference price comparison">
