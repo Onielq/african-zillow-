@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Heza Estate | Kigali Project Study</title>
+<style>
+@font-face{font-family:Playfair;src:url('../../fonts/PlayfairDisplay-Regular.ttf')}@font-face{font-family:Playfair;src:url('../../fonts/PlayfairDisplay-SemiBold.ttf');font-weight:600}@font-face{font-family:Inter;src:url('../../fonts/Inter-Regular.ttf')}@font-face{font-family:Inter;src:url('../../fonts/Inter-Medium.ttf');font-weight:500}@font-face{font-family:Inter;src:url('../../fonts/Inter-SemiBold.ttf');font-weight:600}@font-face{font-family:Inter;src:url('../../fonts/Inter-Bold.ttf');font-weight:700}
+:root{--navy:#13213b;--navy2:#1c3355;--gold:#d8be86;--gold2:#b5893a;--cream:#f5f2ea;--ink:#16232f;--muted:#596674;--line:#e4e2dc}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,Arial,sans-serif;color:var(--ink);background:#fff}.page{width:1280px;height:720px;position:relative;overflow:hidden;background:#fff;page-break-after:always}.foot{position:absolute;bottom:0;left:0;right:0;height:36px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 44px;font-size:10px;color:#87909b;letter-spacing:.5px}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:var(--gold2)}h1,h2,h3{font-family:Playfair,Georgia,serif;color:var(--navy)}.cover{display:flex;background:var(--navy)}.cover .side{width:480px;padding:50px 48px;color:#fff;display:flex;flex-direction:column}.cover .side .eyebrow{color:var(--gold)}.cover h1{font-size:58px;line-height:1.02;color:#fff;font-style:italic;margin:26px 0 12px}.cover .place{font-weight:700;letter-spacing:2px;font-size:14px}.cover .desc{color:#b9c5d4;font-family:Playfair;font-style:italic;margin-top:8px}.cover .stats{margin-top:36px;display:grid;gap:18px}.stat{border-top:1px solid #ffffff2b;padding-top:12px}.stat b{display:block;font-size:24px;color:var(--gold)}.stat span{font-size:12px;color:#b9c5d4}.cover .price{margin-top:auto;border:1px solid var(--gold);padding:16px 18px;display:flex;justify-content:space-between;align-items:center}.cover .price span{font-size:11px;letter-spacing:1.5px;color:#b9c5d4}.cover .price b{font-family:Playfair;font-size:25px;color:var(--gold)}.cover .hero{flex:1;position:relative;overflow:hidden}.cover .hero img{width:100%;height:100%;object-fit:cover}.cover .hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(19,33,59,.35),transparent 55%)}.cover .hero .caption{position:absolute;z-index:2;right:38px;bottom:42px;color:white;font-size:12px;text-shadow:0 1px 5px #000}
+.content{padding:42px 48px 55px}.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px}.head h2{font-size:32px;margin-top:5px}.head .tag{font-size:11px;color:var(--muted);letter-spacing:1px}.cols{display:grid;grid-template-columns:1.35fr .9fr;gap:32px;margin-top:24px}.panel{background:var(--cream);padding:22px;border-radius:4px}.panel.dark{background:var(--navy);color:white}.panel.dark h3,.panel.dark strong{color:var(--gold)}h3{font-size:21px;margin-bottom:12px}.lead{font-size:14px;line-height:1.65;color:var(--muted)}.dark .lead{color:#d5deea}.table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}.table th{background:var(--navy);color:#fff;text-align:left;padding:12px}.table td{padding:13px 12px;border-bottom:1px solid var(--line)}.table tr:nth-child(even){background:#faf9f6}.table .right{text-align:right}.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.chip{background:var(--cream);padding:15px}.chip b{display:block;font-family:Playfair;font-size:25px;color:var(--navy)}.chip span{font-size:11px;color:var(--muted)}.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:18px}.step{padding:16px 12px;background:var(--cream);min-height:120px}.step b{font-size:24px;color:var(--gold2)}.step strong{display:block;font-size:12px;margin:8px 0 4px}.step span{font-size:10px;color:var(--muted);line-height:1.45}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}.feature{border:1px solid var(--line);padding:18px;min-height:145px}.feature .symbol{font-size:22px;color:var(--gold2);margin-bottom:10px}.feature h3{font-size:18px;margin-bottom:7px}.feature p{font-size:12px;color:var(--muted);line-height:1.5}.callout{background:var(--navy);color:#fff;padding:22px 24px;margin-top:20px;display:flex;justify-content:space-between;align-items:center}.callout b{font-family:Playfair;font-size:26px;color:var(--gold)}.callout span{font-size:12px;color:#d5deea;max-width:650px;line-height:1.5}.mapbox{height:280px;background:#e9e4d8;overflow:hidden;border:1px solid var(--line)}.mapbox iframe{width:100%;height:100%;border:0}.source-list{display:grid;gap:10px;margin-top:16px}.source-list a{color:var(--navy2);font-size:12px;text-decoration:underline}.small{font-size:10px;color:#7a8490;line-height:1.5}.pill{display:inline-block;padding:6px 9px;background:var(--cream);font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--navy2);margin:4px 4px 0 0}.warn{border-left:3px solid var(--gold2);padding:10px 14px;background:#fbf8f0;font-size:11px;line-height:1.55;color:#4d5964;margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+<section class="page cover">
+ <div class="side">
+  <div class="eyebrow">Residential development · RSSB</div>
+  <h1>Heza<br>Estate</h1>
+  <div class="place">BATSINDA · KINYINYA · GASABO</div>
+  <div class="desc">A middle-income residential community in Kigali</div>
+  <div class="stats">
+   <div class="stat"><b>548 homes</b><span>Across 18 clusters · official project information</span></div>
+   <div class="stat"><b>11 hectares</b><span>Estate footprint published by RSSB</span></div>
+   <div class="stat"><b>2–3 bedrooms</b><span>Apartments and family townhouses</span></div>
+  </div>
+  <div class="price"><span>OFFICIAL SITE STARTING PRICE</span><b>RWF 87M</b></div>
+  <div class="small" style="color:#aab7c8;margin-top:12px">Project study · Information checked 5 November 2026</div>
+ </div>
+ <div class="hero"><img src="https://www.newtimes.co.rw/thenewtimes/uploads/images/2026/05/26/106361.jpg" alt="Heza Estate residential blocks in Batsinda"><div class="caption">Heza Estate, Batsinda · image published by The New Times, May 2026</div></div>
+ <div class="foot" style="background:#fff"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>01 / PROJECT PROFILE</span></div>
+</section>
+
+<section class="page content">
+ <div class="head"><div><div class="eyebrow">01 · Homes & purchase terms</div><h2>What Heza Estate Offers</h2></div><div class="tag">UNIT MIX · PRICING · PAYMENT</div></div>
+ <div class="cols">
+  <div>
+   <p class="lead">RSSB markets Heza as a residential community combining four-storey apartment blocks with two- and three-bedroom townhouses. The official site gives apartment floor areas and current featured prices. Townhouse floor areas are published as a range, not assigned to each model.</p>
+   <table class="table">
+    <thead><tr><th>Home type</th><th>Published size</th><th class="right">Featured price</th><th class="right">Indicative price / m²</th></tr></thead>
+    <tbody>
+     <tr><td>2-bedroom apartment</td><td>99 m²</td><td class="right">RWF 108M</td><td class="right">RWF 1.09M</td></tr>
+     <tr><td>3-bedroom apartment</td><td>114 m²</td><td class="right">RWF 121M</td><td class="right">RWF 1.06M</td></tr>
+     <tr><td>2-bedroom townhouse · Umurage</td><td>88–109.5 m² range*</td><td class="right">RWF 87M</td><td class="right">Not calculated</td></tr>
+     <tr><td>3-bedroom townhouse · Iriba</td><td>88–109.5 m² range*</td><td class="right">RWF 112M</td><td class="right">Not calculated</td></tr>
+    </tbody>
+   </table>
+   <p class="small" style="margin-top:9px">*RSSB publishes 88–109.5 m² for the townhouse collection but does not clearly map each area to each featured model. Apartment price-per-m² figures are simple asking-price ÷ published floor area calculations, not transaction evidence.</p>
+  </div>
+  <div class="panel dark">
+   <div class="eyebrow">Purchase structure</div><h3>Published instalment schedule</h3>
+   <div class="steps" style="grid-template-columns:1fr 1fr;gap:8px">
+    <div class="step"><b>2.5%</b><strong>Booking fee</strong><span>On signing the sales agreement</span></div>
+    <div class="step"><b>17.5%</b><strong>Down payment</strong><span>Within 30 calendar days</span></div>
+    <div class="step"><b>30%</b><strong>Second instalment</strong><span>Two months after first instalment</span></div>
+    <div class="step"><b>30%</b><strong>Third instalment</strong><span>One month after second instalment</span></div>
+    <div class="step" style="grid-column:1/-1"><b>20%</b><strong>Final payment</strong><span>Within 30 days after written notice that the home is ready for handover</span></div>
+   </div>
+   <p class="lead" style="margin-top:14px">RSSB also advertises partner-bank mortgages with rates “as low as 13%”. Confirm the actual rate, eligibility, fees and terms with RSSB and the lender.</p>
+  </div>
+ </div>
+ <div class="warn"><strong>Price-source note:</strong> The current RSSB website's featured prices are RWF 87M, 112M, 108M and 121M. A previously published brochure and May 2026 news reports show different earlier price points. This report keeps the current official website figures separate rather than blending the two price schedules.</div>
+ <div class="foot"><span>Source: Heza Estate official website and published brochure</span><span>02 / HOMES & TERMS</span></div>
+</section>
+
+<section class="page content">
+ <div class="head"><div><div class="eyebrow">02 · Community & development</div><h2>A Residential Estate, Not Just a Block of Flats</h2></div><div class="tag">11 HECTARES · 18 CLUSTERS</div></div>
+ <p class="lead" style="max-width:1000px;margin-top:20px">The official project description positions Heza Estate as a planned neighbourhood for working professionals, families and diaspora buyers. The development combines homes with shared amenities and everyday services inside the estate.</p>
+ <div class="grid3">
+  <div class="feature"><div class="symbol">⌂</div><h3>548 homes</h3><p>Two- and three-bedroom apartments plus multiple townhouse layouts, arranged across 18 clusters.</p></div>
+  <div class="feature"><div class="symbol">♧</div><h3>Green spaces</h3><p>Communal landscaped green areas and shaded places for residents and families.</p></div>
+  <div class="feature"><div class="symbol">▦</div><h3>Everyday retail</h3><p>Corner shops and commercial spaces are included in the estate plan.</p></div>
+  <div class="feature"><div class="symbol">⚽</div><h3>Sports & play</h3><p>Sports courts and dedicated play areas are listed among the estate amenities.</p></div>
+  <div class="feature"><div class="symbol">⌂</div><h3>Kindergarten</h3><p>A kindergarten is part of the planned community facilities.</p></div>
+  <div class="feature"><div class="symbol">◈</div><h3>Managed community</h3><p>RSSB says its facilities team manages the estate initially, with homeowners' association governance thereafter.</p></div>
+ </div>
+ <div class="callout"><span>Promoter / developer</span><b>Rwanda Social Security Board (RSSB)</b></div>
+ <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:18px">
+  <div><h3>Development context</h3><p class="lead">Heza Estate is also referred to in public-sector reporting as Batsinda Phase II. RSSB is the promoter. Government reporting describes a tripartite public-sector arrangement involving RSSB, Rwanda Housing Authority and MINECOFIN, with infrastructure oversight responsibilities separately identified.</p></div>
+  <div><h3>Construction & handover signal</h3><p class="lead">The latest detailed public progress update located for this report is from 10 July 2026: RSSB's CEO told Parliament housing construction had reached 97%, infrastructure was 70%, and handover was targeted for January 2027. These are dated reported milestones, not a live site inspection.</p></div>
+ </div>
+ <div class="foot"><span>Sources: RSSB · The New Times · MININFRA</span><span>03 / COMMUNITY & DELIVERY</span></div>
+</section>
+
+<section class="page content">
+ <div class="head"><div><div class="eyebrow">03 · Price intelligence</div><h2>What the Published Prices Tell Us</h2></div><div class="tag">ASKING PRICE · NOT TRANSACTION PRICE</div></div>
+ <div class="chips">
+  <div class="chip"><b>RWF 87M</b><span>Lowest current featured price · Umurage 2-bedroom townhouse</span></div>
+  <div class="chip"><b>RWF 108M</b><span>Current featured price · 2-bedroom apartment, 99 m²</span></div>
+  <div class="chip"><b>RWF 121M</b><span>Current featured price · 3-bedroom apartment, 114 m²</span></div>
+ </div>
+ <div class="cols" style="grid-template-columns:1.1fr .9fr;margin-top:26px">
+  <div>
+   <h3>Apartment price per square metre</h3>
+   <table class="table">
+    <thead><tr><th>Published apartment</th><th class="right">Asking price</th><th class="right">Area</th><th class="right">RWF / m²</th></tr></thead>
+    <tbody><tr><td>2-bedroom</td><td class="right">108M</td><td class="right">99 m²</td><td class="right">1.09M</td></tr><tr><td>3-bedroom</td><td class="right">121M</td><td class="right">114 m²</td><td class="right">1.06M</td></tr></tbody>
+   </table>
+   <p class="small" style="margin-top:12px">The calculations use the current featured prices and floor areas shown on RSSB's official Heza Estate website. They do not establish achieved sale prices or current unit availability.</p>
+  </div>
+  <div class="panel">
+   <h3>Read the price carefully</h3>
+   <p class="lead">The two apartment examples are close in price per square metre, even though the three-bedroom apartment has a higher total price. The townhouse models cannot be ranked by price per square metre until RSSB confirms the exact floor area for each model.</p>
+   <div class="warn">Earlier published material shows a different schedule: RWF 80M for the 2-bedroom Umurage townhouse, RWF 98M for the 3-bedroom Iriba townhouse, RWF 101M for 2-bedroom apartments and RWF 111M for 3-bedroom apartments. Treat these as earlier brochure / launch figures, not the current website's featured prices.</div>
+  </div>
+ </div>
+ <div class="callout"><span>Market interpretation</span><b>Use model-matched comparisons only.</b></div>
+ <p class="small" style="margin-top:12px">No competitor price ranking is shown here because a reliable, current, same-bedroom and same-property-type comparison set was not established from the available public sources. This avoids mixing apartment and townhouse prices or using stale launch prices as current market evidence.</p>
+ <div class="foot"><span>Source: RSSB official Heza Estate website · Heza Estate brochure · KT Press</span><span>04 / PRICE INTELLIGENCE</span></div>
+</section>
+
+<section class="page content">
+ <div class="head"><div><div class="eyebrow">04 · Location & access</div><h2>Batsinda, Kinyinya — Gasabo District</h2></div><div class="tag">KIGALI CITY · RWANDA</div></div>
+ <div class="cols" style="grid-template-columns:1fr 1fr;gap:28px">
+  <div>
+   <div class="mapbox"><iframe loading="lazy" src="https://www.google.com/maps?q=Heza+Estate+Batsinda+Kinyinya+Kigali&output=embed" title="Map showing Heza Estate in Batsinda, Kigali"></iframe></div>
+   <p class="small" style="margin-top:8px">Map search for Heza Estate, Batsinda. Pin placement should be confirmed against the official project gate before publishing precise access distances.</p>
+   <p style="margin-top:12px"><a href="https://www.google.com/maps/search/?api=1&query=Heza+Estate+Batsinda+Kinyinya+Kigali" target="_blank" rel="noopener">Open Heza Estate in Google Maps ↗</a></p>
+  </div>
+  <div>
+   <h3>Neighbourhood position</h3>
+   <p class="lead">Heza Estate is in Batsinda, within Kinyinya Sector, Gasabo District. RSSB describes the surrounding area as a growing residential hub with access to schools, healthcare, shopping centres and Kigali's main roads.</p>
+   <div style="margin-top:16px"><span class="pill">Batsinda</span><span class="pill">Kinyinya Sector</span><span class="pill">Gasabo District</span><span class="pill">Kigali City</span></div>
+   <h3 style="margin-top:24px">Access evidence</h3>
+   <p class="lead">The public sources reviewed describe nearby services in general terms but do not establish verified gate-to-gate distances to individual schools, clinics, shops or transport stops. This report therefore does not invent walking times or distance figures.</p>
+   <div class="warn">For a buyer-facing access panel, distances should be measured from the verified estate entrance to named destinations using a routable map network, then labelled as walking or driving distance—not straight-line estimates.</div>
+  </div>
+ </div>
+ <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:20px">
+  <div><h3>Buyer checks before commitment</h3><p class="lead">Confirm the exact unit number, floor area, title / transfer process, service charge, parking allocation, handover condition, utilities, and whether the quoted price remains available.</p></div>
+  <div><h3>Availability status</h3><p class="lead">The official site marks some property types as sold out, but it does not provide a complete live inventory feed. Treat individual unit availability as unverified until RSSB confirms it directly.</p></div>
+ </div>
+ <div class="foot"><span>Sources: RSSB official website · The New Times, 10 July 2026</span><span>05 / LOCATION & ACCESS</span></div>
+</section>
+</main>
+</body>
+</html>
