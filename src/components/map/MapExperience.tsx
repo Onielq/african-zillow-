@@ -2387,6 +2387,15 @@ export function MapExperience() {
         {selectedProject ? (
           <ProjectReportModal
             projectName={selectedProject.name}
+            projectId={selectedProject.id}
+            developer={selectedProject.developer}
+            district={selectedProject.district}
+            sector={selectedProject.sector}
+            status={selectedProject.status}
+            units={selectedProject.units}
+            category={selectedProject.category}
+            sourceUrl={selectedProject.sourceUrl}
+            completion={selectedProject.completion}
             onClose={() => setSelectedProjectId(null)}
           />
         ) : null}
