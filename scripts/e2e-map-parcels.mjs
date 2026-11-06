@@ -721,8 +721,46 @@ try {
   }
 } catch (error) {
   await page.screenshot({ path: screenshotPath, fullPage: false }).catch(() => {});
+  const mapDiagnostics = await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) return null;
+    const layerState = (layer) => ({
+      exists: Boolean(map.getLayer(layer)),
+      visibility: map.getLayer(layer)
+        ? map.getLayoutProperty(layer, "visibility") ?? "visible"
+        : null
+    });
+    const sourceFeatureCount = (source) => {
+      try {
+        return map.querySourceFeatures(source).length;
+      } catch {
+        return 0;
+      }
+    };
+    return {
+      zoom: Number(map.getZoom().toFixed(2)),
+      center: map.getCenter().toArray(),
+      villageOutline: layerState("village-outline"),
+      parcelOutline: layerState("parcel-outline"),
+      villageSourceFeatures: sourceFeatureCount("admin-villages"),
+      parcelSourceFeatures: sourceFeatureCount("land-parcels"),
+      renderedVillageFeatures: map.queryRenderedFeatures(undefined, { layers: ["village-outline"] }).length,
+      refreshTrace: (window.__RLI_E2E_TRACE__ ?? [])
+        .filter((event) => [
+          "area-refresh-attempt",
+          "area-refresh-plan",
+          "area-api-request",
+          "area-api-response",
+          "area-api-failure",
+          "area-api-retry"
+        ].includes(event.event))
+        .slice(-50)
+    };
+  }).catch((diagnosticError) => ({
+    readError: diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError)
+  }));
   console.error(error instanceof Error ? error.stack : String(error));
-  console.error(JSON.stringify({ ...diagnostics, screenshot: screenshotPath }, null, 2));
+  console.error(JSON.stringify({ ...diagnostics, mapDiagnostics, screenshot: screenshotPath }, null, 2));
   process.exitCode = 1;
 } finally {
   await browser.close();
