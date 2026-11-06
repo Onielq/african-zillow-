@@ -11,9 +11,9 @@ permissions:
 jobs:
   verify:
     if: ${{ github.event.pull_request.number == 83 }}
-    name: Test the PR preview and capture selected parcel layouts
+    name: Test the PR build and capture selected parcel layouts
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out pull request
         uses: actions/checkout@v4
@@ -27,13 +27,27 @@ jobs:
         run: npm install --no-save --no-audit --no-fund playwright
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify Bugesera parcel API
+      - name: Build the pull request production app
+        run: npm run build
+      - name: Start the local production server
+        run: |
+          nohup npm run start -- --hostname 127.0.0.1 > /tmp/taiseel-next.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              echo "Local production server is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/taiseel-next.log
+          exit 1
+      - name: Verify Kigali and Bugesera parcel APIs
         env:
-          APP_BASE_URL: https://rwanda-land-intelligence-git-fix-parcel-16361c-onielqs-projects.vercel.app
+          APP_BASE_URL: http://127.0.0.1:3000
         run: node scripts/smoke-test-parcel-api.mjs
       - name: Verify village geometry and selected parcel responsive layouts
         env:
-          APP_BASE_URL: https://rwanda-land-intelligence-git-fix-parcel-16361c-onielqs-projects.vercel.app
+          APP_BASE_URL: http://127.0.0.1:3000
         run: node scripts/e2e-map-parcels.mjs
       - name: Upload responsive screenshots and map diagnostics
         if: always()
