@@ -85,6 +85,38 @@ function validateWgs84(coord) {
     coord[1] >= -3.1 && coord[1] <= -0.8;
 }
 
+async function fetchParcelCollection(url, source) {
+  let lastFailure = "no response";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    const rawBody = await response.text();
+    let body = null;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      // Keep a short response sample in the eventual failure message.
+    }
+
+    if (response.ok && body?.type === "FeatureCollection" && Array.isArray(body.features)) {
+      return { response, body };
+    }
+
+    lastFailure = [
+      "attempt " + attempt,
+      "HTTP " + response.status,
+      "content-type " + (response.headers.get("content-type") ?? "missing"),
+      "body " + (rawBody ? rawBody.slice(0, 320) : "empty")
+    ].join(" · ");
+
+    if (!response.ok && response.status < 500 && response.status !== 429) {
+      throw new Error(source + " parcel API returned an unexpected response: " + lastFailure);
+    }
+    if (attempt < 3) await sleep(1200);
+  }
+
+  throw new Error(source + " parcel API did not return a GeoJSON FeatureCollection after 3 attempts: " + lastFailure);
+}
+
 async function main() {
   const home = await fetchWithRetry(baseUrl + "/");
   if (!home.ok) throw new Error("Home page failed with HTTP " + home.status);
@@ -137,17 +169,10 @@ async function main() {
       source: item.source,
       bbox: item.bbox
     });
-    const response = await fetch(baseUrl + "/api/geography/areas?" + query);
-    const body = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(
-        item.source + " parcel API returned HTTP " + response.status +
-        ": " + JSON.stringify(body).slice(0, 400)
-      );
-    }
-    if (!body || body.type !== "FeatureCollection" || !Array.isArray(body.features)) {
-      throw new Error(item.source + " parcel API did not return a GeoJSON FeatureCollection.");
-    }
+    const { response, body } = await fetchParcelCollection(
+      baseUrl + "/api/geography/areas?" + query,
+      item.source
+    );
 
     const polygonFeatures = body.features.filter((feature) =>
       feature?.geometry && ["Polygon", "MultiPolygon"].includes(feature.geometry.type)
