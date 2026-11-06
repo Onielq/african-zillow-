@@ -501,7 +501,9 @@ try {
     return Boolean(
       map &&
       map.getLayoutProperty("village-outline", "visibility") === "visible" &&
-      map.getLayoutProperty("parcel-outline", "visibility") === "visible"
+      map.getLayoutProperty("parcel-outline", "visibility") === "visible" &&
+      map.querySourceFeatures("admin-villages").length > 0 &&
+      map.queryRenderedFeatures(undefined, { layers: ["village-outline"] }).length > 0
     );
   }, undefined, { timeout: 20_000 });
 
