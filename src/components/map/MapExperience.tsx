@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   CalendarDays,
   FileText,
-  Fingerprint,
   GitCompareArrows,
   Grid,
   Hash,
