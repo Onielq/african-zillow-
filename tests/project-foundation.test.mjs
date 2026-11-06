@@ -54,6 +54,10 @@ test("administrative detail uses the vertical screen-space footprint and prefetc
   assert.match(mapView, /settledIndex <= AREA_LEVELS\.indexOf\("village"\)/);
   assert.doesNotMatch(mapView, /if \(activeLevel === "village"\) requestedLevels\.push\("parcel"\)/);
   assert.match(mapView, /function activeAreaLevelForMap\(/);
+  assert.match(mapView, /const fallbackLevel = zoom >= VILLAGE_ZOOM \? "village" : activeAreaLevel\(zoom\)/);
+  assert.match(mapView, /if \(districtRatio === null\) return fallbackLevel/);
+  assert.match(mapView, /if \(sectorRatio === null\) return fallbackLevel/);
+  assert.match(mapView, /if \(cellRatio === null\) return fallbackLevel/);
   assert.match(mapView, /const resolveActiveAreaLevel = \(\) =>/);
   assert.match(mapView, /const updateLayerVisibility = \(\) => \{\s*resolveActiveAreaLevel\(\);/);
   assert.match(mapView, /transitionThreshold\("sector"\)/);
