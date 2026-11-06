@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   CalendarDays,
   FileText,
   GitCompareArrows,
@@ -2112,7 +2113,7 @@ export function MapExperience() {
               }}
               type="button"
             >
-              <span aria-hidden="true">i</span>
+              <Info aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -2122,7 +2123,7 @@ export function MapExperience() {
           <aside aria-label="Show map layers" className="show-menu">
             <div className="show-menu-header">
               <h2>Show</h2>
-              <button aria-label="Close map layers" className="panel-close" onClick={() => setShowOpen(false)} type="button">×</button>
+              <button aria-label="Close map layers" className="panel-close" onClick={() => setShowOpen(false)} type="button"><X aria-hidden="true" size={16} strokeWidth={1.8} /></button>
             </div>
             <div className="show-option-list">
               {([
@@ -2174,7 +2175,7 @@ export function MapExperience() {
                 <p className="panel-eyebrow">LAND MARKET / RWANDA</p>
                 <h2>Metrics</h2>
               </div>
-              <button aria-label="Close metrics menu" className="panel-close" onClick={() => setMetricsOpen(false)} type="button">×</button>
+              <button aria-label="Close metrics menu" className="panel-close" onClick={() => setMetricsOpen(false)} type="button"><X aria-hidden="true" size={16} strokeWidth={1.8} /></button>
             </div>
             <div className="metrics-menu-section">
               <span className="metrics-section-label">Property type</span>
@@ -2273,7 +2274,7 @@ export function MapExperience() {
                 <p className="panel-eyebrow">RWANDA REAL ESTATE DIRECTORY</p>
                 <h2>Developers &amp; agents</h2>
               </div>
-              <button aria-label="Close developer directory" className="panel-close" onClick={() => setDevelopersOpen(false)} type="button">×</button>
+              <button aria-label="Close developer directory" className="panel-close" onClick={() => setDevelopersOpen(false)} type="button"><X aria-hidden="true" size={16} strokeWidth={1.8} /></button>
             </div>
             <div aria-label="Directory category" className="directory-tabs" role="tablist">
               <button aria-selected={directoryTab === "developers"} className={directoryTab === "developers" ? "directory-tab directory-tab-active" : "directory-tab"} onClick={() => { setDirectoryTab("developers"); setDirectorySearch(""); }} role="tab" type="button">Developers</button>
@@ -2339,7 +2340,7 @@ export function MapExperience() {
                 <p className="panel-eyebrow">TAISEEL / PROJECT INTELLIGENCE</p>
                 <h2>Projects on the map</h2>
               </div>
-              <button aria-label="Close projects panel" className="panel-close" onClick={() => setProjectsOpen(false)} type="button">×</button>
+              <button aria-label="Close projects panel" className="panel-close" onClick={() => setProjectsOpen(false)} type="button"><X aria-hidden="true" size={16} strokeWidth={1.8} /></button>
             </div>
 
             <label className="project-directory-search">
@@ -2410,7 +2411,7 @@ export function MapExperience() {
                       height={96}
                     />
                     <span><strong>{developer.name}</strong><small>{developer.projectIds.length ? developer.projectIds.length + " linked projects" : developer.focus || developer.base || "Developer record"}</small></span>
-                    <span className="project-record-arrow">→</span>
+                    <span className="project-record-arrow"><ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.8} /></span>
                   </button>
                 ))}
                 {filteredProjectDevelopers.length === 0 ? <p className="project-directory-empty">No developer matches that search.</p> : null}
@@ -2455,7 +2456,7 @@ export function MapExperience() {
               onClick={() => setMetricInfoOpen(false)}
               type="button"
             >
-              ×
+              <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
             <p className="panel-eyebrow">
               {workspaceMode === "projects" ? "PROJECT MODE" : "METRIC DESCRIPTION"}
@@ -2580,7 +2581,7 @@ export function MapExperience() {
               onClick={() => setSelectedArea(null)}
               type="button"
             >
-              ×
+              <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
             <p className="panel-eyebrow">{selectedArea.level.toUpperCase()}</p>
             {selectedArea.level !== "parcel" ? (
@@ -3086,7 +3087,7 @@ export function MapExperience() {
               onClick={() => setSourcesOpen(false)}
               type="button"
             >
-              ×
+              <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
             <p className="panel-eyebrow">MAP INFORMATION</p>
             <h2>Sources &amp; map details</h2>
@@ -3260,7 +3261,7 @@ export function MapExperience() {
               onClick={() => setCompareOpen(false)}
               type="button"
             >
-              ×
+              <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
             <p className="panel-eyebrow">COMPARISON</p>
             <div className="comparison-title-row">
@@ -3384,7 +3385,7 @@ export function MapExperience() {
                           onClick={() => removeComparedArea(area)}
                           type="button"
                         >
-                          ×
+                          <X aria-hidden="true" size={16} strokeWidth={1.8} />
                         </button>
                       </span>
                     ))}
