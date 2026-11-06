@@ -202,7 +202,7 @@ try {
     { level: "district", startZoom: 8.35, layer: "district-fill", source: "admin-districts" },
     { level: "sector", startZoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
     { level: "cell", startZoom: 15.5, layer: "cell-fill", source: "admin-cells" },
-    { level: "village", startZoom: 16.6, layer: "village-fill", source: "admin-villages" }
+    { level: "village", startZoom: 15.5, layer: "village-fill", source: "admin-villages" }
   ];
 
   // These transitions follow the dominant ground dimension of the polygon
@@ -233,7 +233,7 @@ try {
           map.querySourceFeatures(source).length > 0 &&
           map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
         );
-      }, config, { timeout: 1_500 }).then(() => true).catch((error) => {
+      }, config, { timeout: 2_500 }).then(() => true).catch((error) => {
         if (!String(error?.message ?? error).includes("Timeout")) throw error;
         return false;
       });
@@ -430,6 +430,52 @@ try {
     return Boolean(bubble && bubble.properties?.is_selected === true);
   }, parcelHoverTarget, { timeout: 8_000 });
 
+  // Capture the selected parcel fact panel at desktop, tablet and mobile sizes.
+  // A real map selection above drives this panel; no fixture or mock is used.
+  const parcelPanel = page.locator(".selected-area-panel");
+  await parcelPanel.waitFor({ state: "visible", timeout: 15_000 });
+  const responsiveParcelPanelChecks = [];
+  const responsiveViewports = [
+    { name: "desktop", width: 1440, height: 1000 },
+    { name: "tablet", width: 768, height: 1024 },
+    { name: "mobile", width: 375, height: 812 }
+  ];
+  for (const viewport of responsiveViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.waitForFunction(() => {
+      const panel = document.querySelector(".selected-area-panel");
+      const details = panel?.querySelector(".parcel-details");
+      return Boolean(
+        panel &&
+        details &&
+        panel.getBoundingClientRect().width > 0 &&
+        details.querySelectorAll(".parcel-fact").length === 6
+      );
+    }, undefined, { timeout: 15_000 });
+    await page.waitForTimeout(350);
+
+    const layout = await parcelPanel.evaluate((panel) => {
+      const details = panel.querySelector(".parcel-details");
+      return {
+        viewportWidth: window.innerWidth,
+        panelWidth: panel.clientWidth,
+        panelScrollWidth: panel.scrollWidth,
+        factsWidth: details?.clientWidth ?? 0,
+        factsScrollWidth: details?.scrollWidth ?? 0,
+        factCount: details?.querySelectorAll(".parcel-fact").length ?? 0,
+        horizontalOverflow: Boolean(details && details.scrollWidth > details.clientWidth + 2)
+      };
+    });
+    if (layout.horizontalOverflow || layout.factCount !== 6) {
+      throw new Error("Selected parcel facts do not fit the " + viewport.name + " layout: " + JSON.stringify(layout));
+    }
+    responsiveParcelPanelChecks.push({ ...layout, viewport: viewport.name });
+    await parcelPanel.screenshot({ path: "artifacts/selected-parcel-panel-" + viewport.name + ".png" });
+    await page.screenshot({ path: "artifacts/selected-parcel-map-" + viewport.name + ".png" });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(350);
+
   // Now click an unrelated empty map location. Both the boundary state and
   // the matching price marker must return to their normal state together.
   await page.mouse.click(parcelBlankPoint.x, parcelBlankPoint.y);
@@ -448,7 +494,7 @@ try {
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
+    map.jumpTo({ center: [30.133, -2.283], zoom: 15.8 });
   });
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
@@ -638,6 +684,7 @@ try {
     ...result,
     initialOverlayCheck,
     hierarchyHoverChecks,
+    responsiveParcelPanelChecks,
     parcelHighlightCheck,
     directParcelApi,
     removedPanelCount,
