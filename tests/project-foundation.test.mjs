@@ -1188,7 +1188,10 @@ test("project selection opens the five-page Giza study in a draggable, resizable
   assert.match(experience, /projectName=\{selectedProject\.name\}/);
   assert.match(experience, /onClose=\{\(\) => setSelectedProjectId\(null\)\}/);
   assert.match(experience, /projectDirectoryTab === "projects"/);
-  assert.match(modal, /src="\/valia-deck\/index\.html"/);
+  assert.ok(modal.includes('"bwiza-riverside-homes": "/valia-deck/index.html"'));
+  assert.ok(modal.includes('"heza-estate-batsinda-project": "/valia-deck/projects/heza-estate-batsinda-project.html"'));
+  assert.ok(modal.includes("const deckSrc = projectDecks[projectId] ??"));
+  assert.ok(modal.includes("src={deckSrc}"));
   assert.match(modal, /document\.querySelectorAll\("\.page"\)/);
   assert.match(modal, /transform: "scale\(" \+ scale \+ "\)"/);
   assert.match(modal, /onPointerDown=\{handleHeaderPointerDown\}/);
