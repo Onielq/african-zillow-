@@ -1018,6 +1018,9 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(e2e.includes('testCloseZoomBasemap("hybrid", "Hybrid"'));
   assert.ok(e2e.includes('name: "Map", exact: true'));
   assert.ok(e2e.includes('!map.getSource("world-imagery")'));
+  assert.ok(e2e.includes('!map.getSource("world-transportation")'));
+  assert.ok(e2e.includes('map.isSourceLoaded("world-imagery")'));
+  assert.ok(e2e.includes('statusDot?.classList.contains("status-dot-ready")'));
   assert.ok(e2e.includes("/tile/18/132734/153014"));
   assert.ok(e2e.includes("!sourceState.transportationSourceLoaded"));
   assert.ok(e2e.includes("!transportResponses.some((item) => item.status === 200)"));

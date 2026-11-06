@@ -704,12 +704,23 @@ try {
   await testCloseZoomBasemap("satellite", "Satellite", "artifacts/bugesera-satellite-close-zoom.png");
   await testCloseZoomBasemap("hybrid", "Hybrid", "artifacts/bugesera-hybrid-close-zoom.png");
 
-  // Keep the main diagnostic screenshot at village scale after the close-zoom
-  // checks, so it remains useful for reviewing village and parcel outlines.
+  // Return through the vector style before restoring Satellite. Both raster
+  // styles contain world-imagery, so checking only for that source can pass
+  // against the still-active Hybrid style before setStyle has completed.
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  await page.waitForFunction(() => {
+    const map = window.__RLI_E2E_MAP__;
+    return Boolean(map && map.isStyleLoaded() && !map.getSource("world-imagery"));
+  }, undefined, { timeout: 45_000 });
   await page.getByRole("button", { name: "Satellite" }).click();
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
-    return Boolean(map && map.isStyleLoaded() && map.getSource("world-imagery"));
+    return Boolean(
+      map &&
+      map.isStyleLoaded() &&
+      map.getSource("world-imagery") &&
+      !map.getSource("world-transportation")
+    );
   }, undefined, { timeout: 45_000 });
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
@@ -718,12 +729,16 @@ try {
   });
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
+    const statusDot = document.querySelector(".map-status-card .status-dot");
     return Boolean(
       map &&
+      map.isStyleLoaded() &&
+      map.isSourceLoaded("world-imagery") &&
+      statusDot?.classList.contains("status-dot-ready") &&
       map.querySourceFeatures("admin-villages").length > 0 &&
       map.queryRenderedFeatures(undefined, { layers: ["village-outline"] }).length > 0
     );
-  }, undefined, { timeout: 20_000 });
+  }, undefined, { timeout: 45_000 });
 
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
