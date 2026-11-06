@@ -193,7 +193,10 @@ type ViewBounds = [number, number, number, number];
 
 const ADMIN_SOURCE_EXTENTS: Record<AdminSourceId, ViewBounds> = {
   kigali: [29.58, -2.12, 30.32, -1.47],
-  bugesera: [29.82, -2.62, 30.56, -1.92]
+  // Padded bounds of the published Bugesera administrative polygons. The
+  // larger parcel-service envelope overlaps central Kigali and caused every
+  // Kigali map refresh to request all 581 Bugesera villages as well.
+  bugesera: [29.95, -2.45, 30.38, -2.02]
 };
 
 // Outward-rounded request windows let nearby pans reuse the same response
