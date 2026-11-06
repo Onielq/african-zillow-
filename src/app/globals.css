@@ -55,6 +55,17 @@
   --radius-panel: 18px;
   --tap-target-min: 44px;
   --shadow-floating: 0 12px 32px rgb(23 35 31 / 10%), 0 2px 6px rgb(23 35 31 / 5%);
+  
+  /* Motion primitives: shared timings and easing for interaction feedback. */
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-enter-duration: 220ms;
+  --motion-exit-duration: 176ms;
+  --motion-menu-duration: 200ms;
+  --motion-stagger-step: 30ms;
+  --motion-press-scale: 0.97;
+  --motion-knob-stretch: 1.12;
 }
 
 * {
@@ -4862,4 +4873,89 @@ input {
   font-weight: 620;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+
+/* Shared motion primitives. Components opt in only where the movement adds clarity. */
+.motion-press {
+  transition: transform 120ms var(--motion-ease-out);
+}
+
+.motion-press:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(var(--motion-press-scale));
+}
+
+.motion-enter {
+  animation: taiseel-motion-enter var(--motion-enter-duration) var(--motion-ease-out) both;
+}
+
+.motion-exit {
+  animation: taiseel-motion-exit var(--motion-exit-duration) var(--motion-ease-in) both;
+}
+
+@keyframes taiseel-motion-enter {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes taiseel-motion-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(4px) scale(0.99); }
+}
+
+/* Set --motion-origin to the actual trigger/anchor point; never default to centre. */
+.motion-popover {
+  transform-origin: var(--motion-origin, top left);
+  transition:
+    opacity var(--motion-menu-duration) var(--motion-ease-out),
+    transform var(--motion-menu-duration) var(--motion-ease-out);
+}
+
+.motion-popover[data-state="closed"] {
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+}
+
+.motion-popover[data-state="open"] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* The caller supplies --motion-order (0, 1, 2...) on each row. */
+.motion-stagger > * {
+  transition-delay: calc(var(--motion-order, 0) * var(--motion-stagger-step));
+}
+
+.motion-success {
+  animation: taiseel-success-pulse 520ms var(--motion-ease-out) both;
+}
+
+@keyframes taiseel-success-pulse {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-press,
+  .motion-popover,
+  .motion-stagger > * {
+    transition: none !important;
+    transition-delay: 0ms !important;
+  }
+
+  .motion-press:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: none;
+  }
+
+  .motion-enter,
+  .motion-exit,
+  .motion-success {
+    animation: none !important;
+  }
+
+  .motion-popover[data-state="closed"] {
+    transform: none;
+  }
 }
