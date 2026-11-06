@@ -202,7 +202,7 @@ try {
     { level: "district", startZoom: 8.35, layer: "district-fill", source: "admin-districts" },
     { level: "sector", startZoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
     { level: "cell", startZoom: 15.5, layer: "cell-fill", source: "admin-cells" },
-    { level: "village", startZoom: 16.6, layer: "village-fill", source: "admin-villages" }
+    { level: "village", startZoom: 16.6, maxZoom: 16.8, waitTimeoutMs: 10_000, layer: "village-fill", source: "admin-villages" }
   ];
 
   // These transitions follow the dominant ground dimension of the polygon
@@ -210,7 +210,8 @@ try {
   // not a valid assertion for districts/sectors/cells/villages of different shapes.
   async function findVisibleLevelZoom(config) {
     const step = 0.2;
-    const maxZoom = 20.5;
+    const maxZoom = config.maxZoom ?? 20.5;
+    const waitTimeoutMs = config.waitTimeoutMs ?? 2_500;
     let lastState = null;
     for (
       let zoom = config.startZoom;
@@ -233,7 +234,7 @@ try {
           map.querySourceFeatures(source).length > 0 &&
           map.queryRenderedFeatures(undefined, { layers: [layer] }).length > 0
         );
-      }, config, { timeout: 2_500 }).then(() => true).catch((error) => {
+      }, config, { timeout: waitTimeoutMs }).then(() => true).catch((error) => {
         if (!String(error?.message ?? error).includes("Timeout")) throw error;
         return false;
       });
@@ -251,7 +252,10 @@ try {
           sourceFeatures: map.querySourceFeatures(source).length,
           renderedFeatures: map.getLayer(layer)
             ? map.queryRenderedFeatures(undefined, { layers: [layer] }).length
-            : 0
+            : 0,
+          activeLevelTrace: (window.__RLI_E2E_TRACE__ ?? [])
+            .filter((event) => ["area-refresh-plan", "area-api-request", "area-api-failure", "area-api-retry"].includes(event.event))
+            .slice(-20)
         };
       }, { ...config, zoom });
     }
