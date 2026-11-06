@@ -2,6 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  CalendarDays,
+  FileText,
+  Fingerprint,
+  GitCompareArrows,
+  Grid,
+  Hash,
+  House,
+  LandPlot,
+  Landmark,
+  Layers,
+  Map as MapIcon,
+  MapPin,
+  MapPinned,
+  Plus,
+  Ruler,
+  Satellite,
+  Search,
+  Waves,
+  X,
+  type LucideIcon
+} from "lucide-react";
 import { BrandImage } from "@/components/directories/BrandImage";
 import { ProjectReportModal } from "@/components/map/ProjectReportModal";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
@@ -64,78 +86,29 @@ type ParcelFactIconName =
   | "wetlands"
   | "date";
 
-const PARCEL_FACT_ICON_CONTENT = {
-  identifier: (
-    <>
-      <path d="M7.5 3.75h6.7l4.3 4.3v12.2H7.5z" />
-      <path d="M14 3.9v4.3h4.3M10.2 12h5.6M10.2 15.3h5.6" />
-    </>
-  ),
-  number: <path d="M8 4 6.5 20M17.5 4 16 20M4.5 9h15M3.5 15h15" />,
-  district: (
-    <>
-      <path d="M4 20V8.5L12 4l8 4.5V20z" />
-      <path d="M9 20v-4h6v4M8 10.5h1M12 10.5h1M16 10.5h1" />
-    </>
-  ),
-  sector: (
-    <>
-      <path d="m3.5 6 5.5-2 6 2 5.5-2v14l-5.5 2-6-2-5.5 2z" />
-      <path d="M9 4v14M15 6v14" />
-    </>
-  ),
-  cell: (
-    <>
-      <path d="M19 10.2c0 5.1-7 10.1-7 10.1S5 15.3 5 10.2a7 7 0 1 1 14 0Z" />
-      <circle cx="12" cy="10" r="2.2" />
-    </>
-  ),
-  village: <path d="m3.5 10 8.5-6.5 8.5 6.5M5.5 9.5V20h13V9.5M9.5 20v-6h5v6" />,
-  zoning: (
-    <>
-      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
-      <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
-    </>
-  ),
-  area: (
-    <>
-      <path d="M4 7h16v10H4z" />
-      <path d="M8 7v4m4-4v2m4-2v4" />
-    </>
-  ),
-  wetlands: (
-    <>
-      <path d="M3.5 9c2.8-2.5 5.5-2.5 8.5 0s5.7 2.5 8.5 0" />
-      <path d="M3.5 14c2.8-2.5 5.5-2.5 8.5 0s5.7 2.5 8.5 0" />
-      <path d="M5 18.5c2.3-1.8 4.6-1.8 7 0 2.3-1.8 4.7-1.8 7 0" />
-    </>
-  ),
-  date: (
-    <>
-      <rect x="4" y="5.5" width="16" height="15" rx="2" />
-      <path d="M8 3.5v4M16 3.5v4M4 10h16" />
-    </>
-  )
+const PARCEL_FACT_ICONS: Record<ParcelFactIconName, LucideIcon> = {
+  identifier: FileText,
+  number: Hash,
+  district: Landmark,
+  sector: MapIcon,
+  cell: Grid,
+  village: House,
+  zoning: Layers,
+  area: Ruler,
+  wetlands: Waves,
+  date: CalendarDays
 };
 
 function ParcelFactIcon({ name }: { name: ParcelFactIconName }) {
+  const Icon = PARCEL_FACT_ICONS[name];
   return (
-    <svg
+    <Icon
       aria-hidden="true"
       className="parcel-fact-icon"
-      fill="none"
       focusable="false"
-      viewBox="0 0 24 24"
-    >
-      <g
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.85"
-      >
-        {PARCEL_FACT_ICON_CONTENT[name]}
-      </g>
-    </svg>
+      size={19}
+      strokeWidth={1.8}
+    />
   );
 }
 
@@ -1808,15 +1781,7 @@ export function MapExperience() {
             }}
             type="button"
           >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M7 4H3v12h4M13 4h4v12h-4M7 7h6M7 10h6M7 13h6"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <GitCompareArrows aria-hidden="true" size={18} strokeWidth={1.8} />
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
           <Link className="compare-control" href="/explorer">
@@ -1886,10 +1851,7 @@ export function MapExperience() {
             onClick={() => { manualBasemapChoiceRef.current = "map"; setBasemapMode("map"); }}
             type="button"
           >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="m2.5 5.2 5-2.1 5 2.1 5-2.1v11.7l-5 2.1-5-2.1-5 2.1V5.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="M7.5 3.3v11.6m5-9.7v11.6" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
+            <MapIcon aria-hidden="true" size={16} strokeWidth={1.8} />
             Map
           </button>
           <button
@@ -1898,20 +1860,13 @@ export function MapExperience() {
             onClick={() => { manualBasemapChoiceRef.current = "satellite"; setBasemapMode("satellite"); }}
             type="button"
           >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="m10 2.2 2.15 2.15-2.15 2.15-2.15-2.15L10 2.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="m4.6 7.6 2.15 2.15L4.6 11.9 2.45 9.75 4.6 7.6Zm10.8 0 2.15 2.15-2.15 2.15-2.15-2.15 2.15-2.15Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="m10 12.2 2.15 2.15L10 16.5l-2.15-2.15L10 12.2Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-            </svg>
+            <Satellite aria-hidden="true" size={16} strokeWidth={1.8} />
             Satellite
           </button>
           <button aria-pressed={basemapMode === "hybrid"}
             className={basemapMode === "hybrid" ? "basemap-button basemap-button-active" : "basemap-button"}
             onClick={() => { manualBasemapChoiceRef.current = "hybrid"; setBasemapMode("hybrid"); }} type="button">
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-              <path d="M2.5 5.4 10 2.2l7.5 3.2L10 8.6 2.5 5.4Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-              <path d="M2.5 10 10 13.2l7.5-3.2M2.5 14.5 10 17.7l7.5-3.2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-            </svg>
+            <Layers aria-hidden="true" size={16} strokeWidth={1.8} />
             Hybrid
           </button>
         </div>
@@ -1940,10 +1895,7 @@ export function MapExperience() {
           <div aria-label="Investment map actions" className="map-toolbar investment-toolbar">
             <div className="global-area-search">
               <div className="global-area-search-field">
-                <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-                  <circle cx="8.8" cy="8.8" r="5.4" stroke="currentColor" strokeWidth="1.6" />
-                  <path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
+                <Search aria-hidden="true" size={17} strokeWidth={1.8} />
                 <input
                   aria-label="Search addresses, districts, sectors, cells, villages and parcels"
                   aria-expanded={globalSearchOpen}
@@ -2003,7 +1955,7 @@ export function MapExperience() {
                     }}
                     type="button"
                   >
-                    ×
+                    <X aria-hidden="true" size={16} strokeWidth={1.8} />
                   </button>
                 ) : null}
               </div>
@@ -2031,7 +1983,13 @@ export function MapExperience() {
                           type="button"
                         >
                           <span className={isAddress ? "global-area-search-symbol global-area-search-address" : "global-area-search-symbol"} aria-hidden="true">
-                            {isAddress ? "⌖" : level === "parcel" ? "▱" : "◇"}
+                            {isAddress ? (
+                              <MapPin aria-hidden="true" size={18} strokeWidth={1.8} />
+                            ) : level === "parcel" ? (
+                              <LandPlot aria-hidden="true" size={18} strokeWidth={1.8} />
+                            ) : (
+                              <MapPinned aria-hidden="true" size={18} strokeWidth={1.8} />
+                            )}
                           </span>
                           <span className="global-area-search-copy">
                             <strong>{result.name}</strong>
@@ -3095,9 +3053,7 @@ export function MapExperience() {
               onClick={addSelectedAreaToComparison}
               type="button"
             >
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
+              <Plus aria-hidden="true" size={16} strokeWidth={1.8} />
               Add to comparison
             </button>
             <div className="panel-divider" />
@@ -3409,7 +3365,7 @@ export function MapExperience() {
             ) : null}
             {comparedAreas.length === 0 ? (
               <div className="comparison-empty">
-                <span aria-hidden="true" className="comparison-empty-pin">⌖</span>
+                <span aria-hidden="true" className="comparison-empty-pin"><MapPinned size={20} strokeWidth={1.7} /></span>
                 <strong>No areas selected</strong>
                 <p>Search a pilot district above or select a smaller area on the map and choose “Add to comparison”.</p>
               </div>
