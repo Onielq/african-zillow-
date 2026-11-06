@@ -7,6 +7,7 @@ import {
   CalendarDays,
   FileText,
   GitCompareArrows,
+  Info,
   Grid,
   Hash,
   House,
