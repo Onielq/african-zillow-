@@ -688,15 +688,18 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Satellite mode is imagery only. Keep roads in the separate Hybrid mode so
-// a failed optional reference overlay cannot make satellite imagery look blank.
+// Keep raster requests at the last dependable imagery level for rural Bugesera.
+// Above this level MapLibre must overzoom the cached source tile instead of
+// requesting higher-resolution tiles that are not available consistently there.
+// Hybrid's road reference uses the same cap so an empty close-zoom overlay cannot
+// cover the underlying satellite imagery.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 23,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
     openmaptiles: {
@@ -718,13 +721,13 @@ const HYBRID_STYLE: StyleSpecification = {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
     "world-transportation": {
       type: "raster",
       tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     },
     openmaptiles: {
