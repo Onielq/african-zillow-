@@ -944,7 +944,10 @@ function activeAreaLevelForMap(
   // handoff as well, with the same hysteresis.
   const villageRatio = featureViewportVerticalRatio(map, collections.village);
   if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
-  if (villageRatio < transitionThreshold("parcel")) return "village";
+  // The parcel layers have PARCEL_ZOOM as their minzoom. Do not switch away
+  // from village outlines before that threshold or both levels are invisible
+  // in the interval where village is hidden and parcel layers are not rendered.
+  if (zoom < PARCEL_ZOOM || villageRatio < transitionThreshold("parcel")) return "village";
 
   return "parcel";
 }
