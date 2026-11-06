@@ -601,6 +601,15 @@ try {
   // tiles rather than request blank higher-resolution tiles.
   const closeZoomBasemapChecks = [];
   const testCloseZoomBasemap = async (mode, buttonName, screenshot) => {
+    // Village zoom may already have switched the app to Satellite and loaded
+    // Bugesera z18 tiles before this helper starts. Switch to the vector Map
+    // style first so each mode test proves a fresh raster load, not a cache hit.
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+    await page.waitForFunction(() => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(map && map.isStyleLoaded() && !map.getSource("world-imagery"));
+    }, undefined, { timeout: 45_000 });
+
     const responseStart = diagnostics.basemapTileResponses.length;
     const failureStart = diagnostics.failedBasemapTileRequests.length;
     await page.getByRole("button", { name: buttonName }).click();
@@ -667,7 +676,10 @@ try {
       !sourceState.imagerySourceLoaded ||
       !sourceState.imageryLayerExists ||
       sourceState.imageryLayerVisibility === "none" ||
-      !imageryResponses.some((item) => item.status === 200)
+      !imageryResponses.some((item) => item.status === 200) ||
+      !imageryResponses.some((item) =>
+        item.status === 200 && item.url.includes("/tile/18/132734/153014")
+      )
     ) {
       throw new Error(mode + " imagery did not stay loaded at Bugesera close zoom: " + JSON.stringify(check));
     }
@@ -677,6 +689,8 @@ try {
     if (mode === "hybrid") {
       if (
         sourceState.transportationMaxZoom !== 18 ||
+        !sourceState.transportationSourceLoaded ||
+        !transportResponses.some((item) => item.status === 200) ||
         transportLevels.some((level) => level > 18) ||
         failures.some((item) => item.url.includes("World_Transportation"))
       ) {
