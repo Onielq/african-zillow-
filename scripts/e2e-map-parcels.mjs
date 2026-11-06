@@ -202,7 +202,7 @@ try {
     { level: "district", startZoom: 8.35, layer: "district-fill", source: "admin-districts" },
     { level: "sector", startZoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
     { level: "cell", startZoom: 15.5, layer: "cell-fill", source: "admin-cells" },
-    { level: "village", startZoom: 15.5, layer: "village-fill", source: "admin-villages" }
+    { level: "village", startZoom: 16.6, layer: "village-fill", source: "admin-villages" }
   ];
 
   // These transitions follow the dominant ground dimension of the polygon
@@ -494,7 +494,7 @@ try {
   await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
     if (!map) throw new Error("Opt-in test map was not exposed.");
-    map.jumpTo({ center: [30.133, -2.283], zoom: 15.8 });
+    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
   });
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
