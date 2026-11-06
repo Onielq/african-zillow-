@@ -922,6 +922,12 @@ function activeAreaLevelForMap(
 ): AreaLevel {
   const zoom = map.getZoom();
 
+  // Honor the configured village and parcel zoom floors. Footprint-based
+  // transitions remain useful below village detail, but must not keep a large
+  // cell polygon active after village boundaries are eligible to render.
+  if (zoom >= PARCEL_ZOOM) return "parcel";
+  if (zoom >= VILLAGE_ZOOM) return "village";
+
   const previousIndex = AREA_LEVELS.indexOf(previousLevel);
   const transitionThreshold = (childLevel: AreaLevel) =>
     previousIndex >= AREA_LEVELS.indexOf(childLevel)
