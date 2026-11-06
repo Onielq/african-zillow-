@@ -688,15 +688,18 @@ const RWANDA_CAMERA_BOUNDS: [[number, number], [number, number]] = [
   [30.93, -1.02]
 ];
 
-// Satellite mode is imagery only. Keep roads in the separate Hybrid mode so
-// a failed optional reference overlay cannot make satellite imagery look blank.
+// Keep raster requests at the last dependable imagery level for rural Bugesera.
+// Above this level MapLibre must overzoom the cached source tile instead of
+// requesting higher-resolution tiles that are not available consistently there.
+// Hybrid's road reference uses the same cap so an empty close-zoom overlay cannot
+// cover the underlying satellite imagery.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 23,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
     openmaptiles: {
@@ -706,8 +709,8 @@ const SATELLITE_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    // The service publishes imagery through z23. Keep the layer visible to
-    // parcel zoom and let MapLibre overzoom only above the provider's max zoom.
+    // Keep the imagery layer visible through parcel zoom. The source itself is
+    // capped at z18 so MapLibre overzooms its last tile at close range in Bugesera.
     { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 }
   ]
 };
@@ -718,13 +721,13 @@ const HYBRID_STYLE: StyleSpecification = {
     "world-imagery": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community"
     },
     "world-transportation": {
       type: "raster",
       tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256, minzoom: 0, maxzoom: 19,
+      tileSize: 256, minzoom: 0, maxzoom: 18,
       attribution: "Transportation © Esri, HERE, Garmin, and OpenStreetMap contributors"
     },
     openmaptiles: {
@@ -734,8 +737,8 @@ const HYBRID_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    // Keep hybrid imagery and road references visible above z19 by overzooming
-    // their last available raster tiles at individual-parcel scale.
+    // Keep hybrid imagery and road references visible through parcel zoom by
+    // overzooming the last reliable rural tiles beyond source z18.
     { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
     { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24 }
   ]

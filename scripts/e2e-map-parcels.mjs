@@ -592,30 +592,121 @@ try {
         }
       });
 
-  // Exercise the satellite basemap as part of the same live-map test.
-  // The default vector style can load successfully while the imagery raster
-  // tiles fail later, so verify both the source and actual tile responses.
+  // Test both raster modes at the map's maximum zoom, in Bugesera.
+  // The service has global tile levels above the close-zoom coverage available
+  // in this rural area. Sources are capped at z18 so MapLibre must overzoom those
+  // tiles rather than request blank higher-resolution tiles.
+  const closeZoomBasemapChecks = [];
+  const testCloseZoomBasemap = async (mode, buttonName, screenshot) => {
+    const responseStart = diagnostics.basemapTileResponses.length;
+    const failureStart = diagnostics.failedBasemapTileRequests.length;
+    await page.getByRole("button", { name: buttonName }).click();
+    await page.waitForFunction(() => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(map && map.isStyleLoaded() && map.getSource("world-imagery"));
+    }, undefined, { timeout: 45_000 });
+    await page.evaluate(() => {
+      const map = window.__RLI_E2E_MAP__;
+      if (!map) throw new Error("Map is not available for close-zoom basemap check.");
+      map.jumpTo({ center: [30.133, -2.283], zoom: 20 });
+    });
+    await page.waitForFunction(() => {
+      const map = window.__RLI_E2E_MAP__;
+      return Boolean(
+        map &&
+        map.getZoom() >= 19.99 &&
+        map.isStyleLoaded() &&
+        map.isSourceLoaded("world-imagery")
+      );
+    }, undefined, { timeout: 45_000 });
+    await page.waitForTimeout(500);
+
+    const sourceState = await page.evaluate(() => {
+      const map = window.__RLI_E2E_MAP__;
+      if (!map) throw new Error("Map is not available for close-zoom source check.");
+      const sources = map.getStyle().sources;
+      return {
+        zoom: Number(map.getZoom().toFixed(2)),
+        imageryMaxZoom: sources["world-imagery"]?.maxzoom ?? null,
+        transportationMaxZoom: sources["world-transportation"]?.maxzoom ?? null,
+        imageryLayerExists: Boolean(map.getLayer("world-imagery")),
+        imageryLayerVisibility: map.getLayoutProperty("world-imagery", "visibility") ?? "visible",
+        imagerySourceLoaded: map.isSourceLoaded("world-imagery"),
+        transportationSourceLoaded: Boolean(
+          map.getSource("world-transportation") && map.isSourceLoaded("world-transportation")
+        )
+      };
+    });
+    const responses = diagnostics.basemapTileResponses.slice(responseStart);
+    const failures = diagnostics.failedBasemapTileRequests.slice(failureStart);
+    const imageryResponses = responses.filter((item) => item.url.includes("World_Imagery"));
+    const imageryLevels = imageryResponses
+      .map((item) => Number(item.url.match(/MapServer\/tile\/(\d+)\//i)?.[1]))
+      .filter(Number.isFinite);
+    const transportResponses = responses.filter((item) => item.url.includes("World_Transportation"));
+    const transportLevels = transportResponses
+      .map((item) => Number(item.url.match(/MapServer\/tile\/(\d+)\//i)?.[1]))
+      .filter(Number.isFinite);
+    const check = {
+      mode,
+      ...sourceState,
+      imageryTileResponses: imageryResponses.length,
+      imageryTileLevels: [...new Set(imageryLevels)].sort((a, b) => a - b),
+      imageryTile200: imageryResponses.filter((item) => item.status === 200).length,
+      transportationTileResponses: transportResponses.length,
+      transportationTileLevels: [...new Set(transportLevels)].sort((a, b) => a - b),
+      failedTileRequests: failures
+    };
+    await page.screenshot({ path: screenshot, fullPage: false });
+
+    if (
+      sourceState.imageryMaxZoom !== 18 ||
+      !sourceState.imagerySourceLoaded ||
+      !sourceState.imageryLayerExists ||
+      sourceState.imageryLayerVisibility === "none" ||
+      !imageryResponses.some((item) => item.status === 200)
+    ) {
+      throw new Error(mode + " imagery did not stay loaded at Bugesera close zoom: " + JSON.stringify(check));
+    }
+    if (imageryLevels.some((level) => level > 18)) {
+      throw new Error(mode + " requested World Imagery tiles above the Bugesera source cap: " + JSON.stringify(check));
+    }
+    if (mode === "hybrid") {
+      if (
+        sourceState.transportationMaxZoom !== 18 ||
+        transportLevels.some((level) => level > 18) ||
+        failures.some((item) => item.url.includes("World_Transportation"))
+      ) {
+        throw new Error("Hybrid road-reference tiles failed or requested unavailable close-zoom levels: " + JSON.stringify(check));
+      }
+    }
+    closeZoomBasemapChecks.push(check);
+    return check;
+  };
+
+  await testCloseZoomBasemap("satellite", "Satellite", "artifacts/bugesera-satellite-close-zoom.png");
+  await testCloseZoomBasemap("hybrid", "Hybrid", "artifacts/bugesera-hybrid-close-zoom.png");
+
+  // Keep the main diagnostic screenshot at village scale after the close-zoom
+  // checks, so it remains useful for reviewing village and parcel outlines.
   await page.getByRole("button", { name: "Satellite" }).click();
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
     return Boolean(map && map.isStyleLoaded() && map.getSource("world-imagery"));
   }, undefined, { timeout: 45_000 });
-  await page.waitForFunction(() => {
-    const statusDot = document.querySelector(".map-status-card .status-dot");
-    return Boolean(statusDot && (
-      statusDot.classList.contains("status-dot-ready") ||
-      statusDot.classList.contains("status-dot-error")
-    ));
-  }, undefined, { timeout: 25_000 }).catch(() => {});
+  await page.evaluate(() => {
+    const map = window.__RLI_E2E_MAP__;
+    if (!map) throw new Error("Map was not available to restore village zoom.");
+    map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
+  });
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
-    if (!map) return false;
-    try {
-      return map.querySourceFeatures("land-parcels").length > 0;
-    } catch {
-      return false;
-    }
-  }, undefined, { timeout: 50_000 }).catch(() => {});
+    return Boolean(
+      map &&
+      map.querySourceFeatures("admin-villages").length > 0 &&
+      map.queryRenderedFeatures(undefined, { layers: ["village-outline"] }).length > 0
+    );
+  }, undefined, { timeout: 20_000 });
 
   const result = await page.evaluate(() => {
     const map = window.__RLI_E2E_MAP__;
@@ -693,6 +784,7 @@ try {
     responsiveParcelPanelChecks,
     parcelHighlightCheck,
     directParcelApi,
+    closeZoomBasemapChecks,
     removedPanelCount,
     exploreAreaTextCount,
     parcelBoundariesTextCount,
