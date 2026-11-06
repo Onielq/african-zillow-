@@ -922,11 +922,8 @@ function activeAreaLevelForMap(
 ): AreaLevel {
   const zoom = map.getZoom();
 
-  // Honor the configured village and parcel zoom floors. Footprint-based
-  // transitions remain useful below village detail, but must not keep a large
-  // cell polygon active after village boundaries are eligible to render.
+  // Parcel layers cannot render below their configured minimum zoom.
   if (zoom >= PARCEL_ZOOM) return "parcel";
-  if (zoom >= VILLAGE_ZOOM) return "village";
 
   const previousIndex = AREA_LEVELS.indexOf(previousLevel);
   const transitionThreshold = (childLevel: AreaLevel) =>
@@ -944,7 +941,10 @@ function activeAreaLevelForMap(
 
   const cellRatio = featureViewportVerticalRatio(map, collections.cell);
   if (cellRatio === null) return "sector";
-  if (cellRatio < transitionThreshold("village")) return "cell";
+  // The configured village minzoom is a hard floor: below it, the cell's
+  // screen-space footprint controls the transition; at or above it, do not
+  // keep a large cell active when village geometry is allowed to render.
+  if (zoom < VILLAGE_ZOOM && cellRatio < transitionThreshold("village")) return "cell";
 
   // Use the village's vertical footprint for the final parcel-detail
   // handoff as well, with the same hysteresis.
