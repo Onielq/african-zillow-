@@ -931,16 +931,23 @@ function activeAreaLevelForMap(
       ? ADMIN_FOOTPRINT_EXIT_RATIO
       : ADMIN_FOOTPRINT_ENTER_RATIO;
 
+  // Geometry can be temporarily absent while the viewport crosses between
+  // GIS source extents. In that state, keep the configured layer floor eligible
+  // so a high-zoom viewport still requests village geometry instead of stopping
+  // at the generic cell fallback. Once geometry exists, footprint transitions
+  // below this point continue to decide the active administrative level.
+  const fallbackLevel = zoom >= VILLAGE_ZOOM ? "village" : activeAreaLevel(zoom);
+
   const districtRatio = featureViewportVerticalRatio(map, collections.district);
-  if (districtRatio === null) return activeAreaLevel(zoom);
+  if (districtRatio === null) return fallbackLevel;
   if (districtRatio < transitionThreshold("sector")) return "district";
 
   const sectorRatio = featureViewportVerticalRatio(map, collections.sector);
-  if (sectorRatio === null) return "district";
+  if (sectorRatio === null) return fallbackLevel;
   if (sectorRatio < transitionThreshold("cell")) return "sector";
 
   const cellRatio = featureViewportVerticalRatio(map, collections.cell);
-  if (cellRatio === null) return "sector";
+  if (cellRatio === null) return fallbackLevel;
   // The configured village minzoom is a hard floor: below it, the cell's
   // screen-space footprint controls the transition; at or above it, do not
   // keep a large cell active when village geometry is allowed to render.
