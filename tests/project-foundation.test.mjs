@@ -1178,7 +1178,7 @@ test("dense final parcel tiles retrieve object IDs in bounded concurrent batches
 });
 
 
-test("project selection opens the five-page Giza study in a draggable, resizable and dockable window", async () => {
+test("project selection opens the five-page study in a draggable, resizable and dockable window", async () => {
   const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
   const html = await readProjectFile("public/valia-deck/index.html");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
@@ -1212,7 +1212,7 @@ test("project selection opens the five-page Giza study in a draggable, resizable
   assert.equal((html.match(/class="page /g) ?? []).length, 5);
 
   const cover = html.slice(0, html.indexOf('<div class="page p2'));
-  assert.match(cover, /class="project-name">Giza Riverside Homes<\/div>/);
+  assert.match(cover, /class="project-name">Bwiza Riverside Homes<\/div>/);
   assert.match(cover, /class="locality">NYARUGENGE DISTRICT<\/div>/);
   assert.match(html, /GIZA RIVERSIDE HOMES MASTER PLAN/);
   assert.match(html, /NYARUGENGE DISTRICT/);
