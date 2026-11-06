@@ -709,8 +709,8 @@ const SATELLITE_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    // The service publishes imagery through z23. Keep the layer visible to
-    // parcel zoom and let MapLibre overzoom only above the provider's max zoom.
+    // Keep the imagery layer visible through parcel zoom. The source itself is
+    // capped at z18 so MapLibre overzooms its last tile at close range in Bugesera.
     { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 }
   ]
 };
@@ -737,8 +737,8 @@ const HYBRID_STYLE: StyleSpecification = {
     }
   },
   layers: [
-    // Keep hybrid imagery and road references visible above z19 by overzooming
-    // their last available raster tiles at individual-parcel scale.
+    // Keep hybrid imagery and road references visible through parcel zoom by
+    // overzooming the last reliable rural tiles beyond source z18.
     { id: "world-imagery", type: "raster", source: "world-imagery", minzoom: 0, maxzoom: 24 },
     { id: "world-transportation", type: "raster", source: "world-transportation", minzoom: 0, maxzoom: 24 }
   ]
