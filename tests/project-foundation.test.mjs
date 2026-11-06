@@ -1012,6 +1012,12 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(e2e.includes("basemapTileResponses"));
   assert.ok(e2e.includes("imagerySourceLoaded"));
   assert.ok(e2e.includes("status-dot-ready"));
+  assert.ok(e2e.includes('level: "cell", startZoom: 15.1, maxZoom: 16.0, waitTimeoutMs: 8_000'));
+  assert.ok(e2e.includes("const closeZoomBasemapChecks = []"));
+  assert.ok(e2e.includes('testCloseZoomBasemap("satellite", "Satellite"'));
+  assert.ok(e2e.includes('testCloseZoomBasemap("hybrid", "Hybrid"'));
+  assert.ok(e2e.includes("artifacts/bugesera-satellite-close-zoom.png"));
+  assert.ok(e2e.includes("artifacts/bugesera-hybrid-close-zoom.png"));
 });
 
 test("the geography API uses build-time transaction rows, not request-time filesystem reads", async () => {

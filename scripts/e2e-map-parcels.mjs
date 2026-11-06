@@ -201,7 +201,10 @@ try {
   const hoverLevels = [
     { level: "district", startZoom: 8.35, layer: "district-fill", source: "admin-districts" },
     { level: "sector", startZoom: 12.4, layer: "sector-fill", source: "admin-sectors" },
-    { level: "cell", startZoom: 15.5, layer: "cell-fill", source: "admin-cells" },
+    // Start at the cell layer's actual minzoom. Small Kigali cells may
+    // already fill the viewport by 15.5 and transition directly to village,
+    // which makes a test starting at 15.5 skip the visible cell interval.
+    { level: "cell", startZoom: 15.1, maxZoom: 16.0, waitTimeoutMs: 8_000, layer: "cell-fill", source: "admin-cells" },
     { level: "village", startZoom: 16.6, maxZoom: 16.8, waitTimeoutMs: 10_000, layer: "village-fill", source: "admin-villages" }
   ];
 
