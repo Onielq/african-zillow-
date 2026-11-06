@@ -641,11 +641,11 @@ try {
     const failures = diagnostics.failedBasemapTileRequests.slice(failureStart);
     const imageryResponses = responses.filter((item) => item.url.includes("World_Imagery"));
     const imageryLevels = imageryResponses
-      .map((item) => Number(item.url.match(/MapServer\\/tile\\/(\\d+)\\//i)?.[1]))
+      .map((item) => Number(item.url.match(/MapServer\/tile\/(\d+)\//i)?.[1]))
       .filter(Number.isFinite);
     const transportResponses = responses.filter((item) => item.url.includes("World_Transportation"));
     const transportLevels = transportResponses
-      .map((item) => Number(item.url.match(/MapServer\\/tile\\/(\\d+)\\//i)?.[1]))
+      .map((item) => Number(item.url.match(/MapServer\/tile\/(\d+)\//i)?.[1]))
       .filter(Number.isFinite);
     const check = {
       mode,
