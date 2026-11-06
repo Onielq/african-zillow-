@@ -224,6 +224,13 @@ test("the map supports a satellite basemap without removing administrative overl
   );
   assert.match(satelliteStyle, /World_Imagery/);
   assert.match(satelliteStyle, /https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/\{z\}\/\{y\}\/\{x\}/);
+  assert.match(satelliteStyle, /maxzoom: 18/);
+  const hybridStyle = mapView.slice(
+    mapView.indexOf("const HYBRID_STYLE"),
+    mapView.indexOf("// Administrative detail advances")
+  );
+  assert.match(hybridStyle, /"world-imagery": \{[\s\S]*?maxzoom: 18/);
+  assert.match(hybridStyle, /"world-transportation": \{[\s\S]*?maxzoom: 18/);
   assert.doesNotMatch(satelliteStyle, /World_Transportation/);
 });
 
@@ -1181,6 +1188,40 @@ test("dense final parcel tiles retrieve object IDs in bounded concurrent batches
   assert.match(route, /remaining: 1600/);
 });
 
+
+
+test("map toolbar and parcel facts use semantic Lucide icons", async () => {
+  const packageJson = JSON.parse(await readProjectFile("package.json"));
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.equal(packageJson.dependencies["lucide-react"], "^1.70.0");
+  for (const icon of [
+    "GitCompareArrows",
+    "MapIcon",
+    "Satellite",
+    "Layers",
+    "Search",
+    "MapPin",
+    "LandPlot",
+    "MapPinned",
+    "Plus",
+    "FileText",
+    "Hash",
+    "Landmark",
+    "Grid",
+    "House",
+    "Ruler",
+    "Waves",
+    "CalendarDays"
+  ]) {
+    assert.ok(experience.includes(icon), "Expected semantic Lucide icon: " + icon);
+  }
+  assert.match(experience, /from "lucide-react"/);
+  assert.doesNotMatch(experience, /PARCEL_FACT_ICON_CONTENT/);
+  assert.doesNotMatch(experience, /isAddress \? "⌖"/);
+  assert.doesNotMatch(experience, /level === "parcel" \? "▱"/);
+  assert.doesNotMatch(experience, /comparison-empty-pin">⌖/);
+});
 
 test("project selection opens the five-page study in a draggable, resizable and dockable window", async () => {
   const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
