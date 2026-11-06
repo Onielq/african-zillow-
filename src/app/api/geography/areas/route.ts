@@ -11,7 +11,7 @@ const BUGESERA_MASTERPLAN_MAP_SERVER =
 const KIGALI_PARCEL_FEATURE_LAYER =
   "https://masterplan.kigalicity.gov.rw/server/rest/services/Hosted/Kigali_Parcels_1June2026_for_search/FeatureServer/0";
 const BUGESERA_PARCEL_FEATURE_LAYER =
-  "https://services7.arcgis.com/htgaiKX6RV2DDGgK/arcgis/rest/services/Bugesera_Parcels/FeatureServer/0";
+  "https://geodata.rw/server/rest/services/LAISData/Bugesera_Parcels/FeatureServer/0";
 
 const INCLUDED_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE", "BUGESERA"] as const;
 const KIGALI_DISTRICTS = ["GASABO", "KICUKIRO", "NYARUGENGE"] as const;
@@ -35,7 +35,11 @@ const DISTRICT_TRANSACTION_PRICE_SOURCE = LAND_PRICE_BENCHMARK_SOURCE;
 // Broad service extents are used only to avoid requesting an unrelated GIS
 // service for a viewport outside its coverage.
 const KIGALI_GIS_EXTENT: Bounds = [29.58, -2.12, 30.32, -1.47];
-const BUGESERA_GIS_EXTENT: Bounds = [29.82, -2.62, 30.56, -1.92];
+const BUGESERA_GIS_EXTENT: Bounds = [29.95, -2.45, 30.38, -2.02];
+// The parcel layer's published projected extent converts to this padded
+// WGS84 box. Keep parcel requests inside the cadastral coverage, not the
+// larger Bugesera administrative-source envelope.
+const BUGESERA_PARCEL_EXTENT: Bounds = [29.96, -2.44, 30.36, -2.03];
 const KIGALI_PARCEL_EXTENT: Bounds = [29.6223, -2.0794, 30.2772, -1.4870];
 
 const RWANDA_BOUNDS = {
@@ -1165,7 +1169,7 @@ async function getParcels(
     {
       id: "bugesera",
       layerUrl: BUGESERA_PARCEL_FEATURE_LAYER,
-      extent: BUGESERA_GIS_EXTENT
+      extent: BUGESERA_PARCEL_EXTENT
     }
   ];
   const providers = parcelProviders.filter((provider) =>

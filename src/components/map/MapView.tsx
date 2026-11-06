@@ -193,7 +193,10 @@ type ViewBounds = [number, number, number, number];
 
 const ADMIN_SOURCE_EXTENTS: Record<AdminSourceId, ViewBounds> = {
   kigali: [29.58, -2.12, 30.32, -1.47],
-  bugesera: [29.82, -2.62, 30.56, -1.92]
+  // Padded bounds of the published Bugesera administrative polygons. The
+  // larger parcel-service envelope overlaps central Kigali and caused every
+  // Kigali map refresh to request all 581 Bugesera villages as well.
+  bugesera: [29.95, -2.45, 30.38, -2.02]
 };
 
 // Outward-rounded request windows let nearby pans reuse the same response
@@ -919,6 +922,9 @@ function activeAreaLevelForMap(
 ): AreaLevel {
   const zoom = map.getZoom();
 
+  // Parcel layers cannot render below their configured minimum zoom.
+  if (zoom >= PARCEL_ZOOM) return "parcel";
+
   const previousIndex = AREA_LEVELS.indexOf(previousLevel);
   const transitionThreshold = (childLevel: AreaLevel) =>
     previousIndex >= AREA_LEVELS.indexOf(childLevel)
@@ -935,13 +941,19 @@ function activeAreaLevelForMap(
 
   const cellRatio = featureViewportVerticalRatio(map, collections.cell);
   if (cellRatio === null) return "sector";
-  if (cellRatio < transitionThreshold("village")) return "cell";
+  // The configured village minzoom is a hard floor: below it, the cell's
+  // screen-space footprint controls the transition; at or above it, do not
+  // keep a large cell active when village geometry is allowed to render.
+  if (zoom < VILLAGE_ZOOM && cellRatio < transitionThreshold("village")) return "cell";
 
   // Use the village's vertical footprint for the final parcel-detail
   // handoff as well, with the same hysteresis.
   const villageRatio = featureViewportVerticalRatio(map, collections.village);
   if (villageRatio === null) return zoom >= PARCEL_ZOOM ? "parcel" : "village";
-  if (villageRatio < transitionThreshold("parcel")) return "village";
+  // The parcel layers have PARCEL_ZOOM as their minzoom. Do not switch away
+  // from village outlines before that threshold or both levels are invisible
+  // in the interval where village is hidden and parcel layers are not rendered.
+  if (zoom < PARCEL_ZOOM || villageRatio < transitionThreshold("parcel")) return "village";
 
   return "parcel";
 }
