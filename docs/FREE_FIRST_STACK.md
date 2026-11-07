@@ -12,12 +12,12 @@ Prefer open source and free tiers while traffic and feature requirements are sma
 | Automated checks | GitHub Actions: lint, types, tests, Next.js build, Docker image build | Configured |
 | Portable runtime | Multi-stage Docker image using Next.js standalone output | Configured |
 | Local container run | Docker Compose | Configured |
-| Database | Neon PostgreSQL via `DATABASE_URL` | Placeholder only; no database adapter/schema is wired yet |
+| Database | Neon PostgreSQL via `@neondatabase/serverless` | Runtime connection and schema-readiness check implemented; no Neon project or connection secret configured yet |
 | Email | Resend via `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_TO_EMAIL` | Contact form and server endpoint are wired; sending remains disabled until credentials and a verified sender are configured and tested |
 | File storage | Cloudflare R2 | Placeholder only; no upload/storage feature is wired yet |
 | Cloud deployment | Cloudflare Workers via vinext | Pilot config and GitHub build/deploy workflow added; compatibility build and Cloudflare credentials are required before a live deployment |
 
-An empty environment variable does not enable a service. Add an integration only alongside the product feature, validation, and tests that use it.
+An empty environment variable does not enable a service. The database health adapter now tests a configured connection and checks for the unified REJA schema; no database is connected until the Neon project and runtime secret exist.
 
 ## Important: Pages versus Workers for this app
 
@@ -83,7 +83,7 @@ The map style URL is public configuration, not a secret. It can be set as a GitH
 Neon and Cloudflare R2 remain **unwired placeholders**. Resend now has a contact form and server-side sending endpoint, but it is not production-ready until the API key is configured, the sender domain is verified, and a real test message is received. Do not add real credentials to the repository.
 
 When the matching application feature is implemented:
-- **Neon:** create the PostgreSQL project, add its pooled `DATABASE_URL` as a runtime secret, and commit tested schema migrations.
+- **Neon:** the application now uses the Neon serverless HTTP driver for request-time health checks in both Node.js and Cloudflare Worker runtimes. Create a development PostgreSQL project with PostGIS, apply the migrations in `Onielq/Taiseel-reja-database`, then add the pooled connection string as `DATABASE_URL` to Vercel and the Cloudflare Worker. Keep a separate direct connection for schema migrations. The current app does not yet read project, parcel or listing records from the database; the health route verifies connectivity and expected schema objects only.
 - **Resend:** verify a sender domain/address, then add `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and the receiving `RESEND_TO_EMAIL` as runtime secrets/variables. The contact page supports email replies and call-back requests; run a controlled form submission and verify receipt before launch. The health check reads the domain list but does not send a test email. Set `NEXT_PUBLIC_CONTACT_PHONE` only if a direct click-to-call number is to be shown.
 - **R2:** create a bucket and use a restricted bucket binding or S3 credentials for server-side uploads; never expose access keys in browser code.
 
