@@ -1,3 +1,4 @@
+import { checkRejaDatabaseIntegration } from "@/lib/reja-database";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -392,10 +393,10 @@ async function checkResendIntegration(): Promise<IntegrationHealth> {
 }
 
 async function checkIntegrations(): Promise<IntegrationHealth[]> {
-  const resend = await checkResendIntegration();
-  const databaseStatus: IntegrationHealthStatus = process.env.DATABASE_URL?.trim()
-    ? "not-integrated"
-    : "not-configured";
+  const [resend, database] = await Promise.all([
+    checkResendIntegration(),
+    checkRejaDatabaseIntegration()
+  ]);
   const r2Status: IntegrationHealthStatus =
     process.env.R2_BUCKET_NAME?.trim() ? "needs-setup" : "not-configured";
   const isCloudflareWorker =
@@ -423,16 +424,7 @@ async function checkIntegrations(): Promise<IntegrationHealth[]> {
       detail: "The VINEXT_KV_CACHE namespace and Worker binding are configured. Live cache operation can only be confirmed after the Worker is deployed successfully."
     },
     resend,
-    {
-      id: "postgresql",
-      name: "Neon / PostgreSQL",
-      category: "database",
-      status: databaseStatus,
-      statusLabel: databaseStatus === "not-configured" ? "No connection string" : "URL present · driver/schema not integrated",
-      detail: databaseStatus === "not-configured"
-        ? "DATABASE_URL is not configured. The repository has no connected PostgreSQL client/schema workflow, so Neon is not currently used by the app."
-        : "DATABASE_URL is present, but this app still has no PostgreSQL client/schema integration. A connection string alone does not prove the database works."
-    },
+    database,
     {
       id: "cloudflare-r2",
       name: "Cloudflare R2 object storage",
