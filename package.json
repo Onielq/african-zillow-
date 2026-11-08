@@ -22,7 +22,8 @@
     "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
     "prebuild": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
     "predev:vinext": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
-    "prebuild:vinext": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs"
+    "prebuild:vinext": "node scripts/copy-maplibre-worker.mjs && node scripts/generate-land-price-index.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
     "@vinext/cloudflare": "^1.2.1",
@@ -50,6 +51,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "4.1.17",
     "typescript": "^5.9.3",
-    "vite": "8.3.0"
+    "vite": "8.3.0",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1"
   }
 }

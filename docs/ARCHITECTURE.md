@@ -61,3 +61,8 @@ flowchart TD
 - A source record count is not evidence that the geographic coverage is complete.
 - Keep provider credentials in secret stores; never hard-code secrets or place them in browser-visible variables unless they are explicitly designed to be public.
 - Keep the Vercel and Cloudflare deploy workflows independently verifiable.
+
+
+## Canonical data foundation
+
+The canonical relational and spatial foundation is documented in [TAISEEL_DATA_PLATFORM.md](./TAISEEL_DATA_PLATFORM.md). It adopts the source-aware REJA core and Market Intelligence schema, then adds PostGIS geography, cadastral parcels, developer projects and units, organizations and memberships, and a verified-authority gate for public listings. The data-source health endpoint checks for the required core, geography, development and exchange objects. The map remains a presentation of sourced records; it is not an ownership or title register.
