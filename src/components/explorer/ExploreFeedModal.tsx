@@ -275,10 +275,10 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
           </div>
         ) : (
           <div className={styles.feedBody}>
-            <div aria-label="Explore categories" className={styles.categories} role="tablist">
+            <div aria-label="Explore categories" className={styles.categories} role="group">
               {CATEGORIES.map((category) => (
                 <button
-                  aria-selected={activeCategory === category.id}
+                  aria-pressed={activeCategory === category.id}
                   className={
                     activeCategory === category.id
                       ? styles.categoryActive
@@ -286,7 +286,6 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
                   }
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  role="tab"
                   type="button"
                 >
                   {category.label}
@@ -295,7 +294,7 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
             </div>
 
             {visibleMedia.length > 0 ? (
-              <div aria-label="Project media" className={styles.grid} role="tabpanel">
+              <div aria-label="Project media" className={styles.grid} role="group">
                 {visibleMedia.map((media, index) => (
                   <button
                     aria-label={"Open " + media.project.name + " " + media.type}
