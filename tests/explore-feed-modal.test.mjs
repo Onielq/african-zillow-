@@ -16,7 +16,7 @@ test("Explore media comes only from sourced project-register image and video fie
   assert.match(modal, /if \(project\.videoUrl\?\.trim\(\)\)/);
   assert.match(projects, /imageUrl\?: string/);
   assert.match(projects, /videoUrl\?: string/);
-  assert.match(modal, /Only project media in this category yet/);
+  assert.match(modal, /No project media in this category yet/);
 });
 
 test("Explore opens a property detail view with project provenance and honest viewer state", async () => {
