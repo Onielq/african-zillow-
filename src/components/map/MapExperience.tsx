@@ -24,6 +24,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { BrandImage } from "@/components/directories/BrandImage";
+import { ExploreFeedModal } from "@/components/explorer/ExploreFeedModal";
 import { ProjectReportModal } from "@/components/map/ProjectReportModal";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
@@ -773,6 +774,7 @@ export function MapExperience() {
   const [propertyScope, setPropertyScope] = useState<PropertyScope>("land");
   const analysisPeriod: AnalysisPeriod = "12m";
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [exploreFeedOpen, setExploreFeedOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [developersOpen, setDevelopersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -877,8 +879,11 @@ export function MapExperience() {
           source: "Valhalla · OpenStreetMap road graph",
           note: "Estimated road routes; not live traffic."
         };
+  const exploreFeedTriggerRef = useRef<HTMLButtonElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
+
+  const closeExploreFeed = useCallback(() => setExploreFeedOpen(false), []);
 
   const handleMapReady = useCallback(
     (map: MapLibreMapInstance | null) => {
@@ -1784,14 +1789,37 @@ export function MapExperience() {
             Compare{comparedAreas.length > 0 ? ` · ${comparedAreas.length}` : ""}
           </button>
           <Link className="compare-control" href="/explorer">
-            Explorer
+            Market explorer
           </Link>
           <Link className="compare-control" href="/data-sources">
             Data sources
           </Link>
         </nav>
 
-        <div aria-label="Application modes" className="topbar-actions">
+        <div aria-label="Workspace and Explore actions" className="topbar-actions">
+          <button
+            aria-controls="taiseel-explore-feed-dialog"
+            aria-expanded={exploreFeedOpen}
+            aria-label="Open Explore feed"
+            className="mode-chip explore-feed-trigger"
+            onClick={() => {
+              setGlobalSearchOpen(false);
+              setGlobalSearchResults([]);
+              setGlobalSearchStatus("idle");
+              setCompareOpen(false);
+              setSourcesOpen(false);
+              setMetricsOpen(false);
+              setDevelopersOpen(false);
+              setProjectsOpen(false);
+              setMetricInfoOpen(false);
+              setExploreFeedOpen(true);
+            }}
+            ref={exploreFeedTriggerRef}
+            type="button"
+          >
+            <Grid aria-hidden="true" size={16} strokeWidth={1.8} />
+            <span>Explore</span>
+          </button>
           <button
             aria-pressed={workspaceMode === "areas"}
             className={workspaceMode === "areas" ? "mode-chip mode-chip-active" : "mode-chip"}
@@ -3561,6 +3589,13 @@ export function MapExperience() {
           </aside>
         ) : null}
       </section>
+
+      {exploreFeedOpen ? (
+        <ExploreFeedModal
+          onClose={closeExploreFeed}
+          returnFocusRef={exploreFeedTriggerRef}
+        />
+      ) : null}
     </main>
   );
 }
