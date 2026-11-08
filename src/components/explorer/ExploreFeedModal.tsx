@@ -14,12 +14,35 @@ import { RWANDA_PROJECT_RECORDS, type RwandaProjectRecord } from "@/data/project
 import styles from "./explore-feed-modal.module.css";
 
 type FeedCategory = "all" | "residential" | "commercial" | "mixed-use";
+type MediaType = "image" | "video";
 
-type ExploreProject = RwandaProjectRecord & { imageUrl: string };
+type ExploreMedia = {
+  id: string;
+  type: MediaType;
+  mediaUrl: string;
+  project: RwandaProjectRecord;
+};
 
-const FEED_PROJECTS = RWANDA_PROJECT_RECORDS.filter(
-  (project): project is ExploreProject => Boolean(project.imageUrl?.trim())
-);
+const FEED_MEDIA: ExploreMedia[] = RWANDA_PROJECT_RECORDS.flatMap((project) => {
+  const media: ExploreMedia[] = [];
+  if (project.imageUrl?.trim()) {
+    media.push({
+      id: project.id + "-image",
+      type: "image",
+      mediaUrl: project.imageUrl,
+      project
+    });
+  }
+  if (project.videoUrl?.trim()) {
+    media.push({
+      id: project.id + "-video",
+      type: "video",
+      mediaUrl: project.videoUrl,
+      project
+    });
+  }
+  return media;
+});
 
 const CATEGORIES: Array<{ id: FeedCategory; label: string }> = [
   { id: "all", label: "For you" },
@@ -28,8 +51,8 @@ const CATEGORIES: Array<{ id: FeedCategory; label: string }> = [
   { id: "mixed-use", label: "Mixed-use" }
 ];
 
-function matchesCategory(project: ExploreProject, category: FeedCategory): boolean {
-  const value = project.category.toLocaleLowerCase("en");
+function matchesCategory(media: ExploreMedia, category: FeedCategory): boolean {
+  const value = media.project.category.toLocaleLowerCase("en");
   if (category === "all") return true;
   if (category === "residential") return value.includes("residential");
   if (category === "commercial") {
@@ -38,11 +61,11 @@ function matchesCategory(project: ExploreProject, category: FeedCategory): boole
   return value.includes("mixed-use") || value.includes("mixed use");
 }
 
-function projectLocation(project: ExploreProject): string {
+function projectLocation(project: RwandaProjectRecord): string {
   return [project.sector, project.district].filter(Boolean).join(" · ") || project.district || "Rwanda";
 }
 
-function locationPrecisionLabel(project: ExploreProject): string {
+function locationPrecisionLabel(project: RwandaProjectRecord): string {
   switch (project.locationPrecision) {
     case "parcel-upi":
       return "Parcel UPI supplied";
@@ -64,12 +87,12 @@ type ExploreFeedModalProps = {
 
 export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalProps) {
   const [activeCategory, setActiveCategory] = useState<FeedCategory>("all");
-  const [selectedProject, setSelectedProject] = useState<ExploreProject | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<ExploreMedia | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const visibleProjects = useMemo(
-    () => FEED_PROJECTS.filter((project) => matchesCategory(project, activeCategory)),
+  const visibleMedia = useMemo(
+    () => FEED_MEDIA.filter((media) => matchesCategory(media, activeCategory)),
     [activeCategory]
   );
 
@@ -111,6 +134,8 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
     };
   }, [onClose, returnFocusRef]);
 
+  const selectedProject = selectedMedia?.project ?? null;
+
   return (
     <div
       className={styles.backdrop}
@@ -147,24 +172,39 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
           </button>
         </header>
 
-        {selectedProject ? (
+        {selectedMedia && selectedProject ? (
           <div className={styles.detailLayout}>
             <div className={styles.detailMedia}>
-              <BrandImage
-                className={styles.detailImage}
-                fit="cover"
-                height={900}
-                name={selectedProject.name}
-                source={selectedProject.imageUrl}
-                width={1100}
-              />
-              <span className={styles.mediaType}>Photo</span>
+              {selectedMedia.type === "video" ? (
+                <video
+                  className={styles.detailVideo}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster={selectedProject.imageUrl ?? undefined}
+                  src={selectedMedia.mediaUrl}
+                >
+                  Your browser does not support embedded video.
+                </video>
+              ) : (
+                <BrandImage
+                  className={styles.detailImage}
+                  fit="cover"
+                  height={900}
+                  name={selectedProject.name}
+                  source={selectedMedia.mediaUrl}
+                  width={1100}
+                />
+              )}
+              <span className={styles.mediaType}>
+                {selectedMedia.type === "video" ? "Video" : "Photo"}
+              </span>
             </div>
 
             <aside aria-label="Project post details" className={styles.detailPanel}>
               <button
                 className={styles.backButton}
-                onClick={() => setSelectedProject(null)}
+                onClick={() => setSelectedMedia(null)}
                 type="button"
               >
                 <ArrowLeft aria-hidden="true" size={16} />
@@ -220,9 +260,11 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
                     Open project source <ExternalLink aria-hidden="true" size={13} />
                   </a>
                 ) : null}
-                <a href={selectedProject.imageUrl} rel="noreferrer" target="_blank">
-                  Open image source <ExternalLink aria-hidden="true" size={13} />
-                </a>
+                {selectedMedia.type === "image" ? (
+                  <a href={selectedMedia.mediaUrl} rel="noreferrer" target="_blank">
+                    Open image source <ExternalLink aria-hidden="true" size={13} />
+                  </a>
+                ) : null}
               </div>
 
               <p className={styles.disclaimer}>
@@ -252,32 +294,45 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
               ))}
             </div>
 
-            {visibleProjects.length > 0 ? (
+            {visibleMedia.length > 0 ? (
               <div aria-label="Project media" className={styles.grid} role="tabpanel">
-                {visibleProjects.map((project, index) => (
+                {visibleMedia.map((media, index) => (
                   <button
-                    aria-label={"Open " + project.name}
+                    aria-label={"Open " + media.project.name + " " + media.type}
                     className={
-                      visibleProjects.length >= 4 && (index === 0 || index === 2)
+                      visibleMedia.length >= 4 && (index === 0 || index === 2)
                         ? styles.gridTileFeature
                         : styles.gridTile
                     }
-                    key={project.id}
-                    onClick={() => setSelectedProject(project)}
+                    key={media.id}
+                    onClick={() => setSelectedMedia(media)}
                     type="button"
                   >
-                    <BrandImage
-                      className={styles.tileImage}
-                      fit="cover"
-                      height={560}
-                      name={project.name}
-                      source={project.imageUrl}
-                      width={560}
-                    />
-                    <span className={styles.tileType}>Photo</span>
+                    {media.type === "video" ? (
+                      <video
+                        className={styles.tileVideo}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        poster={media.project.imageUrl ?? undefined}
+                        src={media.mediaUrl}
+                      />
+                    ) : (
+                      <BrandImage
+                        className={styles.tileImage}
+                        fit="cover"
+                        height={560}
+                        name={media.project.name}
+                        source={media.mediaUrl}
+                        width={560}
+                      />
+                    )}
+                    <span className={styles.tileType}>
+                      {media.type === "video" ? "Video" : "Photo"}
+                    </span>
                     <span className={styles.tileOverlay}>
-                      <strong>{project.name}</strong>
-                      <small>{projectLocation(project)}</small>
+                      <strong>{media.project.name}</strong>
+                      <small>{projectLocation(media.project)}</small>
                     </span>
                   </button>
                 ))}
@@ -285,13 +340,13 @@ export function ExploreFeedModal({ onClose, returnFocusRef }: ExploreFeedModalPr
             ) : (
               <div className={styles.emptyState}>
                 <Grid aria-hidden="true" size={26} />
-                <strong>No project photos in this category yet</strong>
-                <p>Only project records with a sourced image are shown in Explore.</p>
+                <strong>No project media in this category yet</strong>
+                <p>Only project records with a sourced image or video are shown in Explore.</p>
               </div>
             )}
 
             <p className={styles.feedFootnote}>
-              Images come from the project register. A project record does not confirm live
+              Media comes from the project register. A project record does not confirm live
               property availability.
             </p>
           </div>
