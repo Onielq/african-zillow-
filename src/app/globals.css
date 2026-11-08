@@ -230,6 +230,23 @@ button:disabled {
   color: var(--brand);
 }
 
+.explore-feed-trigger {
+  min-height: 44px;
+  gap: 7px;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.explore-feed-trigger svg {
+  flex: 0 0 auto;
+}
+
+.explore-feed-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
 .map-workspace {
   position: relative;
   isolation: isolate;
@@ -1267,6 +1284,12 @@ button:disabled {
     min-height: 32px;
     padding: 0 8px;
     font-size: 11px;
+  }
+
+  .explore-feed-trigger {
+    min-height: 36px;
+    gap: 5px;
+    padding: 0 9px;
   }
 
   .map-status-card {
