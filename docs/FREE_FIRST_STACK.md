@@ -12,12 +12,12 @@ Prefer open source and free tiers while traffic and feature requirements are sma
 | Automated checks | GitHub Actions: lint, types, tests, Next.js build, Docker image build | Configured |
 | Portable runtime | Multi-stage Docker image using Next.js standalone output | Configured |
 | Local container run | Docker Compose | Configured |
-| Database | Neon PostgreSQL via `@neondatabase/serverless` | Runtime connection and schema-readiness check implemented; no Neon project or connection secret configured yet |
+| Database | Neon PostgreSQL + PostGIS via `@neondatabase/serverless` | Neon project provisioned; REJA core and market foundation applied to an isolated child branch; unified geography/development/exchange migration is under validation. App runtime secret is not connected to production. |
 | Email | Resend via `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_TO_EMAIL` | Contact form and server endpoint are wired; sending remains disabled until credentials and a verified sender are configured and tested |
 | File storage | Cloudflare R2 | Placeholder only; no upload/storage feature is wired yet |
 | Cloud deployment | Cloudflare Workers via vinext | Pilot config and GitHub build/deploy workflow added; compatibility build and Cloudflare credentials are required before a live deployment |
 
-An empty environment variable does not enable a service. The database health adapter now tests a configured connection and checks for the unified REJA schema; no database is connected until the Neon project and runtime secret exist.
+An empty environment variable does not enable a service. The database health adapter tests the configured connection and checks the REJA schema contract. SQL migrations are versioned in database/migrations and applied using npm run db:migrate over a direct PostgreSQL URL (DATABASE_URL_UNPOOLED). Runtime requests use the existing Neon serverless driver and pooled DATABASE_URL. The isolated foundation branch is for validation, not production application traffic.
 
 ## Important: Pages versus Workers for this app
 
