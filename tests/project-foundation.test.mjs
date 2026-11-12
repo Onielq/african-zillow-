@@ -985,7 +985,9 @@ test("parcel API fails fast on upstream gateway outages and bounds the browser p
   assert.ok(route.includes("Promise.race([fetchPromise, timeoutPromise])"));
   assert.match(route, /ArcGIS layer request timed out after/);
   assert.ok(route.includes("Promise.race([fallbackPromise, timeoutPromise])"));
-  assert.ok(route.includes("10_000"));
+  assert.ok(route.includes("15_000"));
+  assert.match(route, /same viewport is a stable GIS/);
+  assert.doesNotMatch(route, /headers: \{ Accept: "application\/json" \},\s*cache: "no-store"/);
   assert.match(route, /vercel-empty-feature-collection/);
   assert.match(route, /const fastFallbackPromise = allowVercelFallback/);
   assert.ok(route.indexOf("const fastFallbackPromise = allowVercelFallback") < route.indexOf("const parcelBudget ="));
