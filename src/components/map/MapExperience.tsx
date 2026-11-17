@@ -2441,6 +2441,7 @@ export function MapExperience() {
             projectId={selectedProject.id}
             developer={selectedProject.developer}
             district={selectedProject.district}
+            city={selectedProject.city ?? null}
             sector={selectedProject.sector}
             status={selectedProject.status}
             units={selectedProject.units}
