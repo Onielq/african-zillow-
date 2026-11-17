@@ -1,0 +1,22 @@
+{
+  "standardVersion": 1,
+  "referenceProject": "bwiza-riverside-homes",
+  "pageSize": { "width": 1280, "height": 720 },
+  "designSystem": "report-system.css",
+  "requiredPages": [
+    { "number": 1, "key": "profile", "title": "Project Profile", "purpose": "Identify the project, developer, location, scale, and evidence date." },
+    { "number": 2, "key": "scope", "title": "Project Scope & Products", "purpose": "Explain what is being developed and the products, units, or planned scope." },
+    { "number": 3, "key": "delivery", "title": "Development & Delivery", "purpose": "Explain development history, delivery status, infrastructure, and material project features." },
+    { "number": 4, "key": "market", "title": "Price & Market Intelligence", "purpose": "Present dated prices, comparable evidence, calculations, and limitations." },
+    { "number": 5, "key": "location", "title": "Location & Verification", "purpose": "Show location evidence, access context, source register, and buyer verification checks." }
+  ],
+  "rules": [
+    "Keep the five page slots and their order identical across projects.",
+    "Use the same typography, color tokens, page dimensions, footer placement, and evidence-label treatment.",
+    "Keep project facts and sources specific to each project; never copy Bwiza facts into another report.",
+    "Use Not established, Not published, or Availability unverified when evidence is missing.",
+    "Label asking prices, launch prices, transaction prices, estimates, and historical prices distinctly.",
+    "Every material claim must have a traceable source and an as-of date where relevant.",
+    "Do not invent unit availability, delivery dates, distances, approvals, or financial terms."
+  ]
+}
