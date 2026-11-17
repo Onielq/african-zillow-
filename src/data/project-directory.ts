@@ -12,6 +12,7 @@ export type RwandaProjectRecord = {
   owner: string | null;
   category: string;
   district: string | null;
+  city?: string | null;
   sector: string | null;
   cell?: string | null;
   status: string;
