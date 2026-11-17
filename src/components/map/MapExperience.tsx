@@ -2016,7 +2016,7 @@ export function MapExperience() {
                   ) : (
                     <p className="global-area-search-message">
                       {globalSearchStatus === "ready"
-                        ? (/^\\d{1,2}(?:[/.\\-\\s]\\d{1,2}){3}[/.\\-\\s]\\d{1,7}$/.test(globalSearch.trim())
+                        ? (/^\d{1,2}(?:[\/.\-\s]\d{1,2}){3}[\/.\-\s]\d{1,7}$/.test(globalSearch.trim())
                           ? "No matching parcel UPI was found in the connected cadastral sources."
                           : "No matching area. Press Enter to search this as an address.")
                         : "No matching place found. Try a shorter name or paste the full UPI."}
