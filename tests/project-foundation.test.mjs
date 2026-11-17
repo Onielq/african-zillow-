@@ -1312,6 +1312,9 @@ test("full UPI search uses exact cadastral lookup and does not fall through to a
   );
   assert.doesNotMatch(exactLookup, /searchLayer\(/);
   assert.doesNotMatch(exactLookup, /ADMIN_MAP_SOURCES/);
+  assert.match(experience, /function isFullUpiQuery\(value: string\): boolean/);
+  assert.match(experience, /isFullUpiQuery\(query\)/);
+  assert.match(experience, /isFullUpiQuery\(globalSearch\)/);
   assert.match(experience, /globalSearchResults\.length === 0 && !isFullUpi/);
   assert.match(experience, /No matching parcel UPI was found in the connected cadastral sources/);
 });
@@ -1325,4 +1328,31 @@ test("Cloudflare CLI and Vite plugin use compatible Build Output versions", asyn
   assert.equal(packageJson.devDependencies.cf, "1.0.0-rc.0");
   assert.equal(packageJson.devDependencies["@cloudflare/vite-plugin"], "2.0.0-rc.0");
   assert.equal(packageJson.scripts["deploy:vinext"], "vinext-cloudflare deploy");
+});
+
+test("map search accepts equivalent full-UPI separator formats", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const helperStart = experience.indexOf("function isFullUpiQuery");
+  const helperEnd = experience.indexOf("\n}\n", helperStart);
+  assert.notEqual(helperStart, -1);
+  assert.notEqual(helperEnd, -1);
+
+  const helper = experience.slice(helperStart, helperEnd);
+  const literal = helper.match(/return (\/.*\/)\.test\(normalized\)/)?.[1];
+  assert.ok(literal, "the shared UPI helper must contain one explicit validation pattern");
+  const expression = new RegExp(literal.slice(1, literal.lastIndexOf("/")));
+
+  for (const value of [
+    "1/03/01/04/7509",
+    "1.03.01.04.7509",
+    "1-03-01-04-7509",
+    "1 03 01 04 7509",
+    "1 / 03 / 01 / 04 / 7509"
+  ]) {
+    assert.equal(expression.test(value.trim()), true, value + " should be treated as a full UPI");
+  }
+
+  for (const value of ["1/03/01/04", "1/03/01/04/7509 extra", "Bugesera"]) {
+    assert.equal(expression.test(value.trim()), false, value + " should not be treated as a full UPI");
+  }
 });
