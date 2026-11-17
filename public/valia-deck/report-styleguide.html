@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#13213b">
+<title>Taiseel Project Report System — Style Guide</title>
+<link rel="stylesheet" href="./report-system.css">
+<style>
+  body { padding:0; background:#f1f3f5; color:var(--report-ink); }
+  .guide { width:min(1180px, calc(100% - 36px)); margin:0 auto; padding:42px 0 64px; }
+  .guide-hero { display:grid; grid-template-columns:minmax(0,1fr) 270px; gap:28px; align-items:end; padding:34px; background:var(--report-navy); color:#fff; }
+  .guide-hero h1 { margin:12px 0 10px; color:#fff; font:600 clamp(34px,5vw,54px)/1.02 Georgia,serif; }
+  .guide-hero p { max-width:720px; margin:0; color:#d5deea; font:14px/1.6 Arial,sans-serif; }
+  .guide-version { padding:16px; border:1px solid #ffffff40; color:#e5eaf0; font:11px/1.55 Arial,sans-serif; }
+  .guide-version b { display:block; margin-bottom:6px; color:var(--report-gold); font:600 26px/1 Georgia,serif; }
+  .guide-nav { display:flex; flex-wrap:wrap; gap:8px; padding:14px 0 24px; }
+  .guide-nav a { padding:8px 11px; border:1px solid var(--report-line); background:#fff; color:var(--report-navy); font:700 10px/1.2 Arial,sans-serif; text-decoration:none; }
+  .guide-section { margin-top:20px; padding:24px; background:#fff; border:1px solid var(--report-line); }
+  .guide-section h2 { margin:0 0 8px; font:600 26px/1.15 Georgia,serif; color:var(--report-navy); }
+  .guide-intro { margin:0 0 18px; color:var(--report-muted); font:12px/1.55 Arial,sans-serif; }
+  .swatches { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+  .swatch { min-width:0; border:1px solid var(--report-line); }
+  .swatch-color { height:56px; }
+  .swatch-label { padding:8px; color:var(--report-ink); font:700 9px/1.3 Arial,sans-serif; }
+  .swatch-label small { display:block; margin-top:3px; color:var(--report-muted); font-weight:400; }
+  .type-grid,.example-grid,.asset-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .type-card,.example-card,.asset-card { min-width:0; padding:16px; border:1px solid var(--report-line); background:#fff; }
+  .type-card .label,.example-card .label,.asset-card .label { display:block; margin-bottom:9px; color:var(--report-gold-deep); font:700 9px/1.3 Arial,sans-serif; letter-spacing:1px; text-transform:uppercase; }
+  .sample-display { margin:0 0 6px; color:var(--report-navy); font:600 28px/1.1 Georgia,serif; }
+  .sample-body { margin:0; color:var(--report-muted); font:12px/1.55 Arial,sans-serif; }
+  .pills { display:flex; flex-wrap:wrap; gap:8px; }
+  .evidence { display:inline-flex; align-items:center; min-height:26px; padding:5px 9px; border:1px solid var(--report-line); background:#f7f8fa; color:#344253; font:700 9px/1.2 Arial,sans-serif; letter-spacing:.3px; }
+  .evidence--gold { border-color:#dfcca6; background:#fbf7ed; color:#80612c; }
+  .evidence--dark { border-color:#243b5d; background:#13213b; color:#fff; }
+  .table-wrap { overflow-x:auto; }
+  .guide-table { width:100%; border-collapse:collapse; font:11px/1.4 Arial,sans-serif; }
+  .guide-table th { padding:10px; background:var(--report-navy); color:#fff; text-align:left; font-size:9px; letter-spacing:.6px; text-transform:uppercase; }
+  .guide-table td { padding:10px; border-bottom:1px solid var(--report-line); color:var(--report-muted); }
+  .guide-table td:first-child { color:var(--report-ink); font-weight:700; }
+  .mini-stat-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+  .mini-stat { padding:12px; border-top:2px solid var(--report-gold); background:var(--report-cream); }
+  .mini-stat b { display:block; color:var(--report-navy); font:600 20px/1.1 Georgia,serif; }
+  .mini-stat span { display:block; margin-top:5px; color:var(--report-muted); font:9px/1.35 Arial,sans-serif; }
+  .map-examples { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .map-placeholder { display:grid; min-height:120px; place-items:center; padding:16px; border:1px dashed #9ba8b5; background:linear-gradient(135deg,#eef1f3,#e4e9ed); color:var(--report-navy); text-align:center; }
+  .map-placeholder b { display:block; font:600 18px/1.2 Georgia,serif; }
+  .map-placeholder span { display:block; margin-top:5px; color:var(--report-muted); font:10px/1.4 Arial,sans-serif; }
+  .guide-note { margin-top:14px; padding:12px 14px; border-left:3px solid var(--report-gold-deep); background:var(--report-warning); color:var(--report-muted); font:11px/1.5 Arial,sans-serif; }
+  .guide-footer { display:flex; justify-content:space-between; gap:12px; margin-top:22px; padding-top:14px; border-top:1px solid var(--report-line); color:var(--report-muted); font:9px/1.4 Arial,sans-serif; letter-spacing:.5px; }
+  @media (max-width:720px) {
+    .guide { width:min(100% - 20px, 1180px); padding-top:10px; }
+    .guide-hero { grid-template-columns:1fr; padding:22px; }
+    .guide-version { max-width:260px; }
+    .guide-section { padding:16px; }
+    .swatches { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .type-grid,.example-grid,.asset-grid,.map-examples { grid-template-columns:1fr; }
+    .mini-stat-row { grid-template-columns:1fr; }
+    .guide-footer { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<main class="guide">
+  <header class="guide-hero">
+    <div>
+      <div class="eyebrow">TAISEEL · REPORT DESIGN SYSTEM</div>
+      <h1>One reporting language.<br>Different asset types.</h1>
+      <p>This living guide is the visual and content reference for every project study. Reports share the same frame, section order, typography, evidence labels and footer system. The project data remains separate.</p>
+    </div>
+    <div class="guide-version"><b>v4</b><strong>Report contract</strong><br>Five fixed sections<br>1280 × 720 report canvas<br>Residential · Commercial · Mixed-use</div>
+  </header>
+
+  <nav class="guide-nav" aria-label="Style guide sections">
+    <a href="#tokens">Design tokens</a>
+    <a href="#type">Typography</a>
+    <a href="#evidence">Evidence labels</a>
+    <a href="#products">Product schedules</a>
+    <a href="#markets">Market tables</a>
+    <a href="#location">Location pattern</a>
+    <a href="#language">Writing rules</a>
+  </nav>
+
+  <section class="guide-section" id="tokens">
+    <h2>Design tokens</h2>
+    <p class="guide-intro">Use the same restrained navy, gold, paper and muted text palette across all reports. Project-specific colors should not be introduced without a design-system change.</p>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-color" style="background:#13213b"></div><div class="swatch-label">Navy<small>#13213B</small></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#d8be86"></div><div class="swatch-label">Gold<small>#D8BE86</small></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#f5f2ea"></div><div class="swatch-label">Cream<small>#F5F2EA</small></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#16232f"></div><div class="swatch-label">Ink<small>#16232F</small></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#e4e2dc"></div><div class="swatch-label">Rule<small>#E4E2DC</small></div></div>
+    </div>
+  </section>
+
+  <section class="guide-section" id="type">
+    <h2>Typography and hierarchy</h2>
+    <p class="guide-intro">Display type is reserved for project names and section headlines. Body type carries evidence, calculations and caveats. Labels stay short and factual.</p>
+    <div class="type-grid">
+      <div class="type-card"><span class="label">Project or section title · Georgia / Playfair</span><p class="sample-display">Project Profile</p><p class="sample-body">Use a clear headline that describes the evidence on this page.</p></div>
+      <div class="type-card"><span class="label">Evidence and details · Inter / Arial</span><p class="sample-body">Developer-reported details are not the same as independently verified facts. State the source and date next to material claims.</p></div>
+    </div>
+  </section>
+
+  <section class="guide-section" id="evidence">
+    <h2>Evidence labels</h2>
+    <p class="guide-intro">Labels make the strength and origin of a claim visible. Do not turn unknown facts into confident numbers.</p>
+    <div class="pills">
+      <span class="evidence">Independently verified</span>
+      <span class="evidence evidence--gold">Developer-reported</span>
+      <span class="evidence">Government-reported</span>
+      <span class="evidence">Taiseel-calculated</span>
+      <span class="evidence">Not published</span>
+      <span class="evidence">Not established</span>
+      <span class="evidence evidence--dark">Availability unverified</span>
+      <span class="evidence">Historical plan only</span>
+      <span class="evidence">Map context only</span>
+    </div>
+    <div class="guide-note">An image is not proof of current construction. A map search is not a surveyed boundary. A published price is not a completed transaction. Keep those distinctions visible.</div>
+  </section>
+
+  <section class="guide-section" id="products">
+    <h2>Asset-specific product schedules</h2>
+    <p class="guide-intro">The report shell stays the same. The product vocabulary changes with the asset. These are illustrative field labels, not project data.</p>
+    <div class="asset-grid">
+      <div class="asset-card">
+        <span class="label">Residential</span>
+        <p class="sample-display">Homes and units</p>
+        <div class="table-wrap"><table class="guide-table"><thead><tr><th>Home type</th><th>Bedrooms</th><th>Area</th><th>Price</th></tr></thead><tbody><tr><td>Apartment</td><td>Not published</td><td>— m²</td><td>Not published</td></tr><tr><td>Townhouse</td><td>Not published</td><td>— m²</td><td>Not published</td></tr></tbody></table></div>
+      </div>
+      <div class="asset-card">
+        <span class="label">Commercial</span>
+        <p class="sample-display">Space and use</p>
+        <div class="table-wrap"><table class="guide-table"><thead><tr><th>Use</th><th>Space</th><th>Area</th><th>Rent / sale</th></tr></thead><tbody><tr><td>Office</td><td>Suite</td><td>— m²</td><td>Not published</td></tr><tr><td>Retail</td><td>Shop</td><td>— m²</td><td>Not published</td></tr></tbody></table></div>
+      </div>
+    </div>
+    <div class="guide-note">Never use bedroom counts for office towers, retail centres or other commercial assets. Hotel and serviced-apartment room counts are reported as rooms, not residential bedrooms.</div>
+  </section>
+
+  <section class="guide-section" id="markets">
+    <h2>Market comparison and value</h2>
+    <p class="guide-intro">Comparable assets must match the relevant use, area basis, currency and price type. Keep sale prices separate from rent, and monthly rent separate from annual rent.</p>
+    <div class="table-wrap"><table class="guide-table"><thead><tr><th>Comparable</th><th>Use / type</th><th>Area basis</th><th>Price basis</th><th>Evidence</th></tr></thead><tbody><tr><td>Comparable A</td><td>Same asset type</td><td>— m²</td><td>RWF / m²</td><td>Source + date required</td></tr><tr><td>Comparable B</td><td>Same asset type</td><td>— m²</td><td>RWF / m²</td><td>Source + date required</td></tr><tr><td>Comparable C</td><td>Same asset type</td><td>— m²</td><td>RWF / m²</td><td>Source + date required</td></tr></tbody></table></div>
+    <div class="mini-stat-row"><div class="mini-stat"><b>—</b><span>Lowest published price per m²</span></div><div class="mini-stat"><b>—</b><span>Value advantage / premium</span></div><div class="mini-stat"><b>—</b><span>Whole-project value, if disclosed</span></div></div>
+    <div class="guide-note">Do not calculate the worth of a whole building from its asking rent or gross floor area alone. A defensible valuation needs a clear method, dated inputs and explicit assumptions.</div>
+  </section>
+
+  <section class="guide-section" id="location">
+    <h2>Two-map location pattern</h2>
+    <p class="guide-intro">The first map should help locate the project. The second should help understand the surrounding area and named access points.</p>
+    <div class="map-examples">
+      <div class="map-placeholder"><div><b>Map 1 · Project location</b><span>Exact pin only when source precision supports it</span></div></div>
+      <div class="map-placeholder"><div><b>Map 2 · Surrounding area</b><span>Schools · universities · transit · hospitals · City Jewels</span></div></div>
+    </div>
+    <div class="guide-note">City Jewels show relevant buildings and local anchors. Direct comparables are a separate list used for market pricing. Do not present a city-wide reference as if it were next door.</div>
+  </section>
+
+  <section class="guide-section" id="language">
+    <h2>Writing rules</h2>
+    <p class="guide-intro">Write like a property analyst: name the fact, name the source, explain the calculation, then state what is not yet known.</p>
+    <div class="example-grid">
+      <div class="example-card"><span class="label">Prefer</span><p class="sample-body"><strong>“The developer reports 40+ launch units. Current available inventory was not published.”</strong></p></div>
+      <div class="example-card"><span class="label">Avoid</span><p class="sample-body"><strong>“40 units are available now.”</strong></p></div>
+      <div class="example-card"><span class="label">Prefer</span><p class="sample-body"><strong>“The tower has G+12 floors and two basement levels. A verified height in metres was not published.”</strong></p></div>
+      <div class="example-card"><span class="label">Avoid</span><p class="sample-body"><strong>Converting floor count into an invented metre height.</strong></p></div>
+      <div class="example-card"><span class="label">Prefer</span><p class="sample-body"><strong>“The school is in the wider sector; route distance from the project entrance is not verified.”</strong></p></div>
+      <div class="example-card"><span class="label">Avoid</span><p class="sample-body"><strong>Calling a facility “two minutes away” without a route and method.</strong></p></div>
+    </div>
+  </section>
+
+  <footer class="guide-footer"><span>TAISEEL · PROJECT INTELLIGENCE</span><span>SHARED REPORT SYSTEM · VERSION 4</span></footer>
+</main>
+</body>
+</html>
