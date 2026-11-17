@@ -1437,7 +1437,7 @@ test("all project reports use the shared five-page reporting sequence", async ()
   const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
   assert.deepEqual(standard.requiredPages.map((page) => page.key), expectedPages);
   assert.deepEqual(Object.keys(standard.assetProfiles).sort(), ["commercial", "mixedUse", "residential"]);
-  assert.equal(standard.standardVersion, 3);
+  assert.equal(standard.standardVersion, 4);
   assert.ok(standard.visualRules.length >= 4);
 
   const brilliant = await readProjectFile("public/valia-deck/projects/brilliant-tower.html");
