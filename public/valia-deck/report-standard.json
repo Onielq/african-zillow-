@@ -1,22 +1,95 @@
 {
-  "standardVersion": 1,
+  "standardVersion": 2,
   "referenceProject": "bwiza-riverside-homes",
-  "pageSize": { "width": 1280, "height": 720 },
+  "pageSize": {
+    "width": 1280,
+    "height": 720
+  },
   "designSystem": "report-system.css",
   "requiredPages": [
-    { "number": 1, "key": "profile", "title": "Project Profile", "purpose": "Identify the project, developer, location, scale, and evidence date." },
-    { "number": 2, "key": "scope", "title": "Project Scope & Products", "purpose": "Explain what is being developed and the products, units, or planned scope." },
-    { "number": 3, "key": "delivery", "title": "Development & Delivery", "purpose": "Explain development history, delivery status, infrastructure, and material project features." },
-    { "number": 4, "key": "market", "title": "Price & Market Intelligence", "purpose": "Present dated prices, comparable evidence, calculations, and limitations." },
-    { "number": 5, "key": "location", "title": "Location & Verification", "purpose": "Show location evidence, access context, source register, and buyer verification checks." }
+    {
+      "number": 1,
+      "key": "profile",
+      "title": "Project Profile",
+      "purpose": "Identify the asset, developer or promoter, address, district, city, project ID, asset type, scale, height or floors, completion status, evidence date, image and source."
+    },
+    {
+      "number": 2,
+      "key": "scope",
+      "title": "Project Scope & Products",
+      "purpose": "Residential: unit mix, bedrooms, floor areas, prices and payment terms. Commercial: office/retail/industrial space types, floor areas, use by level, unit count, lease/sale availability and booking terms."
+    },
+    {
+      "number": 3,
+      "key": "delivery",
+      "title": "Development & Delivery",
+      "purpose": "Show developer, construction timeline, completion evidence, delivery status, whole-project scope, facilities, infrastructure and six nearby City Jewels or comparable assets."
+    },
+    {
+      "number": 4,
+      "key": "market",
+      "title": "Price & Market Intelligence",
+      "purpose": "Show starting price or rent, lowest published price per m², price by product/space type, three best comparables, calculation basis, value advantage or premium, and disclosed project value."
+    },
+    {
+      "number": 5,
+      "key": "location",
+      "title": "Location & Verification",
+      "purpose": "Include a project pin map and a local-area map, district/sector/cell/address, nearby schools/universities, transport stops, landmarks, source register and verification checklist."
+    }
   ],
-  "rules": [
-    "Keep the five page slots and their order identical across projects.",
-    "Use the same typography, color tokens, page dimensions, footer placement, and evidence-label treatment.",
-    "Keep project facts and sources specific to each project; never copy Bwiza facts into another report.",
-    "Use Not established, Not published, or Availability unverified when evidence is missing.",
-    "Label asking prices, launch prices, transaction prices, estimates, and historical prices distinctly.",
-    "Every material claim must have a traceable source and an as-of date where relevant.",
-    "Do not invent unit availability, delivery dates, distances, approvals, or financial terms."
+  "assetProfiles": {
+    "residential": {
+      "required": [
+        "unit count or clear not-published status",
+        "bedroom and bathroom mix where sourced",
+        "published floor areas",
+        "asking/launch prices kept separate",
+        "payment terms and booking fee if published",
+        "phase completion and handover status",
+        "price per m² calculations",
+        "matched nearby residential comparables"
+      ]
+    },
+    "commercial": {
+      "required": [
+        "commercial unit count with source qualifier",
+        "use mix: office, retail, dining or other",
+        "floor-by-floor use only when sourced",
+        "total and above-ground floor area kept distinct",
+        "above-ground and basement level count",
+        "height in metres only when authoritative",
+        "rentable or saleable space range",
+        "rent and sale prices separated",
+        "lease, booking and deposit terms or explicit not-published status",
+        "office/retail price per m² per month or sale price per m²",
+        "matched commercial comparables"
+      ]
+    },
+    "mixedUse": {
+      "required": [
+        "separate residential and commercial use mix",
+        "space/bedroom terminology matched to actual product",
+        "price basis separated by use and tenure",
+        "amenity and access evidence",
+        "appropriate comparables for each material use"
+      ]
+    }
+  },
+  "evidenceRules": [
+    "Do not fabricate a project ID. Use an existing register identifier or label the identifier as a Taiseel internal ID.",
+    "A developer-announced count such as 40+ must remain 40+; do not silently convert it to 40.",
+    "Do not label commercial office areas as bedrooms or residential units.",
+    "Do not report a building height in metres unless an authoritative source publishes it; floor count is not a height measurement.",
+    "Keep developer marketing claims separate from independently verified facts.",
+    "Distinguish current asking rent, sale asking price, launch price, transaction price, estimate and historical plan.",
+    "Always show the currency, area basis, and whether a rent is per month or per year.",
+    "Never infer project value from gross floor area and asking rent without explicit valuation assumptions; state not disclosed when no defensible valuation is available.",
+    "Mark unit availability, booking fees, deposits and payment terms as unverified or not published when sources do not establish them.",
+    "Distances must identify the source and method. Distinguish developer-published distances, straight-line estimates and routed travel distances.",
+    "Every important claim needs a project-specific source and, where relevant, an as-of date.",
+    "City Jewels must be real named buildings, developments or civic/business anchors relevant to the project location; distinguish them from direct price comparables.",
+    "Keep the five page slots and order identical across all reports.",
+    "Project facts and sources remain separate; never copy one project's facts into another."
   ]
 }
