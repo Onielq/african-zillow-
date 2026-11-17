@@ -154,7 +154,8 @@
       "Every page declares one of the four assetTypes in data-report-type.",
       "All reports load report-system.css; project files supply facts, evidence and imagery only.",
       "Page-specific headlines may be descriptive, but the section label and page number stay canonical.",
-      "The generic fallback derives asset type from the project category and labels mixed-use projects as both residential and commercial."
+      "The generic fallback derives asset type from the project category and labels mixed-use projects as both residential and commercial.",
+      "The shared report stylesheet must load after report-local inline styles so the common component system has final cascade priority."
     ]
   },
   "languageStandard": {
@@ -167,7 +168,10 @@
       "Not established",
       "Availability unverified",
       "Historical plan only",
-      "Map context only"
+      "Map context only",
+      "Source-reported",
+      "Estimated",
+      "Not verified"
     ],
     "rules": [
       "Use 'space' or the named commercial use for offices, shops, retail, dining and other commercial areas; do not describe them as bedrooms.",
@@ -177,7 +181,40 @@
       "Use 'not published' when no source publishes a fact; use 'not established' when available sources do not resolve it.",
       "Use 'availability unverified' unless current inventory is confirmed by a responsible seller or operator.",
       "For rent, show currency, per-square-metre basis and billing period; never compare rent with sale price as if they were the same measure.",
-      "For calculated values, show the source inputs, formula and date; do not present an estimate as a transaction or formal valuation."
+      "For calculated values, show the source inputs, formula and date; do not present an estimate as a transaction or formal valuation.",
+      "Classify important claims as developer-reported, source-reported, independently verified, calculated, estimated, not published or not verified.",
+      "Every displayed price must identify currency, area basis, observation date, source and rent billing period when applicable.",
+      "Never compare monthly rent, annual rent, asking sale price, launch price or transaction price as if they share one pricing basis.",
+      "Use bedrooms and bathrooms only for residential products; use space, suite, office, retail, floor area and use type for commercial products.",
+      "Describe nearby amenities with neutral facts: name, type, distance, travel method and source. Do not describe residents or neighbourhoods through demographic assumptions or unverified safety and desirability labels.",
+      "Attribute subjective words such as premium, prime, best or exclusive to the source or speaker making the claim.",
+      "Do not steer users toward or away from areas based on protected or personal characteristics; present neutral geography and user-selected property criteria."
+    ]
+  },
+  "zillowInspiredPatterns": {
+    "projectDiscovery": {
+      "source": "https://github.com/zillow/react-fuzzy-search",
+      "adopted": "Local weighted multi-field search with a narrow typo allowance; no third-party runtime package."
+    },
+    "structuredMetadata": {
+      "source": "https://github.com/zillow/schema-dot-org-markup",
+      "adopted": "Structured fact separation as a design principle.",
+      "status": "Full public structured-data output is deferred until project records have stable, correctly typed evidence."
+    },
+    "fairAccessLanguage": {
+      "source": "https://github.com/zillow/fair-housing-guardrail",
+      "adopted": "Neutral, non-steering real-estate language and editorial review.",
+      "limitation": "The repository's US legal categories are not treated as Rwanda law."
+    },
+    "deferredResearch": [
+      {
+        "source": "https://github.com/zillow/luminaire",
+        "reason": "Wait for a reliable longitudinal dataset of dated market observations."
+      },
+      {
+        "source": "https://github.com/zillow/zind",
+        "reason": "Indoor panorama and floor-plan research data is not evidence for Rwanda development inventory."
+      }
     ]
   }
 }
