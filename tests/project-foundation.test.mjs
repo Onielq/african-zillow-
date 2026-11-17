@@ -1396,6 +1396,10 @@ test("the generic project fallback uses source-aware image and map precision", a
   for (const field of ["projectId", "owner", "landLabel", "unitsLabel", "parcelUpi", "latitude", "longitude", "imageUrl", "locationPrecision", "secondarySource", "thirdSource", "latestStatusSource"]) {
     assert.ok(modal.includes(field), "generic report URL must carry " + field);
   }
+  assert.ok(mapExperience.includes("city={selectedProject.city ?? null}"));
+  assert.ok(modal.includes("city: city ?? \"\""));
+  assert.ok(profile.includes("const isKigaliDistrict = [\"gasabo\", \"kicukiro\", \"nyarugenge\"]"));
+  assert.ok(profile.includes("const areaCity = city || (isKigaliDistrict ? \"Kigali City\" : \"\")"));
   assert.ok(mapExperience.includes("owner={selectedProject.owner}"));
   assert.ok(mapExperience.includes("imageUrl={selectedProject.imageUrl}"));
   assert.ok(mapExperience.includes("latitude={selectedProject.latitude}"));
