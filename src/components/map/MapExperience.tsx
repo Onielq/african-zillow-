@@ -729,6 +729,11 @@ function getBasemapLabel(status: BasemapStatus) {
   return "Loading basemap";
 }
 
+function isFullUpiQuery(value: string): boolean {
+  const normalized = value.trim();
+  return /^\d{1,2}(?:[\/.\-\s]+\d{1,2}){3}[\/.\-\s]+\d{1,7}$/.test(normalized);
+}
+
 function getBoundaryLabel(status: BoundaryStatus) {
   if (status === "ready") return "Administrative boundaries loaded";
   if (status === "error") return "Boundary service unavailable";
@@ -1915,7 +1920,7 @@ export function MapExperience() {
                       event.preventDefault();
                       if (globalSearchStatus === "loading") return;
                       const query = globalSearch.trim();
-                      const isFullUpi = /^\d{1,2}(?:[/.\-\s]\d{1,2}){3}[/.\-\s]\d{1,7}$/.test(query);
+                      const isFullUpi = isFullUpiQuery(query);
                       const administrativeResult = globalSearchResults.find(
                         (result) => !("kind" in result && result.kind === "address")
                       );
@@ -2016,7 +2021,7 @@ export function MapExperience() {
                   ) : (
                     <p className="global-area-search-message">
                       {globalSearchStatus === "ready"
-                        ? (/^\d{1,2}(?:[\/.\-\s]\d{1,2}){3}[\/.\-\s]\d{1,7}$/.test(globalSearch.trim())
+                        ? (isFullUpiQuery(globalSearch)
                           ? "No matching parcel UPI was found in the connected cadastral sources."
                           : "No matching area. Press Enter to search this as an address.")
                         : "No matching place found. Try a shorter name or paste the full UPI."}
