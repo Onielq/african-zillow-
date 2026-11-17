@@ -1,5 +1,5 @@
 {
-  "standardVersion": 3,
+  "standardVersion": 4,
   "referenceProject": "bwiza-riverside-homes",
   "pageSize": {
     "width": 1280,
@@ -107,5 +107,40 @@
     "For district or sector precision, display an administrative-area search map labelled area context only; never style it as an exact parcel or entrance pin.",
     "Show missing unit/space mix, prices, payment terms, booking, height, occupancy and current availability as not published, not verified or not established.",
     "Never add nearby facilities or comparables to the fallback unless those names and evidence are attached to that project record."
-  ]
+  ],
+  "languageRules": [
+    "Classify important claims as developer-reported, source-reported, independently verified, calculated, estimated, not published or not verified.",
+    "Every displayed price must identify currency, area basis, observation date, source and rent billing period when applicable.",
+    "Never compare monthly rent, annual rent, asking sale price, launch price or transaction price as if they share one pricing basis.",
+    "Use bedrooms and bathrooms only for residential products; use space, suite, office, retail, floor area and use type for commercial products.",
+    "Describe nearby amenities with neutral facts: name, type, distance, travel method and source. Do not describe residents or neighbourhoods through demographic assumptions or unverified safety and desirability labels.",
+    "Attribute subjective words such as premium, prime, best or exclusive to the source or speaker making the claim.",
+    "Do not steer users toward or away from areas based on protected or personal characteristics; present neutral geography and user-selected property criteria."
+  ],
+  "zillowInspiredPatterns": {
+    "projectDiscovery": {
+      "source": "https://github.com/zillow/react-fuzzy-search",
+      "adopted": "Local weighted multi-field search with a narrow typo allowance; no third-party runtime package."
+    },
+    "structuredMetadata": {
+      "source": "https://github.com/zillow/schema-dot-org-markup",
+      "adopted": "Structured fact separation as a design principle.",
+      "status": "Full public structured-data output is deferred until project records have stable, correctly typed evidence."
+    },
+    "fairAccessLanguage": {
+      "source": "https://github.com/zillow/fair-housing-guardrail",
+      "adopted": "Neutral, non-steering real-estate language and editorial review.",
+      "limitation": "The repository's US legal categories are not treated as Rwanda law."
+    },
+    "deferredResearch": [
+      {
+        "source": "https://github.com/zillow/luminaire",
+        "reason": "Wait for a reliable longitudinal dataset of dated market observations."
+      },
+      {
+        "source": "https://github.com/zillow/zind",
+        "reason": "Indoor panorama and floor-plan research data is not evidence for Rwanda development inventory."
+      }
+    ]
+  }
 }
