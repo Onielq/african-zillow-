@@ -61,6 +61,7 @@ import {
   TRANSACTION_DASHBOARD_SOURCE
 } from "@/data/transaction-benchmarks";
 import { calculateParcelAskingPrice } from "@/lib/parcel-pricing";
+import { searchRwandaProjects } from "@/lib/project-search";
 
 type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
@@ -844,14 +845,10 @@ export function MapExperience() {
     ? RWANDA_PROJECT_RECORDS.find((project) => project.id === selectedProjectId) ?? null
     : null;
   const normalizedProjectSearch = debouncedProjectSearch.trim().toLocaleLowerCase("en");
-  const filteredProjects = RWANDA_PROJECT_RECORDS.filter((project) => {
-    if (selectedProjectDeveloperId) {
-      return developerIdentityKey(project.developer) === selectedProjectDeveloperId;
-    }
-    return !normalizedProjectSearch ||
-      [project.name, project.developer, project.owner, project.category, project.district, project.sector]
-        .filter(Boolean).join(" ").toLocaleLowerCase("en").includes(normalizedProjectSearch);
-  });
+  const projectCandidates = selectedProjectDeveloperId
+    ? RWANDA_PROJECT_RECORDS.filter((project) => developerIdentityKey(project.developer) === selectedProjectDeveloperId)
+    : RWANDA_PROJECT_RECORDS;
+  const filteredProjects = searchRwandaProjects(projectCandidates, normalizedProjectSearch);
   const filteredProjectDevelopers = UNIFIED_DEVELOPER_DIRECTORY.filter((developer) =>
     !normalizedProjectSearch ||
     [developer.name, developer.base, developer.focus].filter(Boolean).join(" ")
@@ -2352,7 +2349,7 @@ export function MapExperience() {
             <label className="project-directory-search">
               <span className="sr-only">Search projects or developers</span>
               <input
-                aria-label="Search projects or developers"
+                aria-label="Search projects by name, developer, location or project ID"
                 onChange={(event) => {
                   setProjectSearch(event.target.value);
                   setProjectVisibleCount(24);
@@ -2360,7 +2357,7 @@ export function MapExperience() {
                   setSelectedProjectDeveloperId(null);
                   setSelectedProjectId(null);
                 }}
-                placeholder="Search a project or developer"
+                placeholder="Search name, developer, district or project ID"
                 type="search"
                 value={projectSearch}
               />
