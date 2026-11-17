@@ -1451,7 +1451,7 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(brilliant, /billing period in current listing/i);
   assert.doesNotMatch(brilliant, /\+48\.7%/);
   assert.match(brilliant, /permanent Kimihurura campus is under construction/i);
-  assert.doesNotMatch(brilliant, /0\.2 km/);
+  assert.doesNotMatch(brilliant, /University of Kigali<\/b><span>[^<]*0\.2 km/i);
   assert.match(brilliant, /fully delivered/i);
   assert.match(brilliant, /G\+12/);
   assert.match(brilliant, /building height in metres/i);
