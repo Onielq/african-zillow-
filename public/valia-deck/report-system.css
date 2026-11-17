@@ -17,6 +17,20 @@
   --report-font-body: "Inter", Arial, sans-serif;
   --report-page-width: 1280px;
   --report-page-height: 720px;
+  /* Compatibility aliases for the existing report files. */
+  --navy: var(--report-navy);
+  --navy2: var(--report-navy-mid);
+  --navy-950: var(--report-navy);
+  --navy-900: var(--report-navy-deep);
+  --navy-800: var(--report-navy-mid);
+  --gold: var(--report-gold);
+  --gold2: var(--report-gold-deep);
+  --gold-deep: var(--report-gold-deep);
+  --cream: var(--report-cream);
+  --paper: var(--report-paper);
+  --ink: var(--report-ink);
+  --muted: var(--report-muted);
+  --line: var(--report-line);
 }
 html { background: #eef0f2; }
 body { color: var(--report-ink); font-family: var(--report-font-body); }
@@ -31,6 +45,7 @@ body { color: var(--report-ink); font-family: var(--report-font-body); }
 }
 .page:last-child { break-after: auto; page-break-after: auto; }
 h1, h2, h3 { font-family: var(--report-font-display); color: var(--report-navy); }
+.footer, .foot { position: absolute; bottom: 0; left: 0; right: 0; min-height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 44px; border-top: 1px solid var(--report-line); color: #87909b; font: 10px var(--report-font-body); letter-spacing: .5px; }
 a { color: var(--report-navy-mid); }
 a:focus-visible { outline: 2px solid var(--report-gold-deep); outline-offset: 3px; }
 table { border-collapse: collapse; }
