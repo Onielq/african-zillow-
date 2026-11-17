@@ -513,3 +513,113 @@ a:focus-visible { outline: 2px solid var(--report-gold-deep); outline-offset: 3p
   body { overflow-x: auto; }
   main { margin-left: 0; margin-right: 0; }
 }
+
+
+/* Zillow-inspired component contract:
+   one shared cover shell, documented components, and consistent section hierarchy.
+   The individual project reports supply facts; this file owns presentation.
+*/
+.page.cover:not(.bwiza-cover) > .cover-copy {
+  width: auto !important;
+  min-width: 0;
+  max-width: none;
+  height: 100%;
+  padding: 40px 40px 46px !important;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.page.cover:not(.bwiza-cover) > .cover-image {
+  width: auto !important;
+  height: 100% !important;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: #d9dde0;
+}
+.page.cover:not(.bwiza-cover) > .cover-image img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+.page.cover:not(.bwiza-cover) .cover-address {
+  color: #d5deea !important;
+  font: 700 11px/1.3 var(--report-font-body) !important;
+  letter-spacing: 1.2px;
+}
+.page.cover:not(.bwiza-cover) .cover-subtitle {
+  margin-top: 7px !important;
+  color: #d5deea !important;
+  font: italic 15px/1.4 var(--report-font-display) !important;
+}
+.page.cover:not(.bwiza-cover) .cover-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 15px !important;
+  margin-top: 21px !important;
+}
+.page.cover:not(.bwiza-cover) .cover-fact {
+  min-width: 0;
+  padding-top: 9px !important;
+  border-top: 1px solid rgba(255,255,255,.18);
+}
+.page.cover:not(.bwiza-cover) .cover-fact b {
+  display: block;
+  color: var(--report-gold) !important;
+  font: 600 21px/1.1 var(--report-font-display) !important;
+}
+.page.cover:not(.bwiza-cover) .cover-fact span {
+  display: block;
+  margin-top: 4px;
+  color: #d5deea !important;
+  font: 9px/1.38 var(--report-font-body) !important;
+}
+.page.cover:not(.bwiza-cover) .cover-status {
+  margin-top: auto !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(216,190,134,.7) !important;
+  color: #d5deea !important;
+  background: rgba(255,255,255,.035);
+  font: 9px/1.45 var(--report-font-body) !important;
+}
+.page.cover:not(.bwiza-cover) .cover-image .caption {
+  position: absolute;
+  z-index: 3;
+  right: 24px;
+  bottom: 43px;
+  left: 24px;
+  color: #fff;
+  font: 9px/1.4 var(--report-font-body) !important;
+  text-shadow: 0 1px 6px rgba(0,0,0,.65);
+}
+
+/* Shared evidence language and page markers. */
+.page[data-report-page] {
+  --report-progress: 20%;
+}
+.page[data-report-page="scope"] { --report-progress: 40%; }
+.page[data-report-page="delivery"] { --report-progress: 60%; }
+.page[data-report-page="market"] { --report-progress: 80%; }
+.page[data-report-page="location"] { --report-progress: 100%; }
+.page[data-report-page]::before {
+  content: "";
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  left: 0;
+  width: var(--report-progress);
+  height: 3px;
+  background: var(--report-gold-deep);
+  pointer-events: none;
+}
+.page.cover[data-report-page]::before { background: var(--report-gold); }
+.page.content .head .eyebrow {
+  color: var(--report-gold-deep);
+  text-transform: uppercase;
+}
+.page[data-report-type="commercial"] .report-type-label,
+.page[data-report-type="residential"] .report-type-label,
+.page[data-report-type="mixed-use"] .report-type-label {
+  display: inline-flex;
+}
