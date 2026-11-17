@@ -7,6 +7,7 @@ type ProjectReportModalProps = {
   projectId: string;
   developer: string;
   district: string | null;
+  city?: string | null;
   sector: string | null;
   status: string;
   units: number | null;
@@ -52,7 +53,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function ProjectReportModal({
-  projectName, projectId, developer, district, sector, status, units, category,
+  projectName, projectId, developer, district, city, sector, status, units, category,
   sourceUrl, completion, owner, cell, landHa, landLabel, unitsLabel, start, route,
   parcelUpi, latitude, longitude, imageUrl, locationPrecision, secondarySourceUrl,
   thirdSourceUrl, latestStatusSourceUrl, onClose
@@ -207,6 +208,7 @@ export function ProjectReportModal({
     developer,
     owner: owner ?? "",
     district: district ?? "",
+    city: city ?? "",
     sector: sector ?? "",
     cell: cell ?? "",
     status,
