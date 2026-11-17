@@ -161,3 +161,12 @@ test("new project report templates start as unclassified instead of guessing an 
   assert.deepEqual(pages.map((page) => page.key), requiredPageKeys);
   assert.ok(pages.every((page) => page.assetType === "unknown"));
 });
+
+
+test("the report system keeps location descriptions evidence-led and avoids demographic steering", async () => {
+  const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
+  const guide = await readProjectFile("public/valia-deck/report-styleguide.html");
+  assert.ok(standard.evidenceRules.some((rule) => rule.includes("do not infer who belongs in an area")));
+  assert.ok(standard.languageStandard.rules.some((rule) => rule.includes("family-friendly")));
+  assert.ok(guide.includes("demographic assumptions or steering language"));
+});
