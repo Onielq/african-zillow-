@@ -1392,6 +1392,10 @@ test("the generic project fallback uses source-aware image and map precision", a
   assert.match(profile, /Area context only/);
   assert.match(profile, /safeUrl/);
   assert.match(profile, /sourceList/);
+  assert.match(profile, /categoryIsCommercial/);
+  assert.match(profile, /categoryIsResidential/);
+  assert.match(profile, /residentialMixRow.style.display = "none"/);
+  assert.match(profile, /commercialMixRow.style.display = "none"/);
 
   for (const field of ["projectId", "owner", "landLabel", "unitsLabel", "parcelUpi", "latitude", "longitude", "imageUrl", "locationPrecision", "secondarySource", "thirdSource", "latestStatusSource"]) {
     assert.ok(modal.includes(field), "generic report URL must carry " + field);
