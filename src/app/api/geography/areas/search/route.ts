@@ -726,10 +726,10 @@ async function searchAddresses(query: string): Promise<SearchAddress[]> {
 
 function canonicalFullUpi(value: string): string | null {
   const normalized = value.trim();
-  if (!/^\d{1,2}(?:[/.\\-\\s]+\d{1,2}){3}[/.\\-\\s]+\d{1,7}$/.test(normalized)) {
+  if (!/^\d{1,2}(?:[\/.\-\s]+\d{1,2}){3}[\/.\-\s]+\d{1,7}$/.test(normalized)) {
     return null;
   }
-  const parts = normalized.split(/[/.\\-\\s]+/).filter(Boolean);
+  const parts = normalized.split(/[\/.\-\s]+/).filter(Boolean);
   return parts.length === 5 ? parts.join("/") : null;
 }
 
