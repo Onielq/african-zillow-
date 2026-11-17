@@ -152,3 +152,12 @@ test("the living report style guide documents shared design and asset-specific l
   assert.ok(guide.includes("City Jewels"));
   assert.ok(guide.toLowerCase().includes("monthly rent"));
 });
+
+
+test("new project report templates start as unclassified instead of guessing an asset type", async () => {
+  const template = await readProjectFile("public/valia-deck/projects/project-report-template.html");
+  const pages = reportPageTags(template);
+
+  assert.deepEqual(pages.map((page) => page.key), requiredPageKeys);
+  assert.ok(pages.every((page) => page.assetType === "unknown"));
+});
