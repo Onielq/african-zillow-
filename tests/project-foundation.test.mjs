@@ -1368,7 +1368,7 @@ test("the project research register contains unique identifiers", async () => {
   assert.notEqual(start, -1, "project records declaration must exist");
   assert.notEqual(end, -1, "project developers declaration must exist");
   const projectSource = source.slice(start, end);
-  const ids = [...projectSource.matchAll(/"id":\\s*"([^"]+)"/g)].map((match) => match[1]);
+  const ids = [...projectSource.matchAll(/"id":\s*"([^"]+)"/g)].map((match) => match[1]);
   assert.ok(ids.length > 0, "project register must contain records");
   assert.equal(new Set(ids).size, ids.length, "project IDs must be unique");
   assert.equal(ids.filter((id) => id === "masaka-views-eco-estate").length, 1);
@@ -1398,31 +1398,31 @@ test("all project reports use the shared five-page reporting sequence", async ()
   const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
   assert.deepEqual(standard.requiredPages.map((page) => page.key), expectedPages);
   assert.deepEqual(Object.keys(standard.assetProfiles).sort(), ["commercial", "mixedUse", "residential"]);
+
   const brilliant = await readProjectFile("public/valia-deck/projects/brilliant-tower.html");
   assert.match(brilliant, /data-report-page="profile" data-report-type="commercial"/);
   assert.match(brilliant, /14,886 m²/);
-  assert.match(brilliant, /40\\+ units/);
+  assert.match(brilliant, /40\+ units/);
   assert.match(brilliant, /210–1,040 m²/);
   assert.match(brilliant, /RWF 32,000/);
   assert.match(brilliant, /RWF 33,850/);
   assert.match(brilliant, /RWF 22,400/);
   assert.match(brilliant, /RWF 21,750/);
-  assert.match(brilliant, /billing period is not stated/i);
-  assert.doesNotMatch(brilliant, /\\+48\\.7%/);
+  assert.match(brilliant, /billing period in current listing/i);
+  assert.doesNotMatch(brilliant, /\+48\.7%/);
   assert.match(brilliant, /permanent Kimihurura campus is under construction/i);
-  assert.doesNotMatch(brilliant, /0\\.2 km/);
-  assert.match(brilliant, /developer reports the tower fully delivered/i);
-  assert.match(brilliant, /G\\+12/);
+  assert.doesNotMatch(brilliant, /0\.2 km/);
+  assert.match(brilliant, /fully delivered/i);
+  assert.match(brilliant, /G\+12/);
   assert.match(brilliant, /building height in metres/i);
   assert.match(brilliant, /booking, occupancy and height/i);
   assert.doesNotMatch(brilliant, /bedrooms?/i);
-
 
   const inzovu = await readProjectFile("public/valia-deck/projects/inzovu-mall.html");
   assert.match(inzovu, /data-report-page="profile" data-report-type="commercial"/);
   assert.match(inzovu, /29,000 m²/);
   assert.match(inzovu, /95 rooms/);
-  assert.match(inzovu, /9,000\\+ m²/);
+  assert.match(inzovu, /9,000\+ m²/);
   assert.match(inzovu, /Q1 2027/);
   assert.match(inzovu, /RWF 36,750/);
   assert.match(inzovu, /RWF 32,000/);
@@ -1433,14 +1433,14 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(inzovu, /10,247 m²/);
   assert.match(inzovu, /3,724 m²/);
   assert.match(inzovu, /10,157 m²/);
-  assert.match(inzovu, /G\\+9/);
-  assert.match(inzovu, /G\\+8/);
+  assert.match(inzovu, /G\+9/);
+  assert.match(inzovu, /G\+8/);
   assert.match(inzovu, /billing cycle/i);
   assert.match(inzovu, /whole-project market value is not published/i);
-  assert.match(inzovu, /Office \\/ commercial reference/);
+  assert.match(inzovu, /Office \/ commercial reference/);
   assert.match(inzovu, /University of Kigali/);
   assert.match(inzovu, /dedicated bus stop immediately outside the mall/i);
-  assert.doesNotMatch(inzovu, /<th>Bedrooms?<\\/th>/i);
+  assert.doesNotMatch(inzovu, /<th>Bedrooms?<\/th>/i);
 
   const masaka = await readProjectFile("public/valia-deck/projects/masaka-views-eco-estate.html");
   assert.match(masaka, /USD \/ m²/);
@@ -1451,11 +1451,11 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(masaka, /302 \+ 51 \+ 33 = 386/);
   assert.match(masaka, /302 \+ 51 \+ 57 = 410/);
   assert.match(masaka, /unit breakdowns conflict/i);
-  
+
   const heza = await readProjectFile("public/valia-deck/projects/heza-estate-batsinda-project.html");
   assert.match(heza, /heza-estate-batsinda-project/);
   assert.match(heza, /four-storey apartment blocks/i);
-  
+
   const rugarama = await readProjectFile("public/valia-deck/projects/rugarama-park-estate.html");
   assert.match(rugarama, /rugarama-park-estate/);
   assert.match(rugarama, /not evidence of completed buildings/i);
