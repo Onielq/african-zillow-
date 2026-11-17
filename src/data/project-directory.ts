@@ -18,6 +18,8 @@ export type RwandaProjectRecord = {
   units: number | null;
   unitsLabel?: string | null;
   latestStatusSourceUrl?: string | null;
+  landLabel?: string | null;
+  thirdSourceUrl?: string | null;
   landHa: number | null;
   start: string | null;
   completion: string | null;
@@ -56,19 +58,22 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
   {
     "id": "rugarama-park-estate",
     "name": "Rugarama Park Estate",
-    "developer": "Joint venture: BRD, Shelter Afrique and Remote Group",
-    "owner": "Joint-venture structure; current controlling entity not confirmed",
+    "developer": "Original joint venture: BRD and Shelter Afrique through Rugarama Park Estates Ltd; Remote Group was a later implementation partner",
+    "owner": "2025 City Council resolution approved amicable ending of the City agreement with RPE; City to recover 32.9 ha while RPE retains the 9 ha it acquired",
     "category": "Affordable / Mixed-use",
     "district": "Nyarugenge",
     "sector": "Nyamirambo",
-    "status": "Status disputed; historical suspension and 2026 shelved listing; current site activity unverified",
-    "units": null,
+    "status": "2025 City Council approved amicable ending of City agreement with RPE; new developer sought in 2025 reporting; current site activity unverified",
+    "units": 2700,
+    "unitsLabel": "2,700 planned homes in 2025 City Council resolution and Shelter Afrique 2024 report; not a delivered stock count",
     "landHa": 42,
-    "start": "2017",
+    "landLabel": "42 ha combined project landholding: 32.9 ha City of Kigali land plus 9 ha acquired by RPE; different sources describe the project concept footprint as 30 ha",
+    "start": "2017 formal start; negotiations began in 2015",
     "completion": null,
-    "sourceUrl": "https://www.rha.gov.rw/updates/news-details/ten-projects-expected-to-boost-efforts-meant-to-address-housing-units-demand-in-kigali",
-    "secondarySourceUrl": "https://housingfinanceafrica.org/wp-content/uploads/2025/03/RWANDA.pdf",
-    "route": "Current sales and availability unverified",
+    "sourceUrl": "https://www.kigalicity.gov.rw/fileadmin/user_upload/Kigali_city/Publications/City_Council_Resolutions/2025/Imyanzuro_y_Inama_Njyanama_y_Umujyi_wa_Kigali_yo_ku_wa_04_Mata_2025.pdf_.pdf",
+    "secondarySourceUrl": "https://www.content.shelterafrique.org/en/wp-content/uploads/2025/07/ShafDB-AnnualReport-ENG_.pdf",
+    "thirdSourceUrl": "https://www.newtimes.co.rw/article/31119/news/housing/city-of-kigali-seeks-new-developer-for-rugarama-park-estate",
+    "route": "Re-plan / new developer sought in 2025 reporting; home availability unverified",
     "locationPrecision": "administrative-area"
   },
   {
@@ -638,39 +643,6 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "locationPrecision": "administrative-area"
   },
   {
-    "id": "la-casa-kacyiru",
-    "name": "LA CASA Kacyiru",
-    "developer": "Belle Ville Groupe",
-    "owner": "Belle Ville Groupe",
-    "category": "Luxury / Residential",
-    "district": "Gasabo",
-    "sector": "Kacyiru",
-    "status": "Project / sales",
-    "units": null,
-    "landHa": null,
-    "start": null,
-    "completion": null,
-    "sourceUrl": "https://bellevillegroupe.com/projects-lacasa/",
-    "route": null,
-    "locationPrecision": "administrative-area"
-  },
-  {
-    "id": "masaka-views-eco-estate",
-    "name": "Masaka Views Eco Estate",
-    "developer": "Fortis Green Housing",
-    "owner": "Fortis Green Holdings",
-    "category": "Green / Residential",
-    "district": "Kicukiro",
-    "sector": "Masaka / Cyimo",
-    "status": "Under construction",
-    "units": 386,
-    "landHa": 7,
-    "start": "2025-10",
-    "completion": "2026-12",
-    "sourceUrl": "https://www.fortisgreenhousing.com/about",
-    "route": "New-build/off-plan purchase and rental",
-    "locationPrecision": "district"
-  },
   {
     "id": "savannah-creek-estate",
     "name": "Savannah Creek Estate",
@@ -1097,6 +1069,8 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "secondarySourceUrl": "https://disclosuresservice.ifc.org/api/File/downloadfile?id=%5C46217_ESRS%5CDUVAL+Mall_SLIP_Main+document.pdf",
     "route": "Commercial leasing / project discovery",
     "parcelUpi": "1/02/08/03/681",
+    "latitude": -1.95447,
+    "longitude": 30.09691,
     "imageUrl": "https://www.inzovumall.com/wp-content/uploads/2024/04/projet1.jpg",
     "locationPrecision": "parcel-upi"
   },
