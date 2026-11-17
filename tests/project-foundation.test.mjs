@@ -1410,6 +1410,9 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(inzovu, /9,000\+ m²/);
   assert.match(inzovu, /Q1 2027/);
   assert.match(inzovu, /RWF 32,000/);
+  assert.match(inzovu, /6,600 m²/);
+  assert.match(inzovu, /English page: 660 m²/);
+  assert.match(inzovu, /5,500 m² office tower/);
   assert.match(inzovu, /billing cycle/i);
   assert.match(inzovu, /whole-project market value is not published/i);
   assert.match(inzovu, /Office \/ commercial reference/);
