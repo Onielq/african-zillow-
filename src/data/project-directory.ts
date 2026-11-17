@@ -16,6 +16,8 @@ export type RwandaProjectRecord = {
   cell?: string | null;
   status: string;
   units: number | null;
+  unitsLabel?: string | null;
+  latestStatusSourceUrl?: string | null;
   landHa: number | null;
   start: string | null;
   completion: string | null;
