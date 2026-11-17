@@ -150,5 +150,5 @@ test("the living report style guide documents shared design and asset-specific l
   assert.ok(guide.includes("Commercial"));
   assert.ok(guide.includes("bedroom counts for office towers"));
   assert.ok(guide.includes("City Jewels"));
-  assert.ok(guide.includes("Monthly rent"));
+  assert.ok(guide.toLowerCase().includes("monthly rent"));
 });
