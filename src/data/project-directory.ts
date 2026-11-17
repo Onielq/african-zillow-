@@ -1066,6 +1066,7 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "completion": "Q1 2027",
     "sourceUrl": "https://www.inzovumall.com/en/projet/",
     "secondarySourceUrl": "https://disclosuresservice.ifc.org/api/File/downloadfile?id=%5C46217_ESRS%5CDUVAL+Mall_SLIP_Main+document.pdf",
+    "thirdSourceUrl": "https://mapcarta.com/W1205427350",
     "route": "Commercial leasing / project discovery",
     "parcelUpi": "1/02/08/03/681",
     "latitude": -1.95447,
