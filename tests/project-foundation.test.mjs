@@ -1329,3 +1329,30 @@ test("Cloudflare CLI and Vite plugin use compatible Build Output versions", asyn
   assert.equal(packageJson.devDependencies["@cloudflare/vite-plugin"], "2.0.0-rc.0");
   assert.equal(packageJson.scripts["deploy:vinext"], "vinext-cloudflare deploy");
 });
+
+test("map search accepts equivalent full-UPI separator formats", async () => {
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const helperStart = experience.indexOf("function isFullUpiQuery");
+  const helperEnd = experience.indexOf("\n}\n", helperStart);
+  assert.notEqual(helperStart, -1);
+  assert.notEqual(helperEnd, -1);
+
+  const helper = experience.slice(helperStart, helperEnd);
+  const literal = helper.match(/return (\/.*\/)\.test\(normalized\)/)?.[1];
+  assert.ok(literal, "the shared UPI helper must contain one explicit validation pattern");
+  const expression = new RegExp(literal.slice(1, literal.lastIndexOf("/")));
+
+  for (const value of [
+    "1/03/01/04/7509",
+    "1.03.01.04.7509",
+    "1-03-01-04-7509",
+    "1 03 01 04 7509",
+    "1 / 03 / 01 / 04 / 7509"
+  ]) {
+    assert.equal(expression.test(value.trim()), true, value + " should be treated as a full UPI");
+  }
+
+  for (const value of ["1/03/01/04", "1/03/01/04/7509 extra", "Bugesera"]) {
+    assert.equal(expression.test(value.trim()), false, value + " should not be treated as a full UPI");
+  }
+});
