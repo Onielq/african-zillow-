@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brilliant Tower | Taiseel Commercial Asset Study</title>
+<link rel="stylesheet" href="../report-system.css">
+<style>
+@font-face{font-family:Playfair;src:url("../../fonts/PlayfairDisplay-Regular.ttf")}
+@font-face{font-family:Playfair;src:url("../../fonts/PlayfairDisplay-SemiBold.ttf");font-weight:600}
+@font-face{font-family:Inter;src:url("../../fonts/Inter-Regular.ttf")}
+@font-face{font-family:Inter;src:url("../../fonts/Inter-Medium.ttf");font-weight:500}
+@font-face{font-family:Inter;src:url("../../fonts/Inter-SemiBold.ttf");font-weight:600}
+@font-face{font-family:Inter;src:url("../../fonts/Inter-Bold.ttf");font-weight:700}
+*{box-sizing:border-box}
+body{font-family:Inter,Arial,sans-serif}
+.page.cover{display:grid;grid-template-columns:49% 51%;background:var(--report-navy);color:#fff}
+.cover-copy{padding:42px 44px;display:flex;flex-direction:column;min-width:0}
+.cover-copy h1{margin:20px 0 10px;color:#fff;font-size:55px;line-height:1.02}
+.cover-subtitle{font:italic 18px/1.35 Playfair,Georgia,serif;color:#d5deea}
+.cover-address{margin-top:10px;color:#e3e8ef;font:11px/1.5 Inter,Arial,sans-serif;letter-spacing:.5px}
+.cover-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 18px;margin-top:28px}
+.cover-fact{padding-top:9px;border-top:1px solid #ffffff38}
+.cover-fact b{display:block;color:var(--report-gold);font:22px/1.1 Playfair,Georgia,serif}
+.cover-fact span{display:block;margin-top:5px;color:#d5deea;font-size:9px;line-height:1.35}
+.cover-status{margin-top:auto;padding:11px 12px;border:1px solid #ffffff55;color:#e9edf3;font-size:10px;line-height:1.45}
+.cover-image{position:relative;overflow:hidden;min-width:0}
+.cover-image img{width:100%;height:100%;object-fit:cover}
+.cover-image:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(19,33,59,.3),transparent 48%)}
+.cover-image .caption{position:absolute;z-index:2;left:24px;right:24px;bottom:44px;color:#fff;font:10px/1.45 Inter,Arial,sans-serif;text-shadow:0 1px 6px #000}
+.page.content .body-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:20px;margin-top:17px}
+.page.content .body-grid.equal{grid-template-columns:1fr 1fr}
+.scope-table td:first-child{width:31%;font-weight:600}
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px}
+.metric-grid .metric{padding:10px 12px}
+.metric-grid .metric b{font-size:20px}
+.floor-list{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}
+.floor-item{padding:9px 11px;background:var(--report-soft);border-left:3px solid var(--report-gold-deep)}
+.floor-item b{display:block;color:var(--report-navy);font-size:10px}
+.floor-item span{display:block;margin-top:3px;color:var(--report-muted);font-size:9px;line-height:1.35}
+.jewels{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px}
+.jewel{min-height:103px;padding:11px 12px;background:var(--report-soft);border:1px solid var(--report-line)}
+.jewel b{display:block;color:var(--report-navy);font:15px/1.15 Playfair,Georgia,serif}
+.jewel span{display:block;margin-top:4px;color:var(--report-gold-deep);font:700 8px/1.3 Inter,Arial,sans-serif;letter-spacing:.6px;text-transform:uppercase}
+.jewel p{margin:5px 0 0;color:var(--report-muted);font:9px/1.35 Inter,Arial,sans-serif}
+.price-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:13px 16px;margin:13px 0 10px;background:var(--report-navy);color:#fff}
+.price-hero b{color:var(--report-gold);font:25px/1.05 Playfair,Georgia,serif}
+.price-hero span{color:#d5deea;font-size:9px;line-height:1.4}
+.page.content .map-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.map-card{border:1px solid var(--report-line);padding:8px;background:#fff}
+.map-card .mapbox{height:172px}
+.map-label{padding:6px 4px 1px;color:var(--report-navy);font:700 9px/1.3 Inter,Arial,sans-serif;letter-spacing:.6px;text-transform:uppercase}
+.access-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+.access-item{padding:8px 10px;background:var(--report-cream);font-size:9px;line-height:1.35}
+.access-item b{display:block;color:var(--report-navy);font-size:10px}
+.source-strip{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:8px}
+.source-strip a{font-size:8px}
+.source-note{font-size:8px;line-height:1.35;color:#7a8490}
+@media print{.page{margin:0!important}}
+</style>
+</head>
+<body>
+<main class="report">
+<section class="page cover" data-report-page="profile" data-report-type="commercial">
+ <div class="cover-copy">
+  <div class="eyebrow" style="color:var(--report-gold)">TAISEEL / COMMERCIAL PROJECT INTELLIGENCE</div>
+  <h1>Brilliant<br>Tower</h1>
+  <div class="cover-subtitle">Grade A office · retail · dining</div>
+  <div class="cover-address">No. 11, KG 7 Avenue, KG543 Street<br>Kimihurura · Gasabo District · Kigali, Rwanda</div>
+  <div class="cover-facts">
+   <div class="cover-fact"><b>BT-01</b><span>Taiseel registry ID · brilliant-tower</span></div>
+   <div class="cover-fact"><b>14,886 m²</b><span>Total floor area stated by developer</span></div>
+   <div class="cover-fact"><b>G+12</b><span>13 above-ground levels · 2 basements</span></div>
+   <div class="cover-fact"><b>40+ units</b><span>Mixed-use units in the 2024 launch release</span></div>
+   <div class="cover-fact"><b>210–1,040 m²</b><span>Published office-space options</span></div>
+   <div class="cover-fact"><b>RWF 33,850</b><span>Published asking rent per m² / month on one 454 m² listing</span></div>
+  </div>
+  <div class="cover-status"><b>Delivery signal:</b> Brilliant Development's November 2026 LinkedIn posts describe the tower as fully delivered. Current floor-by-floor availability remains unverified. Research checked 17 November 2026.</div>
+ </div>
+ <div class="cover-image">
+  <img src="https://pbs.twimg.com/media/HD1aabzboAAAQgU.jpg" alt="Brilliant Tower commercial office building, promotional rendering by Brilliant Development">
+  <div class="caption">Brilliant Tower · developer promotional image · official Brilliant Development social account. Image overlay states 14,886 m² total floor area.</div>
+ </div>
+ <div class="footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>01 / PROJECT PROFILE</span></div>
+</section>
+
+<section class="page content" data-report-page="scope" data-report-type="commercial">
+ <div class="head"><div><div class="eyebrow">01 · Commercial scope</div><h2>Project Scope & Available Space</h2></div><div class="tag">OFFICE · RETAIL · DINING</div></div>
+ <div class="body-grid">
+  <div>
+   <p class="lead">Brilliant Tower is a mixed-use commercial building developed by Brilliant Development Co Ltd. The developer markets it as an international Grade A office asset with office space available for rent or sale, alongside retail, coffee/restaurant and fine-dining uses.</p>
+   <table class="table scope-table">
+    <thead><tr><th>Use / product</th><th>Published scope</th><th>Evidence status</th></tr></thead>
+    <tbody>
+     <tr><td>Office suites</td><td>210–1,040 m² per published office option</td><td>Developer website</td></tr>
+     <tr><td>Retail / shops</td><td>Included in the 40+ mixed-use-unit launch description</td><td>2024 launch release</td></tr>
+     <tr><td>Coffee & restaurant</td><td>Promotional floor-use diagram assigns this to level 2</td><td>Developer marketing graphic</td></tr>
+     <tr><td>Fine dining</td><td>Promotional floor-use diagram assigns this to level 12</td><td>Developer marketing graphic</td></tr>
+     <tr><td>Property operation</td><td>Developer describes star-rated property management</td><td>Developer claim; service scope to confirm</td></tr>
+    </tbody>
+   </table>
+   <div class="warn">The 2024 launch release says “over 40 units”; it does not publish a final as-built unit schedule. Treat 40+ as the launch-announced minimum, not a confirmed current inventory count.</div>
+  </div>
+  <div>
+   <div class="panel">
+    <div class="eyebrow">Developer-promoted floor use</div>
+    <div class="floor-list">
+     <div class="floor-item"><b>Level 1</b><span>Elegant lobby</span></div>
+     <div class="floor-item"><b>Level 2</b><span>Coffee & restaurant</span></div>
+     <div class="floor-item"><b>Levels 3–11</b><span>Premium offices</span></div>
+     <div class="floor-item"><b>Level 12</b><span>Fine dining</span></div>
+    </div>
+    <p class="source-note" style="margin-top:9px">Floor allocation is transcribed from a Brilliant Development promotional graphic. Confirm final as-built use and any tenant changes with the building manager.</p>
+   </div>
+   <div class="metric-grid">
+    <div class="metric"><b>3.9 m</b><span>Floor-to-ceiling height stated by developer</span></div>
+    <div class="metric"><b>250 kg/m²</b><span>Published load-bearing capacity</span></div>
+    <div class="metric"><b>80%+</b><span>Usable-area ratio claimed by developer</span></div>
+   </div>
+   <div class="warn"><b>Booking and payment:</b> no public office reservation fee, booking deposit, sale payment schedule, lease deposit, minimum lease term or service-charge schedule was located. Ask the developer for a dated unit quotation and written terms.</div>
+  </div>
+ </div>
+ <div class="footer"><span>Sources: Brilliant Development · Newsfile launch release · promotional floor-use graphic</span><span>02 / PROJECT SCOPE & PRODUCTS</span></div>
+</section>
+
+<section class="page content" data-report-page="delivery" data-report-type="commercial">
+ <div class="head"><div><div class="eyebrow">02 · Development & delivery</div><h2>Delivered Business Address in Kigali</h2></div><div class="tag">DEVELOPER · TIMELINE · CITY JEWELS</div></div>
+ <div class="body-grid">
+  <div>
+   <div class="chips" style="grid-template-columns:repeat(3,1fr);margin-top:0">
+    <div class="chip"><b>Sep 2024</b><span>Public project launch announcement</span></div>
+    <div class="chip"><b>Jul 2026</b><span>Earlier target on official project page</span></div>
+    <div class="chip"><b>Nov 2026</b><span>Developer LinkedIn says fully delivered</span></div>
+   </div>
+   <p class="lead" style="margin-top:12px">The developer's project page still contains an earlier construction-progress paragraph stating that curtain-wall installation and interior finishing were underway, with completion targeted for July 2026. More recent posts on the developer's LinkedIn page in November 2026 say the tower is fully delivered and ready for occupation. The newer announcement is the better current status signal, but it is not a third-party completion certificate.</p>
+   <div class="panel" style="margin-top:11px">
+    <div class="eyebrow">Development facts</div>
+    <p class="lead" style="margin:7px 0 0">Developer / owner: Brilliant Development Co Ltd. Above-ground construction area: 11,246.8 m². Basement area: 3,473 m². Total floor area: 14,886 m². Above-ground floors: G+12. Underground floors: 2.</p>
+   </div>
+   <div class="warn">Area reconciliation: 11,246.8 m² above ground + 3,473 m² basement = 14,719.8 m², which is 166.2 m² below the developer's stated 14,886 m² total. Confirm the area schedule before using it for valuation or efficiency calculations.</div>
+  </div>
+  <div>
+   <div class="eyebrow">City Jewels · nearby business and civic anchors</div>
+   <div class="jewels">
+    <div class="jewel"><b>Kigali Heights</b><span>0.3 km · developer distance</span><p>Mixed-use commercial complex with offices, retail and dining</p></div>
+    <div class="jewel"><b>KABC</b><span>0.3 km · developer distance</span><p>Commercial offices, retail, services and dining on KN 5 Road</p></div>
+    <div class="jewel"><b>Kigali Convention Centre</b><span>0.5 km · developer distance</span><p>Conference and events venue in Kimihurura</p></div>
+    <div class="jewel"><b>Radisson Blu</b><span>0.5 km · developer distance</span><p>Hotel and conference accommodation next to KCC</p></div>
+    <div class="jewel"><b>University of Kigali</b><span>Approx. 0.2 km · third-party listing</span><p>Main campus in the Kacyiru / KG 541 Street area</p></div>
+    <div class="jewel"><b>Amahoro National Stadium</b><span>2.0 km · developer distance</span><p>Major sport and event venue in the wider business catchment</p></div>
+   </div>
+   <p class="source-note" style="margin-top:8px">The first four and stadium distances are from the developer's project page. UoK distance is from a third-party commercial listing and is approximate. These are not verified walking-route distances.</p>
+  </div>
+ </div>
+ <div class="footer"><span>Sources: Brilliant Development · developer LinkedIn · Newsfile launch release · third-party location listing</span><span>03 / DEVELOPMENT & DELIVERY</span></div>
+</section>
+
+<section class="page content" data-report-page="market" data-report-type="commercial">
+ <div class="head"><div><div class="eyebrow">03 · Commercial market evidence</div><h2>Price & Market Intelligence</h2></div><div class="tag">ASKING RENT · NOT TRANSACTION PRICE</div></div>
+ <div class="price-hero">
+  <div><span>Brilliant Tower · listed office space · 454 m²</span><br><b>RWF 33,850 / m² / month</b></div>
+  <div style="text-align:right"><span>Indicative full-space rent at that asking rate</span><br><b>RWF 15.37M / month</b></div>
+ </div>
+ <table class="table">
+  <thead><tr><th>Office / commercial comparable</th><th>Area</th><th>Asking rent / m² / month</th><th>Comparison note</th></tr></thead>
+  <tbody>
+   <tr><td>Brilliant Tower</td><td>454 m²</td><td><b>RWF 33,850</b></td><td>Subject building · listed office rent</td></tr>
+   <tr><td>Inzovu Mall</td><td>600 m²</td><td>RWF 32,000</td><td>Office space in mixed-use mall</td></tr>
+   <tr><td>Kacyiru office</td><td>470 m²</td><td>RWF 25,000</td><td>Office listing · Kwanda Real Estate</td></tr>
+   <tr><td>The Rock · Kimihurura</td><td>394 m²</td><td>RWF 22,400</td><td>Office and retail listing</td></tr>
+   <tr><td>Kimihurura office</td><td>379 m²</td><td>RWF 21,750</td><td>Lowest published rate in this sample</td></tr>
+  </tbody>
+ </table>
+ <div class="body-grid equal" style="margin-top:12px">
+  <div class="panel">
+   <div class="eyebrow">Market position · selected sample</div>
+   <div class="metric-grid" style="grid-template-columns:repeat(2,1fr)">
+    <div class="metric"><b>RWF 21,750</b><span>Lowest published rent / m² / month in the wider sample</span></div>
+    <div class="metric"><b>+27.9%</b><span>Brilliant asking rent premium versus the mean of the three selected comparables above</span></div>
+   </div>
+   <p class="source-note" style="margin-top:9px">Selected comparable mean: RWF 26,466.67 / m² / month (Inzovu Mall, Kacyiru office and The Rock). Brilliant Tower is priced above this sample; no rent-saving or value advantage is demonstrated by these asking listings.</p>
+  </div>
+  <div class="panel">
+   <div class="eyebrow">What is not published</div>
+   <p class="lead" style="margin:7px 0 0">No current office sale price per m², total building sale value, development cost, independent asset valuation, occupancy schedule, or verified unit availability was found in the reviewed sources.</p>
+   <p class="lead" style="margin-top:9px">The 454 m² listing implies about RWF 15.37M per month at its advertised rate, before any VAT, service charge, parking, fit-out or other lease costs. Confirm the complete lease quotation.</p>
+  </div>
+ </div>
+ <div class="warn">These are advertised asking rents, not completed leases or achieved transaction evidence. The properties differ in grade, fit-out, location and lease conditions. The comparison is an indicative market screen, not a formal valuation. Sale prices and total project worth remain undisclosed.</div>
+ <div class="footer"><span>Sources: Plut Properties · Kwanda Real Estate · property listings checked 17 November 2026</span><span>04 / PRICE & MARKET INTELLIGENCE</span></div>
+</section>
+
+<section class="page content" data-report-page="location" data-report-type="commercial">
+ <div class="head"><div><div class="eyebrow">04 · Site and access</div><h2>Kimihurura · Gasabo District · Kigali</h2></div><div class="tag">RWANDA · TWO-MAP LOCATION VIEW</div></div>
+ <div class="map-grid">
+  <div class="map-card">
+   <div class="map-label">Project location · address pin</div>
+   <div class="mapbox"><iframe loading="lazy" src="https://www.google.com/maps?q=-1.949491,30.092781&z=16&output=embed" title="Brilliant Tower location map"></iframe></div>
+  </div>
+  <div class="map-card">
+   <div class="map-label">Business district · nearby anchors</div>
+   <div class="mapbox"><iframe loading="lazy" src="https://www.google.com/maps?q=Kigali+Heights+KABC+Kigali+Convention+Centre+University+of+Kigali+Kigali&z=15&output=embed" title="Map of business and civic places near Brilliant Tower"></iframe></div>
+  </div>
+ </div>
+ <div class="access-grid">
+  <div class="access-item"><b>University of Kigali</b>KG 541 Street · approx. 0.2 km per third-party listing</div>
+  <div class="access-item"><b>KCC1 bus stop</b>Named stop on Kigali Bus Services route information</div>
+  <div class="access-item"><b>Kigali Heights bus stop</b>Named stop on Kigali Bus Services route information</div>
+  <div class="access-item"><b>KABC / KBC stop</b>Public transport stop beside Kigali Alliance Business Centre</div>
+  <div class="access-item"><b>Kigali Convention Centre</b>0.5 km · developer-published distance</div>
+  <div class="access-item"><b>Kigali International Airport</b>5.0 km · developer-published distance</div>
+ </div>
+ <div class="body-grid equal" style="margin-top:10px">
+  <div>
+   <p class="lead" style="margin:0">Project address: Brilliant Tower, No. 11, KG 7 Avenue, KG543 Street, Kigali, Rwanda. The project register places it in Gasabo District, Kimihurura Sector, Kamukina Cell. The developer publishes KCC and Kigali Heights as 0.5 km and 0.3 km away respectively.</p>
+  </div>
+  <div>
+   <p class="source-note" style="margin:0">Kigali Bus Services lists KCC1 and Kigali Heights on its Remera–Chez Lando–Kimihurura–Downtown route. OpenStreetMap also records a KABC bus stop. These are bus stops, not full bus terminals; exact walk distances from the tower entrance are not published.</p>
+  </div>
+ </div>
+ <div class="source-strip">
+  <a href="https://www.brilliant-development-holding.com/BrilliantTower.html" target="_blank" rel="noopener">Developer project page</a>
+  <a href="https://www.brilliant-development-holding.com/ContactUs.html" target="_blank" rel="noopener">Developer contact / address</a>
+  <a href="https://www.linkedin.com/company/brilliantdevelopment/" target="_blank" rel="noopener">Developer LinkedIn updates</a>
+  <a href="https://www.kigalibusservices.rw/routes/" target="_blank" rel="noopener">Kigali Bus Services routes</a>
+  <a href="https://turebe.com/properties/brilliant-tower-premium-office-space-for-rent-on-kg7-avenue-kigali-b61b7a58?lang=rw" target="_blank" rel="noopener">Nearby access listing</a>
+  <a href="https://plutproperties.com/offices-for-rent-in-kigali/" target="_blank" rel="noopener">Office asking-rent evidence</a>
+ </div>
+ <div class="footer"><span>TAISEEL / BRILLIANT TOWER · LOCATION & SOURCES</span><span>05 / LOCATION & VERIFICATION</span></div>
+</section>
+</main>
+</body>
+</html>
