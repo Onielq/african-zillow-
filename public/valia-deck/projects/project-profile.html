@@ -251,7 +251,8 @@ body{font-family:Inter,Arial,sans-serif}
   const isKigaliDistrict = ["gasabo", "kicukiro", "nyarugenge"].includes(district.toLocaleLowerCase("en"));
   const areaCity = city || (isKigaliDistrict ? "Kigali City" : "");
   const locationParts = [cell, sector, district, areaCity, "Rwanda"].filter(Boolean);
-  const areaQuery = [sector, district, areaCity, "Rwanda"].filter(Boolean).join(" ");
+  const localAreaParts = [sector, district, areaCity].filter(Boolean);
+  const areaQuery = localAreaParts.length ? localAreaParts.concat("Rwanda").join(" ") : "";
   if (projectMapBox && areaQuery) {
     const query = exactPin ? latitude + "," + longitude : (parcelUpi ? parcelUpi + " " + areaQuery : areaQuery);
     const iframe = document.createElement("iframe");
