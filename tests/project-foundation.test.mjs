@@ -1315,3 +1315,14 @@ test("full UPI search uses exact cadastral lookup and does not fall through to a
   assert.match(experience, /globalSearchResults\.length === 0 && !isFullUpi/);
   assert.match(experience, /No matching parcel UPI was found in the connected cadastral sources/);
 });
+
+test("Cloudflare CLI and Vite plugin use compatible Build Output versions", async () => {
+  const packageJson = JSON.parse(await readProjectFile("package.json"));
+
+  // cf 1.0.0-rc.0 requires Build Output from Cloudflare Vite plugin 2.0.0-rc.0 or newer.
+  // Pin both packages to the same release channel; floating "latest" and "beta"
+  // tags can silently combine incompatible Build Output generations.
+  assert.equal(packageJson.devDependencies.cf, "1.0.0-rc.0");
+  assert.equal(packageJson.devDependencies["@cloudflare/vite-plugin"], "2.0.0-rc.0");
+  assert.equal(packageJson.scripts["deploy:vinext"], "vinext-cloudflare deploy");
+});
