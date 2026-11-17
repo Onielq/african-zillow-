@@ -1252,6 +1252,7 @@ test("project selection opens the five-page study in a draggable, resizable and 
   assert.match(legacyHtml, /window\.location\.replace\("\/valia-deck\/projects\/bwiza-riverside-homes\.html"\)/);
   assert.ok(modal.includes('"heza-estate-batsinda-project": "/valia-deck/projects/heza-estate-batsinda-project.html"'));
   assert.ok(modal.includes('"brilliant-tower": "/valia-deck/projects/brilliant-tower.html"'));
+  assert.ok(modal.includes('"inzovu-mall": "/valia-deck/projects/inzovu-mall.html"'));
   assert.ok(modal.includes("const deckSrc = projectDecks[projectId] ??"));
   assert.ok(modal.includes("src={deckSrc}"));
   assert.match(modal, /document\.querySelectorAll\("\.page"\)/);
@@ -1369,7 +1370,8 @@ test("all project reports use the shared five-page reporting sequence", async ()
     "public/valia-deck/projects/rugarama-park-estate.html",
     "public/valia-deck/projects/project-profile.html",
     "public/valia-deck/projects/project-report-template.html",
-    "public/valia-deck/projects/brilliant-tower.html"
+    "public/valia-deck/projects/brilliant-tower.html",
+    "public/valia-deck/projects/inzovu-mall.html"
   ];
 
   for (const path of reportPaths) {
@@ -1394,4 +1396,29 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(brilliant, /building height in metres/i);
   assert.match(brilliant, /booking, occupancy and height/i);
   assert.doesNotMatch(brilliant, /bedrooms?/i);
+
+  const inzovu = await readProjectFile("public/valia-deck/projects/inzovu-mall.html");
+  assert.match(inzovu, /data-report-page="profile" data-report-type="commercial"/);
+  assert.match(inzovu, /29,000 m²/);
+  assert.match(inzovu, /95 rooms/);
+  assert.match(inzovu, /9,000\+ m²/);
+  assert.match(inzovu, /Q1 2027/);
+  assert.match(inzovu, /RWF 32,000/);
+  assert.match(inzovu, /billing cycle/i);
+  assert.match(inzovu, /whole-project market value is not published/i);
+  assert.doesNotMatch(inzovu, /bedrooms?/i);
+  
+  const masaka = await readProjectFile("public/valia-deck/projects/masaka-views-eco-estate.html");
+  assert.match(masaka, /USD \/ m²/);
+  assert.match(masaka, /USD 617\/m²/);
+  assert.match(masaka, /RWF 5,000 per person/);
+  assert.match(masaka, /not a home reservation deposit/i);
+  
+  const heza = await readProjectFile("public/valia-deck/projects/heza-estate-batsinda-project.html");
+  assert.match(heza, /heza-estate-batsinda-project/);
+  assert.match(heza, /four-storey apartment blocks/i);
+  
+  const rugarama = await readProjectFile("public/valia-deck/projects/rugarama-park-estate.html");
+  assert.match(rugarama, /rugarama-park-estate/);
+  assert.match(rugarama, /not evidence of completed buildings/i);
 });
