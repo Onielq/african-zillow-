@@ -170,3 +170,24 @@ test("the report system keeps location descriptions evidence-led and avoids demo
   assert.ok(standard.languageStandard.rules.some((rule) => rule.includes("family-friendly")));
   assert.ok(guide.includes("demographic assumptions or steering language"));
 });
+
+
+test("all project reports load the common stylesheet after their inline styles", async () => {
+  const paths = [
+    ...dedicatedReports.map((report) => report.path),
+    "public/valia-deck/projects/project-profile.html",
+    "public/valia-deck/projects/project-report-template.html",
+  ];
+
+  for (const path of paths) {
+    const html = await readProjectFile(path);
+    const inlineStyleEnd = html.lastIndexOf("</style>");
+    const sharedStyleLink = html.lastIndexOf('href="../report-system.css"');
+    assert.ok(inlineStyleEnd >= 0, path + " must contain its local style block");
+    assert.ok(sharedStyleLink > inlineStyleEnd, path + " must load shared styles after local styles");
+  }
+
+  const bwiza = await readProjectFile("public/valia-deck/projects/bwiza-riverside-homes.html");
+  assert.match(bwiza, /<html lang="en">/);
+  assert.match(bwiza, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
+});
