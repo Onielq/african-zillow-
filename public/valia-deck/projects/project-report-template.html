@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Study | Taiseel</title>
+  <link rel="stylesheet" href="../report-system.css">
+  <style>
+    @font-face { font-family: Playfair; src: url("../../fonts/PlayfairDisplay-Regular.ttf"); }
+    @font-face { font-family: Inter; src: url("../../fonts/Inter-Regular.ttf"); }
+    :root { --navy: var(--report-navy); --navy2: var(--report-navy-mid); --gold: var(--report-gold); --gold2: var(--report-gold-deep); --cream: var(--report-cream); --ink: var(--report-ink); --muted: var(--report-muted); --line: var(--report-line); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, Arial, sans-serif; color: var(--ink); background: #eef0f2; }
+    main { width: 1280px; margin: 0 auto; }
+    .page { width: 1280px; height: 720px; padding: 42px 48px 55px; background: #fff; position: relative; overflow: hidden; }
+    .page.cover { padding: 0; display: flex; background: var(--navy); color: #fff; }
+    .page-head { display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+    .eyebrow { color: var(--gold2); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    h1, h2, h3 { font-family: Playfair, Georgia, serif; color: var(--navy); }
+    h1 { font-size: 58px; line-height: 1.02; }
+    h2 { font-size: 32px; }
+    h3 { font-size: 21px; margin-bottom: 12px; }
+    .lead { color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .page-footer { position: absolute; bottom: 0; left: 0; right: 0; height: 36px; border-top: 1px solid var(--line); padding: 0 44px; display: flex; align-items: center; justify-content: space-between; color: #87909b; font-size: 10px; letter-spacing: .5px; }
+    .placeholder { border: 1px dashed var(--line); background: var(--cream); padding: 16px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <!-- Duplicate this five-page sequence for each project. Do not remove or reorder pages. -->
+  <section class="page cover" data-report-page="profile">
+    <div style="padding:50px 48px;width:480px">
+      <div class="eyebrow">TAISEEL / PROJECT INTELLIGENCE</div>
+      <h1>[Project name]</h1>
+      <p>[Neighbourhood · District]</p>
+      <div class="placeholder">Replace with verified project facts, scale, status, and evidence date.</div>
+    </div>
+    <div class="placeholder" style="flex:1">[Project image with source and caption]</div>
+    <div class="page-footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>01 / PROJECT PROFILE</span></div>
+  </section>
+  <section class="page" data-report-page="scope">
+    <div class="page-head"><div><div class="eyebrow">01 · Project scope</div><h2>Project Scope & Products</h2></div><div>[Project location]</div></div>
+    <div class="placeholder" style="margin-top:24px">[Project-specific scope, product mix, unit schedule, and terms. Mark missing evidence clearly.]</div>
+    <div class="page-footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>02 / PROJECT SCOPE & PRODUCTS</span></div>
+  </section>
+  <section class="page" data-report-page="delivery">
+    <div class="page-head"><div><div class="eyebrow">02 · Development</div><h2>Development & Delivery</h2></div><div>[Evidence date]</div></div>
+    <div class="placeholder" style="margin-top:24px">[Development history, approvals, construction, infrastructure, delivery and handover evidence.]</div>
+    <div class="page-footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>03 / DEVELOPMENT & DELIVERY</span></div>
+  </section>
+  <section class="page" data-report-page="market">
+    <div class="page-head"><div><div class="eyebrow">03 · Market evidence</div><h2>Price & Market Intelligence</h2></div><div>[Price basis and as-of date]</div></div>
+    <div class="placeholder" style="margin-top:24px">[Dated asking / launch / transaction prices, comparable evidence, calculations, and caveats.]</div>
+    <div class="page-footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>04 / PRICE & MARKET INTELLIGENCE</span></div>
+  </section>
+  <section class="page" data-report-page="location">
+    <div class="page-head"><div><div class="eyebrow">04 · Location & sources</div><h2>Location & Verification</h2></div><div>[Neighbourhood · District]</div></div>
+    <div class="placeholder" style="margin-top:24px">[Map, access evidence, source register, unresolved checks, and buyer verification checklist.]</div>
+    <div class="page-footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>05 / LOCATION & VERIFICATION</span></div>
+  </section>
+</main>
+</body>
+</html>
