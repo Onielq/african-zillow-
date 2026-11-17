@@ -1,5 +1,5 @@
 {
-  "standardVersion": 2,
+  "standardVersion": 3,
   "referenceProject": "bwiza-riverside-homes",
   "pageSize": {
     "width": 1280,
@@ -91,5 +91,21 @@
     "City Jewels must be real named buildings, developments or civic/business anchors relevant to the project location; distinguish them from direct price comparables.",
     "Keep the five page slots and order identical across all reports.",
     "Project facts and sources remain separate; never copy one project's facts into another."
+  ],
+  "visualRules": [
+    "Every project study uses five pages in the same order: Project Profile; Project Scope & Products; Development & Delivery; Price & Market Intelligence; Location & Verification.",
+    "Use the same 1280 by 720 page frame, typography scale, navy/gold palette, table treatment, evidence labels and footer system.",
+    "Use one project-specific image on the cover only when its URL and source are recorded; otherwise show an explicit image-not-yet-attached state.",
+    "Use the same two-map pattern on the location page: a project map and a surrounding-area context map.",
+    "Keep City Jewels separate from direct price comparables; label wider-district and city-wide references as such."
+  ],
+  "genericFallbackRules": [
+    "Show the Taiseel internal project ID; do not present it as a public developer ID.",
+    "Pass and display all available register facts: developer, owner, location hierarchy, project scale labels, land area, project start, completion, project route, UPI, image and source links.",
+    "Display a stored image only when the image URL is valid HTTP(S); otherwise show an explicit placeholder.",
+    "Show an exact project pin only when numeric latitude and longitude exist and location precision is address-coordinate or parcel-upi.",
+    "For district or sector precision, display an administrative-area search map labelled area context only; never style it as an exact parcel or entrance pin.",
+    "Show missing unit/space mix, prices, payment terms, booking, height, occupancy and current availability as not published, not verified or not established.",
+    "Never add nearby facilities or comparables to the fallback unless those names and evidence are attached to that project record."
   ]
 }
