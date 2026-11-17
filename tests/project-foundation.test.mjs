@@ -1275,9 +1275,9 @@ test("project selection opens the five-page study in a draggable, resizable and 
   const cover = html.slice(0, html.indexOf('<div class="page p2'));
   assert.match(cover, /class="project-name">Bwiza Riverside Homes<\/div>/);
   assert.match(cover, /class="locality">NYARUGENGE DISTRICT<\/div>/);
-  assert.match(html, /GIZA RIVERSIDE HOMES MASTER PLAN/);
+  assert.match(html, /BWIZA RIVERSIDE HOMES MASTER PLAN/);
   assert.match(html, /NYARUGENGE DISTRICT/);
-  assert.doesNotMatch(html, /GIZA RIVERSIDE HOUSE/);
+  assert.doesNotMatch(html, /GIZA/i);
   assert.match(html, /\.bwiza-p2 \.col-right \{ flex:0 0 3\.05in/);
   assert.match(html, /\.bwiza-p3 \.col-map \{ flex:0 0 3\.3in/);
   assert.match(html, /\.bwiza-p4 \.col-right \{ flex:0 0 2\.95in/);
