@@ -1251,6 +1251,7 @@ test("project selection opens the five-page study in a draggable, resizable and 
   assert.ok(modal.includes('"bwiza-riverside-homes": "/valia-deck/projects/bwiza-riverside-homes.html"'));
   assert.match(legacyHtml, /window\.location\.replace\("\/valia-deck\/projects\/bwiza-riverside-homes\.html"\)/);
   assert.ok(modal.includes('"heza-estate-batsinda-project": "/valia-deck/projects/heza-estate-batsinda-project.html"'));
+  assert.ok(modal.includes('"brilliant-tower": "/valia-deck/projects/brilliant-tower.html"'));
   assert.ok(modal.includes("const deckSrc = projectDecks[projectId] ??"));
   assert.ok(modal.includes("src={deckSrc}"));
   assert.match(modal, /document\.querySelectorAll\("\.page"\)/);
@@ -1367,7 +1368,8 @@ test("all project reports use the shared five-page reporting sequence", async ()
     "public/valia-deck/projects/masaka-views-eco-estate.html",
     "public/valia-deck/projects/rugarama-park-estate.html",
     "public/valia-deck/projects/project-profile.html",
-    "public/valia-deck/projects/project-report-template.html"
+    "public/valia-deck/projects/project-report-template.html",
+    "public/valia-deck/projects/brilliant-tower.html"
   ];
 
   for (const path of reportPaths) {
@@ -1380,4 +1382,16 @@ test("all project reports use the shared five-page reporting sequence", async ()
 
   const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
   assert.deepEqual(standard.requiredPages.map((page) => page.key), expectedPages);
+  assert.deepEqual(Object.keys(standard.assetProfiles).sort(), ["commercial", "mixedUse", "residential"]);
+  const brilliant = await readProjectFile("public/valia-deck/projects/brilliant-tower.html");
+  assert.match(brilliant, /data-report-page="profile" data-report-type="commercial"/);
+  assert.match(brilliant, /14,886 m²/);
+  assert.match(brilliant, /40\+ units/);
+  assert.match(brilliant, /210–1,040 m²/);
+  assert.match(brilliant, /RWF 33,850/);
+  assert.match(brilliant, /RWF 21,750/);
+  assert.match(brilliant, /G\+12/);
+  assert.match(brilliant, /building height in metres/i);
+  assert.match(brilliant, /booking, occupancy and height/i);
+  assert.doesNotMatch(brilliant, /bedrooms?/i);
 });
