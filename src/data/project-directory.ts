@@ -185,6 +185,7 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "cell": "Cyimo",
     "status": "85% complete reported October 2026; first-phase delivery ongoing",
     "units": 382,
+    "unitsLabel": "October 2026 headline count; conflicting breakdowns report 302+51+33=386 and 302+51+57=410. Final approved unit schedule unverified",
     "landHa": null,
     "start": "October 2025",
     "completion": "Remaining first-phase units reported for mid-2027",
