@@ -1,6 +1,6 @@
-/* Taiseel Project Report System
-   Shared design foundation for every project study.
-   Project-specific layouts may add components, but must use these tokens and page rules.
+/* Taiseel Project Report System v2
+   Shared layout, typography and component rules for every project study.
+   Keep project facts and imagery in the individual report; keep presentation here.
 */
 :root {
   --report-navy: #13213b;
@@ -13,11 +13,12 @@
   --report-ink: #16232f;
   --report-muted: #596674;
   --report-line: #e4e2dc;
+  --report-soft: #f7f8fa;
+  --report-warning: #fbf8f0;
   --report-font-display: "Playfair", Georgia, serif;
   --report-font-body: "Inter", Arial, sans-serif;
   --report-page-width: 1280px;
   --report-page-height: 720px;
-  /* Compatibility aliases for the existing report files. */
   --navy: var(--report-navy);
   --navy2: var(--report-navy-mid);
   --navy-950: var(--report-navy);
@@ -32,25 +33,235 @@
   --muted: var(--report-muted);
   --line: var(--report-line);
 }
+* { box-sizing: border-box; }
 html { background: #eef0f2; }
-body { color: var(--report-ink); font-family: var(--report-font-body); }
+body {
+  margin: 0;
+  padding: 22px 0;
+  color: var(--report-ink);
+  background: #eef0f2;
+  font-family: var(--report-font-body);
+  -webkit-font-smoothing: antialiased;
+}
+main {
+  width: var(--report-page-width);
+  margin: 0 auto;
+}
 .page {
   width: var(--report-page-width);
   height: var(--report-page-height);
+  min-height: var(--report-page-height);
   position: relative;
   overflow: hidden;
+  margin: 0 auto 18px;
+  color: var(--report-ink);
   background: var(--report-paper);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 28px rgba(19,33,59,.09);
   break-after: page;
   page-break-after: always;
 }
-.page:last-child { break-after: auto; page-break-after: auto; }
-h1, h2, h3 { font-family: var(--report-font-display); color: var(--report-navy); }
-.footer, .foot { position: absolute; bottom: 0; left: 0; right: 0; min-height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 44px; border-top: 1px solid var(--report-line); color: #87909b; font: 10px var(--report-font-body); letter-spacing: .5px; }
+.page:last-child { margin-bottom: 0; }
+.page.cover { background: var(--report-navy); }
+.page.content { padding: 42px 48px 56px; }
+h1, h2, h3 {
+  margin-top: 0;
+  color: var(--report-navy);
+  font-family: var(--report-font-display);
+}
+h1 { line-height: 1.03; }
+h2 { font-size: 32px; line-height: 1.12; }
+h3 { font-size: 20px; line-height: 1.2; margin-bottom: 10px; }
+p { margin-top: 0; }
+.eyebrow {
+  color: var(--report-gold-deep);
+  font: 700 10px/1.4 var(--report-font-body);
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+.page .head, .page .page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--report-line);
+}
+.page .head h2, .page .page-head h2 { margin: 5px 0 0; }
+.page .tag {
+  color: var(--report-muted);
+  font: 700 9px/1.4 var(--report-font-body);
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  text-align: right;
+}
+.lead {
+  color: var(--report-muted);
+  font: 13px/1.58 var(--report-font-body);
+}
+.small {
+  color: #77818c;
+  font: 10px/1.45 var(--report-font-body);
+}
+.cols {
+  display: grid;
+  grid-template-columns: 1.25fr .95fr;
+  gap: 26px;
+}
+.panel {
+  padding: 18px 20px;
+  border: 1px solid var(--report-line);
+  border-radius: 3px;
+  background: var(--report-cream);
+}
+.panel.dark {
+  color: #fff;
+  background: var(--report-navy);
+  border-color: var(--report-navy);
+}
+.panel.dark h3, .panel.dark strong { color: var(--report-gold); }
+.panel.dark .lead { color: #d5deea; }
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+}
+.feature {
+  min-height: 112px;
+  padding: 14px 16px;
+  border: 1px solid var(--report-line);
+  background: #fff;
+}
+.feature h3 { font-size: 17px; margin-bottom: 6px; }
+.feature p { color: var(--report-muted); font: 11px/1.45 var(--report-font-body); margin: 0; }
+.feature .symbol { color: var(--report-gold-deep); font-size: 18px; margin-bottom: 7px; }
+table, .table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--report-ink);
+  font: 11px/1.35 var(--report-font-body);
+}
+.table { margin-top: 10px; }
+.table th {
+  padding: 10px 11px;
+  text-align: left;
+  color: #fff;
+  background: var(--report-navy);
+  font-size: 9px;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+.table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--report-line);
+  vertical-align: top;
+}
+.table tr:nth-child(even) td { background: #faf9f6; }
+.table .right { text-align: right; }
+.chips {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 12px;
+  margin-top: 17px;
+}
+.chip {
+  min-height: 80px;
+  padding: 13px 15px;
+  background: var(--report-cream);
+  border: 1px solid var(--report-line);
+}
+.chip b {
+  display: block;
+  color: var(--report-navy);
+  font: 23px/1.1 var(--report-font-display);
+}
+.chip span { display:block; margin-top:6px; color:var(--report-muted); font:10px/1.4 var(--report-font-body); }
+.callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 15px 18px;
+  color: #fff;
+  background: var(--report-navy);
+}
+.callout span { color:#d5deea; font:10px/1.4 var(--report-font-body); }
+.callout b { color:var(--report-gold); font:20px/1.15 var(--report-font-display); text-align:right; }
+.warn {
+  margin-top: 12px;
+  padding: 10px 13px;
+  border-left: 3px solid var(--report-gold-deep);
+  color: #4d5964;
+  background: var(--report-warning);
+  font: 10px/1.5 var(--report-font-body);
+}
+.mapbox {
+  height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--report-line);
+  background: #e9e4d8;
+}
+.mapbox iframe { width:100%; height:100%; border:0; }
+.source-list { display:grid; gap:5px; }
+.source-list a, a.source-link {
+  color: var(--report-navy-mid);
+  font: 10px/1.35 var(--report-font-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.pill {
+  display: inline-block;
+  padding: 5px 8px;
+  margin: 3px 3px 0 0;
+  color: var(--report-navy-mid);
+  background: var(--report-cream);
+  font: 700 9px/1.2 var(--report-font-body);
+  letter-spacing: .4px;
+}
+.page .footer, .page .foot {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 44px;
+  border-top: 1px solid var(--report-line);
+  color: #87909b;
+  background: rgba(255,255,255,.96);
+  font: 9px/1 var(--report-font-body);
+  letter-spacing: .55px;
+}
+.page.cover .footer, .page.cover .foot {
+  color: #d5deea;
+  background: rgba(19,33,59,.94);
+  border-color: rgba(255,255,255,.18);
+}
+/* Reference-report compatibility: the Bwiza pages retain their custom grids,
+   but share the same page frame, typography family, footer and colour system. */
+.page .headline {
+  color: var(--report-navy);
+  font: 600 29px/1.12 var(--report-font-display);
+}
+.page .subhead {
+  color: var(--report-muted);
+  font: 12px/1.4 var(--report-font-body);
+}
+.page .headline + .subhead { margin-top: 6px; }
 a { color: var(--report-navy-mid); }
 a:focus-visible { outline: 2px solid var(--report-gold-deep); outline-offset: 3px; }
-table { border-collapse: collapse; }
 @page { size: 1280px 720px; margin: 0; }
 @media print {
-  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-  .page { margin: 0 !important; box-shadow: none !important; }
+  html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
+  main { margin:0 !important; }
+  .page { margin:0 !important; border:0 !important; box-shadow:none !important; }
+}
+@media screen and (max-width: 1280px) {
+  body { padding-left: 0; padding-right: 0; }
+  main, .page { margin-left: 0; margin-right: 0; }
 }
