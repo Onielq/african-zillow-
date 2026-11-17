@@ -1239,7 +1239,8 @@ test("map toolbar and parcel facts use semantic Lucide icons", async () => {
 
 test("project selection opens the five-page study in a draggable, resizable and dockable window", async () => {
   const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
-  const html = await readProjectFile("public/valia-deck/index.html");
+  const html = await readProjectFile("public/valia-deck/projects/bwiza-riverside-homes.html");
+  const legacyHtml = await readProjectFile("public/valia-deck/index.html");
   const experience = await readProjectFile("src/components/map/MapExperience.tsx");
   const css = await readProjectFile("src/app/globals.css");
 
@@ -1247,7 +1248,8 @@ test("project selection opens the five-page study in a draggable, resizable and 
   assert.match(experience, /projectName=\{selectedProject\.name\}/);
   assert.match(experience, /onClose=\{\(\) => setSelectedProjectId\(null\)\}/);
   assert.match(experience, /projectDirectoryTab === "projects"/);
-  assert.ok(modal.includes('"bwiza-riverside-homes": "/valia-deck/index.html"'));
+  assert.ok(modal.includes('"bwiza-riverside-homes": "/valia-deck/projects/bwiza-riverside-homes.html"'));
+  assert.match(legacyHtml, /window\.location\.replace\("\/valia-deck\/projects\/bwiza-riverside-homes\.html"\)/);
   assert.ok(modal.includes('"heza-estate-batsinda-project": "/valia-deck/projects/heza-estate-batsinda-project.html"'));
   assert.ok(modal.includes("const deckSrc = projectDecks[projectId] ??"));
   assert.ok(modal.includes("src={deckSrc}"));
@@ -1355,4 +1357,27 @@ test("map search accepts equivalent full-UPI separator formats", async () => {
   for (const value of ["1/03/01/04", "1/03/01/04/7509 extra", "Bugesera"]) {
     assert.equal(expression.test(value.trim()), false, value + " should not be treated as a full UPI");
   }
+});
+
+test("all project reports use the shared five-page reporting sequence", async () => {
+  const expectedPages = ["profile", "scope", "delivery", "market", "location"];
+  const reportPaths = [
+    "public/valia-deck/projects/bwiza-riverside-homes.html",
+    "public/valia-deck/projects/heza-estate-batsinda-project.html",
+    "public/valia-deck/projects/masaka-views-eco-estate.html",
+    "public/valia-deck/projects/rugarama-park-estate.html",
+    "public/valia-deck/projects/project-profile.html",
+    "public/valia-deck/projects/project-report-template.html"
+  ];
+
+  for (const path of reportPaths) {
+    const html = await readProjectFile(path);
+    const pages = [...html.matchAll(/data-report-page="(profile|scope|delivery|market|location)"/g)]
+      .map((match) => match[1]);
+    assert.deepEqual(pages, expectedPages, path + " must preserve the standard page order");
+    assert.ok(html.includes('href="../report-system.css"'), path + " must load the shared report stylesheet");
+  }
+
+  const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
+  assert.deepEqual(standard.requiredPages.map((page) => page.key), expectedPages);
 });
