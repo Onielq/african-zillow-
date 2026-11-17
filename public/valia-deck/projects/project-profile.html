@@ -83,8 +83,8 @@ body{font-family:Inter,Arial,sans-serif}
    <p class="lead" id="scopeIntro">The current project register does not contain a verified unit or commercial-space schedule for this asset.</p>
    <div class="value-list">
     <div class="value-row"><b>Asset category</b><span id="scopeCategory">Not classified in a detailed schedule</span></div>
-    <div class="value-row"><b>Residential mix</b><span>Bedroom, bathroom and home-type details not published in this baseline record</span></div>
-    <div class="value-row"><b>Commercial mix</b><span>Office, retail, hotel, industrial or other space areas not published in this baseline record</span></div>
+    <div class="value-row" id="residentialMixRow"><b>Residential mix</b><span>Bedroom, bathroom and home-type details not published in this baseline record</span></div>
+    <div class="value-row" id="commercialMixRow"><b>Commercial space mix</b><span>Office, retail, hotel, industrial or other space areas not published in this baseline record</span></div>
     <div class="value-row"><b>Unit / space areas</b><span>Not published</span></div>
     <div class="value-row"><b>Payment / lease terms</b><span>Not published in the project register</span></div>
     <div class="value-row"><b>Booking / reservation</b><span>Not verified; no deposit or reservation fee is assumed</span></div>
@@ -191,6 +191,8 @@ body{font-family:Inter,Arial,sans-serif}
   const hasCoordinates = get("latitude") !== "" && get("longitude") !== "" && Number.isFinite(latitude) && Number.isFinite(longitude);
   const exactPin = hasCoordinates && (precision === "address-coordinate" || precision === "parcel-upi");
   const category = get("category");
+  const categoryIsCommercial = /office|commercial|retail|mall|tower|business|industrial|hotel|hospitality/i.test(category);
+  const categoryIsResidential = /residential|housing|home|apartment|townhouse/i.test(category);
   const status = get("status");
   const units = get("units");
   const unitsLabel = get("unitsLabel");
@@ -205,6 +207,10 @@ body{font-family:Inter,Arial,sans-serif}
   set("developer", developer || "Not confirmed");
   set("category", category || "Asset type not classified");
   set("scopeCategory", category || "Project category not yet verified");
+  const residentialMixRow = document.getElementById("residentialMixRow");
+  const commercialMixRow = document.getElementById("commercialMixRow");
+  if (categoryIsCommercial && !categoryIsResidential && residentialMixRow) residentialMixRow.style.display = "none";
+  if (categoryIsResidential && !categoryIsCommercial && commercialMixRow) commercialMixRow.style.display = "none";
   set("status", status || "Not confirmed");
   set("units", unitsLabel || (units ? units : "Not published"));
   set("scale", unitsLabel || (units ? units : "Not published"));
