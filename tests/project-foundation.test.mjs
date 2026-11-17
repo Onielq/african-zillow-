@@ -1392,6 +1392,10 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(brilliant, /210–1,040 m²/);
   assert.match(brilliant, /RWF 33,850/);
   assert.match(brilliant, /RWF 21,750/);
+  assert.match(brilliant, /RWF 22,200/);
+  assert.match(brilliant, /RWF 23,680/);
+  assert.match(brilliant, /\+48\.7%/);
+  assert.match(brilliant, /developer reports the tower fully delivered/i);
   assert.match(brilliant, /G\+12/);
   assert.match(brilliant, /building height in metres/i);
   assert.match(brilliant, /booking, occupancy and height/i);
@@ -1414,6 +1418,10 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(masaka, /USD 617\/m²/);
   assert.match(masaka, /RWF 5,000 per person/);
   assert.match(masaka, /not a home reservation deposit/i);
+  assert.match(masaka, /382 reported/);
+  assert.match(masaka, /302 \+ 51 \+ 33 = 386/);
+  assert.match(masaka, /302 \+ 51 \+ 57 = 410/);
+  assert.match(masaka, /unit breakdowns conflict/i);
   
   const heza = await readProjectFile("public/valia-deck/projects/heza-estate-batsinda-project.html");
   assert.match(heza, /heza-estate-batsinda-project/);
