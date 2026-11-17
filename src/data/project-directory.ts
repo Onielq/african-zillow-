@@ -643,7 +643,6 @@ export const RWANDA_PROJECT_RECORDS: RwandaProjectRecord[] = [
     "locationPrecision": "administrative-area"
   },
   {
-  {
     "id": "savannah-creek-estate",
     "name": "Savannah Creek Estate",
     "developer": "Savannah Creek Development Company",
