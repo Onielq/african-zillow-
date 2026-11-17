@@ -1406,7 +1406,8 @@ test("all project reports use the shared five-page reporting sequence", async ()
   assert.match(inzovu, /RWF 32,000/);
   assert.match(inzovu, /billing cycle/i);
   assert.match(inzovu, /whole-project market value is not published/i);
-  assert.doesNotMatch(inzovu, /bedrooms?/i);
+  assert.match(inzovu, /Office \/ commercial reference/);
+  assert.doesNotMatch(inzovu, /<th>Bedrooms?<\/th>/i);
   
   const masaka = await readProjectFile("public/valia-deck/projects/masaka-views-eco-estate.html");
   assert.match(masaka, /USD \/ m²/);
