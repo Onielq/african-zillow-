@@ -13,6 +13,21 @@ type ProjectReportModalProps = {
   category: string;
   sourceUrl: string | null;
   completion: string | null;
+  owner?: string | null;
+  cell?: string | null;
+  landHa?: number | null;
+  landLabel?: string | null;
+  unitsLabel?: string | null;
+  start?: string | null;
+  route?: string | null;
+  parcelUpi?: string;
+  latitude?: number;
+  longitude?: number;
+  imageUrl?: string;
+  locationPrecision?: string;
+  secondarySourceUrl?: string | null;
+  thirdSourceUrl?: string | null;
+  latestStatusSourceUrl?: string | null;
   onClose: () => void;
 };
 
@@ -36,7 +51,12 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
-export function ProjectReportModal({ projectName, projectId, developer, district, sector, status, units, category, sourceUrl, completion, onClose }: ProjectReportModalProps) {
+export function ProjectReportModal({
+  projectName, projectId, developer, district, sector, status, units, category,
+  sourceUrl, completion, owner, cell, landHa, landLabel, unitsLabel, start, route,
+  parcelUpi, latitude, longitude, imageUrl, locationPrecision, secondarySourceUrl,
+  thirdSourceUrl, latestStatusSourceUrl, onClose
+}: ProjectReportModalProps) {
   const windowRef = useRef<HTMLElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -183,14 +203,30 @@ export function ProjectReportModal({ projectName, projectId, developer, district
 
   const genericParams = new URLSearchParams({
     name: projectName,
+    projectId,
     developer,
+    owner: owner ?? "",
     district: district ?? "",
     sector: sector ?? "",
+    cell: cell ?? "",
     status,
     units: units == null ? "" : String(units),
+    unitsLabel: unitsLabel ?? "",
+    landHa: landHa == null ? "" : String(landHa),
+    landLabel: landLabel ?? "",
     category,
+    start: start ?? "",
+    completion: completion ?? "",
+    route: route ?? "",
+    parcelUpi: parcelUpi ?? "",
+    latitude: latitude == null ? "" : String(latitude),
+    longitude: longitude == null ? "" : String(longitude),
+    imageUrl: imageUrl ?? "",
+    locationPrecision: locationPrecision ?? "",
     source: sourceUrl ?? "",
-    completion: completion ?? ""
+    secondarySource: secondarySourceUrl ?? "",
+    thirdSource: thirdSourceUrl ?? "",
+    latestStatusSource: latestStatusSourceUrl ?? ""
   });
   const projectDecks: Record<string, string> = {
     "bwiza-riverside-homes": "/valia-deck/projects/bwiza-riverside-homes.html",
