@@ -8,14 +8,14 @@
  * @property {string} id
  * @property {string} name
  * @property {string} developer
- * @property {string=} owner
+ * @property {string|null=} owner
  * @property {string=} category
  * @property {string|null=} district
  * @property {string|null=} city
  * @property {string|null=} sector
  * @property {string|null=} cell
  * @property {string=} status
- * @property {string=} route
+ * @property {string|null=} route
  * @property {string=} parcelUpi
  */
 
