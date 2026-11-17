@@ -2447,6 +2447,21 @@ export function MapExperience() {
             category={selectedProject.category}
             sourceUrl={selectedProject.sourceUrl}
             completion={selectedProject.completion}
+            owner={selectedProject.owner}
+            cell={selectedProject.cell ?? null}
+            landHa={selectedProject.landHa}
+            landLabel={selectedProject.landLabel ?? null}
+            unitsLabel={selectedProject.unitsLabel ?? null}
+            start={selectedProject.start}
+            route={selectedProject.route}
+            parcelUpi={selectedProject.parcelUpi}
+            latitude={selectedProject.latitude}
+            longitude={selectedProject.longitude}
+            imageUrl={selectedProject.imageUrl}
+            locationPrecision={selectedProject.locationPrecision}
+            secondarySourceUrl={selectedProject.secondarySourceUrl ?? null}
+            thirdSourceUrl={selectedProject.thirdSourceUrl ?? null}
+            latestStatusSourceUrl={selectedProject.latestStatusSourceUrl ?? null}
             onClose={() => setSelectedProjectId(null)}
           />
         ) : null}
