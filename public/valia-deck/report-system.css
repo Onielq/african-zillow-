@@ -1,0 +1,41 @@
+/* Taiseel Project Report System
+   Shared design foundation for every project study.
+   Project-specific layouts may add components, but must use these tokens and page rules.
+*/
+:root {
+  --report-navy: #13213b;
+  --report-navy-deep: #182946;
+  --report-navy-mid: #1c3355;
+  --report-gold: #d8be86;
+  --report-gold-deep: #b5893a;
+  --report-paper: #ffffff;
+  --report-cream: #f5f2ea;
+  --report-ink: #16232f;
+  --report-muted: #596674;
+  --report-line: #e4e2dc;
+  --report-font-display: "Playfair", Georgia, serif;
+  --report-font-body: "Inter", Arial, sans-serif;
+  --report-page-width: 1280px;
+  --report-page-height: 720px;
+}
+html { background: #eef0f2; }
+body { color: var(--report-ink); font-family: var(--report-font-body); }
+.page {
+  width: var(--report-page-width);
+  height: var(--report-page-height);
+  position: relative;
+  overflow: hidden;
+  background: var(--report-paper);
+  break-after: page;
+  page-break-after: always;
+}
+.page:last-child { break-after: auto; page-break-after: auto; }
+h1, h2, h3 { font-family: var(--report-font-display); color: var(--report-navy); }
+a { color: var(--report-navy-mid); }
+a:focus-visible { outline: 2px solid var(--report-gold-deep); outline-offset: 3px; }
+table { border-collapse: collapse; }
+@page { size: 1280px 720px; margin: 0; }
+@media print {
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  .page { margin: 0 !important; box-shadow: none !important; }
+}
