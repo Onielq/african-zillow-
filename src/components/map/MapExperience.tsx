@@ -1929,9 +1929,9 @@ export function MapExperience() {
                       );
                       if (looksLikeAddress && addressResult) {
                         selectGlobalSearchResult(addressResult);
-                      } else if (looksLikeAddress || globalSearchResults.length === 0) {
+                      } else if (looksLikeAddress || (globalSearchResults.length === 0 && !isFullUpi)) {
                         void searchGlobalAddress(query);
-                      } else {
+                      } else if (globalSearchResults.length > 0) {
                         selectGlobalSearchResult(globalSearchResults[0]);
                       }
                     }
@@ -2016,7 +2016,9 @@ export function MapExperience() {
                   ) : (
                     <p className="global-area-search-message">
                       {globalSearchStatus === "ready"
-                        ? "No matching area. Press Enter to search this as an address."
+                        ? (/^\d{1,2}(?:[\/.\-\s]\d{1,2}){3}[\/.\-\s]\d{1,7}$/.test(globalSearch.trim())
+                          ? "No matching parcel UPI was found in the connected cadastral sources."
+                          : "No matching area. Press Enter to search this as an address.")
                         : "No matching place found. Try a shorter name or paste the full UPI."}
                     </p>
                   )}

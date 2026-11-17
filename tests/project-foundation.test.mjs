@@ -1293,3 +1293,25 @@ test("project selection opens the five-page study in a draggable, resizable and 
   assert.match(cover, /class="stat-label">Phase I completion<\/div>/);
   assert.match(cover, /class="label">STARTING FROM<\/div>/);
 });
+
+test("full UPI search uses exact cadastral lookup and does not fall through to address geocoding", async () => {
+  const route = await readProjectFile("src/app/api/geography/areas/search/route.ts");
+  const experience = await readProjectFile("src/components/map/MapExperience.tsx");
+
+  assert.match(route, /function canonicalFullUpi\(value: string\): string \| null/);
+  assert.match(route, /normalized\.split\(\/\[/);
+  assert.match(route, /return parts\.length === 5 \? parts\.join\("\/"\) : null/);
+  assert.match(route, /if \(fullUpiQuery\) \{[\s\S]*?searchParcels\(source\.id, source\.parcelUrl, fullUpiQuery\)/);
+  assert.match(route, /exact UPI search is incomplete because one or more cadastral sources are unavailable/);
+  assert.match(route, /No matching parcel UPI was found in the connected Kigali and Bugesera pilot cadastral layers/);
+  assert.match(route, /conditions\.push\(upiField \+ " = '" \+ upiLookup \+ "'"\)/);
+
+  const exactLookup = route.slice(
+    route.indexOf("if (fullUpiQuery) {"),
+    route.indexOf("const hierarchyPathTokens = query")
+  );
+  assert.doesNotMatch(exactLookup, /searchLayer\(/);
+  assert.doesNotMatch(exactLookup, /ADMIN_MAP_SOURCES/);
+  assert.match(experience, /globalSearchResults\.length === 0 && !isFullUpi/);
+  assert.match(experience, /No matching parcel UPI was found in the connected cadastral sources/);
+});

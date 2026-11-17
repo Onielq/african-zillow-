@@ -725,8 +725,12 @@ async function searchAddresses(query: string): Promise<SearchAddress[]> {
 }
 
 function canonicalFullUpi(value: string): string | null {
-  const normalized = value.trim().replace(/\s*[/.-]\s*/g, "/");
-  return /^\d{1,2}(?:\/\d{1,2}){3}\/\d{1,7}$/.test(normalized) ? normalized : null;
+  const normalized = value.trim();
+  if (!/^\d{1,2}(?:[\/.\-\s]+\d{1,2}){3}[\/.\-\s]+\d{1,7}$/.test(normalized)) {
+    return null;
+  }
+  const parts = normalized.split(/[\/.\-\s]+/).filter(Boolean);
+  return parts.length === 5 ? parts.join("/") : null;
 }
 
 async function searchParcels(source: SourceId, layerUrl: string, query: string): Promise<SearchArea[]> {
@@ -744,10 +748,9 @@ async function searchParcels(source: SourceId, layerUrl: string, query: string):
   if (upiField) {
     const upiLookup = (fullUpi ?? normalizedQuery).replace(/'/g, "''");
     if (fullUpi) {
-      // Treat the complete five-part UPI as one parcel identity. Do not query
-      // the final segment as a parcel number, because parcel numbers can repeat by location.
+      // A full UPI is a complete parcel identity. Use exact matching only;
+      // parcel numbers can repeat across locations and must not be used as a fallback.
       conditions.push(upiField + " = '" + upiLookup + "'");
-      conditions.push(upiField + " LIKE '%" + upiLookup + "%'");
     } else {
       conditions.push(upiField + " LIKE '%" + escapedQuery + "%'");
     }
@@ -988,6 +991,64 @@ export async function GET(request: NextRequest) {
     { id: "kigali" as const, baseUrl: KIGALI_MAP_SERVER, parcelUrl: KIGALI_PARCELS, layers: { district: 4, sector: 5, cell: 6, village: 7 } },
     { id: "bugesera" as const, baseUrl: BUGESERA_MAP_SERVER, parcelUrl: BUGESERA_PARCELS, layers: { district: 2, sector: 4, cell: 3, village: 5 } }
   ];
+
+  // Full UPIs are parcel identities, not administrative place names. Query
+  // both cadastral sources directly so an unrelated boundary-layer outage
+  // cannot turn a valid parcel match into a failed search.
+  if (fullUpiQuery) {
+    const parcelLookups = await Promise.all(sources.map(async (source) => {
+      try {
+        return {
+          source: source.id,
+          areas: await searchParcels(source.id, source.parcelUrl, fullUpiQuery),
+          failed: false
+        };
+      } catch (error) {
+        console.error("Exact parcel UPI search failed for " + source.id + ".", error);
+        return { source: source.id, areas: [] as SearchArea[], failed: true };
+      }
+    }));
+    const unavailableSources = parcelLookups.filter((lookup) => lookup.failed).map((lookup) => lookup.source);
+    const exactAreasByUpi = new Map<string, SearchArea>();
+    for (const lookup of parcelLookups) {
+      for (const area of lookup.areas) {
+        if (area.level !== "parcel" || normalizeKey(area.upi ?? "") !== normalizeKey(fullUpiQuery)) continue;
+        exactAreasByUpi.set(normalizeKey(area.upi ?? ""), area);
+      }
+    }
+    const exactAreas = Array.from(exactAreasByUpi.values());
+
+    // A negative result is not trustworthy while either source is unavailable.
+    if (exactAreas.length === 0 && unavailableSources.length > 0) {
+      return NextResponse.json({
+        error: "The exact UPI search is incomplete because one or more cadastral sources are unavailable.",
+        searched: fullUpiQuery,
+        unavailableSources
+      }, {
+        status: 502,
+        headers: { "Cache-Control": "no-store" }
+      });
+    }
+
+    return NextResponse.json({
+      areas: exactAreas,
+      searched: fullUpiQuery,
+      message: exactAreas.length === 0
+        ? "No matching parcel UPI was found in the connected Kigali and Bugesera pilot cadastral layers."
+        : undefined,
+      warning: unavailableSources.length > 0
+        ? "The parcel was found, but one other pilot cadastral source was unavailable during this lookup."
+        : undefined
+    }, {
+      headers: {
+        "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=1800",
+        "X-Data-Source": "City of Kigali Master Plan cadastral parcels; National Land Authority LAIS Bugesera cadastral parcels",
+        ...(unavailableSources.length > 0
+          ? { "X-Parcel-Provider-Warning": "Unavailable source(s): " + unavailableSources.join(", ") }
+          : {})
+      }
+    });
+  }
 
   // Public geocoding is explicit on submit, not called on every autocomplete
   // keystroke. This respects shared geocoder capacity and avoids noisy traffic.
