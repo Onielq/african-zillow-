@@ -1,5 +1,5 @@
 {
-  "standardVersion": 3,
+  "standardVersion": 4,
   "referenceProject": "bwiza-riverside-homes",
   "pageSize": {
     "width": 1280,
@@ -107,5 +107,77 @@
     "For district or sector precision, display an administrative-area search map labelled area context only; never style it as an exact parcel or entrance pin.",
     "Show missing unit/space mix, prices, payment terms, booking, height, occupancy and current availability as not published, not verified or not established.",
     "Never add nearby facilities or comparables to the fallback unless those names and evidence are attached to that project record."
-  ]
+  ],
+  "reportContract": {
+    "pageAttribute": "data-report-page",
+    "assetTypeAttribute": "data-report-type",
+    "assetTypes": [
+      "residential",
+      "commercial",
+      "mixed-use",
+      "unknown"
+    ],
+    "pageSequence": [
+      {
+        "number": 1,
+        "key": "profile",
+        "title": "Project Profile",
+        "footer": "01 / PROJECT PROFILE"
+      },
+      {
+        "number": 2,
+        "key": "scope",
+        "title": "Project Scope & Products",
+        "footer": "02 / PROJECT SCOPE & PRODUCTS"
+      },
+      {
+        "number": 3,
+        "key": "delivery",
+        "title": "Development & Delivery",
+        "footer": "03 / DEVELOPMENT & DELIVERY"
+      },
+      {
+        "number": 4,
+        "key": "market",
+        "title": "Price & Market Intelligence",
+        "footer": "04 / PRICE & MARKET INTELLIGENCE"
+      },
+      {
+        "number": 5,
+        "key": "location",
+        "title": "Location & Verification",
+        "footer": "05 / LOCATION & VERIFICATION"
+      }
+    ],
+    "pageRules": [
+      "Every dedicated report has exactly five pages, in pageSequence order.",
+      "Every page declares one of the four assetTypes in data-report-type.",
+      "All reports load report-system.css; project files supply facts, evidence and imagery only.",
+      "Page-specific headlines may be descriptive, but the section label and page number stay canonical.",
+      "The generic fallback derives asset type from the project category and labels mixed-use projects as both residential and commercial."
+    ]
+  },
+  "languageStandard": {
+    "evidenceLabels": [
+      "Developer-reported",
+      "Government-reported",
+      "Independently verified",
+      "Taiseel-calculated",
+      "Not published",
+      "Not established",
+      "Availability unverified",
+      "Historical plan only",
+      "Map context only"
+    ],
+    "rules": [
+      "Use 'space' or the named commercial use for offices, shops, retail, dining and other commercial areas; do not describe them as bedrooms.",
+      "Use 'bedrooms' only for residential product schedules.",
+      "Use 'room count' for hotels and serviced accommodation where the source reports rooms.",
+      "Keep marketing statements, government records, independent verification and Taiseel calculations visibly distinct.",
+      "Use 'not published' when no source publishes a fact; use 'not established' when available sources do not resolve it.",
+      "Use 'availability unverified' unless current inventory is confirmed by a responsible seller or operator.",
+      "For rent, show currency, per-square-metre basis and billing period; never compare rent with sale price as if they were the same measure.",
+      "For calculated values, show the source inputs, formula and date; do not present an estimate as a transaction or formal valuation."
+    ]
+  }
 }
