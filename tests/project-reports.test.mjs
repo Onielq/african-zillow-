@@ -139,3 +139,16 @@ test("the report-standard manifest defines canonical asset types and evidence la
   assert.ok(standard.languageStandard.evidenceLabels.includes("Availability unverified"));
   assert.ok(standard.languageStandard.rules.some((rule) => /bedrooms/i.test(rule) && /commercial/i.test(rule)));
 });
+
+
+test("the living report style guide documents shared design and asset-specific language", async () => {
+  const guide = await readProjectFile("public/valia-deck/report-styleguide.html");
+
+  for (const section of ["tokens", "type", "evidence", "products", "markets", "location", "language"]) {
+    assert.ok(guide.includes('id="' + section + '"'), "style guide is missing section: " + section);
+  }
+  assert.ok(guide.includes("Commercial"));
+  assert.ok(guide.includes("bedroom counts for office towers"));
+  assert.ok(guide.includes("City Jewels"));
+  assert.ok(guide.includes("Monthly rent"));
+});
