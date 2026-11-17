@@ -1302,7 +1302,7 @@ test("full UPI search uses exact cadastral lookup and does not fall through to a
   assert.match(route, /normalized\.split\(\/\[/);
   assert.match(route, /return parts\.length === 5 \? parts\.join\("\/"\) : null/);
   assert.match(route, /if \(fullUpiQuery\) \{[\s\S]*?searchParcels\(source\.id, source\.parcelUrl, fullUpiQuery\)/);
-  assert.match(route, /Exact UPI search is incomplete because one or more cadastral sources are unavailable/);
+  assert.match(route, /exact UPI search is incomplete because one or more cadastral sources are unavailable/);
   assert.match(route, /No matching parcel UPI was found in the connected Kigali and Bugesera pilot cadastral layers/);
   assert.match(route, /conditions\.push\(upiField \+ " = '" \+ upiLookup \+ "'"\)/);
 
