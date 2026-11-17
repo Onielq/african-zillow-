@@ -1312,6 +1312,9 @@ test("full UPI search uses exact cadastral lookup and does not fall through to a
   );
   assert.doesNotMatch(exactLookup, /searchLayer\(/);
   assert.doesNotMatch(exactLookup, /ADMIN_MAP_SOURCES/);
+  assert.match(experience, /function isFullUpiQuery\(value: string\): boolean/);
+  assert.match(experience, /isFullUpiQuery\(query\)/);
+  assert.match(experience, /isFullUpiQuery\(globalSearch\)/);
   assert.match(experience, /globalSearchResults\.length === 0 && !isFullUpi/);
   assert.match(experience, /No matching parcel UPI was found in the connected cadastral sources/);
 });
