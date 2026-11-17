@@ -61,3 +61,24 @@ flowchart TD
 - A source record count is not evidence that the geographic coverage is complete.
 - Keep provider credentials in secret stores; never hard-code secrets or place them in browser-visible variables unless they are explicitly designed to be public.
 - Keep the Vercel and Cloudflare deploy workflows independently verifiable.
+
+
+## Project discovery and report path
+
+The project directory is a separate discovery surface over `RWANDA_PROJECT_RECORDS`. It filters the current project register locally with the weighted, multi-field matcher in `src/lib/project-search.js`. Search can rank project name, internal ID, parcel UPI, developer, administrative location, category, owner, status and route; it returns the original records and does not generate project facts.
+
+Project reports follow this evidence path:
+
+```text
+Project register + source references
+        ↓
+Project-specific report facts and calculations
+        ↓
+Canonical five-page report sequence
+        ↓
+Shared report stylesheet + residential/commercial presentation
+```
+
+The five page keys are `profile`, `scope`, `delivery`, `market` and `location`. The asset profile controls terminology and comparisons: residential reports use homes and bedrooms; commercial reports use spaces, suites, uses and floor areas. Prices must retain currency, area basis, period, source and observation date. A common report shell must never imply that two project records share facts, images, pricing or availability.
+
+See `public/valia-deck/report-standard.json` for the current report contract and `docs/ZILLOW_PATTERN_ADAPTATION.md` for the reviewed open-source patterns and explicit non-adoptions.
