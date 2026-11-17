@@ -90,7 +90,9 @@
     "Every important claim needs a project-specific source and, where relevant, an as-of date.",
     "City Jewels must be real named buildings, developments or civic/business anchors relevant to the project location; distinguish them from direct price comparables.",
     "Keep the five page slots and order identical across all reports.",
-    "Project facts and sources remain separate; never copy one project's facts into another."
+    "Project facts and sources remain separate; never copy one project's facts into another.",
+    "Describe neighbourhoods through verifiable physical facts such as access, services, transport, planning and amenities; do not infer who belongs in an area.",
+    "Treat subjective phrases such as safe, family-friendly, exclusive or best neighbourhood as attributed opinion unless supported by a relevant, clearly described dataset."
   ],
   "visualRules": [
     "Every project study uses five pages in the same order: Project Profile; Project Scope & Products; Development & Delivery; Price & Market Intelligence; Location & Verification.",
@@ -177,7 +179,9 @@
       "Use 'not published' when no source publishes a fact; use 'not established' when available sources do not resolve it.",
       "Use 'availability unverified' unless current inventory is confirmed by a responsible seller or operator.",
       "For rent, show currency, per-square-metre basis and billing period; never compare rent with sale price as if they were the same measure.",
-      "For calculated values, show the source inputs, formula and date; do not present an estimate as a transaction or formal valuation."
+      "For calculated values, show the source inputs, formula and date; do not present an estimate as a transaction or formal valuation.",
+      "Describe neighbourhoods through verifiable physical facts such as access, services, transport, planning and amenities; do not infer who belongs in an area.",
+      "Treat subjective phrases such as safe, family-friendly, exclusive or best neighbourhood as attributed opinion unless supported by a relevant, clearly described dataset."
     ]
   }
 }
