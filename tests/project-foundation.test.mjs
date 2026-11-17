@@ -1374,6 +1374,36 @@ test("the project research register contains unique identifiers", async () => {
   assert.equal(ids.filter((id) => id === "masaka-views-eco-estate").length, 1);
 });
 
+test("the generic project fallback uses source-aware image and map precision", async () => {
+  const profile = await readProjectFile("public/valia-deck/projects/project-profile.html");
+  const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
+  const mapExperience = await readProjectFile("src/components/map/MapExperience.tsx");
+  const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
+
+  assert.match(profile, /data-report-page="profile"/);
+  assert.match(profile, /data-report-page="scope"/);
+  assert.match(profile, /data-report-page="delivery"/);
+  assert.match(profile, /data-report-page="market"/);
+  assert.match(profile, /data-report-page="location"/);
+  assert.match(profile, /project image not yet attached/i);
+  assert.match(profile, /const exactPin = hasCoordinates &&/);
+  assert.match(profile, /address-coordinate/);
+  assert.match(profile, /parcel-upi/);
+  assert.match(profile, /Area context only/);
+  assert.match(profile, /safeUrl/);
+  assert.match(profile, /sourceList/);
+
+  for (const field of ["projectId", "owner", "landLabel", "unitsLabel", "parcelUpi", "latitude", "longitude", "imageUrl", "locationPrecision", "secondarySource", "thirdSource", "latestStatusSource"]) {
+    assert.ok(modal.includes(field), "generic report URL must carry " + field);
+  }
+  assert.ok(mapExperience.includes("owner={selectedProject.owner}"));
+  assert.ok(mapExperience.includes("imageUrl={selectedProject.imageUrl}"));
+  assert.ok(mapExperience.includes("latitude={selectedProject.latitude}"));
+  assert.ok(mapExperience.includes("locationPrecision={selectedProject.locationPrecision}"));
+  assert.ok(standard.genericFallbackRules.some((rule) => rule.includes("exact project pin")));
+  assert.ok(standard.genericFallbackRules.some((rule) => rule.includes("administrative-area search map")));
+});
+
 test("all project reports use the shared five-page reporting sequence", async () => {
   const expectedPages = ["profile", "scope", "delivery", "market", "location"];
   const reportPaths = [
@@ -1398,6 +1428,8 @@ test("all project reports use the shared five-page reporting sequence", async ()
   const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
   assert.deepEqual(standard.requiredPages.map((page) => page.key), expectedPages);
   assert.deepEqual(Object.keys(standard.assetProfiles).sort(), ["commercial", "mixedUse", "residential"]);
+  assert.equal(standard.standardVersion, 3);
+  assert.ok(standard.visualRules.length >= 4);
 
   const brilliant = await readProjectFile("public/valia-deck/projects/brilliant-tower.html");
   assert.match(brilliant, /data-report-page="profile" data-report-type="commercial"/);
