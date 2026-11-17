@@ -513,3 +513,304 @@ a:focus-visible { outline: 2px solid var(--report-gold-deep); outline-offset: 3p
   body { overflow-x: auto; }
   main { margin-left: 0; margin-right: 0; }
 }
+
+
+/* Project report system v4: common visual shell across residential and commercial assets.
+   Keep each report's evidence and specialist layouts in its own HTML file. */
+html { min-width: 320px; }
+body { min-width: 320px; }
+main, main.report { width: var(--report-page-width); margin-left: auto; margin-right: auto; }
+.page {
+  width: var(--report-page-width);
+  min-width: var(--report-page-width);
+  height: var(--report-page-height);
+  min-height: var(--report-page-height);
+  position: relative;
+  overflow: hidden;
+  color: var(--report-ink);
+  background: var(--report-paper);
+}
+.page.cover,
+.page.cover:not(.bwiza-cover) {
+  display: grid !important;
+  grid-template-columns: minmax(440px, 42%) minmax(0, 58%) !important;
+  align-items: stretch;
+  background: var(--report-navy) !important;
+}
+.page.cover > .sidebar,
+.page.cover > .side,
+.page.cover:not(.bwiza-cover) > .side,
+.page.cover > .cover-copy {
+  display: flex;
+  flex-direction: column;
+  width: auto !important;
+  min-width: 0;
+  max-width: none;
+  height: 100% !important;
+  min-height: 0;
+  padding: 38px 40px 44px !important;
+  color: #fff;
+  overflow: hidden;
+}
+.page.cover > .hero,
+.page.cover:not(.bwiza-cover) > .hero,
+.page.cover > .cover-image {
+  position: relative;
+  width: auto !important;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  flex: none !important;
+  overflow: hidden;
+  background: #d9dde0;
+}
+.page.cover > .hero img,
+.page.cover > .cover-image img,
+.page.cover > .hero picture,
+.page.cover > .cover-image picture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.page.cover .eyebrow,
+.page.cover .tag {
+  color: var(--report-gold);
+  font: 700 9px/1.4 var(--report-font-body);
+  letter-spacing: 1.5px;
+}
+.page.cover .project-name,
+.page.cover .side h1,
+.page.cover .sidebar h1,
+.page.cover .cover-copy h1 {
+  margin: 18px 0 10px !important;
+  color: #fff !important;
+  font: 600 48px/1.03 var(--report-font-display) !important;
+  letter-spacing: -.35px;
+  overflow-wrap: anywhere;
+}
+.page.cover .locality,
+.page.cover .place,
+.page.cover .cover-address {
+  color: #e4eaf1;
+  font: 700 10px/1.45 var(--report-font-body);
+  letter-spacing: .8px;
+}
+.page.cover .plot,
+.page.cover .cover-subtitle,
+.page.cover .desc {
+  color: #d5deea;
+  font: italic 14px/1.45 var(--report-font-display);
+}
+.page.cover .stats,
+.page.cover .cover-facts {
+  margin-top: 20px !important;
+}
+.page.cover .stat,
+.page.cover .cover-fact {
+  border-color: rgba(255,255,255,.2);
+}
+.page.cover .stat b,
+.page.cover .cover-fact b {
+  color: var(--report-gold);
+  font: 600 21px/1.12 var(--report-font-display);
+}
+.page.cover .stat span,
+.page.cover .cover-fact span {
+  color: #d5deea;
+  font: 9px/1.4 var(--report-font-body);
+}
+.page.cover .price,
+.page.cover .cover-status {
+  margin-top: auto;
+  border: 1px solid rgba(216,190,134,.7);
+  background: rgba(255,255,255,.035);
+}
+.page.cover .price b {
+  color: var(--report-gold);
+  font: 600 21px/1.12 var(--report-font-display);
+}
+.page.cover .hero .caption,
+.page.cover .cover-image .caption {
+  position: absolute;
+  z-index: 3;
+  right: 22px;
+  bottom: 42px;
+  left: 22px;
+  color: #fff;
+  font: 9px/1.4 var(--report-font-body);
+  text-shadow: 0 1px 6px rgba(0,0,0,.65);
+}
+.page.content {
+  padding: 36px 44px 48px !important;
+}
+.page.content .head,
+.page.content .page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--report-line);
+}
+.page.content .head h2,
+.page.content .page-head h2 {
+  margin: 4px 0 0 !important;
+  color: var(--report-navy);
+  font: 600 30px/1.1 var(--report-font-display) !important;
+}
+.page.content .head .eyebrow,
+.page.content .page-head .eyebrow {
+  color: var(--report-gold-deep);
+  font: 700 9px/1.35 var(--report-font-body);
+  letter-spacing: 1.45px;
+}
+.page.content .head .tag,
+.page.content .page-head .tag {
+  max-width: 300px;
+  color: var(--report-muted);
+  font: 700 8px/1.4 var(--report-font-body);
+  letter-spacing: .8px;
+  text-align: right;
+}
+.page .headline {
+  color: var(--report-navy);
+  font: 600 30px/1.12 var(--report-font-display);
+}
+.page .subhead {
+  color: var(--report-muted);
+  font: 12px/1.45 var(--report-font-body);
+}
+.page.content .lead {
+  color: var(--report-muted);
+  font: 11px/1.52 var(--report-font-body);
+}
+.page.content h3 {
+  color: var(--report-navy);
+  font: 600 18px/1.18 var(--report-font-display);
+}
+.page.content .panel,
+.page.content .feature,
+.page.content .chip,
+.page.content .report-jewel,
+.page.content .report-map-card,
+.page.content .map-card {
+  border-color: var(--report-line);
+  border-radius: 2px;
+}
+.page.content .panel {
+  padding: 14px 16px;
+  background: var(--report-cream);
+}
+.page.content .table,
+.page.content table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--report-ink);
+  font: 10px/1.35 var(--report-font-body);
+}
+.page.content .table th,
+.page.content table th {
+  padding: 8px 9px;
+  color: #fff;
+  background: var(--report-navy);
+  font: 700 8px/1.35 var(--report-font-body);
+  letter-spacing: .6px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.page.content .table td,
+.page.content table td {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--report-line);
+  vertical-align: top;
+}
+.page.content .table tr:nth-child(even) td,
+.page.content table tbody tr:nth-child(even) td {
+  background: #faf9f6;
+}
+.page .warn {
+  border-left-color: var(--report-gold-deep);
+  color: #4d5964;
+  background: var(--report-warning);
+  font: 9px/1.45 var(--report-font-body);
+}
+.page .footer,
+.page .foot {
+  z-index: 5;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 40px !important;
+  color: #87909b;
+  background: rgba(255,255,255,.96);
+  border-top: 1px solid var(--report-line);
+  font: 8px/1.25 var(--report-font-body) !important;
+  letter-spacing: .4px;
+}
+.page.cover .footer,
+.page.cover .foot {
+  color: #d5deea;
+  background: rgba(19,33,59,.94);
+  border-color: rgba(255,255,255,.18);
+}
+.page .report-map-grid,
+.page .map-grid,
+.page.content .map-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+.page .report-map-card,
+.page .map-card {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--report-line);
+  background: #fff;
+}
+.page .report-map-label,
+.page .map-label {
+  color: var(--report-navy);
+  font: 700 9px/1.35 var(--report-font-body);
+  letter-spacing: .65px;
+  text-transform: uppercase;
+}
+.page .report-map-card .mapbox,
+.page .map-card .mapbox {
+  height: 162px;
+}
+.page .report-access-grid,
+.page .access-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 7px;
+}
+.page .report-access-item,
+.page .access-item {
+  min-width: 0;
+  padding: 8px 9px;
+  color: var(--report-muted);
+  background: var(--report-cream);
+  font: 9px/1.4 var(--report-font-body);
+}
+.page .report-access-item b,
+.page .access-item b {
+  color: var(--report-navy);
+  font-size: 10px;
+}
+.page .source-list a,
+.page .source-strip a,
+.page a.source-link {
+  color: var(--report-navy-mid);
+  font: 9px/1.4 var(--report-font-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.page .source-note,
+.page .small {
+  color: #77818c;
+  font: 9px/1.4 var(--report-font-body);
+}
+@media screen and (max-width: 1280px) {
+  html, body { overflow-x: auto; }
+  main, main.report { margin-left: 0; margin-right: 0; }
+}
