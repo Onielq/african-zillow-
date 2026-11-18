@@ -100,6 +100,62 @@ export function createRejaReadOnlyDatabase() {
   });
 }
 
+type RejaReadOnlyRoleRow = {
+  is_superuser: boolean;
+  bypasses_row_security: boolean;
+  can_create_roles: boolean;
+  can_create_databases: boolean;
+  can_create_objects: boolean;
+  can_write: boolean;
+};
+
+/**
+ * Refuses public listing reads when the configured role can bypass RLS,
+ * create database objects, administer roles/databases, or write REJA records.
+ */
+export async function verifyRejaReadOnlyRole(
+  database: NonNullable<ReturnType<typeof createRejaReadOnlyDatabase>>
+): Promise<boolean> {
+  const rows = await database`
+    SELECT
+      role.rolsuper AS is_superuser,
+      role.rolbypassrls AS bypasses_row_security,
+      role.rolcreaterole AS can_create_roles,
+      role.rolcreatedb AS can_create_databases,
+      has_database_privilege(current_user, current_database(), 'CREATE')
+        AS can_create_objects,
+      EXISTS (
+        SELECT 1
+        FROM pg_class relation
+        JOIN pg_namespace schema ON schema.oid = relation.relnamespace
+        WHERE schema.nspname = 'reja'
+          AND relation.relkind IN ('r','p','v','m','f')
+          AND (
+            has_table_privilege(current_user, relation.oid, 'INSERT')
+            OR has_table_privilege(current_user, relation.oid, 'UPDATE')
+            OR has_table_privilege(current_user, relation.oid, 'DELETE')
+            OR has_table_privilege(current_user, relation.oid, 'TRUNCATE')
+            OR has_table_privilege(current_user, relation.oid, 'REFERENCES')
+            OR has_table_privilege(current_user, relation.oid, 'TRIGGER')
+          )
+      ) AS can_write
+    FROM pg_roles role
+    WHERE role.rolname = current_user
+    LIMIT 1
+  `;
+
+  const row = rows[0] as RejaReadOnlyRoleRow | undefined;
+  return Boolean(
+    row &&
+    !row.is_superuser &&
+    !row.bypasses_row_security &&
+    !row.can_create_roles &&
+    !row.can_create_databases &&
+    !row.can_create_objects &&
+    !row.can_write
+  );
+}
+
 export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth> {
   const connectionString = process.env.APP_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 
