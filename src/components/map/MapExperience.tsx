@@ -80,14 +80,9 @@ const PROPERTY_FILTER_OPTIONS = [
 
 const ZONING_FILTER_OPTIONS = [
   { value: "R1", label: "R1 · Residential" },
-  { value: "R1A", label: "R1A · Residential" },
-  { value: "R2", label: "R2 · Residential" },
-  { value: "R3", label: "R3 · Residential" },
-  { value: "R4", label: "R4 · Residential" },
   { value: "C", label: "C · Commercial" },
   { value: "A", label: "A · Agriculture" },
-  { value: "MIXED_USE", label: "Mixed-use" },
-  { value: "INDUSTRIAL", label: "Industrial" }
+  { value: "MIXED_USE", label: "Mixed-use" }
 ] as const;
 
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
