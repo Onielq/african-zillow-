@@ -4,10 +4,10 @@
 
 The existing primary map toolbar remains intact. The Filters trigger is icon-only. Opening it reveals a second, bordered navigation row directly below the Developers / Projects / Metrics / Show controls.
 
-The row contains six separate filter cells. Each cell opens its own popover. Selected values are reflected in the cell label, and **Reset all** appears after any filter state changes.
+The row contains six separate filter cells. Each cell opens its own popover. Selected values are reflected in the cell label; the icon-only Filters trigger gains a small numeric count, and **Reset all** appears after any filter state changes.
 
 - **Sale / Rent:** Any status, For sale, For rent, Sold out. Sold out remains a historical market status; it is not proof of a registered transfer.
-- **Price:** List price and Monthly payment are visible side by side. Each has its own dual-handle minimum/maximum slider and editable numeric bounds. RWF/USD selection applies to both, with limits of RWF 0–1 trillion and USD 0–100 million. Both price-distribution panels remain honest empty states until verified observations exist.
+- **Price:** List price and Monthly payment are visible side by side. Each has its own dual-handle minimum/maximum slider and editable numeric bounds. The two ranges are independent; setting or clearing one does not change the other. RWF/USD selection applies to both, with limits of RWF 0–1 trillion and USD 0–100 million. Both price-distribution panels remain honest empty states until verified observations exist.
 - **Property type:** Any, Houses, Townhouse, Multifamily, Condos, Land, Lots & Land, Apartment, Manufactured and Mixed Use. Each choice uses a Lucide icon.
 - **Zoning:** Searchable, grouped codes; All zoning; an information panel; selected-code descriptions; and links to the official plan sources.
 - **Measurement:** Plot area and Interior area are separate bases. Switching bases clears the previous numeric range so plot area cannot silently be reused as floor area. Quick search bands (0–300, 300–500, 500–700, 700–800 and 800+ m²) retain editable minimum/maximum inputs.
