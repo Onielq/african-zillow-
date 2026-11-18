@@ -2588,7 +2588,7 @@ export function MapExperience() {
                     className="map-filter-popover map-filter-popover-zoning"
                   >
                     <div className="map-filter-popover-heading">
-                      <div><strong>Zoning classifications</strong><small>Codes found in connected district-plan legends</small></div>
+                      <div><strong>Zoning classifications</strong><small>Codes verified in published district-plan legends</small></div>
                       <button aria-label="Zoning information" aria-expanded={zoningInfoOpen} className="map-filter-icon-button" onClick={() => setZoningInfoOpen((open) => !open)} type="button"><Info size={17} /></button>
                     </div>
                     <div className="map-filter-zoning-toolbar">
@@ -2604,7 +2604,7 @@ export function MapExperience() {
                     {zoningInfoOpen ? (
                       <div className="map-filter-info-panel">
                         <strong>How zoning works</strong>
-                        <p>Each District Land Use Plan defines which codes apply locally. This catalogue combines codes found in the connected Kigali, Bugesera and Gakenke plan legends; it does not mean every code is available in every district.</p>
+                        <p>Each District Land Use Plan defines which codes apply locally. This catalogue combines codes found in published Kigali, Bugesera and Gakenke plan legends; it does not mean every code is available in every district.</p>
                         <p>Some codes, including A3 and A4, were not found in the plan legends checked, so they are not added as assumptions.</p>
                       </div>
                     ) : null}
