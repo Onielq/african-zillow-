@@ -2478,6 +2478,9 @@ export function MapExperience() {
               type="button"
             >
               <SlidersHorizontal aria-hidden="true" size={18} strokeWidth={1.9} />
+              {activeFilterCount > 0 ? (
+                <span className="toolbar-filter-count" aria-hidden="true">{activeFilterCount}</span>
+              ) : null}
             </button>
             <button
               aria-label="Sources and map information"
