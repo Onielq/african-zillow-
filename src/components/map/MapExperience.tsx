@@ -90,7 +90,7 @@ const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: Lucid
 ];
 
 /**
- * Union of zoning codes found in the connected Kigali, Bugesera and Gakenke
+ * Union of zoning codes found in published Kigali, Bugesera and Gakenke
  * plan legends. A district's own plan remains authoritative; this is a
  * searchable catalogue, not a claim that every code applies in every district.
  */
@@ -100,10 +100,10 @@ const ZONING_FILTER_GROUPS = [
   { label: "Agriculture", codes: ["A1", "A2"] },
   { label: "Industrial & mining", codes: ["I1", "I2", "I3"] },
   { label: "Public facilities", codes: ["PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6"] },
-  { label: "Buffers", codes: ["B1", "B2", "B3", "B4", "WB"] },
+  { label: "Buffers", codes: ["B", "B1", "B2", "B3", "B4", "WB"] },
   { label: "Parks, forests & ecology", codes: ["ET", "F1", "F2", "F3", "F4", "F5", "F6", "P1", "P2", "P3B", "P3C"] },
   { label: "Transport & utilities", codes: ["T", "T1", "T2", "T3", "T4", "U", "UE"] },
-  { label: "Wetlands & water", codes: ["W1A", "W1B", "W2", "W3", "W4", "W5"] }
+  { label: "Wetlands & water", codes: ["W1", "W1A", "W1B", "W2", "W3", "W4", "W5"] }
 ] as const;
 
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
@@ -2595,6 +2595,12 @@ export function MapExperience() {
                       <button aria-pressed={mapFilters.zoningCodes.length === 0} className={mapFilters.zoningCodes.length === 0 ? "map-filter-all-zones map-filter-all-zones-active" : "map-filter-all-zones"} onClick={() => setMapFilters((current) => ({ ...current, zoningCodes: [] }))} type="button">All zoning</button>
                       <span>{mapFilters.zoningCodes.length ? mapFilters.zoningCodes.length + " selected" : "No zoning restriction"}</span>
                     </div>
+                    {selectedZoneCodes.length > 0 ? (
+                      <div className="map-filter-selected-zone-summary">
+                        <div><span>Selected zone</span><strong>{selectedZoneCodes.join(", ")}</strong></div>
+                        <div><span>Typical plot measurement</span><strong>See local Edition 2 rules</strong></div>
+                      </div>
+                    ) : null}
                     {zoningInfoOpen ? (
                       <div className="map-filter-info-panel">
                         <strong>How zoning works</strong>
@@ -2618,15 +2624,11 @@ export function MapExperience() {
                         </div>
                       </section>
                     ))}
-                    {selectedZoneCodes.length > 0 ? (
-                      <div className="map-filter-zone-guidance">
-                        <div><span>Selected zoning</span><strong>{selectedZoneCodes.join(", ")}</strong></div>
-                        <div className="map-filter-zone-rule"><span>Typical plot measurement</span><strong>Plan-specific standard not loaded</strong></div>
-                        <p>Plot-size standards depend on the district plan, development type and building use. Current Edition 2 regulation values must be loaded before a legal measurement range can be displayed.</p>
-                      </div>
-                    ) : (
-                      <p className="map-filter-note">Choose a code to view its local planning context. Parcel-wide matching is not connected yet.</p>
-                    )}
+                    <p className="map-filter-note">
+                      {selectedZoneCodes.length > 0
+                        ? "Plot-size standards vary by district plan, development type and building use. Taiseel must index the published Edition 2 rules before showing a legal minimum or maximum."
+                        : "Choose a code to view its local planning context. Parcel-wide matching is not connected yet."}
+                    </p>
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Results unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>Parcel-wide zoning index is not connected</small></div>
                       <button disabled={filterResultCount === null} type="button">{filterResultCount === null ? "See results" : "See " + filterResultCount.toLocaleString() + " results"}</button>
