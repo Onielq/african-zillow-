@@ -134,7 +134,7 @@ export async function verifyRejaReadOnlyRole(
       EXISTS (
         SELECT 1
         FROM pg_class c
-        JOIN pg_namespace schema ON n.oid = relation.relnamespace
+        JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'reja'
           AND c.relkind IN ('r','p','v','m','f')
           AND (
