@@ -118,36 +118,36 @@ export async function verifyRejaReadOnlyRole(
 ): Promise<boolean> {
   const rows = await database`
     SELECT
-      role.rolsuper AS is_superuser,
-      role.rolbypassrls AS bypasses_row_security,
-      role.rolcreaterole AS can_create_roles,
-      role.rolcreatedb AS can_create_databases,
+      r.rolsuper AS is_superuser,
+      r.rolbypassrls AS bypasses_row_security,
+      r.rolcreaterole AS can_create_roles,
+      r.rolcreatedb AS can_create_databases,
       (
         has_database_privilege(current_user, current_database(), 'CREATE')
         OR EXISTS (
           SELECT 1
-          FROM pg_namespace schema
-          WHERE schema.nspname = 'reja'
-            AND has_schema_privilege(current_user, schema.oid, 'CREATE')
+          FROM pg_namespace n
+          WHERE n.nspname = 'reja'
+            AND has_schema_privilege(current_user, n.oid, 'CREATE')
         )
       ) AS can_create_objects,
       EXISTS (
         SELECT 1
-        FROM pg_class relation
-        JOIN pg_namespace schema ON schema.oid = relation.relnamespace
-        WHERE schema.nspname = 'reja'
-          AND relation.relkind IN ('r','p','v','m','f')
+        FROM pg_class c
+        JOIN pg_namespace schema ON n.oid = relation.relnamespace
+        WHERE n.nspname = 'reja'
+          AND c.relkind IN ('r','p','v','m','f')
           AND (
-            has_table_privilege(current_user, relation.oid, 'INSERT')
-            OR has_table_privilege(current_user, relation.oid, 'UPDATE')
-            OR has_table_privilege(current_user, relation.oid, 'DELETE')
-            OR has_table_privilege(current_user, relation.oid, 'TRUNCATE')
-            OR has_table_privilege(current_user, relation.oid, 'REFERENCES')
-            OR has_table_privilege(current_user, relation.oid, 'TRIGGER')
+            has_table_privilege(current_user, c.oid, 'INSERT')
+            OR has_table_privilege(current_user, c.oid, 'UPDATE')
+            OR has_table_privilege(current_user, c.oid, 'DELETE')
+            OR has_table_privilege(current_user, c.oid, 'TRUNCATE')
+            OR has_table_privilege(current_user, c.oid, 'REFERENCES')
+            OR has_table_privilege(current_user, c.oid, 'TRIGGER')
           )
       ) AS can_write
-    FROM pg_roles role
-    WHERE role.rolname = current_user
+    FROM pg_roles r
+    WHERE r.rolname = current_user
     LIMIT 1
   `;
 
