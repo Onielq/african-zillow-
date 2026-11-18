@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRejaReadOnlyDatabase } from "@/lib/reja-database";
+import {
+  createRejaReadOnlyDatabase,
+  verifyRejaReadOnlyRole
+} from "@/lib/reja-database";
 import {
   buildMarketListingHistory,
   sourceListingStatusLabel
@@ -37,6 +40,13 @@ export async function GET(
   }
 
   try {
+    if (!(await verifyRejaReadOnlyRole(database))) {
+      return unavailable(
+        "LISTING_READ_ROLE_UNSAFE",
+        "The listing API requires a non-privileged read-only database role."
+      );
+    }
+
     const listings = await database`
       SELECT
         l.id::text AS id,
