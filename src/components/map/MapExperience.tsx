@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -790,6 +791,67 @@ function getAreaParent(area: SelectedArea): string | null {
   }
 }
 
+
+type FilterPopoverPortalProps = {
+  anchorRef: { current: HTMLButtonElement | null };
+  popoverRef: { current: HTMLDivElement | null };
+  ariaLabel: string;
+  className: string;
+  children: ReactNode;
+};
+
+function FilterPopoverPortal({
+  anchorRef,
+  popoverRef,
+  ariaLabel,
+  className,
+  children
+}: FilterPopoverPortalProps) {
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      const bounds = anchor.getBoundingClientRect();
+      const preferredWidth = className.includes("zoning") ? 326 : 292;
+      const popoverWidth = Math.min(preferredWidth, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(bounds.left, window.innerWidth - popoverWidth - 16));
+      const expectedHeight = popoverRef.current?.offsetHeight ?? 260;
+      const roomBelow = window.innerHeight - bounds.bottom - 16;
+      const top = roomBelow >= expectedHeight
+        ? bounds.bottom + 8
+        : Math.max(12, bounds.top - expectedHeight - 8);
+
+      setPosition({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, className, popoverRef]);
+
+  if (!position || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      aria-label={ariaLabel}
+      className={className}
+      ref={popoverRef}
+      role="dialog"
+      style={position}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
@@ -835,6 +897,9 @@ export function MapExperience() {
     bathroomsMin: ""
   });
   const filterSubnavRef = useRef<HTMLDivElement>(null);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const activeFilterAnchorRef = useRef<HTMLButtonElement>(null);
   const closeFilterMenus = useCallback(() => {
     setFiltersOpen(false);
     setActiveFilterMenu(null);
@@ -1761,10 +1826,12 @@ export function MapExperience() {
       // Close the topmost interaction first, leaving the selected map area intact.
       if (activeFilterMenu) {
         setActiveFilterMenu(null);
+        activeFilterAnchorRef.current?.focus();
         return;
       }
       if (filtersOpen) {
         closeFilterMenus();
+        filtersTriggerRef.current?.focus();
         return;
       }
       if (compareOpen) {
@@ -1789,7 +1856,11 @@ export function MapExperience() {
   useEffect(() => {
     if (!filtersOpen || !activeFilterMenu) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !filterSubnavRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !filterSubnavRef.current?.contains(event.target) &&
+        !filterPopoverRef.current?.contains(event.target)
+      ) {
         setActiveFilterMenu(null);
       }
     };
@@ -2178,6 +2249,7 @@ export function MapExperience() {
             </button>
             <button
               aria-label="Filters"
+              ref={filtersTriggerRef}
               aria-controls="map-filter-subnav"
               aria-expanded={filtersOpen}
               title="Filters"
@@ -2231,13 +2303,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "sale"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "sale" || mapFilters.listingType !== "all" ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "sale" ? null : "sale")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "sale" ? null : "sale");
+                  }}
                   type="button"
                 >
                   Sale / Rent <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "sale" ? (
-                  <div aria-label="Sale or rent" className="map-filter-popover map-filter-popover-sale" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Sale or rent"
+                    className="map-filter-popover map-filter-popover-sale"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Listing type</strong>
                     </div>
@@ -2257,7 +2337,7 @@ export function MapExperience() {
                       </label>
                     ))}
                     <p className="map-filter-note">This selection is staged until an authorized listing feed is connected.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
 
@@ -2266,13 +2346,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "price"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "price" || mapFilters.priceMin || mapFilters.priceMax ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "price" ? null : "price")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "price" ? null : "price");
+                  }}
                   type="button"
                 >
                   Price <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "price" ? (
-                  <div aria-label="Price range" className="map-filter-popover" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Price range"
+                    className="map-filter-popover"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Price range</strong>
                       <select
@@ -2314,7 +2402,7 @@ export function MapExperience() {
                       <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                     ) : null}
                     <p className="map-filter-note">Price means a listing price, not an estimated land value. Live price matching is not connected yet.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
 
@@ -2323,13 +2411,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "property"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "property" || mapFilters.propertyTypes.length > 0 ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "property" ? null : "property")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "property" ? null : "property");
+                  }}
                   type="button"
                 >
                   Property type <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "property" ? (
-                  <div aria-label="Property types" className="map-filter-popover" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Property types"
+                    className="map-filter-popover"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Property type</strong>
                       <span className="map-filter-count">{mapFilters.propertyTypes.length || "All"}</span>
@@ -2345,7 +2441,7 @@ export function MapExperience() {
                       </label>
                     ))}
                     <p className="map-filter-note">Select more than one type. Building inventory is not yet connected to the cadastral map.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
 
@@ -2354,13 +2450,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "zoning"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "zoning" || mapFilters.zoningCodes.length > 0 ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "zoning" ? null : "zoning")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "zoning" ? null : "zoning");
+                  }}
                   type="button"
                 >
                   Zoning <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "zoning" ? (
-                  <div aria-label="Zoning types" className="map-filter-popover map-filter-popover-zoning" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Zoning types"
+                    className="map-filter-popover map-filter-popover-zoning"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Zoning</strong>
                       <span className="map-filter-count">{mapFilters.zoningCodes.length || "All"}</span>
@@ -2378,7 +2482,7 @@ export function MapExperience() {
                       ))}
                     </div>
                     <p className="map-filter-note">R codes denote residential categories, C commercial, and A agriculture. Parcel-wide zoning matching still needs a spatial join.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
 
@@ -2387,13 +2491,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "measurement"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "measurement" || mapFilters.measurementMin || mapFilters.measurementMax ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "measurement" ? null : "measurement")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "measurement" ? null : "measurement");
+                  }}
                   type="button"
                 >
                   Measurement <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "measurement" ? (
-                  <div aria-label="Measurement range" className="map-filter-popover" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Measurement range"
+                    className="map-filter-popover"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Area (m²)</strong>
                     </div>
@@ -2425,7 +2537,7 @@ export function MapExperience() {
                       <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                     ) : null}
                     <p className="map-filter-note">Land uses plot area; houses and apartments use floor area. Parcel-level filtering will be connected next.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
 
@@ -2434,13 +2546,21 @@ export function MapExperience() {
                   aria-expanded={activeFilterMenu === "bedsBaths"}
                   aria-haspopup="dialog"
                   className={activeFilterMenu === "bedsBaths" || mapFilters.bedroomsMin || mapFilters.bathroomsMin ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
-                  onClick={() => setActiveFilterMenu((current) => current === "bedsBaths" ? null : "bedsBaths")}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "bedsBaths" ? null : "bedsBaths");
+                  }}
                   type="button"
                 >
                   Beds / Baths <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "bedsBaths" ? (
-                  <div aria-label="Bedroom and bathroom filters" className="map-filter-popover map-filter-popover-beds" role="dialog">
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Bedroom and bathroom filters"
+                    className="map-filter-popover map-filter-popover-beds"
+                  >
                     <div className="map-filter-popover-heading">
                       <strong>Bedrooms & bathrooms</strong>
                     </div>
@@ -2467,7 +2587,7 @@ export function MapExperience() {
                       </label>
                     </div>
                     <p className="map-filter-note">Bedroom and bathroom matching applies when verified building and unit records are connected.</p>
-                  </div>
+                  </FilterPopoverPortal>
                 ) : null}
               </div>
             </div>
