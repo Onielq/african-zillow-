@@ -4970,34 +4970,3 @@ input {
     transform: none;
   }
 }
-
-
-/* Phase A: compact map-level guidance and honest, data-aware filters. */
-.geographic-level-indicator { position:absolute; z-index:5; top:119px; right:18px; display:grid; gap:7px; min-width:244px; padding:9px 11px 10px; border:1px solid rgb(220 228 222 / 94%); border-radius:12px; background:rgb(255 255 255 / 94%); box-shadow:var(--shadow-floating); backdrop-filter:blur(12px); }
-.geographic-level-caption { color:#7a887f; font-size:8px; font-weight:800; letter-spacing:.09em; }
-.geographic-level-steps { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }
-.geographic-level-step { display:grid; justify-items:center; gap:4px; color:#849188; min-width:0; }
-.geographic-level-step i { display:grid; place-items:center; width:23px; height:23px; border:1px solid #dce5de; border-radius:50%; background:#f7faf8; color:#7b8980; font-size:9px; font-style:normal; font-weight:750; }
-.geographic-level-step small { font-size:8px; font-weight:650; text-transform:capitalize; }
-.geographic-level-step-passed i { border-color:#b9d8c7; background:#eef7f1; color:#39745a; }
-.geographic-level-step-active i { border-color:#197a9a; background:#197a9a; color:white; box-shadow:0 0 0 3px rgb(25 122 154 / 12%); }
-.geographic-level-step-active small { color:#176b83; font-weight:800; }
-.toolbar-filter-action { gap:6px; }
-.toolbar-filter-label { font-size:11px; }
-.map-filters-panel { position:absolute; z-index:18; top:70px; left:50%; width:min(430px,calc(100% - 28px)); max-height:calc(100% - 88px); overflow-y:auto; transform:translateX(-50%); padding:15px; border:1px solid rgb(220 228 222 / 96%); border-radius:16px; background:rgb(255 255 255 / 98%); color:var(--ink); box-shadow:var(--shadow-floating); backdrop-filter:blur(18px); }
-.map-filter-section { display:grid; gap:8px; padding:11px 0; border-top:1px solid #edf1ee; }
-.map-filter-section h3 { margin:0; color:#34483c; font-size:11px; font-weight:780; }
-.map-filter-chips { display:flex; flex-wrap:wrap; gap:6px; }
-.map-filter-chip { min-height:30px; padding:0 10px; border:1px solid #dce5de; border-radius:8px; background:#fff; color:#43564a; font:inherit; font-size:10px; font-weight:650; cursor:pointer; }
-.map-filter-chip-active { border-color:#a8d3bd; background:#edf7f1; color:#176b50; }
-.map-filter-chip:disabled { background:#f6f8f6; color:#9aa59d; cursor:not-allowed; }
-.map-filter-range { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.map-filter-range label { display:grid; gap:5px; color:#738077; font-size:9px; font-weight:700; }
-.map-filter-range input { width:100%; min-width:0; height:35px; padding:0 9px; border:1px solid #dce5de; border-radius:8px; background:#fff; color:#263b30; font:inherit; font-size:11px; }
-.map-filter-range input:disabled { background:#f6f8f6; color:#9aa59d; }
-.map-filter-note { margin:0; color:#7a877e; font-size:9px; line-height:1.5; }
-.map-filter-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:10px; border-top:1px solid #edf1ee; }
-.map-filter-reset,.map-filter-done { min-height:33px; padding:0 12px; border-radius:8px; font:inherit; font-size:10px; font-weight:750; cursor:pointer; }
-.map-filter-reset { border:1px solid #dce5de; background:#fff; color:#53645a; }
-.map-filter-done { border:1px solid #176b50; background:#176b50; color:#fff; }
-@media (max-width:720px) { .geographic-level-indicator { top:108px; right:10px; min-width:218px; padding:8px 9px; } .geographic-level-step small { font-size:7px; } .map-filters-panel { top:66px; width:calc(100% - 20px); max-height:calc(100% - 80px); } }
