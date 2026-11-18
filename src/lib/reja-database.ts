@@ -53,8 +53,41 @@ function integration(
   };
 }
 
+/**
+ * Returns a server-only Neon client for public market reads.
+ *
+ * This deliberately requires APP_DATABASE_URL. It must use the restricted
+ * reja_app role, not the migration/database owner. The general DATABASE_URL
+ * remains a readiness-check fallback only and is never used by listing reads.
+ */
+export function createRejaReadOnlyDatabase() {
+  const connectionString = process.env.APP_DATABASE_URL?.trim();
+  if (!connectionString) return null;
+
+  try {
+    const parsed = new URL(connectionString);
+    if (
+      !["postgres:", "postgresql:"].includes(parsed.protocol) ||
+      !parsed.hostname ||
+      !parsed.pathname ||
+      parsed.pathname === "/"
+    ) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return neon(connectionString, {
+    fetchOptions: {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000)
+    }
+  });
+}
+
 export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth> {
-  const connectionString = process.env.DATABASE_URL?.trim();
+  const connectionString = process.env.APP_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 
   if (!connectionString) {
     return integration(
