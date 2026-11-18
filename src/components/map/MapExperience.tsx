@@ -974,7 +974,7 @@ export function MapExperience() {
   const activePriceMin = priceRangeMode === "list" ? mapFilters.priceMin : mapFilters.monthlyPaymentMin;
   const activePriceMax = priceRangeMode === "list" ? mapFilters.priceMax : mapFilters.monthlyPaymentMax;
   const activePriceLimit = mapFilters.priceCurrency === "USD" ? 100_000_000 : 1_000_000_000_000;
-  const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 100_000_000;
+  const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 1_000_000;
   const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
   const visibleZoningGroups = ZONING_FILTER_GROUPS
@@ -999,7 +999,7 @@ export function MapExperience() {
     return min ? "From " + min : "Up to " + max;
   })();
   const measurementSummary = mapFilters.measurementMin || mapFilters.measurementMax
-    ? (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
+    ? (mapFilters.measurementBasis === "plot" ? "Plot " : "Interior ") + (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
     : "Measurement";
   const bedsBathsSummary = [
     mapFilters.bedroomsMin ? mapFilters.bedroomsMin + (mapFilters.bedroomsExact ? " bd" : "+ bd") : "",
