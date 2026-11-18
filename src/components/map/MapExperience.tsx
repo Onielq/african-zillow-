@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -892,10 +892,10 @@ export function MapExperience() {
     setGeographicLevel(level);
   }, []);
 
-  const parcelSizeFilter = {
-    min: minimumParcelArea.trim() ? Number(minimumParcelArea) : null,
-    max: maximumParcelArea.trim() ? Number(maximumParcelArea) : null
-  };
+  const parcelSizeFilter = useMemo(() => ({
+    min: minimumParcelArea.trim() && Number.isFinite(Number(minimumParcelArea)) && Number(minimumParcelArea) >= 0 ? Number(minimumParcelArea) : null,
+    max: maximumParcelArea.trim() && Number.isFinite(Number(maximumParcelArea)) && Number(maximumParcelArea) >= 0 ? Number(maximumParcelArea) : null
+  }), [minimumParcelArea, maximumParcelArea]);
 
   const handleMapReady = useCallback(
     (map: MapLibreMapInstance | null) => {
