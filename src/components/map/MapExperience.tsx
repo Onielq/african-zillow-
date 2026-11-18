@@ -92,21 +92,82 @@ const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: Lucid
 ];
 
 /**
- * Union of zoning codes found in published Kigali, Bugesera and Gakenke
- * plan legends. A district's own plan remains authoritative; this is a
- * searchable catalogue, not a claim that every code applies in every district.
+ * Codes in the published Kigali, Bugesera and Gakenke planning legends,
+ * plus shorthand classes used in the Ruhango Gazette map legend. A district's
+ * own plan remains authoritative; this catalogue is not a national parcel index.
  */
 const ZONING_FILTER_GROUPS = [
   { label: "Residential", codes: ["R1", "R1A", "R1B", "R2", "R3", "R4", "RS"] },
   { label: "Commercial", codes: ["C1", "C2", "C3", "C4"] },
-  { label: "Agriculture", codes: ["A1", "A2"] },
-  { label: "Industrial & mining", codes: ["I1", "I2", "I3"] },
+  { label: "Agriculture & livestock", codes: ["A", "A1", "A2"] },
+  { label: "Industrial & mining", codes: ["F", "I", "I1", "I2", "I3"] },
   { label: "Public facilities", codes: ["PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6"] },
-  { label: "Buffers", codes: ["B", "B1", "B2", "B3", "B4", "WB"] },
-  { label: "Parks, forests & ecology", codes: ["ET", "F1", "F2", "F3", "F4", "F5", "F6", "P1", "P2", "P3B", "P3C"] },
+  { label: "Buffers", codes: ["B", "B1", "B2", "B3", "B4"] },
+  { label: "Parks, forests & ecology", codes: ["ET", "F1", "F2", "F3", "F4", "F5", "F6", "OS", "P1", "P2", "P3B", "P3C"] },
   { label: "Transport & utilities", codes: ["T", "T1", "T2", "T3", "T4", "U", "UE"] },
-  { label: "Wetlands & water", codes: ["W1", "W1A", "W1B", "W2", "W3", "W4", "W5"] }
+  { label: "Wetlands & water", codes: ["W1A", "W1B", "W2", "W3", "W4", "W5", "WB"] }
 ] as const;
+
+const ZONING_FILTER_DESCRIPTIONS: Record<string, string> = {
+  A: "Agriculture zone",
+  A1: "Agriculture zone",
+  A2: "Livestock zone",
+  B: "Buffer zone",
+  B1: "Wetland buffer zone",
+  B2: "Water body buffer zone",
+  B3: "National park buffer zone",
+  B4: "Other buffer zone",
+  C1: "Mixed use commercial zone",
+  C2: "Neighbourhood commercial zone",
+  C3: "City commercial zone",
+  C4: "Regional commercial zone",
+  ET: "Eco-tourism and open space zone",
+  F: "Forest plantation zone",
+  F1: "Forest plantation zone",
+  F2: "National parks zone",
+  F3: "National park expansion zone",
+  F4: "Natural forest zone",
+  F5: "Afforestation zone",
+  F6: "Ecotourism zone",
+  I: "Industrial zone",
+  I1: "Light industrial zone",
+  I2: "General industrial zone",
+  I3: "Mining, extraction and quarry",
+  OS: "Open space and ecotourism zone",
+  P1: "Parks and open spaces zone",
+  P2: "Sport and eco-tourism zone",
+  P3B: "Forest zone",
+  P3C: "Steep slopes above 30%",
+  PA: "Public administration zone",
+  PF: "Public facilities zone",
+  PF1: "Education and research facilities",
+  PF2: "Health facilities",
+  PF3: "Religious facilities",
+  PF4: "Cultural, heritage and memorial sites",
+  PF5: "Sport and leisure facilities",
+  PF6: "Cemetery and crematoria",
+  R1: "Low-density residential zone",
+  R1A: "Low-density residential densification zone",
+  R1B: "Rural residential zone",
+  R2: "Medium-density residential improvement zone",
+  R3: "Medium-density residential expansion zone",
+  R4: "High-density residential zone",
+  RS: "Rural settlement site",
+  T: "Transportation zone",
+  T1: "Road reserve",
+  T2: "Bus terminals and stations",
+  T3: "Airports, ports and connected facilities",
+  T4: "Railway and stations",
+  U: "Utility zone",
+  UE: "Urban area extension zone",
+  W1A: "Protected wetland",
+  W1B: "Unprotected wetland",
+  W2: "Wetland rehabilitation zone",
+  W3: "Wetland sustainable exploitation zone",
+  W4: "Wetland conservation zone",
+  W5: "Wetland recreational zone",
+  WB: "Waterbody zone"
+};
 
 function compactFilterAmount(value: number, currency: "RWF" | "USD"): string {
   if (!Number.isFinite(value) || value < 0) return currency === "RWF" ? "RWF 0" : "$0";
