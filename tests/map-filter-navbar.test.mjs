@@ -85,7 +85,7 @@ test("zoning selector includes multiple plan codes grouped by category", async (
   assert.match(source, /ZONING_FILTER_DESCRIPTIONS/);
   assert.match(source, /A3 and A4 were not present/);
   assert.match(source, /NLA zoning regulations/);
-  assert.match(source, /geodata\\.rw\\/server\\/rest\\/services/);
+  assert.ok(source.includes("https://geodata.rw/server/rest/services"));
 });
 
 test("measurement keeps manual inputs and adds non-regulatory area presets", async () => {
