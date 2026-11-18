@@ -5497,6 +5497,47 @@ input {
   font-weight: 600;
 }
 
+.map-filter-selected-zone-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.map-filter-selected-zone-summary > div {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+}
+
+.map-filter-selected-zone-summary span {
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.map-filter-selected-zone-summary strong {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 740;
+}
+
+@media (max-width: 480px) {
+  .map-filter-selected-zone-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .map-filter-selected-zone-summary > div {
+    text-align: left;
+  }
+}
+
 .map-filter-all-zones {
   min-height: 34px;
   padding: 0 12px;
