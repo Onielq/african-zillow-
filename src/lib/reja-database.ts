@@ -122,8 +122,15 @@ export async function verifyRejaReadOnlyRole(
       role.rolbypassrls AS bypasses_row_security,
       role.rolcreaterole AS can_create_roles,
       role.rolcreatedb AS can_create_databases,
-      has_database_privilege(current_user, current_database(), 'CREATE')
-        AS can_create_objects,
+      (
+        has_database_privilege(current_user, current_database(), 'CREATE')
+        OR EXISTS (
+          SELECT 1
+          FROM pg_namespace schema
+          WHERE schema.nspname = 'reja'
+            AND has_schema_privilege(current_user, schema.oid, 'CREATE')
+        )
+      ) AS can_create_objects,
       EXISTS (
         SELECT 1
         FROM pg_class relation
