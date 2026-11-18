@@ -104,3 +104,20 @@ test("public exchange reads recheck the verified seller authorization and its va
     assert.match(source, /l\.seller_organization_id/);
   }
 });
+
+
+test("exchange listing totals use the same current-property join as visible rows", async () => {
+  const route = await read("../src/app/api/market/exchange/listings/route.ts");
+  assert.match(
+    route,
+    /SELECT count\(\*\)::integer AS total\s+FROM reja\.exchange_listings l\s+JOIN reja\.market_properties p\s+ON p\.id = l\.market_property_id AND p\.is_current = true/
+  );
+});
+
+test("listing history does not invent an original price when no snapshots exist", async () => {
+  const route = await read("../src/app/api/market/listings/[id]/history/route.ts");
+  assert.match(route, /const historyInput = observations\.map/);
+  assert.doesNotMatch(route, /listing\.firstSeenAt[\s\S]{0,180}listing\.askingAmount/);
+  assert.match(route, /historyBasis: observations\.length > 0 \? "source_observations" : "no_observations"/);
+  assert.match(route, /A current asking price cannot establish the original price/);
+});
