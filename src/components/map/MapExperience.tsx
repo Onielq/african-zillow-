@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   CalendarDays,
+  BarChart3,
   Building,
   Building2,
   Blocks,
@@ -76,6 +77,7 @@ type ProjectDirectoryTab = "projects" | "developers";
 type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
 type ListingFilterValue = "all" | "sale" | "rent" | "sold";
 type PriceRangeMode = "list" | "monthly";
+type MeasurementBasis = "plot" | "interior";
 
 const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: LucideIcon }> = [
   { value: "house", label: "Houses", Icon: House },
@@ -904,6 +906,7 @@ export function MapExperience() {
   const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
   const [priceRangeMode, setPriceRangeMode] = useState<PriceRangeMode>("list");
   const [zoningInfoOpen, setZoningInfoOpen] = useState(false);
+  const [zoningSearch, setZoningSearch] = useState("");
   const [mapFilters, setMapFilters] = useState<{
     listingType: ListingFilterValue;
     priceCurrency: "RWF" | "USD";
@@ -916,6 +919,7 @@ export function MapExperience() {
     measurementMin: string;
     measurementMax: string;
     measurementPreset: string;
+    measurementBasis: MeasurementBasis;
     bedroomsMin: string;
     bathroomsMin: string;
     bedroomsExact: boolean;
@@ -932,6 +936,7 @@ export function MapExperience() {
     measurementMin: "",
     measurementMax: "",
     measurementPreset: "",
+    measurementBasis: "plot",
     bedroomsMin: "",
     bathroomsMin: "",
     bedroomsExact: false,
@@ -963,6 +968,69 @@ export function MapExperience() {
   const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 100_000_000;
   const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
+  const visibleZoningGroups = ZONING_FILTER_GROUPS
+    .map((group) => ({
+      ...group,
+      codes: group.codes.filter((code) => code.toLowerCase().includes(zoningSearch.trim().toLowerCase()))
+    }))
+    .filter((group) => group.codes.length > 0);
+  const activeFilterCount = [
+    mapFilters.listingType !== "all",
+    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax),
+    mapFilters.propertyTypes.length > 0,
+    mapFilters.zoningCodes.length > 0,
+    Boolean(mapFilters.measurementMin || mapFilters.measurementMax),
+    Boolean(mapFilters.bedroomsMin || mapFilters.bathroomsMin)
+  ].filter(Boolean).length;
+  const priceSummary = (() => {
+    const min = activePriceMin ? compactFilterAmount(Number(activePriceMin), mapFilters.priceCurrency) : "";
+    const max = activePriceMax ? compactFilterAmount(Number(activePriceMax), mapFilters.priceCurrency) : "";
+    if (!min && !max) return priceRangeMode === "monthly" ? "Monthly payment" : "Price";
+    if (min && max) return min + " – " + max;
+    return min ? "From " + min : "Up to " + max;
+  })();
+  const measurementSummary = mapFilters.measurementMin || mapFilters.measurementMax
+    ? (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
+    : "Measurement";
+  const bedsBathsSummary = [
+    mapFilters.bedroomsMin ? mapFilters.bedroomsMin + (mapFilters.bedroomsExact ? " bd" : "+ bd") : "",
+    mapFilters.bathroomsMin ? mapFilters.bathroomsMin + (mapFilters.bathroomsExact ? " ba" : "+ ba") : ""
+  ].filter(Boolean).join(" · ") || "Beds / Baths";
+  const resetMapFilters = () => {
+    setMapFilters({
+      listingType: "all",
+      priceCurrency: "RWF",
+      priceMin: "",
+      priceMax: "",
+      monthlyPaymentMin: "",
+      monthlyPaymentMax: "",
+      propertyTypes: [],
+      zoningCodes: [],
+      measurementMin: "",
+      measurementMax: "",
+      measurementPreset: "",
+      measurementBasis: "plot",
+      bedroomsMin: "",
+      bathroomsMin: "",
+      bedroomsExact: false,
+      bathroomsExact: false
+    });
+    setPriceRangeMode("list");
+    setZoningSearch("");
+    setZoningInfoOpen(false);
+  };
+  const updatePriceSlider = (bound: "min" | "max", rawValue: string) => {
+    const value = Math.min(activePriceLimit, Math.max(0, Number(rawValue) || 0));
+    setMapFilters((current) => {
+      const minKey = priceRangeMode === "list" ? "priceMin" : "monthlyPaymentMin";
+      const maxKey = priceRangeMode === "list" ? "priceMax" : "monthlyPaymentMax";
+      const minimum = current[minKey] ? Number(current[minKey]) : 0;
+      const maximum = current[maxKey] ? Number(current[maxKey]) : activePriceLimit;
+      return bound === "min"
+        ? { ...current, [minKey]: String(Math.min(value, maximum)) }
+        : { ...current, [maxKey]: String(Math.max(value, minimum)) };
+    });
+  };
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks"]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
