@@ -56,6 +56,12 @@ export async function GET(
       WHERE l.id = ${id}::bigint
         AND l.publication_status = 'published'
         AND (l.expires_at IS NULL OR l.expires_at > now())
+          AND reja.has_verified_listing_authorization(
+            l.listing_authorization_id,
+            l.market_property_id,
+            l.seller_user_id,
+            l.seller_organization_id
+          )
       LIMIT 1
     `;
 
