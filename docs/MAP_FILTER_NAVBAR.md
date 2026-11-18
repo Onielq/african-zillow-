@@ -9,7 +9,7 @@ Each filter has its own trigger and dropdown:
 - Sale / Rent: Any, For sale, For rent.
 - Price: minimum, maximum and currency.
 - Property type: land, apartment, house/villa, commercial, industrial and mixed-use.
-- Zoning: R1, R1A, R2, R3, R4, C, A, mixed-use and industrial.
+- Zoning: R1 (residential), C (commercial), A (agriculture) and mixed-use.
 - Measurement: minimum and maximum area in square metres.
 - Beds / Baths: minimum bedrooms and minimum bathrooms.
 
