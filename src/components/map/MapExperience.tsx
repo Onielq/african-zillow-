@@ -168,6 +168,20 @@ const ZONING_FILTER_DESCRIPTIONS: Record<string, string> = {
   WB: "Waterbody zone"
 };
 
+function filterPriceRangeSummary(
+  minimum: string,
+  maximum: string,
+  currency: "RWF" | "USD",
+  limit: number
+): string {
+  const min = minimum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(minimum))), currency) : "";
+  const max = maximum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(maximum))), currency) : "";
+  if (min && max) return min + " – " + max;
+  if (min) return "From " + min;
+  if (max) return "Up to " + max;
+  return "Any amount";
+}
+
 function compactFilterAmount(value: number, currency: "RWF" | "USD"): string {
   if (!Number.isFinite(value) || value < 0) return currency === "RWF" ? "RWF 0" : "$0";
   const compact = new Intl.NumberFormat("en", {
@@ -2606,7 +2620,7 @@ export function MapExperience() {
                         return (
                           <section className="map-filter-price-section" key={range.key}>
                             <div className="map-filter-price-section-heading">
-                              <strong>{range.title}</strong>
+                              <div><strong>{range.title}</strong><small>{range.summary}</small></div>
                               <span>{mapFilters.priceCurrency}</span>
                             </div>
                             <div className="map-filter-histogram" aria-label={range.title + " distribution preview"}>
