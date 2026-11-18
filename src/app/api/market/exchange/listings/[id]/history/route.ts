@@ -106,9 +106,18 @@ export async function GET(
           asking_amount::text AS "askingAmount",
           currency,
           publication_status AS "publicationStatus"
-        FROM reja.exchange_listing_observations
-        WHERE listing_id = ${id}::bigint
-        ORDER BY observed_at ASC, id ASC
+        FROM reja.exchange_listing_observations o
+        JOIN reja.exchange_listings l ON l.id = o.listing_id
+        WHERE o.listing_id = ${id}::bigint
+          AND l.publication_status = 'published'
+          AND (l.expires_at IS NULL OR l.expires_at > now())
+          AND reja.has_verified_listing_authorization(
+            l.listing_authorization_id,
+            l.market_property_id,
+            l.seller_user_id,
+            l.seller_organization_id
+          )
+        ORDER BY o.observed_at ASC, o.id ASC
       `
     ]);
 
