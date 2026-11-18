@@ -2370,7 +2370,7 @@ export function MapExperience() {
                     className="map-filter-popover map-filter-popover-sale"
                   >
                     <div className="map-filter-popover-heading">
-                      <div><strong>Listing status</strong><small>Choose the property's market status</small></div>
+                      <div><strong>Listing status</strong><small>Choose the property&apos;s market status</small></div>
                       <span className="map-filter-count">{mapFilters.listingType === "all" ? "Any" : mapFilters.listingType === "sold" ? "Sold out" : mapFilters.listingType === "sale" ? "For sale" : "For rent"}</span>
                     </div>
                     <div className="map-filter-choice-stack">
