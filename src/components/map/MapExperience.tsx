@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -19,6 +20,7 @@ import {
   Ruler,
   Satellite,
   Search,
+  SlidersHorizontal,
   Waves,
   X,
   type LucideIcon
@@ -65,6 +67,24 @@ import { searchRwandaProjects } from "@/lib/project-search";
 
 type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
+type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
+type ListingFilterValue = "all" | "sale" | "rent";
+
+const PROPERTY_FILTER_OPTIONS = [
+  { value: "land", label: "Land" },
+  { value: "apartment", label: "Apartment" },
+  { value: "house", label: "House / Villa" },
+  { value: "commercial", label: "Commercial" },
+  { value: "industrial", label: "Industrial" },
+  { value: "mixed_use", label: "Mixed-use" }
+] as const;
+
+const ZONING_FILTER_OPTIONS = [
+  { value: "R1", label: "R1 · Residential" },
+  { value: "C", label: "C · Commercial" },
+  { value: "A", label: "A · Agriculture" },
+  { value: "MIXED_USE", label: "Mixed-use" }
+] as const;
 
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
   const code = zone.code?.trim();
@@ -771,6 +791,67 @@ function getAreaParent(area: SelectedArea): string | null {
   }
 }
 
+
+type FilterPopoverPortalProps = {
+  anchorRef: { current: HTMLButtonElement | null };
+  popoverRef: { current: HTMLDivElement | null };
+  ariaLabel: string;
+  className: string;
+  children: ReactNode;
+};
+
+function FilterPopoverPortal({
+  anchorRef,
+  popoverRef,
+  ariaLabel,
+  className,
+  children
+}: FilterPopoverPortalProps) {
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      const bounds = anchor.getBoundingClientRect();
+      const preferredWidth = className.includes("zoning") ? 326 : 292;
+      const popoverWidth = Math.min(preferredWidth, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(bounds.left, window.innerWidth - popoverWidth - 16));
+      const expectedHeight = popoverRef.current?.offsetHeight ?? 260;
+      const roomBelow = window.innerHeight - bounds.bottom - 16;
+      const top = roomBelow >= expectedHeight
+        ? bounds.bottom + 8
+        : Math.max(12, bounds.top - expectedHeight - 8);
+
+      setPosition({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, className, popoverRef]);
+
+  if (!position || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      aria-label={ariaLabel}
+      className={className}
+      ref={popoverRef}
+      role="dialog"
+      style={position}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 export function MapExperience() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("map");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("areas");
@@ -790,6 +871,47 @@ export function MapExperience() {
   const [selectedProjectDeveloperId, setSelectedProjectDeveloperId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
+  const [mapFilters, setMapFilters] = useState<{
+    listingType: ListingFilterValue;
+    priceCurrency: "RWF" | "USD" | "all";
+    priceMin: string;
+    priceMax: string;
+    propertyTypes: string[];
+    zoningCodes: string[];
+    measurementMin: string;
+    measurementMax: string;
+    bedroomsMin: string;
+    bathroomsMin: string;
+  }>({
+    listingType: "all",
+    priceCurrency: "RWF",
+    priceMin: "",
+    priceMax: "",
+    propertyTypes: [],
+    zoningCodes: [],
+    measurementMin: "",
+    measurementMax: "",
+    bedroomsMin: "",
+    bathroomsMin: ""
+  });
+  const filterSubnavRef = useRef<HTMLDivElement>(null);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const activeFilterAnchorRef = useRef<HTMLButtonElement>(null);
+  const closeFilterMenus = useCallback(() => {
+    setFiltersOpen(false);
+    setActiveFilterMenu(null);
+  }, []);
+  const toggleFilterOption = (key: "propertyTypes" | "zoningCodes", value: string) => {
+    setMapFilters((current) => ({
+      ...current,
+      [key]: current[key].includes(value)
+        ? current[key].filter((item) => item !== value)
+        : [...current[key], value]
+    }));
+  };
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks"]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
@@ -1697,11 +1819,21 @@ export function MapExperience() {
   }, []);
 
   useEffect(() => {
-    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !selectedArea) return;
+    if (!compareOpen && !metricInfoOpen && !metricsOpen && !developersOpen && !projectsOpen && !sourcesOpen && !showOpen && !filtersOpen && !activeFilterMenu && !selectedArea) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
 
       // Close the topmost interaction first, leaving the selected map area intact.
+      if (activeFilterMenu) {
+        setActiveFilterMenu(null);
+        activeFilterAnchorRef.current?.focus();
+        return;
+      }
+      if (filtersOpen) {
+        closeFilterMenus();
+        filtersTriggerRef.current?.focus();
+        return;
+      }
       if (compareOpen) {
         setCompareOpen(false);
         return;
@@ -1719,7 +1851,22 @@ export function MapExperience() {
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, selectedArea]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, filtersOpen, activeFilterMenu, selectedArea, closeFilterMenus]);
+
+  useEffect(() => {
+    if (!filtersOpen || !activeFilterMenu) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !filterSubnavRef.current?.contains(event.target) &&
+        !filterPopoverRef.current?.contains(event.target)
+      ) {
+        setActiveFilterMenu(null);
+      }
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [filtersOpen, activeFilterMenu]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -2035,6 +2182,7 @@ export function MapExperience() {
                 setProjectsOpen(false);
                 setSourcesOpen(false);
                 setShowOpen(false);
+                closeFilterMenus();
                 setMetricInfoOpen(false);
                 setDirectoryTab("developers");
                 setDevelopersOpen((open) => !open);
@@ -2053,6 +2201,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setSourcesOpen(false);
                 setShowOpen(false);
+                closeFilterMenus();
                 setMetricInfoOpen(false);
                 setProjectsOpen((open) => {
                   const next = !open;
@@ -2073,6 +2222,7 @@ export function MapExperience() {
                 setProjectsOpen(false);
                 setSourcesOpen(false);
                 setShowOpen(false);
+                closeFilterMenus();
                 setMetricInfoOpen(false);
                 setMetricsOpen((open) => !open);
               }}
@@ -2089,12 +2239,38 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                closeFilterMenus();
                 setMetricInfoOpen(false);
                 setShowOpen((open) => !open);
               }}
               type="button"
             >
               Show <span aria-hidden="true">⌄</span>
+            </button>
+            <button
+              aria-label="Filters"
+              ref={filtersTriggerRef}
+              aria-controls="map-filter-subnav"
+              aria-expanded={filtersOpen}
+              title="Filters"
+              className={filtersOpen ? "toolbar-action toolbar-filter-icon toolbar-action-active" : "toolbar-action toolbar-filter-icon"}
+              onClick={() => {
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setShowOpen(false);
+                setMetricInfoOpen(false);
+                if (filtersOpen) {
+                  closeFilterMenus();
+                } else {
+                  setFiltersOpen(true);
+                  setActiveFilterMenu(null);
+                }
+              }}
+              type="button"
+            >
+              <SlidersHorizontal aria-hidden="true" size={18} strokeWidth={1.9} />
             </button>
             <button
               aria-label="Sources and map information"
@@ -2106,6 +2282,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setShowOpen(false);
+                closeFilterMenus();
                 if (sourcesOpen || metricInfoOpen) {
                   setSourcesOpen(false);
                   setMetricInfoOpen(false);
@@ -2119,6 +2296,302 @@ export function MapExperience() {
               <span aria-hidden="true">i</span>
             </button>
           </div>
+          {filtersOpen ? (
+            <div aria-label="Map filters" className="map-filter-subnav" id="map-filter-subnav" ref={filterSubnavRef} role="group">
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "sale"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "sale" || mapFilters.listingType !== "all" ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "sale" ? null : "sale");
+                  }}
+                  type="button"
+                >
+                  Sale / Rent <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "sale" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Sale or rent"
+                    className="map-filter-popover map-filter-popover-sale"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Listing type</strong>
+                    </div>
+                    {([
+                      { value: "all" as const, label: "Any" },
+                      { value: "sale" as const, label: "For sale" },
+                      { value: "rent" as const, label: "For rent" }
+                    ]).map((option) => (
+                      <label className="map-filter-radio-row" key={option.value}>
+                        <input
+                          checked={mapFilters.listingType === option.value}
+                          name="map-listing-type"
+                          onChange={() => setMapFilters((current) => ({ ...current, listingType: option.value }))}
+                          type="radio"
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                    <p className="map-filter-note">This selection is staged until an authorized listing feed is connected.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "price"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "price" || mapFilters.priceMin || mapFilters.priceMax ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "price" ? null : "price");
+                  }}
+                  type="button"
+                >
+                  Price <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "price" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Price range"
+                    className="map-filter-popover"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Price range</strong>
+                      <select
+                        aria-label="Price currency"
+                        className="map-filter-currency"
+                        onChange={(event) => setMapFilters((current) => ({ ...current, priceCurrency: event.target.value as "RWF" | "USD" | "all" }))}
+                        value={mapFilters.priceCurrency}
+                      >
+                        <option value="RWF">RWF</option>
+                        <option value="USD">USD</option>
+                        <option value="all">Any currency</option>
+                      </select>
+                    </div>
+                    <div className="map-filter-range-fields">
+                      <label>
+                        <span>Minimum</span>
+                        <input
+                          inputMode="decimal"
+                          min="0"
+                          onChange={(event) => setMapFilters((current) => ({ ...current, priceMin: event.target.value }))}
+                          placeholder="0"
+                          type="number"
+                          value={mapFilters.priceMin}
+                        />
+                      </label>
+                      <label>
+                        <span>Maximum</span>
+                        <input
+                          inputMode="decimal"
+                          min="0"
+                          onChange={(event) => setMapFilters((current) => ({ ...current, priceMax: event.target.value }))}
+                          placeholder="No limit"
+                          type="number"
+                          value={mapFilters.priceMax}
+                        />
+                      </label>
+                    </div>
+                    {mapFilters.priceMin && mapFilters.priceMax && Number(mapFilters.priceMin) > Number(mapFilters.priceMax) ? (
+                      <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
+                    ) : null}
+                    <p className="map-filter-note">Price means a listing price, not an estimated land value. Live price matching is not connected yet.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "property"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "property" || mapFilters.propertyTypes.length > 0 ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "property" ? null : "property");
+                  }}
+                  type="button"
+                >
+                  Property type <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "property" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Property types"
+                    className="map-filter-popover"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Property type</strong>
+                      <span className="map-filter-count">{mapFilters.propertyTypes.length || "All"}</span>
+                    </div>
+                    {PROPERTY_FILTER_OPTIONS.map((option) => (
+                      <label className="map-filter-check-row" key={option.value}>
+                        <input
+                          checked={mapFilters.propertyTypes.includes(option.value)}
+                          onChange={() => toggleFilterOption("propertyTypes", option.value)}
+                          type="checkbox"
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                    <p className="map-filter-note">Select more than one type. Building inventory is not yet connected to the cadastral map.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "zoning"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "zoning" || mapFilters.zoningCodes.length > 0 ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "zoning" ? null : "zoning");
+                  }}
+                  type="button"
+                >
+                  Zoning <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "zoning" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Zoning types"
+                    className="map-filter-popover map-filter-popover-zoning"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Zoning</strong>
+                      <span className="map-filter-count">{mapFilters.zoningCodes.length || "All"}</span>
+                    </div>
+                    <div className="map-filter-zoning-grid">
+                      {ZONING_FILTER_OPTIONS.map((option) => (
+                        <label className={mapFilters.zoningCodes.includes(option.value) ? "map-filter-chip map-filter-chip-active" : "map-filter-chip"} key={option.value}>
+                          <input
+                            checked={mapFilters.zoningCodes.includes(option.value)}
+                            onChange={() => toggleFilterOption("zoningCodes", option.value)}
+                            type="checkbox"
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="map-filter-note">R codes denote residential categories, C commercial, and A agriculture. Parcel-wide zoning matching still needs a spatial join.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "measurement"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "measurement" || mapFilters.measurementMin || mapFilters.measurementMax ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "measurement" ? null : "measurement");
+                  }}
+                  type="button"
+                >
+                  Measurement <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "measurement" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Measurement range"
+                    className="map-filter-popover"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Area (m²)</strong>
+                    </div>
+                    <div className="map-filter-range-fields">
+                      <label>
+                        <span>Minimum m²</span>
+                        <input
+                          inputMode="decimal"
+                          min="0"
+                          onChange={(event) => setMapFilters((current) => ({ ...current, measurementMin: event.target.value }))}
+                          placeholder="0"
+                          type="number"
+                          value={mapFilters.measurementMin}
+                        />
+                      </label>
+                      <label>
+                        <span>Maximum m²</span>
+                        <input
+                          inputMode="decimal"
+                          min="0"
+                          onChange={(event) => setMapFilters((current) => ({ ...current, measurementMax: event.target.value }))}
+                          placeholder="No limit"
+                          type="number"
+                          value={mapFilters.measurementMax}
+                        />
+                      </label>
+                    </div>
+                    {mapFilters.measurementMin && mapFilters.measurementMax && Number(mapFilters.measurementMin) > Number(mapFilters.measurementMax) ? (
+                      <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
+                    ) : null}
+                    <p className="map-filter-note">Land uses plot area; houses and apartments use floor area. Parcel-level filtering will be connected next.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+
+              <div className="map-filter-control">
+                <button
+                  aria-expanded={activeFilterMenu === "bedsBaths"}
+                  aria-haspopup="dialog"
+                  className={activeFilterMenu === "bedsBaths" || mapFilters.bedroomsMin || mapFilters.bathroomsMin ? "map-filter-trigger map-filter-trigger-active" : "map-filter-trigger"}
+                  onClick={(event) => {
+                    activeFilterAnchorRef.current = event.currentTarget;
+                    setActiveFilterMenu((current) => current === "bedsBaths" ? null : "bedsBaths");
+                  }}
+                  type="button"
+                >
+                  Beds / Baths <span aria-hidden="true">⌄</span>
+                </button>
+                {activeFilterMenu === "bedsBaths" ? (
+                  <FilterPopoverPortal
+                    anchorRef={activeFilterAnchorRef}
+                    popoverRef={filterPopoverRef}
+                    ariaLabel="Bedroom and bathroom filters"
+                    className="map-filter-popover map-filter-popover-beds"
+                  >
+                    <div className="map-filter-popover-heading">
+                      <strong>Bedrooms & bathrooms</strong>
+                    </div>
+                    <div className="map-filter-select-fields">
+                      <label>
+                        <span>Bedrooms · minimum</span>
+                        <select
+                          onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsMin: event.target.value }))}
+                          value={mapFilters.bedroomsMin}
+                        >
+                          <option value="">Any</option>
+                          {[1, 2, 3, 4, 5].map((value) => <option key={value} value={String(value)}>{value}+</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Bathrooms · minimum</span>
+                        <select
+                          onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsMin: event.target.value }))}
+                          value={mapFilters.bathroomsMin}
+                        >
+                          <option value="">Any</option>
+                          {[1, 2, 3, 4, 5].map((value) => <option key={value} value={String(value)}>{value}+</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <p className="map-filter-note">Bedroom and bathroom matching applies when verified building and unit records are connected.</p>
+                  </FilterPopoverPortal>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
 
 
