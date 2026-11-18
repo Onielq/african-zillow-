@@ -25,6 +25,13 @@ type SchemaReadinessRow = {
   parcels: boolean;
   development_units: boolean;
   exchange_listings: boolean;
+  market_listings: boolean;
+  market_listing_observations: boolean;
+  source_reuse_permissions: boolean;
+  listing_authorizations: boolean;
+  exchange_listing_observations: boolean;
+  exchange_listing_events: boolean;
+  listing_authorization_helper: boolean;
 };
 
 const REQUIRED_SCHEMA = [
@@ -35,7 +42,14 @@ const REQUIRED_SCHEMA = [
   ["geo_areas", "administrative geography"],
   ["parcels", "cadastral parcels"],
   ["development_units", "project units"],
-  ["exchange_listings", "first-party exchange listings"]
+  ["exchange_listings", "first-party exchange listings"],
+  ["market_listings", "external market listings"],
+  ["market_listing_observations", "external listing history"],
+  ["source_reuse_permissions", "source reuse permissions"],
+  ["listing_authorizations", "seller listing authorizations"],
+  ["exchange_listing_observations", "first-party listing observations"],
+  ["exchange_listing_events", "first-party listing event history"],
+  ["listing_authorization_helper", "verified seller authorization check"]
 ] as const;
 
 function integration(
@@ -93,7 +107,7 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
     return integration(
       "not-configured",
       "No connection string",
-      "The Neon serverless driver is integrated, but DATABASE_URL is not configured in this runtime. The application is not connected to PostgreSQL."
+      "The Neon serverless driver is integrated, but neither APP_DATABASE_URL nor DATABASE_URL is configured in this runtime. The application is not connected to PostgreSQL."
     );
   }
 
@@ -107,7 +121,7 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
       return integration(
         "invalid-credentials",
         "Invalid PostgreSQL URL",
-        "DATABASE_URL must be a valid PostgreSQL connection string. The value itself is never returned."
+        "APP_DATABASE_URL or DATABASE_URL must be a valid PostgreSQL connection string. The value itself is never returned."
       );
     }
   } catch {
@@ -137,7 +151,26 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
         to_regclass('reja.geo_areas') IS NOT NULL AS geo_areas,
         to_regclass('reja.parcels') IS NOT NULL AS parcels,
         to_regclass('reja.development_units') IS NOT NULL AS development_units,
-        to_regclass('reja.exchange_listings') IS NOT NULL AS exchange_listings
+        to_regclass('reja.exchange_listings') IS NOT NULL AS exchange_listings,
+        to_regclass('reja.market_listings') IS NOT NULL AS market_listings,
+        to_regclass('reja.market_listing_observations') IS NOT NULL AS market_listing_observations,
+        (
+          SELECT count(*) = 4
+          FROM information_schema.columns
+          WHERE table_schema = 'reja'
+            AND table_name = 'sources'
+            AND column_name IN (
+              'license_status',
+              'commercial_use_allowed',
+              'redistribution_allowed',
+              'caching_allowed'
+            )
+        ) AS source_reuse_permissions,
+        to_regclass('reja.listing_authorizations') IS NOT NULL AS listing_authorizations,
+        to_regclass('reja.exchange_listing_observations') IS NOT NULL AS exchange_listing_observations,
+        to_regclass('reja.exchange_listing_events') IS NOT NULL AS exchange_listing_events,
+        to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL
+          AS listing_authorization_helper
     `;
 
     const row = rows[0] as SchemaReadinessRow | undefined;
