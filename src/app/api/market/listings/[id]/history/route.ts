@@ -105,21 +105,13 @@ export async function GET(
       ORDER BY o.observed_at ASC, o.id ASC
     `;
 
-    const historyInput = observations.length > 0
-      ? observations.map((row) => ({
-          observed_at: row.observedAt,
-          asking_amount: row.askingAmount,
-          currency: row.currency,
-          rent_period: row.rentPeriod,
-          listing_status: row.listingStatus
-        }))
-      : [{
-          observed_at: listing.firstSeenAt,
-          asking_amount: listing.askingAmount,
-          currency: listing.currency,
-          rent_period: listing.rentPeriod,
-          listing_status: listing.sourceReportedStatus
-        }];
+    const historyInput = observations.map((row) => ({
+      observed_at: row.observedAt,
+      asking_amount: row.askingAmount,
+      currency: row.currency,
+      rent_period: row.rentPeriod,
+      listing_status: row.listingStatus
+    }));
 
     return NextResponse.json(
       {
@@ -130,8 +122,10 @@ export async function GET(
           statusBasis: "source_reported"
         },
         events: buildMarketListingHistory(historyInput),
-        historyBasis: "source_observations",
-        note: "These are source observations. A listing status is not proof of a registered sale, lease, title transfer or ownership change."
+        historyBasis: observations.length > 0 ? "source_observations" : "no_observations",
+        note: observations.length > 0
+          ? "These are source observations. A listing status is not proof of a registered sale, lease, title transfer or ownership change."
+          : "No dated source snapshots are recorded for this listing, so no earlier asking-price or availability history is shown. A current asking price cannot establish the original price. A listing status is not proof of a registered sale, lease, title transfer or ownership change."
       },
       { headers: { "Cache-Control": "no-store" } }
     );
