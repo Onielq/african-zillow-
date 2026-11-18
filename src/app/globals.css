@@ -6204,3 +6204,124 @@ input {
     gap: 7px;
   }
 }
+
+
+/* List price and monthly payment are independent, visible side by side. */
+.map-filter-popover-price {
+  width: 660px;
+  max-width: min(660px, calc(100vw - 32px));
+}
+
+.map-filter-price-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.map-filter-price-section {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.map-filter-price-section-heading {
+  display: flex;
+  min-height: 35px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-filter-price-section-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.map-filter-price-section-heading strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.map-filter-price-section-heading small {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-filter-price-section-heading > span {
+  flex: 0 0 auto;
+  color: var(--ink-secondary);
+  font-size: 9px;
+  font-weight: 740;
+}
+
+.map-filter-price-section .map-filter-histogram {
+  min-height: 112px;
+  padding: 8px 9px 7px;
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.map-filter-price-section .map-filter-histogram-empty {
+  gap: 3px;
+  padding: 10px 2px 6px;
+}
+
+.map-filter-price-section .map-filter-histogram-empty span {
+  font-size: 10px;
+}
+
+.map-filter-price-section .map-filter-histogram-empty small {
+  max-width: 190px;
+  font-size: 9px;
+}
+
+.map-filter-price-section .map-filter-price-values strong {
+  font-size: 11px;
+}
+
+.map-filter-price-section .map-filter-range-fields {
+  gap: 7px;
+}
+
+.map-filter-price-section .map-filter-range-fields input {
+  height: 37px;
+  padding-inline: 8px;
+  font-size: 11px;
+}
+
+.map-filter-price-section .map-filter-dual-slider {
+  margin-inline: 4px;
+}
+
+@media (max-width: 760px) {
+  .map-filter-popover-price {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  .map-filter-price-columns {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .map-filter-price-section {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-filter-price-section .map-filter-range-fields input {
+    height: 39px;
+    font-size: 12px;
+  }
+}
