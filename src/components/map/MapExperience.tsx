@@ -840,10 +840,10 @@ export function MapExperience() {
     bathroomsMin: ""
   });
   const filterSubnavRef = useRef<HTMLDivElement>(null);
-  const closeFilterMenus = () => {
+  const closeFilterMenus = useCallback(() => {
     setFiltersOpen(false);
     setActiveFilterMenu(null);
-  };
+  }, []);
   const toggleFilterOption = (key: "propertyTypes" | "zoningCodes", value: string) => {
     setMapFilters((current) => ({
       ...current,
@@ -1789,7 +1789,7 @@ export function MapExperience() {
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, filtersOpen, activeFilterMenu, selectedArea]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, filtersOpen, activeFilterMenu, selectedArea, closeFilterMenus]);
 
   useEffect(() => {
     if (!filtersOpen || !activeFilterMenu) return;
@@ -2173,6 +2173,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setSourcesOpen(false);
+                closeFilterMenus();
                 setMetricInfoOpen(false);
                 setShowOpen((open) => !open);
               }}
@@ -2192,10 +2193,10 @@ export function MapExperience() {
                 setProjectsOpen(false);
                 setSourcesOpen(false);
                 setShowOpen(false);
-                closeFilterMenus();
                 setMetricInfoOpen(false);
-                if (filtersOpen) closeFilterMenus();
-                else {
+                if (filtersOpen) {
+                  closeFilterMenus();
+                } else {
                   setFiltersOpen(true);
                   setActiveFilterMenu(null);
                 }
@@ -2214,6 +2215,7 @@ export function MapExperience() {
                 setDevelopersOpen(false);
                 setProjectsOpen(false);
                 setShowOpen(false);
+                closeFilterMenus();
                 if (sourcesOpen || metricInfoOpen) {
                   setSourcesOpen(false);
                   setMetricInfoOpen(false);
