@@ -25,6 +25,13 @@ type SchemaReadinessRow = {
   parcels: boolean;
   development_units: boolean;
   exchange_listings: boolean;
+  market_listings: boolean;
+  market_listing_observations: boolean;
+  source_reuse_permissions: boolean;
+  listing_authorizations: boolean;
+  exchange_listing_observations: boolean;
+  exchange_listing_events: boolean;
+  listing_authorization_helper: boolean;
 };
 
 const REQUIRED_SCHEMA = [
@@ -35,7 +42,14 @@ const REQUIRED_SCHEMA = [
   ["geo_areas", "administrative geography"],
   ["parcels", "cadastral parcels"],
   ["development_units", "project units"],
-  ["exchange_listings", "first-party exchange listings"]
+  ["exchange_listings", "first-party exchange listings"],
+  ["market_listings", "external market listings"],
+  ["market_listing_observations", "external listing history"],
+  ["source_reuse_permissions", "source reuse permissions"],
+  ["listing_authorizations", "seller listing authorizations"],
+  ["exchange_listing_observations", "first-party listing observations"],
+  ["exchange_listing_events", "first-party listing event history"],
+  ["listing_authorization_helper", "verified seller authorization check"]
 ] as const;
 
 function integration(
@@ -53,14 +67,110 @@ function integration(
   };
 }
 
+/**
+ * Returns a server-only Neon client for public market reads.
+ *
+ * This deliberately requires APP_DATABASE_URL. It must use the restricted
+ * reja_app role, not the migration/database owner. The general DATABASE_URL
+ * remains a readiness-check fallback only and is never used by listing reads.
+ */
+export function createRejaReadOnlyDatabase() {
+  const connectionString = process.env.APP_DATABASE_URL?.trim();
+  if (!connectionString) return null;
+
+  try {
+    const parsed = new URL(connectionString);
+    if (
+      !["postgres:", "postgresql:"].includes(parsed.protocol) ||
+      !parsed.hostname ||
+      !parsed.pathname ||
+      parsed.pathname === "/"
+    ) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return neon(connectionString, {
+    fetchOptions: {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000)
+    }
+  });
+}
+
+type RejaReadOnlyRoleRow = {
+  is_superuser: boolean;
+  bypasses_row_security: boolean;
+  can_create_roles: boolean;
+  can_create_databases: boolean;
+  can_create_objects: boolean;
+  can_write: boolean;
+};
+
+/**
+ * Refuses public listing reads when the configured role can bypass RLS,
+ * create database objects, administer roles/databases, or write REJA records.
+ */
+export async function verifyRejaReadOnlyRole(
+  database: NonNullable<ReturnType<typeof createRejaReadOnlyDatabase>>
+): Promise<boolean> {
+  const rows = await database`
+    SELECT
+      r.rolsuper AS is_superuser,
+      r.rolbypassrls AS bypasses_row_security,
+      r.rolcreaterole AS can_create_roles,
+      r.rolcreatedb AS can_create_databases,
+      (
+        has_database_privilege(current_user, current_database(), 'CREATE')
+        OR EXISTS (
+          SELECT 1
+          FROM pg_namespace n
+          WHERE n.nspname = 'reja'
+            AND has_schema_privilege(current_user, n.oid, 'CREATE')
+        )
+      ) AS can_create_objects,
+      EXISTS (
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'reja'
+          AND c.relkind IN ('r','p','v','m','f')
+          AND (
+            has_table_privilege(current_user, c.oid, 'INSERT')
+            OR has_table_privilege(current_user, c.oid, 'UPDATE')
+            OR has_table_privilege(current_user, c.oid, 'DELETE')
+            OR has_table_privilege(current_user, c.oid, 'TRUNCATE')
+            OR has_table_privilege(current_user, c.oid, 'REFERENCES')
+            OR has_table_privilege(current_user, c.oid, 'TRIGGER')
+          )
+      ) AS can_write
+    FROM pg_roles r
+    WHERE r.rolname = current_user
+    LIMIT 1
+  `;
+
+  const row = rows[0] as RejaReadOnlyRoleRow | undefined;
+  return Boolean(
+    row &&
+    !row.is_superuser &&
+    !row.bypasses_row_security &&
+    !row.can_create_roles &&
+    !row.can_create_databases &&
+    !row.can_create_objects &&
+    !row.can_write
+  );
+}
+
 export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth> {
-  const connectionString = process.env.DATABASE_URL?.trim();
+  const connectionString = process.env.APP_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
 
   if (!connectionString) {
     return integration(
       "not-configured",
       "No connection string",
-      "The Neon serverless driver is integrated, but DATABASE_URL is not configured in this runtime. The application is not connected to PostgreSQL."
+      "The Neon serverless driver is integrated, but neither APP_DATABASE_URL nor DATABASE_URL is configured in this runtime. The application is not connected to PostgreSQL."
     );
   }
 
@@ -74,7 +184,7 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
       return integration(
         "invalid-credentials",
         "Invalid PostgreSQL URL",
-        "DATABASE_URL must be a valid PostgreSQL connection string. The value itself is never returned."
+        "APP_DATABASE_URL or DATABASE_URL must be a valid PostgreSQL connection string. The value itself is never returned."
       );
     }
   } catch {
@@ -104,7 +214,26 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
         to_regclass('reja.geo_areas') IS NOT NULL AS geo_areas,
         to_regclass('reja.parcels') IS NOT NULL AS parcels,
         to_regclass('reja.development_units') IS NOT NULL AS development_units,
-        to_regclass('reja.exchange_listings') IS NOT NULL AS exchange_listings
+        to_regclass('reja.exchange_listings') IS NOT NULL AS exchange_listings,
+        to_regclass('reja.market_listings') IS NOT NULL AS market_listings,
+        to_regclass('reja.market_listing_observations') IS NOT NULL AS market_listing_observations,
+        (
+          SELECT count(*) = 4
+          FROM information_schema.columns
+          WHERE table_schema = 'reja'
+            AND table_name = 'sources'
+            AND column_name IN (
+              'license_status',
+              'commercial_use_allowed',
+              'redistribution_allowed',
+              'caching_allowed'
+            )
+        ) AS source_reuse_permissions,
+        to_regclass('reja.listing_authorizations') IS NOT NULL AS listing_authorizations,
+        to_regclass('reja.exchange_listing_observations') IS NOT NULL AS exchange_listing_observations,
+        to_regclass('reja.exchange_listing_events') IS NOT NULL AS exchange_listing_events,
+        to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL
+          AS listing_authorization_helper
     `;
 
     const row = rows[0] as SchemaReadinessRow | undefined;
@@ -133,7 +262,7 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
     return integration(
       "reachable",
       "Connected · unified schema detected",
-      "The configured PostgreSQL database responded and the core, geographic, development, market and exchange schema objects are present. This check does not verify imported data quality, user authentication, seller authority or listing permissions."
+      "The configured PostgreSQL database responded and the core, geographic, development, source-permission, listing-observation, seller-authorization and exchange-event schema objects are present. This check does not verify imported data quality, signed user authentication or the evidence behind each individual listing."
     );
   } catch (error) {
     const timedOut = error instanceof Error &&
