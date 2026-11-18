@@ -73,3 +73,11 @@ test("filter menus close on Escape, outside click and when another primary menu 
   assert.match(source, /filterSubnavRef\.current\?\.contains\(event\.target\)/);
   assert.match(source, /closeFilterMenus\(\)/);
 });
+
+test("filter popovers render outside the scrolling navbar and restore keyboard focus", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /createPortal\(/);
+  assert.match(source, /activeFilterAnchorRef\.current\?\.focus\(\)/);
+  assert.match(source, /filterPopoverRef\.current\?\.contains\(event\.target\)/);
+  assert.match(source, /ref=\{filterPopoverRef\}/);
+});
