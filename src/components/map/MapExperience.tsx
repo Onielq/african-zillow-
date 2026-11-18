@@ -1058,9 +1058,10 @@ export function MapExperience() {
   const priceSummary = (() => {
     const min = activePriceMin ? compactFilterAmount(Number(activePriceMin), mapFilters.priceCurrency) : "";
     const max = activePriceMax ? compactFilterAmount(Number(activePriceMax), mapFilters.priceCurrency) : "";
-    if (!min && !max) return priceRangeMode === "monthly" ? "Monthly payment" : "Price";
-    if (min && max) return min + " – " + max;
-    return min ? "From " + min : "Up to " + max;
+    const basis = priceRangeMode === "monthly" ? "Monthly " : "";
+    if (!min && !max) return priceRangeMode === "monthly" ? "Monthly payment" : mapFilters.priceCurrency === "USD" ? "Price · USD" : "Price";
+    if (min && max) return basis + min + " – " + max;
+    return basis + (min ? "From " + min : "Up to " + max);
   })();
   const measurementSummary = mapFilters.measurementMin || mapFilters.measurementMax
     ? (mapFilters.measurementBasis === "plot" ? "Plot " : "Interior ") + (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
@@ -2600,7 +2601,7 @@ export function MapExperience() {
                         aria-hidden="true"
                         style={{
                           left: ((Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0)) / activePriceLimit) * 100) + "%",
-                          width: (((Math.max(0, Math.min(activePriceLimit, Number(activePriceMax) || activePriceLimit)) - Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0))) / activePriceLimit) * 100) + "%"
+                          width: (Math.max(0, Math.max(0, Math.min(activePriceLimit, Number(activePriceMax) || activePriceLimit)) - Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0))) / activePriceLimit * 100) + "%"
                         }}
                       />
                       <input
@@ -2698,10 +2699,15 @@ export function MapExperience() {
                                 ? withoutOtherKind.filter((value) => value !== option.value)
                                 : [...withoutOtherKind, option.value];
                               const landOnly = nextTypes.length > 0 && nextTypes.every((value) => value === "land" || value === "lots_land");
+                              const nextMeasurementBasis = landOnly ? "plot" : nextTypes.length > 0 ? "interior" : current.measurementBasis;
+                              const measurementBasisChanged = nextMeasurementBasis !== current.measurementBasis;
                               return {
                                 ...current,
                                 propertyTypes: nextTypes,
-                                measurementBasis: landOnly ? "plot" : nextTypes.length > 0 ? "interior" : current.measurementBasis,
+                                measurementBasis: nextMeasurementBasis,
+                                measurementMin: measurementBasisChanged ? "" : current.measurementMin,
+                                measurementMax: measurementBasisChanged ? "" : current.measurementMax,
+                                measurementPreset: measurementBasisChanged ? "" : current.measurementPreset,
                                 bedroomsMin: landOnly ? "" : current.bedroomsMin,
                                 bathroomsMin: landOnly ? "" : current.bathroomsMin,
                                 bedroomsExact: landOnly ? false : current.bedroomsExact,
@@ -2835,13 +2841,13 @@ export function MapExperience() {
                       <button
                         aria-pressed={mapFilters.measurementBasis === "plot"}
                         className={mapFilters.measurementBasis === "plot" ? "map-filter-segment map-filter-segment-active" : "map-filter-segment"}
-                        onClick={() => setMapFilters((current) => ({ ...current, measurementBasis: "plot", measurementPreset: "" }))}
+                        onClick={() => setMapFilters((current) => ({ ...current, measurementBasis: "plot", measurementMin: "", measurementMax: "", measurementPreset: "" }))}
                         type="button"
                       >Plot area</button>
                       <button
                         aria-pressed={mapFilters.measurementBasis === "interior"}
                         className={mapFilters.measurementBasis === "interior" ? "map-filter-segment map-filter-segment-active" : "map-filter-segment"}
-                        onClick={() => setMapFilters((current) => ({ ...current, measurementBasis: "interior", measurementPreset: "" }))}
+                        onClick={() => setMapFilters((current) => ({ ...current, measurementBasis: "interior", measurementMin: "", measurementMax: "", measurementPreset: "" }))}
                         type="button"
                       >Interior area</button>
                     </div>
@@ -2925,13 +2931,13 @@ export function MapExperience() {
                               className={mapFilters.bedroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
                               disabled={bedsBathsDisabled}
                               key={value || "any"}
-                              onClick={() => setMapFilters((current) => ({ ...current, bedroomsMin: value }))}
+                              onClick={() => setMapFilters((current) => ({ ...current, bedroomsMin: value, bedroomsExact: value ? current.bedroomsExact : false }))}
                               type="button"
                             >{index === 0 ? "Any" : value + "+"}</button>
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bedroomsExact} disabled={bedsBathsDisabled} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bedroomsExact} disabled={bedsBathsDisabled || !mapFilters.bedroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
@@ -2944,13 +2950,13 @@ export function MapExperience() {
                               className={mapFilters.bathroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
                               disabled={bedsBathsDisabled}
                               key={value || "any"}
-                              onClick={() => setMapFilters((current) => ({ ...current, bathroomsMin: value }))}
+                              onClick={() => setMapFilters((current) => ({ ...current, bathroomsMin: value, bathroomsExact: value ? current.bathroomsExact : false }))}
                               type="button"
                             >{index === 0 ? "Any" : value + "+"}</button>
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bathroomsExact} disabled={bedsBathsDisabled} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bathroomsExact} disabled={bedsBathsDisabled || !mapFilters.bathroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
