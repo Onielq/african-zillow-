@@ -1,0 +1,130 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createRejaReadOnlyDatabase } from "@/lib/reja-database";
+import {
+  buildMarketListingHistory,
+  sourceListingStatusLabel
+} from "@/lib/market-listing-history.js";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function unavailable(code: string, message: string, status = 503) {
+  return NextResponse.json(
+    { ok: false, error: code, message },
+    { status, headers: { "Cache-Control": "no-store" } }
+  );
+}
+
+/**
+ * History for one externally sourced listing. Every observation is attributed
+ * to the source; no inferred transfer or legal completion is created here.
+ */
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  if (!/^[1-9]\d{0,17}$/.test(id)) {
+    return unavailable("INVALID_LISTING_ID", "The listing ID is invalid.", 400);
+  }
+
+  const database = createRejaReadOnlyDatabase();
+  if (!database) {
+    return unavailable(
+      "LISTING_FEED_NOT_CONFIGURED",
+      "The authorized listing database is not connected. Listing history is unavailable."
+    );
+  }
+
+  try {
+    const listings = await database`
+      SELECT
+        l.id::text AS id,
+        l.listing_type AS "listingType",
+        l.asking_amount::text AS "askingAmount",
+        l.currency,
+        l.rent_period AS "rentPeriod",
+        l.property_type AS "propertyType",
+        l.district_label AS district,
+        l.sector_label AS sector,
+        l.property_area_sqm::text AS "propertyAreaSqm",
+        l.listing_status AS "sourceReportedStatus",
+        l.first_seen_at AS "firstSeenAt",
+        l.last_seen_at AS "lastSeenAt",
+        s.title AS "sourceTitle",
+        s.publisher AS "sourcePublisher",
+        s.source_url AS "sourceUrl"
+      FROM reja.market_listings l
+      JOIN reja.sources s ON s.id = l.source_id
+      WHERE l.id = ${id}::bigint
+        AND l.is_current = true
+        AND s.is_current = true
+        AND s.license_status = 'permitted'
+        AND s.commercial_use_allowed IS TRUE
+        AND s.redistribution_allowed IS TRUE
+        AND s.caching_allowed IS TRUE
+      LIMIT 1
+    `;
+
+    const listing = listings[0];
+    if (!listing) {
+      return unavailable(
+        "LISTING_NOT_FOUND",
+        "No current listing with public reuse permission matches that ID.",
+        404
+      );
+    }
+
+    const observations = await database`
+      SELECT
+        observed_at AS "observedAt",
+        asking_amount::text AS "askingAmount",
+        currency,
+        rent_period AS "rentPeriod",
+        listing_status AS "listingStatus"
+      FROM reja.market_listing_observations
+      WHERE listing_id = ${id}::bigint
+      ORDER BY observed_at ASC, id ASC
+    `;
+
+    const historyInput = observations.length > 0
+      ? observations.map((row) => ({
+          observed_at: row.observedAt,
+          asking_amount: row.askingAmount,
+          currency: row.currency,
+          rent_period: row.rentPeriod,
+          listing_status: row.listingStatus
+        }))
+      : [{
+          observed_at: listing.firstSeenAt,
+          asking_amount: listing.askingAmount,
+          currency: listing.currency,
+          rent_period: listing.rentPeriod,
+          listing_status: listing.sourceReportedStatus
+        }];
+
+    return NextResponse.json(
+      {
+        ok: true,
+        listing: {
+          ...listing,
+          statusLabel: sourceListingStatusLabel(listing.sourceReportedStatus),
+          statusBasis: "source_reported"
+        },
+        events: buildMarketListingHistory(historyInput),
+        historyBasis: "source_observations",
+        note: "These are source observations. A listing status is not proof of a registered sale, lease, title transfer or ownership change."
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error(
+      "[market:listing-history] Read failed",
+      error instanceof Error ? error.name : "UnknownError"
+    );
+    return unavailable(
+      "LISTING_HISTORY_UNAVAILABLE",
+      "The listing history could not be read. No sale or lease outcome is inferred."
+    );
+  }
+}
