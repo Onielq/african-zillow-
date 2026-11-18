@@ -76,7 +76,17 @@ export function buildMarketListingHistory(observations) {
     .filter((item) => item && Number.isFinite(new Date(item.observed_at).getTime()))
     .sort((left, right) => new Date(left.observed_at).getTime() - new Date(right.observed_at).getTime());
 
-  /** @type {ReturnType<typeof buildMarketListingHistory>} */
+  /** @type {Array<{
+   *   eventType: "first_observed"|"asking_price_changed"|"asking_terms_changed"|"status_changed"|"relisted_by_source",
+   *   occurredAt: string,
+   *   description: string,
+   *   sourceReported: true,
+   *   previousAskingAmount: string|null,
+   *   askingAmount: string,
+   *   currency: string,
+   *   previousStatus: SourceListingStatus|null,
+   *   listingStatus: SourceListingStatus
+   * }>} */
   const events = [];
   let previous = null;
 
