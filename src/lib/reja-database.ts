@@ -262,7 +262,7 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
     return integration(
       "reachable",
       "Connected · unified schema detected",
-      "The configured PostgreSQL database responded and the core, geographic, development, market and exchange schema objects are present. This check does not verify imported data quality, user authentication, seller authority or listing permissions."
+      "The configured PostgreSQL database responded and the core, geographic, development, source-permission, listing-observation, seller-authorization and exchange-event schema objects are present. This check does not verify imported data quality, signed user authentication or the evidence behind each individual listing."
     );
   } catch (error) {
     const timedOut = error instanceof Error &&
