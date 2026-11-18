@@ -63,7 +63,7 @@ test("property categories use icon cards and include the requested categories", 
 
 test("zoning selector includes multiple plan codes grouped by category", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  for (const code of ["R1", "R1A", "R1B", "R2", "R3", "R4", "A1", "A2", "C1", "C2", "C3", "C4", "I1", "I2", "I3", "T1", "T2", "T3", "T4", "PF1", "PF6", "W1A", "WB"]) {
+  for (const code of ["R1", "R1A", "R1B", "R2", "R3", "R4", "A1", "A2", "C1", "C2", "C3", "C4", "I1", "I2", "I3", "T1", "T2", "T3", "T4", "PF1", "PF6", "B", "W1", "W1A", "WB"]) {
     assert.match(source, new RegExp('"'+code+'"'));
   }
   assert.match(source, /All zoning/);
