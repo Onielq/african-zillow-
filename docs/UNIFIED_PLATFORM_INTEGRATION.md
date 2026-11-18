@@ -2,7 +2,7 @@
 
 ## What is wired
 
-The active Land Intelligence app now depends on `@neondatabase/serverless` and uses its HTTPS query transport for a server-side readiness check. This driver is compatible with the Node.js runtime used on Vercel and the Cloudflare Worker runtime used by the second deployment.
+The active Land Intelligence app depends on `@neondatabase/serverless`. It uses the HTTPS transport for a server-side schema-readiness check and a separate, read-only public listing API. This driver is compatible with the Node.js runtime used on Vercel and the Cloudflare Worker runtime used by the second deployment.
 
 `GET /api/data-sources/health` reports one of:
 - `not-configured`: no `DATABASE_URL` secret is present.
@@ -15,13 +15,13 @@ The check does not read property records, seed data, create database objects or 
 
 ## Environment setup once a Neon project exists
 
-Set `DATABASE_URL` using the Neon pooled connection string on:
+Set `APP_DATABASE_URL` using the Neon pooled connection string for the least-privilege `reja_app` role on:
 - Vercel project `rwanda-land-intelligence` (Production and Preview as appropriate).
 - Cloudflare Worker `rwanda-land-intelligence` as a secret.
 
 Use the pooled hostname for request-time runtime queries. Use a separate direct PostgreSQL connection for migrations and administrative tasks; never expose either URL to the browser or commit it to Git.
 
-The live app currently has no Neon project to connect to. No credential is configured by this change.
+The production Vercel project currently has no production database URL. A preview-only `DATABASE_URL` exists for an older schema-readiness branch; do not reuse it for production. The external listing API requires `APP_DATABASE_URL` and uses it only for read queries. It intentionally returns a configuration error until the canonical migrations, read-only role and source-permission records are ready.
 
 ## Schema source of truth
 
