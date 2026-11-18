@@ -1,29 +1,38 @@
-# Map filter navigation
+# Map filter navigation and panels
 
 ## Layout
 
-The Filters trigger on the existing map toolbar is icon-only. Opening it reveals one horizontal secondary row directly below the Developer / Projects / Metrics / Show toolbar.
+The existing map toolbar remains unchanged. The Filters trigger is icon-only. Opening it reveals a second row directly below the Developers / Projects / Metrics / Show controls.
 
-Each filter has its own trigger and dropdown:
+The row is built as six distinct, bordered filter cells. Each opens its own polished popover:
 
-- Sale / Rent: Any, For sale, For rent.
-- Price: minimum, maximum and currency.
-- Property type: land, apartment, house/villa, commercial, industrial and mixed-use.
-- Zoning: R1 (residential), C (commercial), A (agriculture) and mixed-use.
-- Measurement: minimum and maximum area in square metres.
-- Beds / Baths: minimum bedrooms and minimum bathrooms.
+- **Sale / Rent:** Any status, For sale, For rent, Sold out.
+- **Price:** List price and Monthly payment tabs; currency selection; price-distribution chart area; range sliders; and editable minimum/maximum values. Bounds are RWF 0–1 trillion and USD 0–100 million.
+- **Property type:** Any, Houses, Townhouse, Multifamily, Condos, Land, Lots & Land, Apartment, Manufactured and Mixed Use. Categories use Lucide icons.
+- **Zoning:** Grouped codes from published Kigali, Bugesera and Gakenke plan legends, with All zoning and an information panel.
+- **Measurement:** Search presets (0–300, 300–500, 500–700, 700–800 and 800+ m²) plus editable minimum/maximum fields.
+- **Beds / Baths:** Separate bedroom and bathroom sections, minimum values, and independent exact-match toggles. They are disabled for land-only selections.
 
-Only one dropdown is open at a time. Escape closes the active dropdown first and the secondary row second. Clicking outside a dropdown closes it. The main toolbar's other menus close the filter row.
+Only one filter menu is open at a time. Escape closes the active dropdown first and the secondary row second. Clicking outside a dropdown closes it. Opening another primary toolbar menu closes the filter row.
 
-## Current implementation boundary
+## Zoning catalogue and accuracy boundary
 
-This is the first UI skeleton. Dropdowns open, accept selections and retain the selected values while the map component remains mounted. It does not yet filter the map or listing results.
+The code list is a union of codes found in published plan legends. It is not a national rulebook and does not mean every code applies in every district. District Land Use Plans define the local zoning and allowed uses. The connected parcel-zoning API currently supports selected parcels in Gasabo, Kicukiro, Nyarugenge and Bugesera; it does not provide a nationwide parcel index.
 
-The data connections are intentionally separate:
+The selected-zone panel points users to local Edition 2 rules, but the Edition 2 tables are not yet indexed in Taiseel's filter data. Do not treat the measurement presets as legal plot standards. The presets are search bands only. The legal standard can vary with district plan, housing typology and building use. A verified, district-aware Edition 2 zoning-rule dataset is required before displaying official minimum or maximum plot sizes.
 
-- Sale/rent and price need an authorized listing feed. The map's estimated land value is not a listing asking price.
-- Property type and bed/ bath need verified building and unit inventory.
-- Zoning needs parcel-wide spatial joins. The current map can show zoning overlays and fetch zoning for a selected parcel, but that does not provide a complete parcel-wide filter index.
-- Measurement can later use the cadastral plot-area attribute or geometry-derived estimate, preserving the source and area basis. Building floor area must remain separate from plot area.
+## Result-count and data boundary
+
+The UI is interactive and keeps selections in component state. It does not yet filter the map or provide a live matched-result count.
+
+The result button remains disabled while the matching inventory is unavailable. This is intentional: the project directory is a research register, not a unit-level listing feed, and it does not contain reliable sale/rent/sold status, list price, monthly payment, bedroom or bathroom records. Do not infer an inventory count from project rows or seeded examples.
+
+Required data connections:
+
+- **Sale / rent / sold and price:** authorized first-party or source-observed listing records with current market status, currency, list price and monthly payment.
+- **Histogram:** enough verified list-price/payment observations to build a distribution. Do not display synthetic bars as market evidence.
+- **Property type and beds/baths:** verified building and unit inventory, with consistent typology and room-count fields.
+- **Zoning:** parcel-wide spatial joins against the applicable district-plan layer. Selected-parcel zoning alone is not a filter index.
+- **Measurement:** preserve the difference between cadastral plot area, geometry-estimated area and building floor area. Never compare them as if they were the same attribute.
 
 Do not represent a selected filter as applied to map results until its matching data layer is connected and tested.
