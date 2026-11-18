@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRejaReadOnlyDatabase } from "@/lib/reja-database";
+import {
+  createRejaReadOnlyDatabase,
+  verifyRejaReadOnlyRole
+} from "@/lib/reja-database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +80,13 @@ export async function GET(request: NextRequest) {
   const offset = (page - 1) * pageSize;
 
   try {
+    if (!(await verifyRejaReadOnlyRole(database))) {
+      return unavailable(
+        "LISTING_READ_ROLE_UNSAFE",
+        "The listing API requires a non-privileged read-only database role."
+      );
+    }
+
     const [countRows, listingRows] = await Promise.all([
       database`
         SELECT count(*)::integer AS total
