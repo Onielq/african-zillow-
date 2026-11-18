@@ -26,7 +26,7 @@ setWorkerUrl(`/vendor/maplibre-gl/${mapLibreVersion}/maplibre-gl-worker.mjs?v=${
 export type BasemapStatus = "loading" | "ready" | "error";
 export type BoundaryStatus = "loading" | "ready" | "error";
 export type BasemapMode = "map" | "satellite" | "hybrid";
-export export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
+export type AreaLevel = "district" | "sector" | "cell" | "village" | "parcel";
 
 export type ParcelPriceType =
   | "calculated-asking-price"
