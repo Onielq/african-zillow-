@@ -210,3 +210,13 @@ test("the two price sections receive separate sliders and remain side by side on
   assert.match(styles, /\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: 1fr/);
 });
+
+
+test("the icon-only Filters trigger shows an unobtrusive count when filters are active", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(source, /className="toolbar-filter-count"/);
+  assert.match(source, /activeFilterCount > 0/);
+  assert.match(styles, /\.toolbar-filter-count\s*\{[\s\S]*?position: absolute/);
+  assert.match(styles, /\.toolbar-filter-icon\s*\{[\s\S]*?position: relative/);
+});
