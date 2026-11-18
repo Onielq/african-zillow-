@@ -11,6 +11,16 @@ test("public listing API requires the dedicated read-only database connection", 
   assert.match(listingRoute, /createRejaReadOnlyDatabase/);
   assert.match(listingRoute, /LISTING_FEED_NOT_CONFIGURED/);
   assert.doesNotMatch(listingRoute, /process\.env\.DATABASE_URL/);
+  for (const schemaObject of [
+    /market_listing_observations/,
+    /source_reuse_permissions/,
+    /listing_authorizations/,
+    /exchange_listing_observations/,
+    /exchange_listing_events/,
+    /has_verified_listing_authorization/
+  ]) {
+    assert.match(database, schemaObject);
+  }
 });
 
 test("external listings are gated by explicit source reuse permissions", async () => {
