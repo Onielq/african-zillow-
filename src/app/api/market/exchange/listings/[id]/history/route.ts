@@ -86,7 +86,7 @@ export async function GET(
 
     const [events, observations] = await Promise.all([
       database`
-        SELECT event_type AS "eventType", created_at AS "occurredAt"
+        SELECT e.event_type AS "eventType", e.created_at AS "occurredAt"
         FROM reja.exchange_listing_events e
         JOIN reja.exchange_listings l ON l.id = e.listing_id
         WHERE e.listing_id = ${id}::bigint
@@ -102,10 +102,10 @@ export async function GET(
       `,
       database`
         SELECT
-          observed_at AS "observedAt",
-          asking_amount::text AS "askingAmount",
-          currency,
-          publication_status AS "publicationStatus"
+          o.observed_at AS "observedAt",
+          o.asking_amount::text AS "askingAmount",
+          o.currency,
+          o.publication_status AS "publicationStatus"
         FROM reja.exchange_listing_observations o
         JOIN reja.exchange_listings l ON l.id = o.listing_id
         WHERE o.listing_id = ${id}::bigint
