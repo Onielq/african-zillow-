@@ -15,6 +15,14 @@ test("public listing API requires the dedicated read-only database connection", 
   assert.match(database, /has_table_privilege/);
   assert.match(database, /can_write/);
   assert.doesNotMatch(listingRoute, /process\.env\.DATABASE_URL/);
+  for (const endpoint of [
+    "../src/app/api/market/listings/route.ts",
+    "../src/app/api/market/listings/[id]/history/route.ts",
+    "../src/app/api/market/exchange/listings/route.ts",
+    "../src/app/api/market/exchange/listings/[id]/history/route.ts"
+  ]) {
+    assert.match(await read(endpoint), /verifyRejaReadOnlyRole/);
+  }
   for (const schemaObject of [
     /market_listing_observations/,
     /source_reuse_permissions/,
