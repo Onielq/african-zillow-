@@ -4974,10 +4974,31 @@ input {
 
 /* Map filters — compact toolbar cells and carefully structured popovers. */
 .toolbar-filter-icon {
+  position: relative;
   width: 38px;
   min-width: 38px;
   height: 36px;
   padding: 0;
+}
+
+.toolbar-filter-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0 4px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .toolbar-filter-icon svg {
@@ -5887,5 +5908,441 @@ input {
   .map-filter-property-card,
   .map-filter-chip {
     transition: none;
+  }
+}
+
+
+/* Filter refinement v3: clear active states, one continuous dual-handle price range,
+   and an explicit distinction between land area and interior floor area. */
+.map-filter-trigger {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.map-filter-reset {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-left: 3px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 680;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.map-filter-reset:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.map-filter-price-values {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: -2px;
+}
+
+.map-filter-price-values > span {
+  display: grid;
+  gap: 3px;
+}
+
+.map-filter-price-values > span:last-child {
+  text-align: right;
+}
+
+.map-filter-price-values small {
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.map-filter-price-values strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-filter-dual-slider {
+  position: relative;
+  height: 32px;
+  margin: 0 7px;
+  touch-action: pan-y;
+}
+
+.map-filter-dual-slider-track,
+.map-filter-dual-slider-range {
+  position: absolute;
+  top: 14px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.map-filter-dual-slider-track {
+  right: 0;
+  left: 0;
+  background: var(--border);
+}
+
+.map-filter-dual-slider-range {
+  z-index: 1;
+  background: var(--brand);
+}
+
+.map-filter-dual-slider-input {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+.map-filter-dual-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.map-filter-dual-slider-input::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+.map-filter-dual-slider-input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  appearance: none;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand), 0 2px 5px rgb(20 35 28 / 18%);
+  pointer-events: auto;
+}
+
+.map-filter-dual-slider-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand), 0 2px 5px rgb(20 35 28 / 18%);
+  pointer-events: auto;
+}
+
+.map-filter-dual-slider-input:focus-visible {
+  outline: none;
+}
+
+.map-filter-dual-slider-input:focus-visible::-webkit-slider-thumb {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.map-filter-dual-slider-input:focus-visible::-moz-range-thumb {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.map-filter-histogram-empty > svg {
+  margin-bottom: 2px;
+  color: var(--ink-muted);
+}
+
+.map-filter-area-basis-note {
+  margin-top: -7px;
+  padding: 0 2px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.map-filter-zone-search {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+
+.map-filter-zone-search:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.map-filter-zone-search input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+
+.map-filter-zone-search input::placeholder {
+  color: var(--ink-muted);
+}
+
+.map-filter-zone-search button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.map-filter-zone-search button:hover {
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+@media (max-width: 760px) {
+  .map-filter-trigger {
+    max-width: 156px;
+  }
+
+  .map-filter-reset {
+    min-height: 34px;
+    padding-inline: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-filter-trigger {
+    max-width: 142px;
+  }
+
+  .map-filter-price-values strong {
+    font-size: 11px;
+  }
+
+  .map-filter-dual-slider {
+    margin-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-filter-reset {
+    transition: none;
+  }
+}
+
+
+/* Zoning details remain compact but readable when several codes are selected. */
+.map-filter-selected-zone-summary {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.map-filter-selected-zone-summary > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.map-filter-selected-zone-summary small {
+  display: block;
+  max-width: 270px;
+  color: var(--ink-secondary);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.map-filter-info-panel {
+  gap: 8px;
+}
+
+.map-filter-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+
+.map-filter-source-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 720;
+  text-decoration: none;
+}
+
+.map-filter-source-links a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.map-filter-source-links a span {
+  color: inherit;
+  font-size: 10px;
+}
+
+@media (max-width: 480px) {
+  .map-filter-selected-zone-summary {
+    align-items: flex-start;
+  }
+
+  .map-filter-selected-zone-summary small {
+    max-width: none;
+  }
+
+  .map-filter-source-links {
+    flex-direction: column;
+    gap: 7px;
+  }
+}
+
+
+/* List price and monthly payment are independent, visible side by side. */
+.map-filter-popover-price {
+  width: 660px;
+  max-width: min(660px, calc(100vw - 32px));
+}
+
+.map-filter-price-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.map-filter-price-section {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.map-filter-price-section-heading {
+  display: flex;
+  min-height: 35px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.map-filter-price-section-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.map-filter-price-section-heading strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.map-filter-price-section-heading small {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-filter-price-section-heading > span {
+  flex: 0 0 auto;
+  color: var(--ink-secondary);
+  font-size: 9px;
+  font-weight: 740;
+}
+
+.map-filter-price-section .map-filter-histogram {
+  min-height: 112px;
+  padding: 8px 9px 7px;
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.map-filter-price-section .map-filter-histogram-empty {
+  gap: 3px;
+  padding: 10px 2px 6px;
+}
+
+.map-filter-price-section .map-filter-histogram-empty span {
+  font-size: 10px;
+}
+
+.map-filter-price-section .map-filter-histogram-empty small {
+  max-width: 190px;
+  font-size: 9px;
+}
+
+.map-filter-price-section .map-filter-price-values strong {
+  font-size: 11px;
+}
+
+.map-filter-price-section .map-filter-range-fields {
+  gap: 7px;
+}
+
+.map-filter-price-section .map-filter-range-fields input {
+  height: 37px;
+  padding-inline: 8px;
+  font-size: 11px;
+}
+
+.map-filter-price-section .map-filter-dual-slider {
+  margin-inline: 4px;
+}
+
+@media (max-width: 760px) {
+  .map-filter-popover-price {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  .map-filter-price-columns {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .map-filter-price-section {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-filter-price-section .map-filter-range-fields input {
+    height: 39px;
+    font-size: 12px;
   }
 }
