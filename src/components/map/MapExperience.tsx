@@ -19,6 +19,7 @@ import {
   Ruler,
   Satellite,
   Search,
+  SlidersHorizontal,
   Waves,
   X,
   type LucideIcon
@@ -30,6 +31,7 @@ import { gsap } from "gsap";
 import { Marker, type Map as MapLibreMapInstance } from "maplibre-gl";
 import {
   MapView,
+  type AreaLevel,
   isParcelPriceType,
   parcelPriceTypeLabel,
   type BasemapStatus,
@@ -790,6 +792,10 @@ export function MapExperience() {
   const [selectedProjectDeveloperId, setSelectedProjectDeveloperId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [geographicLevel, setGeographicLevel] = useState<AreaLevel>("district");
+  const [minimumParcelArea, setMinimumParcelArea] = useState("");
+  const [maximumParcelArea, setMaximumParcelArea] = useState("");
   const [showLayers, setShowLayers] = useState<MapOverlayCategory[]>(["landmarks"]);
   const [showZoning, setShowZoning] = useState(false);
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("developers");
@@ -881,6 +887,15 @@ export function MapExperience() {
         };
   const toolbarRef = useRef<HTMLDivElement>(null);
   const areaPanelRef = useRef<HTMLElement>(null);
+
+  const handleGeographicLevelChange = useCallback((level: AreaLevel) => {
+    setGeographicLevel(level);
+  }, []);
+
+  const parcelSizeFilter = {
+    min: minimumParcelArea.trim() ? Number(minimumParcelArea) : null,
+    max: maximumParcelArea.trim() ? Number(maximumParcelArea) : null
+  };
 
   const handleMapReady = useCallback(
     (map: MapLibreMapInstance | null) => {
@@ -1706,20 +1721,21 @@ export function MapExperience() {
         setCompareOpen(false);
         return;
       }
-      if (metricInfoOpen || metricsOpen || developersOpen || projectsOpen || sourcesOpen || showOpen) {
+      if (metricInfoOpen || metricsOpen || developersOpen || projectsOpen || sourcesOpen || showOpen || filtersOpen) {
         setMetricInfoOpen(false);
         setMetricsOpen(false);
         setDevelopersOpen(false);
         setProjectsOpen(false);
         setSourcesOpen(false);
         setShowOpen(false);
+        setFiltersOpen(false);
         return;
       }
       if (selectedArea) setSelectedArea(null);
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, selectedArea]);
+  }, [compareOpen, metricInfoOpen, metricsOpen, developersOpen, projectsOpen, sourcesOpen, showOpen, filtersOpen, selectedArea]);
 
   useEffect(() => {
     if (!selectedArea || !areaPanelRef.current) return;
@@ -1835,6 +1851,8 @@ export function MapExperience() {
           onStatusChange={handleBasemapStatus}
           onBoundaryStatusChange={handleBoundaryStatus}
           onAreaSelected={handleAreaSelected}
+          onGeographicLevelChange={handleGeographicLevelChange}
+          parcelSizeFilter={parcelSizeFilter}
           selectedArea={selectedArea}
           projects={RWANDA_PROJECT_RECORDS}
           showProjects={workspaceMode === "projects" || projectsOpen}
@@ -1870,6 +1888,16 @@ export function MapExperience() {
             <Layers aria-hidden="true" size={16} strokeWidth={1.8} />
             Hybrid
           </button>
+        </div>
+
+        <div className="geographic-level-indicator" role="group" aria-label="Current map detail level">
+          <span className="geographic-level-caption">MAP LEVEL</span>
+          <div className="geographic-level-steps">
+            {(["district", "sector", "cell", "village", "parcel"] as AreaLevel[]).map((level, index) => {
+              const activeIndex = (["district", "sector", "cell", "village", "parcel"] as AreaLevel[]).indexOf(geographicLevel);
+              return <span className={index === activeIndex ? "geographic-level-step geographic-level-step-active" : index < activeIndex ? "geographic-level-step geographic-level-step-passed" : "geographic-level-step"} key={level} aria-current={index === activeIndex ? "step" : undefined}><i>{index + 1}</i><small>{level}</small></span>;
+            })}
+          </div>
         </div>
 
         <div className="map-status-card" aria-label="Map connection status">
@@ -2097,6 +2125,25 @@ export function MapExperience() {
               Show <span aria-hidden="true">⌄</span>
             </button>
             <button
+              aria-label="Filter map results"
+              aria-expanded={filtersOpen}
+              className={filtersOpen ? "toolbar-action toolbar-action-active toolbar-filter-action" : "toolbar-action toolbar-filter-action"}
+              onClick={() => {
+                setShowOpen(false);
+                setMetricsOpen(false);
+                setDevelopersOpen(false);
+                setProjectsOpen(false);
+                setSourcesOpen(false);
+                setMetricInfoOpen(false);
+                setFiltersOpen((open) => !open);
+              }}
+              title="Filter map results"
+              type="button"
+            >
+              <SlidersHorizontal aria-hidden="true" size={15} />
+              <span className="toolbar-filter-label">Filters</span>
+            </button>
+            <button
               aria-label="Sources and map information"
               aria-expanded={sourcesOpen || metricInfoOpen}
               title="Sources and map information"
@@ -2121,6 +2168,21 @@ export function MapExperience() {
           </div>
         </div>
 
+
+        {filtersOpen ? (
+          <aside aria-label="Filter map results" className="map-filters-panel">
+            <div className="show-menu-header">
+              <div><p className="panel-eyebrow">MAP RESULTS</p><h2>Filters</h2></div>
+              <button aria-label="Close filters" className="panel-close" onClick={() => setFiltersOpen(false)} type="button">×</button>
+            </div>
+            <section className="map-filter-section"><h3>Property type</h3><div className="map-filter-chips"><button className="map-filter-chip map-filter-chip-active" type="button" aria-pressed="true">Land</button><button className="map-filter-chip" type="button" disabled title="Verified building inventory is not connected">Residential</button><button className="map-filter-chip" type="button" disabled title="Verified building inventory is not connected">Commercial</button></div></section>
+            <section className="map-filter-section"><h3>Availability</h3><div className="map-filter-chips"><button className="map-filter-chip" type="button" disabled title="A verified listing feed is not connected">For sale</button><button className="map-filter-chip" type="button" disabled title="A verified rental listing feed is not connected">For rent</button></div><p className="map-filter-note">Sale and rental listings will appear when verified listing records are connected. Cadastral parcels are not automatically properties for sale.</p></section>
+            <section className="map-filter-section"><h3>Land size</h3><div className="map-filter-range"><label>Minimum m²<input inputMode="decimal" min="0" type="number" placeholder="Any" value={minimumParcelArea} onChange={(event) => setMinimumParcelArea(event.target.value)} /></label><label>Maximum m²<input inputMode="decimal" min="0" type="number" placeholder="Any" value={maximumParcelArea} onChange={(event) => setMaximumParcelArea(event.target.value)} /></label></div><p className="map-filter-note">Uses the published cadastral parcel-size attribute. Parcels without a recorded size are excluded while a size filter is active. Zoom to parcel level to see matching plots.</p></section>
+            <section className="map-filter-section"><h3>Budget</h3><div className="map-filter-range"><label>Minimum RWF<input disabled placeholder="Not connected" /></label><label>Maximum RWF<input disabled placeholder="Not connected" /></label></div><p className="map-filter-note">A reliable parcel-level asking-price feed is not connected. Area price benchmarks are not individual parcel asking prices.</p></section>
+            <section className="map-filter-section"><h3>Zoning</h3><div className="map-filter-chips">{["R1", "R1A", "R2", "R3", "R4", "Commercial", "Industrial", "Mixed use", "Agriculture"].map((zone) => <button className="map-filter-chip" disabled key={zone} title="Parcel-to-zoning matching is not yet connected">{zone}</button>)}</div><p className="map-filter-note">Published zoning overlays exist, but parcel-to-zone matching and verified plot-size rules are not yet joined. These choices stay unavailable rather than returning misleading results.</p></section>
+            <div className="map-filter-footer"><button type="button" className="map-filter-reset" onClick={() => { setMinimumParcelArea(""); setMaximumParcelArea(""); }}>Clear filters</button><button type="button" className="map-filter-done" onClick={() => setFiltersOpen(false)}>Done</button></div>
+          </aside>
+        ) : null}
 
         {showOpen ? (
           <aside aria-label="Show map layers" className="show-menu">
