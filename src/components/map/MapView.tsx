@@ -557,8 +557,8 @@ type MapViewProps = {
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
   onAreaSelected: (area: SelectedArea | null) => void;
-  onGeographicLevelChange: (level: AreaLevel) => void;
-  parcelSizeFilter: { min: number | null; max: number | null };
+  onGeographicLevelChange?: (level: AreaLevel) => void;
+  parcelSizeFilter?: { min: number | null; max: number | null };
 };
 
 const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
@@ -1192,8 +1192,8 @@ export function MapView({
   onStatusChange,
   onBoundaryStatusChange,
   onAreaSelected,
-  onGeographicLevelChange,
-  parcelSizeFilter,
+  onGeographicLevelChange = () => undefined,
+  parcelSizeFilter = { min: null, max: null },
   showLayers,
   showScope,
   selectedArea,
