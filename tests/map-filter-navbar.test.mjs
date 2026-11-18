@@ -48,13 +48,20 @@ test("price filter has list-price and monthly-payment ranges, caps and editable 
   assert.match(source, /priceMin/);
   assert.match(source, /priceMax/);
   assert.match(source, /Price distribution/);
-  assert.match(source, /No sample bars are shown/);
+  assert.match(source, /Verified listings are required to draw price bands/);
   assert.match(source, /Live count unavailable/);
   assert.match(source, /Inventory not connected/);
+  assert.match(source, /map-filter-price-columns/);
+  assert.match(source, /map-filter-price-section/);
+  assert.match(source, /key: "list"/);
+  assert.match(source, /key: "monthly"/);
   assert.match(source, /map-filter-dual-slider/);
-  assert.match(source, /updatePriceSlider\("min"/);
-  assert.match(source, /updatePriceSlider\("max"/);
+  assert.match(source, /updatePriceSlider\(range\.key, "min"/);
+  assert.match(source, /updatePriceSlider\(range\.key, "max"/);
+  assert.match(source, /rangeOutOfBounds/);
+  assert.match(source, /RWF 0 and RWF 1 trillion/);
   assert.match(source, /Maximum must be greater than minimum/);
+  assert.doesNotMatch(source, /priceRangeMode/);
 });
 
 test("property categories use icon cards and include the requested categories", async () => {
@@ -177,4 +184,17 @@ test("zoning information points to official plan sources and avoids universal pl
   assert.match(source, /https:\/\/geodata\.rw\/server\/rest\/services\/Hosted\/Gakenke_DLUP_20042026\/MapServer\/legend/);
   assert.match(source, /A3 and A4 were not present in the official plan legends checked/);
   assert.match(source, /Those figures must not be copied to other districts/);
+});
+
+test("list price and monthly payment are visible as two independent side-by-side sections", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /className="map-filter-price-columns"/);
+  assert.match(source, /title: "List price"/);
+  assert.match(source, /title: "Monthly payment"/);
+  assert.match(source, /minKey: "priceMin"/);
+  assert.match(source, /maxKey: "priceMax"/);
+  assert.match(source, /minKey: "monthlyPaymentMin"/);
+  assert.match(source, /maxKey: "monthlyPaymentMax"/);
+  assert.match(source, /aria-label=\{range\.title \+ " minimum slider"\}/);
+  assert.match(source, /aria-label=\{range\.title \+ " maximum slider"\}/);
 });
