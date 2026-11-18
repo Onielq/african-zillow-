@@ -54,3 +54,17 @@ test("history lookup repeats the same source-permission gates as the public feed
   assert.match(route, /statusBasis: "source_reported"/);
   assert.match(route, /not proof of a registered sale/);
 });
+
+
+test("first-party exchange endpoints expose only published, unexpired listings", async () => {
+  const route = await read("../src/app/api/market/exchange/listings/route.ts");
+  const history = await read("../src/app/api/market/exchange/listings/[id]/history/route.ts");
+  assert.match(route, /l\.publication_status = 'published'/);
+  assert.match(route, /l\.expires_at IS NULL OR l\.expires_at > now\(\)/);
+  assert.match(route, /inventoryKind: "first_party_taiseel"/);
+  assert.match(history, /l\.publication_status = 'published'/);
+  assert.match(history, /reja\.exchange_listing_events/);
+  assert.match(history, /reja\.exchange_listing_observations/);
+  assert.doesNotMatch(route + history, /seller_user_id|moderation_notes|event_data|actor_user_id/);
+  assert.doesNotMatch(route + history, /\b(?:INSERT INTO|UPDATE reja\.|DELETE FROM)\b/i);
+});
