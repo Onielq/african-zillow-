@@ -68,3 +68,16 @@ test("first-party exchange endpoints expose only published, unexpired listings",
   assert.doesNotMatch(route + history, /seller_user_id|moderation_notes|event_data|actor_user_id/);
   assert.doesNotMatch(route + history, /\b(?:INSERT INTO|UPDATE reja\.|DELETE FROM)\b/i);
 });
+
+
+test("public exchange reads recheck the verified seller authorization and its validity", async () => {
+  const route = await read("../src/app/api/market/exchange/listings/route.ts");
+  const history = await read("../src/app/api/market/exchange/listings/[id]/history/route.ts");
+  for (const source of [route, history]) {
+    assert.match(source, /reja\.has_verified_listing_authorization\(/);
+    assert.match(source, /l\.listing_authorization_id/);
+    assert.match(source, /l\.market_property_id/);
+    assert.match(source, /l\.seller_user_id/);
+    assert.match(source, /l\.seller_organization_id/);
+  }
+});
