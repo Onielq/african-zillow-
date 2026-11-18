@@ -92,9 +92,17 @@ export async function GET(
         currency,
         rent_period AS "rentPeriod",
         listing_status AS "listingStatus"
-      FROM reja.market_listing_observations
-      WHERE listing_id = ${id}::bigint
-      ORDER BY observed_at ASC, id ASC
+      FROM reja.market_listing_observations o
+      JOIN reja.market_listings l ON l.id = o.listing_id
+      JOIN reja.sources s ON s.id = l.source_id
+      WHERE o.listing_id = ${id}::bigint
+        AND l.is_current = true
+        AND s.is_current = true
+        AND s.license_status = 'permitted'
+        AND s.commercial_use_allowed IS TRUE
+        AND s.redistribution_allowed IS TRUE
+        AND s.caching_allowed IS TRUE
+      ORDER BY o.observed_at ASC, o.id ASC
     `;
 
     const historyInput = observations.length > 0
