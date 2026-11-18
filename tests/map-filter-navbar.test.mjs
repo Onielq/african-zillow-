@@ -48,7 +48,12 @@ test("price filter has list-price and monthly-payment ranges, caps and editable 
   assert.match(source, /priceMin/);
   assert.match(source, /priceMax/);
   assert.match(source, /Price distribution/);
-  assert.match(source, /Results unavailable/);
+  assert.match(source, /No sample bars are shown/);
+  assert.match(source, /Live count unavailable/);
+  assert.match(source, /Inventory not connected/);
+  assert.match(source, /map-filter-dual-slider/);
+  assert.match(source, /updatePriceSlider\("min"/);
+  assert.match(source, /updatePriceSlider\("max"/);
   assert.match(source, /Maximum must be greater than minimum/);
 });
 
@@ -63,13 +68,17 @@ test("property categories use icon cards and include the requested categories", 
 
 test("zoning selector includes multiple plan codes grouped by category", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  for (const code of ["R1", "R1A", "R1B", "R2", "R3", "R4", "A1", "A2", "C1", "C2", "C3", "C4", "I1", "I2", "I3", "T1", "T2", "T3", "T4", "PF1", "PF6", "B", "W1", "W1A", "WB"]) {
+  for (const code of ["R1", "R1A", "R1B", "R2", "R3", "R4", "RS", "A", "A1", "A2", "B", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4", "ET", "F", "F1", "F2", "F3", "F4", "F5", "F6", "I", "I1", "I2", "I3", "OS", "P1", "P2", "P3B", "P3C", "PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "T", "T1", "T2", "T3", "T4", "U", "UE", "W1A", "W1B", "W2", "W3", "W4", "W5", "WB"]) {
     assert.match(source, new RegExp('"'+code+'"'));
   }
   assert.match(source, /All zoning/);
   assert.match(source, /zoningInfoOpen/);
   assert.match(source, /Typical plot measurement/);
-  assert.match(source, /See local Edition 2 rules/);
+  assert.match(source, /District-plan and housing-type specific/);
+  assert.match(source, /ZONING_FILTER_DESCRIPTIONS/);
+  assert.match(source, /A3 and A4 were not present/);
+  assert.match(source, /NLA zoning regulations/);
+  assert.match(source, /geodata\\.rw\\/server\\/rest\\/services/);
 });
 
 test("measurement keeps manual inputs and adds non-regulatory area presets", async () => {
@@ -111,4 +120,61 @@ test("filter popovers portal outside the toolbar and restore keyboard focus", as
   assert.match(source, /activeFilterAnchorRef\.current\?\.focus\(\)/);
   assert.match(source, /filterPopoverRef\.current\?\.contains\(event\.target\)/);
   assert.match(source, /ref=\{popoverRef\}/);
+});
+
+
+test("filter values summarize in the toolbar and Reset all clears every filter state", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /priceSummary/);
+  assert.match(source, /measurementSummary/);
+  assert.match(source, /bedsBathsSummary/);
+  assert.match(source, /selectedZoneCodes.length > 0/);
+  assert.match(source, /activeFilterCount > 0/);
+  assert.match(source, /className="map-filter-reset"/);
+  assert.match(source, /Reset all/);
+  assert.match(source, /const resetMapFilters = \(\) =>/);
+  assert.match(source, /setZoningSearch\(""/);
+});
+
+test("plot and interior measurement ranges are kept separate when the area basis changes", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /type MeasurementBasis = "plot" \| "interior"/);
+  assert.match(source, /Plot area/);
+  assert.match(source, /Interior area/);
+  assert.match(source, /measurementBasis: "plot", measurementMin: "", measurementMax: ""/);
+  assert.match(source, /measurementBasis: "interior", measurementMin: "", measurementMax: ""/);
+  assert.match(source, /measurementBasisChanged/);
+  assert.match(source, /interior floor area/);
+});
+
+test("land-only selections switch to plot measurement and clear room filters", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /const landOnly = nextTypes\.length > 0/);
+  assert.match(source, /measurementBasis: nextMeasurementBasis/);
+  assert.match(source, /bedroomsMin: landOnly \? ""/);
+  assert.match(source, /bathroomsMin: landOnly \? ""/);
+  assert.match(source, /bedroomsExact: landOnly \? false/);
+  assert.match(source, /bathroomsExact: landOnly \? false/);
+});
+
+test("exact-match toggles require a selected bedroom or bathroom value", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /disabled=\{bedsBathsDisabled \|\| !mapFilters\.bedroomsMin\}/);
+  assert.match(source, /disabled=\{bedsBathsDisabled \|\| !mapFilters\.bathroomsMin\}/);
+  assert.match(source, /bedroomsExact: value \? current\.bedroomsExact : false/);
+  assert.match(source, /bathroomsExact: value \? current\.bathroomsExact : false/);
+});
+
+test("the price track cannot render a negative width when manual bounds are temporarily invalid", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /width: \(Math\.max\(0, Math\.max\(0,/);
+  assert.match(source, /Maximum must be greater than minimum/);
+});
+
+test("zoning information points to official plan sources and avoids universal plot-size claims", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /https:\/\/www\.lands\.rw\/publications\/master-plans/);
+  assert.match(source, /https:\/\/geodata\.rw\/server\/rest\/services\/Hosted\/Gakenke_DLUP_20042026\/MapServer\/legend/);
+  assert.match(source, /A3 and A4 were not present in the official plan legends checked/);
+  assert.match(source, /Those figures must not be copied to other districts/);
 });
