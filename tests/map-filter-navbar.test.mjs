@@ -79,5 +79,5 @@ test("filter popovers render outside the scrolling navbar and restore keyboard f
   assert.match(source, /createPortal\(/);
   assert.match(source, /activeFilterAnchorRef\.current\?\.focus\(\)/);
   assert.match(source, /filterPopoverRef\.current\?\.contains\(event\.target\)/);
-  assert.match(source, /ref=\{filterPopoverRef\}/);
+  assert.match(source, /ref=\{popoverRef\}/);
 });
