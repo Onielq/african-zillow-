@@ -87,11 +87,11 @@ export async function GET(
 
     const observations = await database`
       SELECT
-        observed_at AS "observedAt",
-        asking_amount::text AS "askingAmount",
-        currency,
-        rent_period AS "rentPeriod",
-        listing_status AS "listingStatus"
+        o.observed_at AS "observedAt",
+        o.asking_amount::text AS "askingAmount",
+        o.currency,
+        o.rent_period AS "rentPeriod",
+        o.listing_status AS "listingStatus"
       FROM reja.market_listing_observations o
       JOIN reja.market_listings l ON l.id = o.listing_id
       JOIN reja.sources s ON s.id = l.source_id
