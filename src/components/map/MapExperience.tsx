@@ -812,6 +812,11 @@ function getAreaParent(area: SelectedArea): string | null {
 }
 
 
+function getFilterResultCount(): number | null {
+  // Waiting for a verified listing and unit inventory index.
+  return null;
+}
+
 type FilterPopoverPortalProps = {
   anchorRef: { current: HTMLButtonElement | null };
   popoverRef: { current: HTMLDivElement | null };
@@ -951,7 +956,7 @@ export function MapExperience() {
   const bedsBathsDisabled = mapFilters.propertyTypes.length > 0 &&
     mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
   // Project-directory records are not live unit listings; do not invent a result count.
-  const filterResultCount: number | null = null;
+  const filterResultCount = getFilterResultCount();
   const activePriceMin = priceRangeMode === "list" ? mapFilters.priceMin : mapFilters.monthlyPaymentMin;
   const activePriceMax = priceRangeMode === "list" ? mapFilters.priceMax : mapFilters.monthlyPaymentMax;
   const activePriceLimit = mapFilters.priceCurrency === "USD" ? 100_000_000 : 1_000_000_000_000;
