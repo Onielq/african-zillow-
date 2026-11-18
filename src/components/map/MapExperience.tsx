@@ -835,7 +835,11 @@ function FilterPopoverPortal({
       if (!anchor) return;
 
       const bounds = anchor.getBoundingClientRect();
-      const preferredWidth = className.includes("zoning") ? 326 : 292;
+      const preferredWidth = className.includes("price") || className.includes("beds") || className.includes("zoning")
+        ? 520
+        : className.includes("property") || className.includes("measurement")
+          ? 430
+          : 320;
       const popoverWidth = Math.min(preferredWidth, window.innerWidth - 32);
       const left = Math.max(16, Math.min(bounds.left, window.innerWidth - popoverWidth - 16));
       const expectedHeight = popoverRef.current?.offsetHeight ?? 260;
@@ -2767,7 +2771,7 @@ export function MapExperience() {
                   </FilterPopoverPortal>
                 ) : null}
               </div>
-            </div>            </div>
+            </div>
           ) : null}
         </div>
 
