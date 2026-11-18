@@ -174,7 +174,8 @@ test("exact-match toggles require a selected bedroom or bathroom value", async (
 
 test("the price track cannot render a negative width when manual bounds are temporarily invalid", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /width: \(Math\.max\(0, Math\.max\(0,/);
+  assert.match(source, /width: \(Math\.max\(0, maximum - minimum\)/);
+  assert.match(source, /rangeInvalid = range\.minimum && range\.maximum/);
   assert.match(source, /Maximum must be greater than minimum/);
 });
 
