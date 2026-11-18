@@ -25,7 +25,7 @@ These records are not Taiseel-authorized inventory. The API labels the status as
 
 The migration supports events such as created, submitted, approved, published, revised, withdrawn, expired, sold, leased and reopened. A listing needs verified seller authority for the exact property before it can be published. Public reads and seller/moderator access are protected by PostgreSQL row-level security.
 
-The external-feed endpoints do not read or write first-party exchange tables. The public exchange endpoints read only currently published, unexpired listings. PostgreSQL row-level security must remain enabled; the API does not return seller IDs, authorization evidence, free-text moderation notes or private event payloads. First-party submission, moderation and private seller history remain disabled until a signed-session identity provider and trusted transaction-local user context are implemented. History for a listing that is no longer publicly published remains private to authorized parties.
+The external-feed endpoints do not read or write first-party exchange tables. The public exchange endpoints read only currently published, unexpired listings and recheck the verified authorization against the exact property and seller on every read. PostgreSQL row-level security must remain enabled; the API does not return seller IDs, authorization evidence, free-text moderation notes or private event payloads. First-party submission, moderation and private seller history remain disabled until a signed-session identity provider and trusted transaction-local user context are implemented. History for a listing that is no longer publicly published remains private to authorized parties.
 
 ## Status rules
 
