@@ -6137,3 +6137,70 @@ input {
     transition: none;
   }
 }
+
+
+/* Zoning details remain compact but readable when several codes are selected. */
+.map-filter-selected-zone-summary {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.map-filter-selected-zone-summary > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.map-filter-selected-zone-summary small {
+  display: block;
+  max-width: 270px;
+  color: var(--ink-secondary);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.map-filter-info-panel {
+  gap: 8px;
+}
+
+.map-filter-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+
+.map-filter-source-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 720;
+  text-decoration: none;
+}
+
+.map-filter-source-links a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.map-filter-source-links a span {
+  color: inherit;
+  font-size: 10px;
+}
+
+@media (max-width: 480px) {
+  .map-filter-selected-zone-summary {
+    align-items: flex-start;
+  }
+
+  .map-filter-selected-zone-summary small {
+    max-width: none;
+  }
+
+  .map-filter-source-links {
+    flex-direction: column;
+    gap: 7px;
+  }
+}
