@@ -10,6 +10,10 @@ test("public listing API requires the dedicated read-only database connection", 
   assert.match(database, /process\.env\.APP_DATABASE_URL\?\.trim\(\)/);
   assert.match(listingRoute, /createRejaReadOnlyDatabase/);
   assert.match(listingRoute, /LISTING_FEED_NOT_CONFIGURED/);
+  assert.match(listingRoute, /verifyRejaReadOnlyRole/);
+  assert.match(database, /rolbypassrls/);
+  assert.match(database, /has_table_privilege/);
+  assert.match(database, /can_write/);
   assert.doesNotMatch(listingRoute, /process\.env\.DATABASE_URL/);
   for (const schemaObject of [
     /market_listing_observations/,
