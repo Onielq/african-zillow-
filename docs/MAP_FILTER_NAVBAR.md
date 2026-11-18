@@ -19,7 +19,7 @@ Only one filter menu is open at a time. Escape closes the active dropdown first 
 
 The code list is a union of codes found in published plan legends. It is not a national rulebook and does not mean every code applies in every district. District Land Use Plans define the local zoning and allowed uses. The connected parcel-zoning API currently supports selected parcels in Gasabo, Kicukiro, Nyarugenge and Bugesera; it does not provide a nationwide parcel index.
 
-The selected-zone panel therefore identifies that the current Edition 2 plot-size rule is not loaded. Do not treat the measurement presets as legal plot standards. The presets are search bands only. The legal standard can vary with district plan, housing typology and building use. A verified Edition 2 zoning-rule dataset is required before displaying official minimum or maximum plot sizes.
+The selected-zone panel points users to local Edition 2 rules, but the Edition 2 tables are not yet indexed in Taiseel's filter data. Do not treat the measurement presets as legal plot standards. The presets are search bands only. The legal standard can vary with district plan, housing typology and building use. A verified, district-aware Edition 2 zoning-rule dataset is required before displaying official minimum or maximum plot sizes.
 
 ## Result-count and data boundary
 
