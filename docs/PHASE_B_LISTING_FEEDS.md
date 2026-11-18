@@ -44,7 +44,7 @@ Asking prices remain separate from completed transaction records. Currency and r
 
 ## Runtime connection
 
-The APIs require server-only `APP_DATABASE_URL`. Set it to a pooled connection for the dedicated, least-privilege `reja_app` role after the canonical migrations have been applied. That role must have read permissions only and must not bypass row-level security. The listing routes never use `DATABASE_URL` as a fallback and contain no write operations.
+The APIs require server-only `APP_DATABASE_URL`. Set it to a pooled connection for the dedicated, least-privilege `reja_app` role after the canonical migrations have been applied. Each public request checks the connected role and rejects it if it can bypass row-level security, create database/schema objects, administer roles/databases, or write to REJA tables. The listing routes never use `DATABASE_URL` as a fallback and contain no write operations.
 
 The general integration-health probe may use `APP_DATABASE_URL` first and `DATABASE_URL` as a legacy readiness fallback. Do not set an owner/migration credential as `APP_DATABASE_URL`.
 
