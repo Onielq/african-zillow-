@@ -100,10 +100,10 @@ const ZONING_FILTER_GROUPS = [
   { label: "Residential", codes: ["R1", "R1A", "R1B", "R2", "R3", "R4", "RS"] },
   { label: "Commercial", codes: ["C1", "C2", "C3", "C4"] },
   { label: "Agriculture & livestock", codes: ["A", "A1", "A2"] },
-  { label: "Industrial & mining", codes: ["F", "I", "I1", "I2", "I3"] },
+  { label: "Industrial & mining", codes: ["I", "I1", "I2", "I3"] },
   { label: "Public facilities", codes: ["PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6"] },
   { label: "Buffers", codes: ["B", "B1", "B2", "B3", "B4"] },
-  { label: "Parks, forests & ecology", codes: ["ET", "F1", "F2", "F3", "F4", "F5", "F6", "OS", "P1", "P2", "P3B", "P3C"] },
+  { label: "Parks, forests & ecology", codes: ["ET", "F", "F1", "F2", "F3", "F4", "F5", "F6", "OS", "P1", "P2", "P3B", "P3C"] },
   { label: "Transport & utilities", codes: ["T", "T1", "T2", "T3", "T4", "U", "UE"] },
   { label: "Wetlands & water", codes: ["W1A", "W1B", "W2", "W3", "W4", "W5", "WB"] }
 ] as const;
@@ -1038,6 +1038,9 @@ export function MapExperience() {
   const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 1_000_000;
   const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
+  const selectedZoneDescriptions = selectedZoneCodes
+    .map((code) => code + " · " + (ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"))
+    .join(" / ");
   const visibleZoningGroups = ZONING_FILTER_GROUPS
     .map((group) => ({
       ...group,
@@ -1046,11 +1049,11 @@ export function MapExperience() {
     .filter((group) => group.codes.length > 0);
   const activeFilterCount = [
     mapFilters.listingType !== "all",
-    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax),
+    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax || mapFilters.priceCurrency !== "RWF" || priceRangeMode !== "list"),
     mapFilters.propertyTypes.length > 0,
     mapFilters.zoningCodes.length > 0,
-    Boolean(mapFilters.measurementMin || mapFilters.measurementMax),
-    Boolean(mapFilters.bedroomsMin || mapFilters.bathroomsMin)
+    Boolean(mapFilters.measurementMin || mapFilters.measurementMax || mapFilters.measurementBasis !== "plot"),
+    Boolean(mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.bedroomsExact || mapFilters.bathroomsExact)
   ].filter(Boolean).length;
   const priceSummary = (() => {
     const min = activePriceMin ? compactFilterAmount(Number(activePriceMin), mapFilters.priceCurrency) : "";
@@ -2759,15 +2762,20 @@ export function MapExperience() {
                     </label>
                     {selectedZoneCodes.length > 0 ? (
                       <div className="map-filter-selected-zone-summary">
-                        <div><span>Selected zone</span><strong>{selectedZoneCodes.join(", ")}</strong></div>
-                        <div><span>Typical plot measurement</span><strong>See local Edition 2 rules</strong></div>
+                        <div><span>Selected zone</span><strong>{selectedZoneCodes.join(", ")}</strong><small>{selectedZoneDescriptions}</small></div>
+                        <div><span>Typical plot measurement</span><strong>District-plan and housing-type specific</strong></div>
                       </div>
                     ) : null}
                     {zoningInfoOpen ? (
                       <div className="map-filter-info-panel">
                         <strong>How zoning works</strong>
-                        <p>Each District Land Use Plan defines which codes apply locally. This catalogue combines codes found in published Kigali, Bugesera and Gakenke plan legends; it does not mean every code is available in every district.</p>
-                        <p>Some codes, including A3 and A4, were not found in the plan legends checked, so they are not added as assumptions.</p>
+                        <p>Each District Land Use Plan defines which codes apply locally. This searchable catalogue combines codes from the published Kigali, Bugesera and Gakenke plan legends, plus shorthand classes used in the Ruhango plan. A code appearing here does not mean it applies in every district.</p>
+                        <p>A3 and A4 were not present in the official plan legends checked, so they are not added as assumptions.</p>
+                        <p>Plot-size rules vary by district and housing type. The 2026 Ruhango plan, for example, sets R1 plots at 500 m² and R1A at 300 m². Those figures must not be copied to other districts.</p>
+                        <div className="map-filter-source-links">
+                          <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">NLA zoning regulations <span aria-hidden="true">↗</span></a>
+                          <a href="https://geodata.rw/server/rest/services/Hosted/Gakenke_DLUP_20042026/MapServer/legend" rel="noreferrer" target="_blank">Official zoning legend <span aria-hidden="true">↗</span></a>
+                        </div>
                       </div>
                     ) : null}
                     {visibleZoningGroups.length > 0 ? visibleZoningGroups.map((group) => (
@@ -2788,8 +2796,8 @@ export function MapExperience() {
                     )) : <p className="map-filter-disabled-note">No zoning codes match “{zoningSearch}”.</p>}
                     <p className="map-filter-note">
                       {selectedZoneCodes.length > 0
-                        ? "Plot-size standards vary by district plan, development type and building use. Taiseel must index the published Edition 2 rules before showing a legal minimum or maximum."
-                        : "Choose a code to view its local planning context. Parcel-wide matching is not connected yet."}
+                        ? "These codes identify land use, not a universal plot-size band. The applicable district plan and housing type must be loaded before a legal minimum or maximum is shown."
+                        : "Choose a code to view its land-use meaning. Parcel-wide matching is not connected yet."}
                     </p>
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Live count unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>{filterResultCount === null ? "Parcel-wide zoning search is not connected." : "Matches these selected zones."}</small></div>
