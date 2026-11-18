@@ -198,3 +198,15 @@ test("list price and monthly payment are visible as two independent side-by-side
   assert.match(source, /aria-label=\{range\.title \+ " minimum slider"\}/);
   assert.match(source, /aria-label=\{range\.title \+ " maximum slider"\}/);
 });
+
+
+test("the two price sections receive separate sliders and remain side by side on desktop", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(source, /filterPriceRangeSummary\(mapFilters\.priceMin, mapFilters\.priceMax/);
+  assert.match(source, /filterPriceRangeSummary\(mapFilters\.monthlyPaymentMin, mapFilters\.monthlyPaymentMax/);
+  assert.match(source, /updatePriceSlider\(range\.key, "min"/);
+  assert.match(source, /updatePriceSlider\(range\.key, "max"/);
+  assert.match(styles, /\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: 1fr/);
+});
