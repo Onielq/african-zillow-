@@ -557,8 +557,6 @@ type MapViewProps = {
   onStatusChange: (status: BasemapStatus) => void;
   onBoundaryStatusChange: (status: BoundaryStatus) => void;
   onAreaSelected: (area: SelectedArea | null) => void;
-  onGeographicLevelChange?: (level: AreaLevel) => void;
-  parcelSizeFilter?: { min: number | null; max: number | null };
 };
 
 const FALLBACK_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
@@ -1192,8 +1190,6 @@ export function MapView({
   onStatusChange,
   onBoundaryStatusChange,
   onAreaSelected,
-  onGeographicLevelChange = () => undefined,
-  parcelSizeFilter = { min: null, max: null },
   showLayers,
   showScope,
   selectedArea,
@@ -1225,8 +1221,6 @@ export function MapView({
   const showLayersRef = useRef(showLayers);
   const showScopeRef = useRef(showScope);
   const showZoningRef = useRef(showZoning);
-  const onGeographicLevelChangeRef = useRef(onGeographicLevelChange);
-  const parcelSizeFilterRef = useRef(parcelSizeFilter);
   const refreshShowOverlaysRef = useRef<(() => void) | null>(null);
   const refreshZoningRef = useRef<(() => void) | null>(null);
 
@@ -1333,22 +1327,6 @@ export function MapView({
   }, [showZoning]);
 
   useEffect(() => {
-    onGeographicLevelChangeRef.current = onGeographicLevelChange;
-  }, [onGeographicLevelChange]);
-
-  useEffect(() => {
-    parcelSizeFilterRef.current = parcelSizeFilter;
-    const map = mapRef.current;
-    if (!map) return;
-    const bounds = parcelSizeFilter.min !== null || parcelSizeFilter.max !== null
-      ? ["all", ["has", "parcel_size_m2"], ...(parcelSizeFilter.min !== null ? [[">=", ["to-number", ["get", "parcel_size_m2"]], parcelSizeFilter.min]] : []), ...(parcelSizeFilter.max !== null ? [["<=", ["to-number", ["get", "parcel_size_m2"]], parcelSizeFilter.max]] : [])]
-      : null;
-    for (const layerId of [AREA_LAYERS.parcel.fill, AREA_LAYERS.parcel.outline, AREA_LAYERS.parcel.label]) {
-      if (map.getLayer(layerId)) map.setFilter(layerId, bounds as never);
-    }
-  }, [parcelSizeFilter]);
-
-  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -1388,14 +1366,10 @@ export function MapView({
     mapRef.current = map;
     activeBasemapModeRef.current = "map";
     activeAreaLevelRef.current = activeAreaLevel(map.getZoom());
-    onGeographicLevelChangeRef.current(activeAreaLevelRef.current);
 
     const resolveActiveAreaLevel = () => {
       const level = activeAreaLevelForMap(map, areaDataRef.current, activeAreaLevelRef.current);
-      if (level !== activeAreaLevelRef.current) {
-        activeAreaLevelRef.current = level;
-        onGeographicLevelChangeRef.current(level);
-      }
+      activeAreaLevelRef.current = level;
       return level;
     };
     const getActiveAreaLevel = () => activeAreaLevelRef.current;
@@ -2748,13 +2722,6 @@ export function MapView({
       resolveActiveAreaLevel();
       const activeLevel = getActiveAreaLevel();
       const activeIndex = AREA_LEVELS.indexOf(activeLevel);
-      const sizeFilter = parcelSizeFilterRef.current;
-      const parcelFilter = sizeFilter.min !== null || sizeFilter.max !== null
-        ? ["all", ["has", "parcel_size_m2"], ...(sizeFilter.min !== null ? [[">=", ["to-number", ["get", "parcel_size_m2"]], sizeFilter.min]] : []), ...(sizeFilter.max !== null ? [["<=", ["to-number", ["get", "parcel_size_m2"]], sizeFilter.max]] : [])]
-        : null;
-      for (const layerId of [AREA_LAYERS.parcel.fill, AREA_LAYERS.parcel.outline, AREA_LAYERS.parcel.label]) {
-        if (map.getLayer(layerId)) map.setFilter(layerId, parcelFilter as never);
-      }
       const villageIndex = AREA_LEVELS.indexOf("village");
       // Show cadastral outlines as soon as village boundaries appear. Parcel
       // outlines are an additional detail layer, not a replacement for villages.
