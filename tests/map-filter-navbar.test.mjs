@@ -69,7 +69,7 @@ test("zoning selector includes multiple plan codes grouped by category", async (
   assert.match(source, /All zoning/);
   assert.match(source, /zoningInfoOpen/);
   assert.match(source, /Typical plot measurement/);
-  assert.match(source, /Plan-specific standard not loaded/);
+  assert.match(source, /See local Edition 2 rules/);
 });
 
 test("measurement keeps manual inputs and adds non-regulatory area presets", async () => {
