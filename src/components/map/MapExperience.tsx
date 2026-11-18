@@ -76,7 +76,6 @@ type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
 type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
 type ListingFilterValue = "all" | "sale" | "rent" | "sold";
-type PriceRangeMode = "list" | "monthly";
 type MeasurementBasis = "plot" | "interior";
 
 const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: LucideIcon }> = [
@@ -974,7 +973,6 @@ export function MapExperience() {
   const [showOpen, setShowOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
-  const [priceRangeMode, setPriceRangeMode] = useState<PriceRangeMode>("list");
   const [zoningInfoOpen, setZoningInfoOpen] = useState(false);
   const [zoningSearch, setZoningSearch] = useState("");
   const [mapFilters, setMapFilters] = useState<{
@@ -1032,10 +1030,10 @@ export function MapExperience() {
     mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
   // Project-directory records are not live unit listings; do not invent a result count.
   const filterResultCount = getFilterResultCount();
-  const activePriceMin = priceRangeMode === "list" ? mapFilters.priceMin : mapFilters.monthlyPaymentMin;
-  const activePriceMax = priceRangeMode === "list" ? mapFilters.priceMax : mapFilters.monthlyPaymentMax;
   const activePriceLimit = mapFilters.priceCurrency === "USD" ? 100_000_000 : 1_000_000_000_000;
   const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 1_000_000;
+  const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
+  const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
   const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
   const selectedZoneDescriptions = selectedZoneCodes
@@ -1049,19 +1047,19 @@ export function MapExperience() {
     .filter((group) => group.codes.length > 0);
   const activeFilterCount = [
     mapFilters.listingType !== "all",
-    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax || mapFilters.priceCurrency !== "RWF" || priceRangeMode !== "list"),
+    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax || mapFilters.priceCurrency !== "RWF"),
     mapFilters.propertyTypes.length > 0,
     mapFilters.zoningCodes.length > 0,
     Boolean(mapFilters.measurementMin || mapFilters.measurementMax || mapFilters.measurementBasis !== "plot"),
     Boolean(mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.bedroomsExact || mapFilters.bathroomsExact)
   ].filter(Boolean).length;
   const priceSummary = (() => {
-    const min = activePriceMin ? compactFilterAmount(Number(activePriceMin), mapFilters.priceCurrency) : "";
-    const max = activePriceMax ? compactFilterAmount(Number(activePriceMax), mapFilters.priceCurrency) : "";
-    const basis = priceRangeMode === "monthly" ? "Monthly " : "";
-    if (!min && !max) return priceRangeMode === "monthly" ? "Monthly payment" : mapFilters.priceCurrency === "USD" ? "Price · USD" : "Price";
-    if (min && max) return basis + min + " – " + max;
-    return basis + (min ? "From " + min : "Up to " + max);
+    const listSelected = Boolean(mapFilters.priceMin || mapFilters.priceMax);
+    const monthlySelected = Boolean(mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax);
+    if (listSelected && monthlySelected) return "Price · 2 ranges";
+    if (listSelected) return "List " + listPriceSummary;
+    if (monthlySelected) return "Monthly " + monthlyPaymentSummary;
+    return mapFilters.priceCurrency === "USD" ? "Price · USD" : "Price";
   })();
   const measurementSummary = mapFilters.measurementMin || mapFilters.measurementMax
     ? (mapFilters.measurementBasis === "plot" ? "Plot " : "Interior ") + (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
@@ -1089,15 +1087,15 @@ export function MapExperience() {
       bedroomsExact: false,
       bathroomsExact: false
     });
-    setPriceRangeMode("list");
+    setActiveFilterMenu(null);
     setZoningSearch("");
     setZoningInfoOpen(false);
   };
-  const updatePriceSlider = (bound: "min" | "max", rawValue: string) => {
+  const updatePriceSlider = (basis: "list" | "monthly", bound: "min" | "max", rawValue: string) => {
     const value = Math.min(activePriceLimit, Math.max(0, Number(rawValue) || 0));
     setMapFilters((current) => {
-      const minKey = priceRangeMode === "list" ? "priceMin" : "monthlyPaymentMin";
-      const maxKey = priceRangeMode === "list" ? "priceMax" : "monthlyPaymentMax";
+      const minKey = basis === "list" ? "priceMin" : "monthlyPaymentMin";
+      const maxKey = basis === "list" ? "priceMax" : "monthlyPaymentMax";
       const minimum = current[minKey] ? Number(current[minKey]) : 0;
       const maximum = current[maxKey] ? Number(current[maxKey]) : activePriceLimit;
       return bound === "min"
@@ -2578,66 +2576,122 @@ export function MapExperience() {
                         <option value="USD">USD · US dollars</option>
                       </select>
                     </div>
-                    <div aria-label="Price basis" className="map-filter-segmented" role="group">
-                      <button aria-pressed={priceRangeMode === "list"} className={priceRangeMode === "list" ? "map-filter-segment map-filter-segment-active" : "map-filter-segment"} onClick={() => setPriceRangeMode("list")} type="button">List price</button>
-                      <button aria-pressed={priceRangeMode === "monthly"} className={priceRangeMode === "monthly" ? "map-filter-segment map-filter-segment-active" : "map-filter-segment"} onClick={() => setPriceRangeMode("monthly")} type="button">Monthly payment</button>
+                                        <div className="map-filter-price-columns">
+                      {([
+                        {
+                          key: "list" as const,
+                          title: "List price",
+                          minimum: mapFilters.priceMin,
+                          maximum: mapFilters.priceMax,
+                          minKey: "priceMin" as const,
+                          maxKey: "priceMax" as const,
+                          summary: listPriceSummary
+                        },
+                        {
+                          key: "monthly" as const,
+                          title: "Monthly payment",
+                          minimum: mapFilters.monthlyPaymentMin,
+                          maximum: mapFilters.monthlyPaymentMax,
+                          minKey: "monthlyPaymentMin" as const,
+                          maxKey: "monthlyPaymentMax" as const,
+                          summary: monthlyPaymentSummary
+                        }
+                      ]).map((range) => {
+                        const minimum = Math.min(activePriceLimit, Math.max(0, Number(range.minimum) || 0));
+                        const maximum = Math.max(0, Math.min(activePriceLimit, range.maximum ? Number(range.maximum) : activePriceLimit));
+                        const rangeInvalid = range.minimum && range.maximum && Number(range.minimum) > Number(range.maximum);
+                        const rangeOutOfBounds = [range.minimum, range.maximum].some((value) =>
+                          value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > activePriceLimit)
+                        );
+                        return (
+                          <section className="map-filter-price-section" key={range.key}>
+                            <div className="map-filter-price-section-heading">
+                              <strong>{range.title}</strong>
+                              <span>{mapFilters.priceCurrency}</span>
+                            </div>
+                            <div className="map-filter-histogram" aria-label={range.title + " distribution preview"}>
+                              <div className="map-filter-histogram-empty">
+                                <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
+                                <span>Price distribution</span>
+                                <small>Verified listings are required to draw price bands.</small>
+                              </div>
+                              <div className="map-filter-histogram-axis">
+                                <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
+                                <span>{mapFilters.priceCurrency === "USD" ? "$100M" : "RWF 1T"}</span>
+                              </div>
+                            </div>
+                            <div className="map-filter-price-values">
+                              <span><small>Minimum</small><strong>{compactFilterAmount(minimum, mapFilters.priceCurrency)}</strong></span>
+                              <span><small>Maximum</small><strong>{compactFilterAmount(maximum, mapFilters.priceCurrency)}</strong></span>
+                            </div>
+                            <div className="map-filter-dual-slider" aria-label={range.title + " minimum and maximum"}>
+                              <div className="map-filter-dual-slider-track" aria-hidden="true" />
+                              <div
+                                className="map-filter-dual-slider-range"
+                                aria-hidden="true"
+                                style={{
+                                  left: (minimum / activePriceLimit * 100) + "%",
+                                  width: (Math.max(0, maximum - minimum) / activePriceLimit * 100) + "%"
+                                }}
+                              />
+                              <input
+                                aria-label={range.title + " minimum slider"}
+                                className="map-filter-dual-slider-input map-filter-dual-slider-min"
+                                max={activePriceLimit}
+                                min="0"
+                                onChange={(event) => updatePriceSlider(range.key, "min", event.target.value)}
+                                step={activePriceStep}
+                                type="range"
+                                value={minimum}
+                              />
+                              <input
+                                aria-label={range.title + " maximum slider"}
+                                className="map-filter-dual-slider-input map-filter-dual-slider-max"
+                                max={activePriceLimit}
+                                min="0"
+                                onChange={(event) => updatePriceSlider(range.key, "max", event.target.value)}
+                                step={activePriceStep}
+                                type="range"
+                                value={maximum}
+                              />
+                            </div>
+                            <div className="map-filter-range-fields">
+                              <label>
+                                <span>Minimum</span>
+                                <input
+                                  inputMode="decimal"
+                                  min="0"
+                                  max={activePriceLimit}
+                                  onChange={(event) => setMapFilters((current) => ({ ...current, [range.minKey]: event.target.value }))}
+                                  placeholder="0"
+                                  type="number"
+                                  value={range.minimum}
+                                />
+                              </label>
+                              <label>
+                                <span>Maximum</span>
+                                <input
+                                  inputMode="decimal"
+                                  min="0"
+                                  max={activePriceLimit}
+                                  onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))}
+                                  placeholder={mapFilters.priceCurrency === "USD" ? "100,000,000" : "1,000,000,000,000"}
+                                  type="number"
+                                  value={range.maximum}
+                                />
+                              </label>
+                            </div>
+                            {rangeOutOfBounds ? (
+                              <p className="map-filter-validation" role="alert">
+                                Values must stay between {mapFilters.priceCurrency === "USD" ? "$0 and $100 million" : "RWF 0 and RWF 1 trillion"}.
+                              </p>
+                            ) : rangeInvalid ? (
+                              <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
+                            ) : null}
+                          </section>
+                        );
+                      })}
                     </div>
-                    <div className="map-filter-histogram" aria-label="Price distribution preview">
-                      <div className="map-filter-histogram-empty">
-                        <BarChart3 aria-hidden="true" size={24} strokeWidth={1.6} />
-                        <span>Price distribution</span>
-                        <small>Real price bands appear when authorized listing records are connected. No sample bars are shown.</small>
-                      </div>
-                      <div className="map-filter-histogram-axis"><span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span><span>{mapFilters.priceCurrency === "USD" ? "$100M" : "RWF 1T"}</span></div>
-                    </div>
-                    <div className="map-filter-price-values">
-                      <span><small>Minimum</small><strong>{compactFilterAmount(Number(activePriceMin) || 0, mapFilters.priceCurrency)}</strong></span>
-                      <span><small>Maximum</small><strong>{activePriceMax ? compactFilterAmount(Number(activePriceMax), mapFilters.priceCurrency) : compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)}</strong></span>
-                    </div>
-                    <div className="map-filter-dual-slider" aria-label="Minimum and maximum price">
-                      <div className="map-filter-dual-slider-track" aria-hidden="true" />
-                      <div
-                        className="map-filter-dual-slider-range"
-                        aria-hidden="true"
-                        style={{
-                          left: ((Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0)) / activePriceLimit) * 100) + "%",
-                          width: (Math.max(0, Math.max(0, Math.min(activePriceLimit, Number(activePriceMax) || activePriceLimit)) - Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0))) / activePriceLimit * 100) + "%"
-                        }}
-                      />
-                      <input
-                        aria-label="Minimum price slider"
-                        className="map-filter-dual-slider-input map-filter-dual-slider-min"
-                        max={activePriceLimit}
-                        min="0"
-                        onChange={(event) => updatePriceSlider("min", event.target.value)}
-                        step={activePriceStep}
-                        type="range"
-                        value={Math.min(activePriceLimit, Math.max(0, Number(activePriceMin) || 0))}
-                      />
-                      <input
-                        aria-label="Maximum price slider"
-                        className="map-filter-dual-slider-input map-filter-dual-slider-max"
-                        max={activePriceLimit}
-                        min="0"
-                        onChange={(event) => updatePriceSlider("max", event.target.value)}
-                        step={activePriceStep}
-                        type="range"
-                        value={Math.max(0, Math.min(activePriceLimit, activePriceMax ? Number(activePriceMax) : activePriceLimit))}
-                      />
-                    </div>
-                    <div className="map-filter-range-fields">
-                      <label>
-                        <span>Minimum</span>
-                        <input inputMode="decimal" min="0" max={activePriceLimit} onChange={(event) => setMapFilters((current) => ({ ...current, [priceRangeMode === "list" ? "priceMin" : "monthlyPaymentMin"]: event.target.value }))} placeholder="0" type="number" value={activePriceMin} />
-                      </label>
-                      <label>
-                        <span>Maximum</span>
-                        <input inputMode="decimal" min="0" max={activePriceLimit} onChange={(event) => setMapFilters((current) => ({ ...current, [priceRangeMode === "list" ? "priceMax" : "monthlyPaymentMax"]: event.target.value }))} placeholder={mapFilters.priceCurrency === "USD" ? "100,000,000" : "1,000,000,000,000"} type="number" value={activePriceMax} />
-                      </label>
-                    </div>
-                    {activePriceMin && activePriceMax && Number(activePriceMin) > Number(activePriceMax) ? (
-                      <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
-                    ) : null}
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Live count unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>{filterResultCount === null ? "The production listing database is not connected." : "Matches these selected criteria."}</small></div>
                       <button disabled={filterResultCount === null} type="button">{filterResultCount === null ? "Inventory not connected" : "See " + filterResultCount.toLocaleString() + " results"}</button>
