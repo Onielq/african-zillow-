@@ -5055,13 +5055,13 @@ input {
 }
 
 .map-filter-popover {
-  position: absolute;
-  z-index: 140;
-  top: calc(100% + 8px);
-  left: 0;
+  position: fixed;
+  z-index: 1000;
   display: grid;
   width: 292px;
-  max-width: min(330px, calc(100vw - 28px));
+  max-width: min(330px, calc(100vw - 32px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   gap: 9px;
   padding: 14px;
   border: 1px solid var(--border);
@@ -5074,11 +5074,6 @@ input {
 
 .map-filter-popover-zoning {
   width: 326px;
-}
-
-.map-filter-popover-beds {
-  right: 0;
-  left: auto;
 }
 
 .map-filter-popover-heading {
@@ -5256,20 +5251,6 @@ input {
 
   .map-filter-popover-zoning {
     width: min(326px, calc(100vw - 32px));
-  }
-
-  .map-filter-control:nth-child(2) .map-filter-popover,
-  .map-filter-control:nth-child(3) .map-filter-popover,
-  .map-filter-control:nth-child(4) .map-filter-popover,
-  .map-filter-control:nth-child(5) .map-filter-popover {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .map-filter-control:last-child .map-filter-popover {
-    right: 0;
-    left: auto;
-    transform: none;
   }
 }
 
