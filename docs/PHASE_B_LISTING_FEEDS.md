@@ -4,7 +4,9 @@
 
 - A read-only API for source-observed active listings: `GET /api/market/listings`.
 - Filters for sale/rent, property type, currency, district and sector, with bounded pagination.
-- A listing history endpoint: `GET /api/market/listings/:id/history`.
+- A source listing history endpoint: `GET /api/market/listings/:id/history`.
+- A separate public Taiseel exchange endpoint: `GET /api/market/exchange/listings`.
+- A public exchange event and price-history endpoint: `GET /api/market/exchange/listings/:id/history`.
 - A timeline derived only from recorded source observations. It can identify a source-reported asking-price change, terms change, status change, or a transition from withdrawn/expired back to active.
 - A public source-permission gate. A listing is returned only when its source is current and explicitly permits commercial use, redistribution and caching.
 - No seller write endpoint, no fake inventory, and no new migration.
@@ -23,7 +25,7 @@ These records are not Taiseel-authorized inventory. The API labels the status as
 
 The migration supports events such as created, submitted, approved, published, revised, withdrawn, expired, sold, leased and reopened. A listing needs verified seller authority for the exact property before it can be published. Public reads and seller/moderator access are protected by PostgreSQL row-level security.
 
-The public external-feed endpoints in this phase do not read or write first-party exchange tables. First-party submission, moderation and private seller history remain disabled until a signed-session identity provider and the trusted transaction-local user context are implemented.
+The external-feed endpoints do not read or write first-party exchange tables. The public exchange endpoints read only currently published, unexpired listings. PostgreSQL row-level security must remain enabled; the API does not return seller IDs, authorization evidence, free-text moderation notes or private event payloads. First-party submission, moderation and private seller history remain disabled until a signed-session identity provider and trusted transaction-local user context are implemented. History for a listing that is no longer publicly published remains private to authorized parties.
 
 ## Status rules
 
@@ -42,7 +44,7 @@ Asking prices remain separate from completed transaction records. Currency and r
 
 ## Runtime connection
 
-The API requires server-only `APP_DATABASE_URL`. Set it to a pooled connection for the dedicated, least-privilege `reja_app` role after the canonical migrations have been applied. That role must have read permissions only. The listing routes never use `DATABASE_URL` as a fallback and contain no write operations.
+The APIs require server-only `APP_DATABASE_URL`. Set it to a pooled connection for the dedicated, least-privilege `reja_app` role after the canonical migrations have been applied. That role must have read permissions only and must not bypass row-level security. The listing routes never use `DATABASE_URL` as a fallback and contain no write operations.
 
 The general integration-health probe may use `APP_DATABASE_URL` first and `DATABASE_URL` as a legacy readiness fallback. Do not set an owner/migration credential as `APP_DATABASE_URL`.
 
@@ -66,4 +68,4 @@ The no-connection response is intentional. It prevents the UI or API from sugges
 
 ## Verification
 
-The phase tests cover event derivation for price changes, terms changes, source-reported relisting, and the deliberately ambiguous sold-or-leased status. Database-backed API tests remain pending until the canonical development schema and an authorized feed are connected.
+The phase tests cover event derivation for price changes, terms changes, source-reported relisting, the deliberately ambiguous sold-or-leased status, and the public/private API boundaries. Database-backed API tests remain pending until the canonical development schema and an authorized feed are connected.
