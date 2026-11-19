@@ -107,3 +107,91 @@ export function formatProjectNearbyAccessItem(item) {
 
   return { category: item.category, name, distanceLabel };
 }
+
+
+/**
+ * Mount the shared live access panel in a project report. Existing report facts
+ * remain untouched; these results are a separate, current map-source lookup.
+ */
+export async function mountProjectNearbyAccess({ location, grid, note }) {
+  if (!grid) return { status: "not-mounted", items: [] };
+
+  const renderMessage = (title, detail) => {
+    grid.replaceChildren();
+    const item = document.createElement("div");
+    item.className = grid.classList.contains("access-grid") ? "access-item" : "report-access-item";
+    const heading = document.createElement("b");
+    heading.textContent = title;
+    const description = document.createElement("span");
+    description.textContent = detail;
+    item.append(heading, description);
+    grid.appendChild(item);
+  };
+
+  const setNote = (message, addAttribution = false) => {
+    if (!note) return;
+    note.textContent = message;
+    if (addAttribution) {
+      note.appendChild(document.createTextNode(" "));
+      const attribution = document.createElement("a");
+      attribution.href = "https://www.openstreetmap.org/copyright";
+      attribution.target = "_blank";
+      attribution.rel = "noopener noreferrer";
+      attribution.textContent = "OpenStreetMap attribution";
+      note.appendChild(attribution);
+    }
+  };
+
+  if (!isPreciseProjectLocation(location)) {
+    renderMessage(
+      "Area context only",
+      "Nearby distances were not calculated because this project record does not contain a precise, source-backed coordinate. This is not evidence that nearby facilities or road access are absent."
+    );
+    setNote("No coordinate-specific lookup was run. The map shows administrative-area context only.");
+    return { status: "not-eligible", items: [] };
+  }
+
+  grid.setAttribute("aria-busy", "true");
+  renderMessage("Nearby access", "Checking mapped facilities and road proximity…");
+  setNote("Source lookup in progress.");
+
+  try {
+    const payload = await fetchProjectNearbyAccess(location);
+    const items = payload.items
+      .map(formatProjectNearbyAccessItem)
+      .filter((item) => item !== null);
+    grid.replaceChildren();
+
+    if (items.length === 0) {
+      renderMessage(
+        "No mapped results returned",
+        "The map source returned no nearby facilities or main-road geometry for this coordinate. Coverage may be incomplete; this does not prove that facilities or legal access are absent."
+      );
+    } else {
+      items.forEach((nearby) => {
+        const item = document.createElement("div");
+        item.className = grid.classList.contains("access-grid") ? "access-item" : "report-access-item";
+        const heading = document.createElement("b");
+        heading.textContent = nearby.category;
+        const name = document.createElement("span");
+        name.textContent = nearby.name;
+        const distance = document.createElement("span");
+        distance.textContent = nearby.distanceLabel;
+        item.append(heading, name, distance);
+        grid.appendChild(item);
+      });
+    }
+
+    setNote([payload.source, payload.note].filter(Boolean).join(" · "), true);
+    return { status: "ready", items };
+  } catch {
+    renderMessage(
+      "Nearby access unavailable",
+      "The nearby-access service could not return results. A service failure is not evidence that facilities or road access are absent."
+    );
+    setNote("Nearby access could not be checked. No distance or travel time is being inferred.");
+    return { status: "error", items: [] };
+  } finally {
+    grid.setAttribute("aria-busy", "false");
+  }
+}
