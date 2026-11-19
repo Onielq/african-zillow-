@@ -88,7 +88,7 @@ export function formatProjectNearbyAccessItem(item) {
 
   const numericDistance = item.distanceKm == null ? Number.NaN : Number(item.distanceKm);
   const hasDistance = Number.isFinite(numericDistance) && numericDistance >= 0;
-  const distance = hasDistance ? numericDistance.toFixed(2).replace(/\\.?0+$/, "") + " km" : "";
+  const distance = hasDistance ? (Math.round(numericDistance * 100) / 100) + " km" : "";
 
   let distanceLabel = "Distance unavailable";
   if (item.routeStatus === "routed" && hasDistance) {
