@@ -159,7 +159,7 @@ test("dedicated report coordinates stay aligned with the canonical project regis
   const getRecord = (id) => {
     const start = directory.indexOf('"id": "' + id + '"');
     assert.notEqual(start, -1, "project register must contain " + id);
-    const end = directory.indexOf("\\n  },", start);
+    const end = directory.indexOf(String.fromCharCode(10) + "  },", start);
     assert.notEqual(end, -1, "project register record must close for " + id);
     return directory.slice(start, end);
   };
