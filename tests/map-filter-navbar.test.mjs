@@ -41,16 +41,17 @@ test("price filter has list-price and monthly-payment ranges, caps and editable 
   assert.match(source, /List price/);
   assert.match(source, /Monthly payment/);
   assert.match(source, /100_000_000/);
-  assert.match(source, /1_000_000_000_000/);
+  assert.doesNotMatch(source, /1_000_000_000_000/);
+  assert.match(source, /dynamicParcelPriceLimit\(parcelFilterResults\?\.maxPriceRwf\)/);
   assert.match(source, /type="range"/);
   assert.match(source, /monthlyPaymentMin/);
   assert.match(source, /monthlyPaymentMax/);
   assert.match(source, /priceMin/);
   assert.match(source, /priceMax/);
   assert.match(source, /Price distribution/);
-  assert.match(source, /Verified listings are required to draw price bands/);
-  assert.match(source, /Live count unavailable/);
-  assert.match(source, /Inventory not connected/);
+  assert.match(source, /Parcel price estimates are not verified asking prices/);
+  assert.match(source, /matching parcels/);
+  assert.match(source, /Loading map parcels/);
   assert.match(source, /map-filter-price-columns/);
   assert.match(source, /map-filter-price-section/);
   assert.match(source, /key: "list"/);
@@ -59,7 +60,7 @@ test("price filter has list-price and monthly-payment ranges, caps and editable 
   assert.match(source, /updatePriceSlider\(range\.key, "min"/);
   assert.match(source, /updatePriceSlider\(range\.key, "max"/);
   assert.match(source, /rangeOutOfBounds/);
-  assert.match(source, /RWF 0 and RWF 1 trillion/);
+  assert.match(source, /current map area/);
   assert.match(source, /Maximum must be greater than minimum/);
   assert.doesNotMatch(source, /priceRangeMode/);
 });
@@ -145,7 +146,8 @@ test("filter values summarize in the toolbar and Reset all clears every filter s
 
 test("plot and interior measurement ranges are kept separate when the area basis changes", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /type MeasurementBasis = "plot" \| "interior"/);
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(mapView, /measurementBasis: "plot" \| "interior"/);
   assert.match(source, /Plot area/);
   assert.match(source, /Interior area/);
   assert.match(source, /measurementBasis: "plot", measurementMin: "", measurementMax: ""/);
@@ -228,7 +230,8 @@ test("parcel filter controls are connected to the cadastral map source and retur
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(experience, /parcelFilters=\{mapFilters\}/);
   assert.match(experience, /onParcelFilterResults=\{setParcelFilterResults\}/);
-  assert.match(mapView, /parcelFilters: ParcelMapFilters/);
+  assert.match(mapView, /parcelFilters\?: ParcelMapFilters/);
+  assert.match(mapView, /parcelFilters = EMPTY_PARCEL_MAP_FILTERS/);
   assert.match(mapView, /filteredParcelFeatureIdsRef\.current/);
   assert.match(mapView, /source\?\.setData\(\{ \.\.\.raw, features: filtered \}/);
   assert.match(mapView, /matching: filtered\.length/);
