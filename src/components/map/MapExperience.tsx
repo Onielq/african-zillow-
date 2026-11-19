@@ -47,6 +47,8 @@ import {
   type MapOverlayCategory,
   type MapMetric,
   type ParcelPriceType,
+  type ParcelMapFilters,
+  type ParcelFilterResults,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -897,9 +899,12 @@ function getAreaParent(area: SelectedArea): string | null {
 }
 
 
-function getFilterResultCount(): number | null {
-  // Waiting for a verified listing and unit inventory index.
-  return null;
+function dynamicParcelPriceLimit(maxPriceRwf: number | null | undefined): number {
+  if (typeof maxPriceRwf !== "number" || !Number.isFinite(maxPriceRwf) || maxPriceRwf <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(maxPriceRwf));
+  const ratio = maxPriceRwf / magnitude;
+  const rounded = ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10;
+  return rounded * magnitude;
 }
 
 type FilterPopoverPortalProps = {
@@ -991,24 +996,7 @@ export function MapExperience() {
   const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
   const [zoningInfoOpen, setZoningInfoOpen] = useState(false);
   const [zoningSearch, setZoningSearch] = useState("");
-  const [mapFilters, setMapFilters] = useState<{
-    listingType: ListingFilterValue;
-    priceCurrency: "RWF" | "USD";
-    priceMin: string;
-    priceMax: string;
-    monthlyPaymentMin: string;
-    monthlyPaymentMax: string;
-    propertyTypes: string[];
-    zoningCodes: string[];
-    measurementMin: string;
-    measurementMax: string;
-    measurementPreset: string;
-    measurementBasis: MeasurementBasis;
-    bedroomsMin: string;
-    bathroomsMin: string;
-    bedroomsExact: boolean;
-    bathroomsExact: boolean;
-  }>({
+  const [mapFilters, setMapFilters] = useState<ParcelMapFilters>({
     listingType: "all",
     priceCurrency: "RWF",
     priceMin: "",
@@ -1026,6 +1014,7 @@ export function MapExperience() {
     bedroomsExact: false,
     bathroomsExact: false
   });
+  const [parcelFilterResults, setParcelFilterResults] = useState<ParcelFilterResults | null>(null);
   const filterSubnavRef = useRef<HTMLDivElement>(null);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1042,12 +1031,43 @@ export function MapExperience() {
         : [...current[key], value]
     }));
   };
-  const bedsBathsDisabled = mapFilters.propertyTypes.length > 0 &&
+  const bedsBathsDisabled = mapFilters.propertyTypes.length === 0 ||
     mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
-  // Project-directory records are not live unit listings; do not invent a result count.
-  const filterResultCount = getFilterResultCount();
-  const activePriceLimit = mapFilters.priceCurrency === "USD" ? 100_000_000 : 1_000_000_000_000;
-  const activePriceStep = mapFilters.priceCurrency === "USD" ? 10_000 : 1_000_000;
+  const filterResultCount = parcelFilterResults?.matching ?? null;
+  const activePriceLimit = mapFilters.priceCurrency === "USD"
+    ? 100_000_000
+    : dynamicParcelPriceLimit(parcelFilterResults?.maxPriceRwf);
+  const activePriceStep = Math.max(1, Math.ceil(activePriceLimit / 100));
+  const filterResultNote = (() => {
+    if (mapFilters.listingType !== "all") {
+      return "The cadastral parcel feed does not provide verified sale, rent or sold listing status.";
+    }
+    if (mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax) {
+      return "Monthly payment terms are not part of cadastral parcel records. Use List price for indicative parcel values.";
+    }
+    if ((mapFilters.priceMin || mapFilters.priceMax) && mapFilters.priceCurrency === "USD") {
+      return "Parcel value estimates are in RWF. A live, verified currency conversion is not connected.";
+    }
+    if ((mapFilters.measurementMin || mapFilters.measurementMax) && mapFilters.measurementBasis === "interior") {
+      return "This map contains land parcels, not building interior floor areas.";
+    }
+    if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
+      return "Loading the official zoning polygons for the current map area.";
+    }
+    if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "unavailable") {
+      return "The zoning source is temporarily unavailable. No parcel zoning match is being assumed.";
+    }
+    if (mapFilters.zoningCodes.length) {
+      return "Zoning is matched using each parcel's map-centre point against the published zoning polygons. Check parcel details for exact overlaps.";
+    }
+    if (mapFilters.bedroomsMin || mapFilters.bathroomsMin) {
+      return "Bedrooms and bathrooms do not apply to cadastral land parcels.";
+    }
+    if (parcelFilterResults) {
+      return "Matching cadastral parcels in the current map area. Geometry-derived plot sizes are estimates, not cadastral measurements.";
+    }
+    return "Waiting for parcel boundaries in the current map area.";
+  })();
   const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
   const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
   const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
@@ -2190,6 +2210,8 @@ export function MapExperience() {
           onBoundaryStatusChange={handleBoundaryStatus}
           onAreaSelected={handleAreaSelected}
           selectedArea={selectedArea}
+          parcelFilters={mapFilters}
+          onParcelFilterResults={setParcelFilterResults}
           projects={RWANDA_PROJECT_RECORDS}
           showProjects={workspaceMode === "projects" || projectsOpen}
           selectedProjectId={selectedProjectId}
@@ -2632,11 +2654,11 @@ export function MapExperience() {
                               <div className="map-filter-histogram-empty">
                                 <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
                                 <span>Price distribution</span>
-                                <small>Verified listings are required to draw price bands.</small>
+                                <small>Parcel price estimates are not verified asking prices. The map does not invent price distributions.</small>
                               </div>
                               <div className="map-filter-histogram-axis">
                                 <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
-                                <span>{mapFilters.priceCurrency === "USD" ? "$100M" : "RWF 1T"}</span>
+                                <span>{compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)}</span>
                               </div>
                             </div>
                             <div className="map-filter-price-values">
@@ -2694,7 +2716,7 @@ export function MapExperience() {
                                   min="0"
                                   max={activePriceLimit}
                                   onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))}
-                                  placeholder={mapFilters.priceCurrency === "USD" ? "100,000,000" : "1,000,000,000,000"}
+                                  placeholder="No max"
                                   type="number"
                                   value={range.maximum}
                                 />
@@ -2702,7 +2724,7 @@ export function MapExperience() {
                             </div>
                             {rangeOutOfBounds ? (
                               <p className="map-filter-validation" role="alert">
-                                Values must stay between {mapFilters.priceCurrency === "USD" ? "$0 and $100 million" : "RWF 0 and RWF 1 trillion"}.
+                                Values must stay between zero and {compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)} for the current map area.
                               </p>
                             ) : rangeInvalid ? (
                               <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
@@ -2712,8 +2734,8 @@ export function MapExperience() {
                       })}
                     </div>
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Live count unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>{filterResultCount === null ? "The production listing database is not connected." : "Matches these selected criteria."}</small></div>
-                      <button disabled={filterResultCount === null} type="button">{filterResultCount === null ? "Inventory not connected" : "See " + filterResultCount.toLocaleString() + " results"}</button>
+                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
+                      <button disabled={filterResultCount === null} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
@@ -2879,8 +2901,8 @@ export function MapExperience() {
                         : "Choose a code to view its land-use meaning. Parcel-wide matching is not connected yet."}
                     </p>
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Live count unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>{filterResultCount === null ? "Parcel-wide zoning search is not connected." : "Matches these selected zones."}</small></div>
-                      <button disabled={filterResultCount === null} type="button">{filterResultCount === null ? "Inventory not connected" : "See " + filterResultCount.toLocaleString() + " results"}</button>
+                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
+                      <button disabled={filterResultCount === null} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
@@ -3040,8 +3062,8 @@ export function MapExperience() {
                       <p className="map-filter-note">Bedroom and bathroom values require verified unit-level records. Exact match replaces the “or more” rule.</p>
                     )}
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Live count unavailable" : filterResultCount.toLocaleString() + " matching"}</strong><small>{filterResultCount === null ? "Verified unit-level inventory is not connected." : "Matches these room requirements."}</small></div>
-                      <button disabled={filterResultCount === null || bedsBathsDisabled} type="button">{filterResultCount === null ? "Inventory not connected" : "See " + filterResultCount.toLocaleString() + " results"}</button>
+                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
+                      <button disabled={filterResultCount === null || bedsBathsDisabled} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
