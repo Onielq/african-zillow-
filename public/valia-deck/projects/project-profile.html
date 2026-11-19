@@ -164,9 +164,8 @@ body{font-family:Inter,Arial,sans-serif}
 </main>
 <script type="module">
 import {
-  fetchProjectNearbyAccess,
-  formatProjectNearbyAccessItem,
-  isPreciseProjectLocation
+  isPreciseProjectLocation,
+  mountProjectNearbyAccess
 } from "../project-access.js";
 
 (() => {
@@ -297,88 +296,11 @@ import {
     set("contextMapLabel", "Schools, transport and services · map search only");
   }
 
-  const reportAccessGrid = document.getElementById("reportAccessGrid");
-  const reportAccessNote = document.getElementById("reportAccessNote");
-  const renderAccessMessage = (title, detail) => {
-    if (!reportAccessGrid) return;
-    reportAccessGrid.replaceChildren();
-    const item = document.createElement("div");
-    item.className = "report-access-item";
-    const heading = document.createElement("b");
-    heading.textContent = title;
-    const description = document.createElement("span");
-    description.textContent = detail;
-    item.append(heading, description);
-    reportAccessGrid.appendChild(item);
-  };
-
-  const appendOpenStreetMapAttribution = () => {
-    if (!reportAccessNote) return;
-    reportAccessNote.appendChild(document.createTextNode(" "));
-    const attribution = document.createElement("a");
-    attribution.href = "https://www.openstreetmap.org/copyright";
-    attribution.target = "_blank";
-    attribution.rel = "noopener noreferrer";
-    attribution.textContent = "OpenStreetMap attribution";
-    reportAccessNote.appendChild(attribution);
-  };
-
-  if (!exactPin) {
-    renderAccessMessage(
-      "Area context only",
-      "Nearby distances were not calculated because this project record does not contain a precise, source-backed coordinate. This is not evidence that nearby facilities or road access are absent."
-    );
-    if (reportAccessNote) {
-      reportAccessNote.textContent = "No coordinate-specific lookup was run. The map shows administrative-area context only.";
-    }
-  } else if (reportAccessGrid) {
-    reportAccessGrid.setAttribute("aria-busy", "true");
-    renderAccessMessage("Nearby access", "Checking mapped facilities and road proximity…");
-    if (reportAccessNote) reportAccessNote.textContent = "Source lookup in progress.";
-
-    fetchProjectNearbyAccess({ latitude, longitude, precision, district })
-      .then((payload) => {
-        const items = payload.items
-          .map(formatProjectNearbyAccessItem)
-          .filter((item) => item !== null);
-        reportAccessGrid.replaceChildren();
-
-        if (items.length === 0) {
-          renderAccessMessage(
-            "No mapped results returned",
-            "The map source returned no nearby facilities or main-road geometry for this coordinate. Coverage may be incomplete; this does not prove that facilities or legal access are absent."
-          );
-        } else {
-          items.forEach((nearby) => {
-            const item = document.createElement("div");
-            item.className = "report-access-item";
-            const heading = document.createElement("b");
-            heading.textContent = nearby.category;
-            const name = document.createElement("span");
-            name.textContent = nearby.name;
-            const distance = document.createElement("span");
-            distance.textContent = nearby.distanceLabel;
-            item.append(heading, name, distance);
-            reportAccessGrid.appendChild(item);
-          });
-        }
-
-        if (reportAccessNote) {
-          reportAccessNote.textContent = [payload.source, payload.note].filter(Boolean).join(" · ");
-          appendOpenStreetMapAttribution();
-        }
-      })
-      .catch(() => {
-        renderAccessMessage(
-          "Nearby access unavailable",
-          "The nearby-access service could not return results. A service failure is not evidence that facilities or road access are absent."
-        );
-        if (reportAccessNote) {
-          reportAccessNote.textContent = "Nearby access could not be checked. No distance or travel time is being inferred.";
-        }
-      })
-      .finally(() => reportAccessGrid.setAttribute("aria-busy", "false"));
-  }
+  void mountProjectNearbyAccess({
+    location: { latitude, longitude, precision, district },
+    grid: document.getElementById("reportAccessGrid"),
+    note: document.getElementById("reportAccessNote")
+  });
 
   const sourceEntries = [
     ["Primary project source", get("source")],
