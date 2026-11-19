@@ -221,3 +221,53 @@ test("the icon-only Filters trigger shows an unobtrusive count when filters are 
   assert.match(styles, /\.toolbar-filter-count\s*\{[\s\S]*?position: absolute/);
   assert.match(styles, /\.toolbar-filter-icon\s*\{[\s\S]*?position: relative/);
 });
+
+
+test("parcel filter controls are connected to the cadastral map source and return map-area counts", async () => {
+  const experience = await read("../src/components/map/MapExperience.tsx");
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(experience, /parcelFilters=\{mapFilters\}/);
+  assert.match(experience, /onParcelFilterResults=\{setParcelFilterResults\}/);
+  assert.match(mapView, /parcelFilters: ParcelMapFilters/);
+  assert.match(mapView, /filteredParcelFeatureIdsRef\.current/);
+  assert.match(mapView, /source\?\.setData\(\{ \.\.\.raw, features: filtered \}/);
+  assert.match(mapView, /matching: filtered\.length/);
+  assert.match(mapView, /inView: raw\.features\.length/);
+});
+
+test("plot measurement filters use cadastral area first and a marked geometry estimate as fallback", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(mapView, /properties\.parcel_size_m2 === "number"/);
+  assert.match(mapView, /geometryAreaM2\(feature\.geometry as Geometry\)/);
+  assert.match(mapView, /filters\.measurementBasis !== "plot"/);
+  assert.match(mapView, /minArea !== null/);
+  assert.match(mapView, /maxArea !== null/);
+});
+
+test("zoning filters load official map polygons and use parcel-centre spatial matching", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(mapView, /fetch\("\/api\/geography\/zoning\?bbox=/);
+  assert.match(mapView, /zoningFilterFeaturesRef\.current\.filter/);
+  assert.match(mapView, /pointWithinGeometry\(center, zone\.geometry/);
+  assert.match(mapView, /zoningStatus: zoningCodes\.length \? zoningFilterStatusRef\.current/);
+});
+
+test("land parcel filters do not invent sale status, monthly payments, bedroom data, or USD conversions", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const experience = await read("../src/components/map/MapExperience.tsx");
+  assert.match(mapView, /status !== "available" \|\| listingType !== filters\.listingType/);
+  assert.match(mapView, /if \(hasMonthlyRange\) return false/);
+  assert.match(mapView, /if \(filters\.bedroomsMin \|\| filters\.bathroomsMin\) return false/);
+  assert.match(mapView, /filters\.priceCurrency !== "RWF"/);
+  assert.match(experience, /The cadastral parcel feed does not provide verified sale, rent or sold listing status/);
+  assert.match(experience, /Monthly payments are not supplied by the cadastral parcel source/);
+  assert.match(experience, /live currency conversion is not connected/);
+});
+
+test("parcel price slider maximum adapts to the maximum estimate in the current map area", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const experience = await read("../src/components/map/MapExperience.tsx");
+  assert.match(mapView, /maxPriceRwf/);
+  assert.match(experience, /dynamicParcelPriceLimit\(parcelFilterResults\?\.maxPriceRwf\)/);
+  assert.doesNotMatch(experience, /RWF 1T/);
+});
