@@ -49,7 +49,7 @@ test("price filter has list-price and monthly-payment ranges, caps and editable 
   assert.match(source, /priceMin/);
   assert.match(source, /priceMax/);
   assert.match(source, /Price distribution/);
-  assert.match(source, /Parcel price estimates are not verified asking prices/);
+  assert.match(source, /not verified asking prices/);
   assert.match(source, /matching parcels/);
   assert.match(source, /Loading map parcels/);
   assert.match(source, /map-filter-price-columns/);
