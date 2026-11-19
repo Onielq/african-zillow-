@@ -1230,7 +1230,7 @@ function zoningFeatureMatchesCodes(
   feature: MapFeatureCollection["features"][number],
   codes: string[]
 ): boolean {
-  const properties = feature.properties ?? {};
+  const properties = (feature.properties ?? {}) as Record<string, unknown>;
   const values = [
     properties.zoning,
     properties.new_zoning,
@@ -1946,7 +1946,7 @@ export function MapView({
       const maxArea = filters.measurementMax.trim() ? Number(filters.measurementMax) : null;
 
       const filtered = raw.features.filter((feature, index) => {
-        const properties = feature.properties ?? {};
+        const properties = (feature.properties ?? {}) as Record<string, unknown>;
         if (filters.propertyTypes.length && !filters.propertyTypes.every((value) => value === "land" || value === "lots_land")) {
           return false;
         }
@@ -3205,6 +3205,7 @@ export function MapView({
           refreshParcelMapFiltersRef.current?.();
         } else {
           source.setData(withStableFeatureIds);
+          if (areaDataRef.current.parcel) refreshParcelMapFiltersRef.current?.();
         }
         updateLayerVisibility();
         selectionSyncRef.current?.(selectedAreaRef.current);
@@ -3378,6 +3379,7 @@ export function MapView({
             });
           }
         }
+        refreshParcelMapFiltersRef.current?.();
         selectionSyncRef.current?.(selectedAreaRef.current);
         refreshMetricBubbles();
         refreshProjectMarkers();
