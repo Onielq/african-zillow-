@@ -52,6 +52,7 @@ body{font-family:Inter,Arial,sans-serif}
 .access-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
 .access-item{padding:8px 10px;background:var(--report-cream);font-size:9px;line-height:1.35}
 .access-item b{display:block;color:var(--report-navy);font-size:10px}
+.access-item span{display:block;margin-top:3px;line-height:1.35}
 .source-strip{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:8px}
 .source-strip a{font-size:8px}
 .source-note{font-size:8px;line-height:1.35;color:#7a8490}
@@ -210,7 +211,12 @@ body{font-family:Inter,Arial,sans-serif}
   <div class="access-item"><b>Kigali Convention Centre</b>0.5 km · developer-published distance</div>
   <div class="access-item"><b>IFAK Don Bosco Kimihurura</b>Secondary school · 41 KN 14 Avenue; entrance distance not verified</div>
  </div>
- <div class="body-grid equal" style="margin-top:10px">
+ <p class="source-note" style="margin:8px 0 4px">Current map-source lookup · OpenStreetMap facilities and Valhalla road estimates. This is separate from the dated and developer-reported references above.</p>
+  <div id="liveNearbyAccessGrid" class="access-grid" aria-live="polite" aria-busy="false">
+   <div class="access-item"><b>Nearby access lookup</b><span>Loading current mapped facilities and route estimates for the recorded project coordinate…</span></div>
+  </div>
+  <p id="liveNearbyAccessNote" class="source-note" style="margin-top:5px">Road times are estimates and do not include live traffic.</p>
+  <div class="body-grid equal" style="margin-top:10px">
   <div>
    <p class="lead" style="margin:0">Project address: Brilliant Tower, No. 11, KG 7 Avenue, KG543 Street, Kigali, Rwanda. The project register places it in Gasabo District, Kimihurura Sector, Kamukina Cell. The developer publishes KCC and Kigali Heights as 0.5 km and 0.3 km away respectively.</p>
   </div>
@@ -231,5 +237,14 @@ body{font-family:Inter,Arial,sans-serif}
  <div class="footer"><span>TAISEEL / BRILLIANT TOWER · LOCATION & SOURCES</span><span>05 / LOCATION & VERIFICATION</span></div>
 </section>
 </main>
+<script type="module">
+import { mountProjectNearbyAccess } from "../project-access.js";
+
+void mountProjectNearbyAccess({
+  location: {"latitude":-1.949491,"longitude":30.092781,"precision":"address-coordinate","district":"Gasabo"},
+  grid: document.getElementById("liveNearbyAccessGrid"),
+  note: document.getElementById("liveNearbyAccessNote")
+});
+</script>
 </body>
 </html>
