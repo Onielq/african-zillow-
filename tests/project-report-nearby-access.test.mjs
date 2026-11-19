@@ -149,6 +149,7 @@ test("both existing precise-coordinate project studies use the shared live acces
     assert.match(report, /liveNearbyAccessGrid/);
     assert.match(report, /liveNearbyAccessNote/);
     assert.match(report, /OpenStreetMap facilities and Valhalla road estimates/);
+    assert.match(report, /compact: true/);
   }
 
   assert.match(brilliant, /"latitude":-1[.]949491/);
