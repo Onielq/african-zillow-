@@ -145,11 +145,11 @@ test("both existing precise-coordinate project studies use the shared live acces
     assert.match(report, /OpenStreetMap facilities and Valhalla road estimates/);
   }
 
-  assert.match(brilliant, /"latitude":-1\\.949491/);
-  assert.match(brilliant, /"longitude":30\\.092781/);
+  assert.match(brilliant, /"latitude":-1[.]949491/);
+  assert.match(brilliant, /"longitude":30[.]092781/);
   assert.match(brilliant, /"precision":"address-coordinate"/);
-  assert.match(inzovu, /"latitude":-1\\.95447/);
-  assert.match(inzovu, /"longitude":30\\.09691/);
+  assert.match(inzovu, /"latitude":-1[.]95447/);
+  assert.match(inzovu, /"longitude":30[.]09691/);
   assert.match(inzovu, /"precision":"parcel-upi"/);
 });
 
