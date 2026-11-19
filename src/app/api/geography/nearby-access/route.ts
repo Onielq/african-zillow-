@@ -274,7 +274,7 @@ async function calculateNearbyRoutes(lat: number, lon: number): Promise<{ items:
     ...routedItems
   ];
   const noteParts = [
-    "Facility distances and driving times are estimated from the parcel-area center; road routes do not include live traffic.",
+    "Facility distances and driving times are estimated from the selected map coordinate; road routes do not include live traffic.",
     "Main-road distance is straight-line proximity to the nearest mapped trunk, primary, secondary or tertiary road, not proof of a driveway or legal access.",
     "OpenStreetMap may have incomplete or outdated facility and landmark coverage."
   ];

@@ -1376,6 +1376,7 @@ test("the project research register contains unique identifiers", async () => {
 
 test("the generic project fallback uses source-aware image and map precision", async () => {
   const profile = await readProjectFile("public/valia-deck/projects/project-profile.html");
+  const access = await readProjectFile("public/valia-deck/project-access.js");
   const modal = await readProjectFile("src/components/map/ProjectReportModal.tsx");
   const mapExperience = await readProjectFile("src/components/map/MapExperience.tsx");
   const standard = JSON.parse(await readProjectFile("public/valia-deck/report-standard.json"));
@@ -1386,10 +1387,15 @@ test("the generic project fallback uses source-aware image and map precision", a
   assert.match(profile, /data-report-page="market"/);
   assert.match(profile, /data-report-page="location"/);
   assert.match(profile, /project image not yet attached/i);
-  assert.match(profile, /const exactPin = hasCoordinates &&/);
-  assert.match(profile, /address-coordinate/);
-  assert.match(profile, /parcel-upi/);
+  assert.match(profile, /const exactPin = isPreciseProjectLocation/);
   assert.match(profile, /Area context only/);
+  assert.match(profile, /mountProjectNearbyAccess/);
+  assert.match(access, /if \(!isPreciseProjectLocation\(location\)\)/);
+  assert.match(access, /address-coordinate/);
+  assert.match(access, /parcel-upi/);
+  assert.match(access, /RWANDA_BOUNDS/);
+  assert.match(access, /latitude >= RWANDA_BOUNDS\.south/);
+  assert.match(access, /longitude <= RWANDA_BOUNDS\.east/);
   assert.match(profile, /safeUrl/);
   assert.match(profile, /sourceList/);
   assert.match(profile, /categoryIsCommercial/);
