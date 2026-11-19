@@ -125,8 +125,29 @@ test("generic project report gates nearby access behind exact source-backed prec
   const html = await readFile(new URL("../public/valia-deck/projects/project-profile.html", import.meta.url), "utf8");
   assert.match(html, /type="module"/);
   assert.match(html, /isPreciseProjectLocation/);
-  assert.match(html, /fetchProjectNearbyAccess/);
+  assert.match(html, /mountProjectNearbyAccess/);
   assert.match(html, /reportAccessGrid/);
   assert.match(html, /reportAccessNote/);
   assert.match(html, /administrative-area context only/i);
+});
+
+
+test("both existing precise-coordinate project studies use the shared live access panel", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const brilliant = await readFile(new URL("../public/valia-deck/projects/brilliant-tower.html", import.meta.url), "utf8");
+  const inzovu = await readFile(new URL("../public/valia-deck/projects/inzovu-mall.html", import.meta.url), "utf8");
+
+  for (const report of [brilliant, inzovu]) {
+    assert.match(report, /mountProjectNearbyAccess/);
+    assert.match(report, /liveNearbyAccessGrid/);
+    assert.match(report, /liveNearbyAccessNote/);
+    assert.match(report, /OpenStreetMap facilities and Valhalla road estimates/);
+  }
+
+  assert.match(brilliant, /latitude: -1\.949491/);
+  assert.match(brilliant, /longitude: 30\.092781/);
+  assert.match(brilliant, /precision: "address-coordinate"/);
+  assert.match(inzovu, /latitude: -1\.95447/);
+  assert.match(inzovu, /longitude: 30\.09691/);
+  assert.match(inzovu, /precision: "parcel-upi"/);
 });
