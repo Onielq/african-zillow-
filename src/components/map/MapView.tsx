@@ -561,6 +561,7 @@ export type ParcelMapFilters = {
 };
 
 export type ParcelFilterResults = {
+  loaded: boolean;
   matching: number;
   inView: number;
   maxPriceRwf: number | null;
@@ -1302,6 +1303,7 @@ export function MapView({
   const zoningFilterFeaturesRef = useRef<MapFeatureCollection["features"]>([]);
   const zoningFilterStatusRef = useRef<ParcelFilterResults["zoningStatus"]>("not-required");
   const filteredParcelFeatureIdsRef = useRef<Set<string> | null>(null);
+  const parcelDataLoadedRef = useRef(false);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
@@ -1998,6 +2000,7 @@ export function MapView({
       source?.setData({ ...raw, features: filtered } as MapFeatureCollection);
 
       onParcelFilterResultsRef.current?.({
+        loaded: parcelDataLoadedRef.current,
         matching: filtered.length,
         inView: raw.features.length,
         maxPriceRwf,
@@ -3202,6 +3205,7 @@ export function MapView({
         const withStableFeatureIds = withStableAreaFeatureIds(level, merged);
         areaDataRef.current[level] = withStableFeatureIds;
         if (level === "parcel") {
+          parcelDataLoadedRef.current = true;
           refreshParcelMapFiltersRef.current?.();
         } else {
           source.setData(withStableFeatureIds);
@@ -3358,6 +3362,7 @@ export function MapView({
           const stableData = withStableAreaFeatureIds(result.level, result.data);
           areaDataRef.current[result.level] = stableData;
           if (result.level === "parcel") {
+            parcelDataLoadedRef.current = true;
             refreshParcelMapFiltersRef.current?.();
           } else {
             source.setData(stableData);
@@ -3370,8 +3375,10 @@ export function MapView({
           areaDataRef.current[level] = emptyData;
           source.setData(emptyData);
           if (level === "parcel") {
+            parcelDataLoadedRef.current = false;
             filteredParcelFeatureIdsRef.current = new Set();
             onParcelFilterResultsRef.current?.({
+              loaded: false,
               matching: 0,
               inView: 0,
               maxPriceRwf: null,
