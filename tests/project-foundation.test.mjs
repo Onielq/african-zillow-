@@ -1390,7 +1390,7 @@ test("the generic project fallback uses source-aware image and map precision", a
   assert.match(profile, /const exactPin = isPreciseProjectLocation/);
   assert.match(profile, /Area context only/);
   assert.match(profile, /mountProjectNearbyAccess/);
-  assert.match(profile, /if \(!exactPin\)/);
+  assert.match(access, /if \(!isPreciseProjectLocation\(location\)\)/);
   assert.match(access, /address-coordinate/);
   assert.match(access, /parcel-upi/);
   assert.match(access, /RWANDA_BOUNDS/);
