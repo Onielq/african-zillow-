@@ -1411,10 +1411,12 @@ export function MapView({
     const previousZones = parcelFiltersRef.current.zoningCodes.join("|");
     parcelFiltersRef.current = parcelFilters;
     onParcelFilterResultsRef.current = onParcelFilterResults;
-    refreshParcelMapFiltersRef.current?.();
     if (previousZones !== parcelFilters.zoningCodes.join("|")) {
       zoningFilterStatusRef.current = parcelFilters.zoningCodes.length ? "loading" : "not-required";
+      refreshParcelMapFiltersRef.current?.();
       refreshZoningRef.current?.();
+    } else {
+      refreshParcelMapFiltersRef.current?.();
     }
   }, [parcelFilters, onParcelFilterResults]);
 
@@ -3890,7 +3892,10 @@ export function MapView({
         refreshParcelMapFiltersRef.current?.();
         return;
       }
-      if (zoningNeededForSearch) zoningFilterStatusRef.current = "loading";
+      if (zoningNeededForSearch) {
+        zoningFilterStatusRef.current = "loading";
+        refreshParcelMapFiltersRef.current?.();
+      }
 
       const controller = new AbortController();
       zoningOverlayController = controller;
