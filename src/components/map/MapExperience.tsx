@@ -77,8 +77,6 @@ import { searchRwandaProjects } from "@/lib/project-search";
 type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
 type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
-type ListingFilterValue = "all" | "sale" | "rent" | "sold";
-type MeasurementBasis = "plot" | "interior";
 
 const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: LucideIcon }> = [
   { value: "house", label: "Houses", Icon: House },
