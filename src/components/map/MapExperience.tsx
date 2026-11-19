@@ -1033,12 +1033,17 @@ export function MapExperience() {
   };
   const bedsBathsDisabled = mapFilters.propertyTypes.length === 0 ||
     mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
-  const filterResultCount = parcelFilterResults?.matching ?? null;
+  const parcelDataReady = parcelFilterResults?.loaded === true;
+  const parcelPriceReady = parcelDataReady && typeof parcelFilterResults?.maxPriceRwf === "number" && parcelFilterResults.maxPriceRwf > 0;
+  const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
   const activePriceLimit = mapFilters.priceCurrency === "USD"
     ? 100_000_000
     : dynamicParcelPriceLimit(parcelFilterResults?.maxPriceRwf);
   const activePriceStep = Math.max(1, Math.ceil(activePriceLimit / 100));
   const filterResultNote = (() => {
+    if (!parcelDataReady) {
+      return "Zoom in to parcel-level coverage to search cadastral plots in the current map area.";
+    }
     if (mapFilters.listingType !== "all") {
       return "The cadastral parcel feed does not provide verified sale, rent or sold listing status.";
     }
@@ -1064,7 +1069,7 @@ export function MapExperience() {
       return "Bedrooms and bathrooms do not apply to cadastral land parcels.";
     }
     if (parcelFilterResults) {
-      return "Matching cadastral parcels in the current map area. Geometry-derived plot sizes are estimates, not cadastral measurements.";
+      return "Matching cadastral parcels within the current map area. Geometry-derived plot sizes are estimates, not cadastral measurements.";
     }
     return "Waiting for parcel boundaries in the current map area.";
   })();
@@ -2678,6 +2683,7 @@ export function MapExperience() {
                               <input
                                 aria-label={range.title + " minimum slider"}
                                 className="map-filter-dual-slider-input map-filter-dual-slider-min"
+                                disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
                                 max={activePriceLimit}
                                 min="0"
                                 onChange={(event) => updatePriceSlider(range.key, "min", event.target.value)}
@@ -2688,6 +2694,7 @@ export function MapExperience() {
                               <input
                                 aria-label={range.title + " maximum slider"}
                                 className="map-filter-dual-slider-input map-filter-dual-slider-max"
+                                disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
                                 max={activePriceLimit}
                                 min="0"
                                 onChange={(event) => updatePriceSlider(range.key, "max", event.target.value)}
@@ -2703,6 +2710,7 @@ export function MapExperience() {
                                   inputMode="decimal"
                                   min="0"
                                   max={activePriceLimit}
+                                  disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
                                   onChange={(event) => setMapFilters((current) => ({ ...current, [range.minKey]: event.target.value }))}
                                   placeholder="0"
                                   type="number"
@@ -2715,6 +2723,7 @@ export function MapExperience() {
                                   inputMode="decimal"
                                   min="0"
                                   max={activePriceLimit}
+                                  disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
                                   onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))}
                                   placeholder="No max"
                                   type="number"
