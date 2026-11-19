@@ -5,6 +5,8 @@ const RWANDA_BOUNDS = {
   north: -1.0
 };
 
+export const PROJECT_NEARBY_ACCESS_TIMEOUT_MS = 30_000;
+
 const ACCESS_CATEGORIES = new Set([
   "Main road",
   "School",
@@ -55,7 +57,7 @@ export async function fetchProjectNearbyAccess(location, fetchImpl = globalThis.
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
-    signal: AbortSignal.timeout(10000)
+    signal: AbortSignal.timeout(PROJECT_NEARBY_ACCESS_TIMEOUT_MS)
   });
 
   if (!response.ok) {
