@@ -151,3 +151,26 @@ test("both existing precise-coordinate project studies use the shared live acces
   assert.match(inzovu, /longitude: 30\.09691/);
   assert.match(inzovu, /precision: "parcel-upi"/);
 });
+
+
+test("dedicated report coordinates stay aligned with the canonical project register", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const directory = await readFile(new URL("../src/data/project-directory.ts", import.meta.url), "utf8");
+  const getRecord = (id) => {
+    const start = directory.indexOf('"id": "' + id + '"');
+    assert.notEqual(start, -1, "project register must contain " + id);
+    const end = directory.indexOf("\\n  },", start);
+    assert.notEqual(end, -1, "project register record must close for " + id);
+    return directory.slice(start, end);
+  };
+
+  const brilliant = getRecord("brilliant-tower");
+  assert.match(brilliant, /"latitude": -1\.949491/);
+  assert.match(brilliant, /"longitude": 30\.092781/);
+  assert.match(brilliant, /"locationPrecision": "address-coordinate"/);
+
+  const inzovu = getRecord("inzovu-mall");
+  assert.match(inzovu, /"latitude": -1\.95447/);
+  assert.match(inzovu, /"longitude": 30\.09691/);
+  assert.match(inzovu, /"locationPrecision": "parcel-upi"/);
+});
