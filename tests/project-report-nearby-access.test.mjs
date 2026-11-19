@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   fetchProjectNearbyAccess,
   formatProjectNearbyAccessItem,
-  isPreciseProjectLocation
+  isPreciseProjectLocation,
+  PROJECT_NEARBY_ACCESS_TIMEOUT_MS
 } from "../public/valia-deck/project-access.js";
 
 const exactAddress = {
@@ -21,6 +22,11 @@ test("nearby access accepts only precise Rwanda project coordinates", () => {
   assert.equal(isPreciseProjectLocation({ ...exactAddress, latitude: 0 }), false);
   assert.equal(isPreciseProjectLocation({ ...exactAddress, longitude: 32 }), false);
   assert.equal(isPreciseProjectLocation({ ...exactAddress, latitude: "" }), false);
+});
+
+test("nearby access client timeout covers the existing upstream fallback and routing budget", () => {
+  // Two Overpass attempts can each use 8.5 s, followed by a 7.5 s Valhalla route.
+  assert.equal(PROJECT_NEARBY_ACCESS_TIMEOUT_MS, 30_000);
 });
 
 test("administrative-area records do not call the nearby-access API", async () => {
