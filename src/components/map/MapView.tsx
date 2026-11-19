@@ -552,6 +552,7 @@ export type ParcelMapFilters = {
   zoningCodes: string[];
   measurementMin: string;
   measurementMax: string;
+  measurementPreset: string;
   measurementBasis: "plot" | "interior";
   bedroomsMin: string;
   bathroomsMin: string;
@@ -1239,7 +1240,12 @@ function zoningFeatureMatchesCodes(
     properties.zoning_class
   ].filter((value) => value !== null && value !== undefined).map(String);
   return codes.some((code) => {
-    const escaped = code.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\export function MapView({
+    const pattern = new RegExp("(^|[^A-Z0-9])" + code + "($|[^A-Z0-9])", "i");
+    return values.some((value) => pattern.test(value));
+  });
+}
+
+export function MapView({
   basemapMode,");
     const pattern = new RegExp("(^|[^A-Z0-9])" + escaped + "($|[^A-Z0-9])", "i");
     return values.some((value) => pattern.test(value));
