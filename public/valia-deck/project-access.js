@@ -115,13 +115,13 @@ export function formatProjectNearbyAccessItem(item) {
  * Mount the shared live access panel in a project report. Existing report facts
  * remain untouched; these results are a separate, current map-source lookup.
  */
-export async function mountProjectNearbyAccess({ location, grid, note }) {
+export async function mountProjectNearbyAccess({ location, grid, note, compact = false }) {
   if (!grid) return { status: "not-mounted", items: [] };
 
   const renderMessage = (title, detail) => {
     grid.replaceChildren();
     const item = document.createElement("div");
-    item.className = grid.classList.contains("access-grid") ? "access-item" : "report-access-item";
+    item.className = compact ? "live-access-message" : grid.classList.contains("access-grid") ? "access-item" : "report-access-item";
     const heading = document.createElement("b");
     heading.textContent = title;
     const description = document.createElement("span");
@@ -169,6 +169,18 @@ export async function mountProjectNearbyAccess({ location, grid, note }) {
         "No mapped results returned",
         "The map source returned no nearby facilities or main-road geometry for this coordinate. Coverage may be incomplete; this does not prove that facilities or legal access are absent."
       );
+    } else if (compact) {
+      const list = document.createElement("div");
+      list.className = "live-access-list";
+      items.forEach((nearby) => {
+        const item = document.createElement("span");
+        item.className = "live-access-result";
+        const heading = document.createElement("b");
+        heading.textContent = nearby.category + ": ";
+        item.append(heading, document.createTextNode(nearby.name + " · " + nearby.distanceLabel));
+        list.appendChild(item);
+      });
+      grid.appendChild(list);
     } else {
       items.forEach((nearby) => {
         const item = document.createElement("div");
