@@ -44,6 +44,9 @@ body{font-family:Inter,Arial,sans-serif}
 .report-access-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
 .report-access-item{padding:9px 10px;background:var(--report-cream);color:var(--report-muted);font:9px/1.4 Inter,Arial,sans-serif}
 .report-access-item b{display:block;margin-bottom:4px;color:var(--report-navy);font-size:10px}
+.report-access-item span{display:block;margin-top:4px;line-height:1.4}
+.report-access-note{grid-column:1/-1;margin:6px 0 0;color:var(--report-muted);font:8px/1.45 Inter,Arial,sans-serif}
+.report-access-note a{color:var(--report-navy-mid);text-decoration:underline}
 @media print{.page{margin:0!important}}
 </style>
  <link rel="stylesheet" href="../report-system.css">
@@ -148,11 +151,10 @@ body{font-family:Inter,Arial,sans-serif}
   <div class="report-map-card"><div id="projectMapLabel" class="report-map-label">Project location</div><div id="projectMapBox" class="map-placeholder">A verified project pin is not attached to this record.</div></div>
   <div class="report-map-card"><div id="contextMapLabel" class="report-map-label">Local area context</div><div id="contextMapBox" class="map-placeholder">A sector / district context map will appear when the record includes location information.</div></div>
  </div>
- <div class="report-access-grid">
-  <div class="report-access-item"><b>Schools / universities</b>Nearby names and routed distances are not recorded.</div>
-  <div class="report-access-item"><b>Bus stations / stops</b>Operating stops and walking distances are not recorded.</div>
-  <div class="report-access-item"><b>Healthcare / public facilities</b>Nearest verified facilities are not attached to this profile.</div>
+ <div id="reportAccessGrid" class="report-access-grid" aria-live="polite" aria-busy="false">
+  <div class="report-access-item"><b>Nearby access</b><span>Nearby routes are loaded only for a precise, source-backed project coordinate.</span></div>
  </div>
+ <p id="reportAccessNote" class="report-access-note">Administrative-area context is not used as a project access point.</p>
  <div class="body-grid equal" style="margin-top:10px">
   <div><p class="lead" id="locationNote" style="margin:0">The location hierarchy is displayed only to the precision recorded. An area map is not a parcel boundary or a project entrance pin.</p></div>
   <div><div class="eyebrow">Sources recorded</div><div id="sourceList" class="source-list"><span class="small">No source links are attached to this project record.</span></div></div>
@@ -160,7 +162,13 @@ body{font-family:Inter,Arial,sans-serif}
  <div class="footer"><span>TAISEEL / PROJECT INTELLIGENCE</span><span>05 / LOCATION & VERIFICATION</span></div>
 </section>
 </main>
-<script>
+<script type="module">
+import {
+  fetchProjectNearbyAccess,
+  formatProjectNearbyAccessItem,
+  isPreciseProjectLocation
+} from "../project-access.js";
+
 (() => {
   const params = new URLSearchParams(window.location.search);
   const get = (key) => (params.get(key) || "").trim();
@@ -188,8 +196,7 @@ body{font-family:Inter,Arial,sans-serif}
   const precision = get("locationPrecision");
   const latitude = Number(get("latitude"));
   const longitude = Number(get("longitude"));
-  const hasCoordinates = get("latitude") !== "" && get("longitude") !== "" && Number.isFinite(latitude) && Number.isFinite(longitude);
-  const exactPin = hasCoordinates && (precision === "address-coordinate" || precision === "parcel-upi");
+  const exactPin = isPreciseProjectLocation({ latitude, longitude, precision });
   const category = get("category");
   const categoryIsMixedUse = /mixed[\s-]?use/i.test(category);
   const categoryIsCommercial = categoryIsMixedUse || /office|commercial|retail|mall|tower|business|industrial|hotel|hospitality/i.test(category);
@@ -288,6 +295,89 @@ body{font-family:Inter,Arial,sans-serif}
     contextMapBox.textContent = "";
     contextMapBox.appendChild(iframe);
     set("contextMapLabel", "Schools, transport and services · map search only");
+  }
+
+  const reportAccessGrid = document.getElementById("reportAccessGrid");
+  const reportAccessNote = document.getElementById("reportAccessNote");
+  const renderAccessMessage = (title, detail) => {
+    if (!reportAccessGrid) return;
+    reportAccessGrid.replaceChildren();
+    const item = document.createElement("div");
+    item.className = "report-access-item";
+    const heading = document.createElement("b");
+    heading.textContent = title;
+    const description = document.createElement("span");
+    description.textContent = detail;
+    item.append(heading, description);
+    reportAccessGrid.appendChild(item);
+  };
+
+  const appendOpenStreetMapAttribution = () => {
+    if (!reportAccessNote) return;
+    reportAccessNote.appendChild(document.createTextNode(" "));
+    const attribution = document.createElement("a");
+    attribution.href = "https://www.openstreetmap.org/copyright";
+    attribution.target = "_blank";
+    attribution.rel = "noopener noreferrer";
+    attribution.textContent = "OpenStreetMap attribution";
+    reportAccessNote.appendChild(attribution);
+  };
+
+  if (!exactPin) {
+    renderAccessMessage(
+      "Area context only",
+      "Nearby distances were not calculated because this project record does not contain a precise, source-backed coordinate. This is not evidence that nearby facilities or road access are absent."
+    );
+    if (reportAccessNote) {
+      reportAccessNote.textContent = "No coordinate-specific lookup was run. The map shows administrative-area context only.";
+    }
+  } else if (reportAccessGrid) {
+    reportAccessGrid.setAttribute("aria-busy", "true");
+    renderAccessMessage("Nearby access", "Checking mapped facilities and road proximity…");
+    if (reportAccessNote) reportAccessNote.textContent = "Source lookup in progress.";
+
+    fetchProjectNearbyAccess({ latitude, longitude, precision, district })
+      .then((payload) => {
+        const items = payload.items
+          .map(formatProjectNearbyAccessItem)
+          .filter((item) => item !== null);
+        reportAccessGrid.replaceChildren();
+
+        if (items.length === 0) {
+          renderAccessMessage(
+            "No mapped results returned",
+            "The map source returned no nearby facilities or main-road geometry for this coordinate. Coverage may be incomplete; this does not prove that facilities or legal access are absent."
+          );
+        } else {
+          items.forEach((nearby) => {
+            const item = document.createElement("div");
+            item.className = "report-access-item";
+            const heading = document.createElement("b");
+            heading.textContent = nearby.category;
+            const name = document.createElement("span");
+            name.textContent = nearby.name;
+            const distance = document.createElement("span");
+            distance.textContent = nearby.distanceLabel;
+            item.append(heading, name, distance);
+            reportAccessGrid.appendChild(item);
+          });
+        }
+
+        if (reportAccessNote) {
+          reportAccessNote.textContent = [payload.source, payload.note].filter(Boolean).join(" · ");
+          appendOpenStreetMapAttribution();
+        }
+      })
+      .catch(() => {
+        renderAccessMessage(
+          "Nearby access unavailable",
+          "The nearby-access service could not return results. A service failure is not evidence that facilities or road access are absent."
+        );
+        if (reportAccessNote) {
+          reportAccessNote.textContent = "Nearby access could not be checked. No distance or travel time is being inferred.";
+        }
+      })
+      .finally(() => reportAccessGrid.setAttribute("aria-busy", "false"));
   }
 
   const sourceEntries = [
