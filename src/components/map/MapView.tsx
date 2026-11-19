@@ -1247,13 +1247,6 @@ function zoningFeatureMatchesCodes(
 }
 
 export function MapView({
-  basemapMode,");
-    const pattern = new RegExp("(^|[^A-Z0-9])" + escaped + "($|[^A-Z0-9])", "i");
-    return values.some((value) => pattern.test(value));
-  });
-}
-
-export function MapView({
   basemapMode,
   showLandPriceHeatmap,
   selectedMetric,
