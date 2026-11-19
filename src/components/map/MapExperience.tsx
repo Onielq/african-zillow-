@@ -2659,7 +2659,7 @@ export function MapExperience() {
                               <div className="map-filter-histogram-empty">
                                 <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
                                 <span>Price distribution</span>
-                                <small>Parcel price estimates are not verified asking prices. The map does not invent price distributions.</small>
+                                <small>{range.key === "monthly" ? "Monthly payments are not supplied by the cadastral parcel source." : mapFilters.priceCurrency === "USD" ? "Parcel estimates are in RWF; live currency conversion is not connected." : "Estimates use the map's transaction-price benchmarks and parcel area, not verified asking prices."}</small>
                               </div>
                               <div className="map-filter-histogram-axis">
                                 <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
