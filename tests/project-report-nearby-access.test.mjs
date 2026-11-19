@@ -123,12 +123,13 @@ test("HTTP and malformed API responses fail explicitly", async () => {
 test("generic project report gates nearby access behind exact source-backed precision", async () => {
   const { readFile } = await import("node:fs/promises");
   const html = await readFile(new URL("../public/valia-deck/projects/project-profile.html", import.meta.url), "utf8");
+  const access = await readFile(new URL("../public/valia-deck/project-access.js", import.meta.url), "utf8");
   assert.match(html, /type="module"/);
   assert.match(html, /isPreciseProjectLocation/);
   assert.match(html, /mountProjectNearbyAccess/);
   assert.match(html, /reportAccessGrid/);
   assert.match(html, /reportAccessNote/);
-  assert.match(html, /administrative-area context only/i);
+  assert.match(access, /administrative-area context only/i);
 });
 
 
@@ -144,12 +145,12 @@ test("both existing precise-coordinate project studies use the shared live acces
     assert.match(report, /OpenStreetMap facilities and Valhalla road estimates/);
   }
 
-  assert.match(brilliant, /latitude: -1\.949491/);
-  assert.match(brilliant, /longitude: 30\.092781/);
-  assert.match(brilliant, /precision: "address-coordinate"/);
-  assert.match(inzovu, /latitude: -1\.95447/);
-  assert.match(inzovu, /longitude: 30\.09691/);
-  assert.match(inzovu, /precision: "parcel-upi"/);
+  assert.match(brilliant, /"latitude":-1\\.949491/);
+  assert.match(brilliant, /"longitude":30\\.092781/);
+  assert.match(brilliant, /"precision":"address-coordinate"/);
+  assert.match(inzovu, /"latitude":-1\\.95447/);
+  assert.match(inzovu, /"longitude":30\\.09691/);
+  assert.match(inzovu, /"precision":"parcel-upi"/);
 });
 
 
