@@ -560,6 +560,25 @@ export type ParcelMapFilters = {
   bathroomsExact: boolean;
 };
 
+const EMPTY_PARCEL_MAP_FILTERS: ParcelMapFilters = {
+  listingType: "all",
+  priceCurrency: "RWF",
+  priceMin: "",
+  priceMax: "",
+  monthlyPaymentMin: "",
+  monthlyPaymentMax: "",
+  propertyTypes: [],
+  zoningCodes: [],
+  measurementMin: "",
+  measurementMax: "",
+  measurementPreset: "",
+  measurementBasis: "plot",
+  bedroomsMin: "",
+  bathroomsMin: "",
+  bedroomsExact: false,
+  bathroomsExact: false
+};
+
 export type ParcelFilterResults = {
   loaded: boolean;
   matching: number;
@@ -576,7 +595,7 @@ type MapViewProps = {
   showZoning: boolean;
   showScope: ShowScope;
   selectedArea: SelectedArea | null;
-  parcelFilters: ParcelMapFilters;
+  parcelFilters?: ParcelMapFilters;
   onParcelFilterResults?: (results: ParcelFilterResults) => void;
   projects?: RwandaProjectRecord[];
   showProjects?: boolean;
@@ -1258,7 +1277,7 @@ export function MapView({
   showLayers,
   showScope,
   selectedArea,
-  parcelFilters,
+  parcelFilters = EMPTY_PARCEL_MAP_FILTERS,
   onParcelFilterResults,
   projects = [],
   showProjects = false,
