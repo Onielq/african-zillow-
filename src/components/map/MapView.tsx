@@ -1242,10 +1242,6 @@ function geometryPolygons(geometry: Geometry | null): number[][][][] {
   return [];
 }
 
-function pointWithinGeometry(point: [number, number], geometry: Geometry | null): boolean {
-  return geometryPolygons(geometry).some((polygon) => pointWithinPolygon(point, polygon));
-}
-
 function segmentsIntersect(a: [number, number], b: [number, number], c: [number, number], d: [number, number]): boolean {
   const orientation = (p: [number, number], q: [number, number], r: [number, number]) =>
     (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
