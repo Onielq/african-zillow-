@@ -1983,7 +1983,8 @@ export function MapView({
       const maxArea = filters.measurementMax.trim() ? Number(filters.measurementMax) : null;
       const landOnly = filters.propertyTypes.length > 0 &&
         filters.propertyTypes.every((value) => value === "land" || value === "lots_land");
-      const hasParcelFilters = zoningCodes.length > 0 || hasPlotRange || landOnly ||
+      const zoningCanBeApplied = zoningCodes.length > 0 && zoningFilterStatusRef.current === "ready";
+      const hasParcelFilters = zoningCanBeApplied || hasPlotRange || landOnly ||
         (filters.listingType !== "all" && raw.features.some((feature) => feature.properties?.market_status));
 
       const confirmedAskingPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
@@ -2425,7 +2426,7 @@ export function MapView({
               "case",
               ["boolean", ["feature-state", "selected"], false], 0.98,
               ["boolean", ["feature-state", "hover"], false], 0.96,
-              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], false]], 0.28,
+              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], false]], 0.55,
               level === "parcel" ? 0.95 : 0.92
             ]
           }
