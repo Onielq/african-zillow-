@@ -2839,150 +2839,145 @@ export function MapExperience() {
                       <button aria-pressed={activePriceTab === "list"} className={activePriceTab === "list" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("list")} type="button">List price</button>
                       <button aria-pressed={activePriceTab === "monthly"} className={activePriceTab === "monthly" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("monthly")} type="button">Monthly payment</button>
                     </div>
-                    {activePriceTab === "monthly" ? (
-                      <div className="map-filter-finance-terms">
-                        <div className="map-filter-finance-heading">
-                          <strong>Estimate your monthly payment</strong>
-                          <small>Enter lender terms or an assumption. No bank rate is preselected.</small>
-                        </div>
-                        <div className="map-filter-finance-fields">
-                          <label>
-                            <span>Down payment ({mapFilters.priceCurrency})</span>
-                            <input inputMode="decimal" min="0" onChange={(event) => setFinanceTerms((current) => ({ ...current, downPayment: event.target.value }))} placeholder="Enter amount" type="number" value={financeTerms.downPayment} />
-                          </label>
-                          <label>
-                            <span>Annual interest rate (%)</span>
-                            <input inputMode="decimal" min="0" max="30" onChange={(event) => setFinanceTerms((current) => ({ ...current, annualRate: event.target.value }))} placeholder="Enter rate" type="number" value={financeTerms.annualRate} />
-                          </label>
-                          <label>
-                            <span>Loan term (months)</span>
-                            <input inputMode="numeric" min="1" max="360" onChange={(event) => setFinanceTerms((current) => ({ ...current, loanMonths: event.target.value }))} placeholder="e.g. 240" type="number" value={financeTerms.loanMonths} />
-                          </label>
-                        </div>
-                        <p className="map-filter-note">Estimated principal and interest only. Taxes, insurance, fees, lender approval and partner-specific charges are not included.</p>
-                      </div>
-                    ) : null}
-                    <div className="map-filter-price-columns">
-                      {([
-                        activePriceTab === "list" ? {
-                          key: "list" as const,
-                          title: "List price",
-                          minimum: mapFilters.priceMin,
-                          maximum: mapFilters.priceMax,
-                          minKey: "priceMin" as const,
-                          maxKey: "priceMax" as const,
-                          summary: listPriceSummary
-                        } : {
-                          key: "monthly" as const,
-                          title: "Monthly payment",
-                          minimum: mapFilters.monthlyPaymentMin,
-                          maximum: mapFilters.monthlyPaymentMax,
-                          minKey: "monthlyPaymentMin" as const,
-                          maxKey: "monthlyPaymentMax" as const,
-                          summary: monthlyPaymentSummary
-                        }
-                      ]).map((range) => {
-                        const maximumLimit = activePriceLimit > 0 ? activePriceLimit : 1;
-                        const minimum = Math.min(maximumLimit, Math.max(0, Number(range.minimum) || 0));
-                        const maximum = Math.max(0, Math.min(maximumLimit, range.maximum ? Number(range.maximum) : maximumLimit));
-                        const rangeInvalid = Boolean(range.minimum && range.maximum && Number(range.minimum) > Number(range.maximum));
-                        const rangeOutOfBounds = activePriceLimit > 0 && [range.minimum, range.maximum].some((value) =>
-                          value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > activePriceLimit)
-                        );
-                        const histogram = marketInventory?.histogram ?? [];
-                        const largestBin = Math.max(1, ...histogram.map((bin) => bin.count));
-                        const draggedValue = activePriceDrag === "min" ? minimum : maximum;
-                        const draggedPosition = Math.max(0, Math.min(100, draggedValue / maximumLimit * 100));
-                        return (
-                          <section className="map-filter-price-section" key={range.key}>
-                            <div className="map-filter-price-section-heading">
-                              <div><strong>{range.title}</strong><small>{range.summary}</small></div>
-                              <span>{mapFilters.priceCurrency}</span>
-                            </div>
-                            <div className="map-filter-histogram" aria-label={range.title + " listing price distribution"}>
-                              {histogram.length > 0 ? (
-                                <div className="map-filter-histogram-bars" aria-hidden="true">
-                                  {Array.from({ length: 24 }, (_, index) => {
-                                    const count = histogram.find((bin) => bin.bucket === index + 1)?.count ?? 0;
-                                    return <span className="map-filter-histogram-bar" key={index} style={{ height: Math.max(2, count / largestBin * 100) + "%" }} />;
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="map-filter-histogram-empty">
-                                  <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
-                                  <span>{marketInventoryLoading ? "Loading price distribution" : "Price distribution"}</span>
-                                  <small>{marketInventory?.message ?? (marketInventory?.dataStatus === "needs_finance_terms" ? "Enter the down payment, interest rate and loan term above to calculate a monthly estimate." : "No current, source-authorized asking-price records are connected for this map area yet.")}</small>
-                                </div>
-                              )}
-                              <div className="map-filter-histogram-axis">
-                                <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
-                                <span>{activePriceLimit > 0 ? compactFilterAmount(activePriceLimit, mapFilters.priceCurrency) : "No inventory maximum"}</span>
+                    <div className="map-filter-price-content">
+                      {activePriceTab === "list" ? (
+                        (() => {
+                          const minimum = Math.min(sliderLimit, Math.max(0, Number(mapFilters.priceMin) || 0));
+                          const maximum = Math.max(minimum, Math.min(sliderLimit, mapFilters.priceMax ? Number(mapFilters.priceMax) : sliderLimit));
+                          const rangeInvalid = Boolean(mapFilters.priceMin && mapFilters.priceMax && Number(mapFilters.priceMin) > Number(mapFilters.priceMax));
+                          const histogram = marketInventory?.histogram ?? [];
+                          const largestBin = Math.max(1, ...histogram.map((bin) => bin.count));
+                          const draggedValue = activePriceDrag === "min" ? minimum : maximum;
+                          const draggedPosition = Math.max(0, Math.min(100, draggedValue / sliderLimit * 100));
+                          return (
+                            <section className="map-filter-price-section map-filter-list-price-section">
+                              <div className="map-filter-price-section-heading">
+                                <div><strong>List price</strong><small>{listPriceSummary}</small></div>
+                                <span>{mapFilters.priceCurrency}</span>
                               </div>
+                              <div className="map-filter-histogram" aria-label="List-price distribution by number of properties">
+                                {histogram.length > 0 ? (
+                                  <div className="map-filter-histogram-bars" aria-hidden="true">
+                                    {Array.from({ length: 24 }, (_, index) => {
+                                      const count = histogram.find((bin) => bin.bucket === index + 1)?.count ?? 0;
+                                      return <span className="map-filter-histogram-bar" key={index} style={{ height: Math.max(2, count / largestBin * 100) + "%" }} />;
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="map-filter-histogram-empty">
+                                    <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
+                                    <span>{marketInventoryLoading ? "Loading price distribution" : "Price distribution"}</span>
+                                    <small>{marketInventory?.message ?? "No current, source-authorized asking-price records are connected for this map area yet."}</small>
+                                  </div>
+                                )}
+                                <div className="map-filter-histogram-axis">
+                                  <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
+                                  <span>{formatFilterAmount(sliderLimit, mapFilters.priceCurrency)}</span>
+                                </div>
+                              </div>
+                              <div className="map-filter-price-values">
+                                <span><small>Minimum</small><strong>{mapFilters.priceMin ? formatFilterAmount(minimum, mapFilters.priceCurrency) : "No min"}</strong></span>
+                                <span><small>Maximum</small><strong>{mapFilters.priceMax ? formatFilterAmount(maximum, mapFilters.priceCurrency) : "No max"}</strong></span>
+                              </div>
+                              <div className="map-filter-dual-slider" aria-label="List price minimum and maximum">
+                                <div className="map-filter-dual-slider-track" aria-hidden="true" />
+                                <div className="map-filter-dual-slider-range" aria-hidden="true" style={{
+                                  left: (minimum / sliderLimit * 100) + "%",
+                                  width: (Math.max(0, maximum - minimum) / sliderLimit * 100) + "%"
+                                }} />
+                                {activePriceDrag ? (
+                                  <output className="map-filter-slider-value" style={{ left: draggedPosition + "%" }}>
+                                    {formatFilterAmount(draggedValue, mapFilters.priceCurrency)}
+                                  </output>
+                                ) : null}
+                                <input
+                                  aria-label="List price minimum slider"
+                                  className={activePriceDrag === "min" ? "map-filter-dual-slider-input map-filter-dual-slider-min map-filter-slider-active" : "map-filter-dual-slider-input map-filter-dual-slider-min"}
+                                  max={sliderLimit}
+                                  min="0"
+                                  onBlur={() => setActivePriceDrag(null)}
+                                  onChange={(event) => updatePriceSlider("list", "min", event.target.value)}
+                                  onFocus={() => setActivePriceDrag("min")}
+                                  onPointerDown={() => setActivePriceDrag("min")}
+                                  onPointerUp={() => setActivePriceDrag(null)}
+                                  step={activePriceStep}
+                                  type="range"
+                                  value={minimum}
+                                />
+                                <input
+                                  aria-label="List price maximum slider"
+                                  className={activePriceDrag === "max" ? "map-filter-dual-slider-input map-filter-dual-slider-max map-filter-slider-active" : "map-filter-dual-slider-input map-filter-dual-slider-max"}
+                                  max={sliderLimit}
+                                  min="0"
+                                  onBlur={() => setActivePriceDrag(null)}
+                                  onChange={(event) => updatePriceSlider("list", "max", event.target.value)}
+                                  onFocus={() => setActivePriceDrag("max")}
+                                  onPointerDown={() => setActivePriceDrag("max")}
+                                  onPointerUp={() => setActivePriceDrag(null)}
+                                  step={activePriceStep}
+                                  type="range"
+                                  value={maximum}
+                                />
+                              </div>
+                              <div className="map-filter-range-fields">
+                                <label>
+                                  <span>Minimum</span>
+                                  <GroupedNumericInput ariaLabel="List price minimum" onChange={(value) => setMapFilters((current) => ({ ...current, priceMin: value }))} placeholder="No min" value={mapFilters.priceMin} />
+                                </label>
+                                <label>
+                                  <span>Maximum</span>
+                                  <GroupedNumericInput ariaLabel="List price maximum" onChange={(value) => setMapFilters((current) => ({ ...current, priceMax: value }))} placeholder="No max" value={mapFilters.priceMax} />
+                                </label>
+                              </div>
+                              {rangeInvalid ? <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p> : null}
+                              <p className="map-filter-note">{activePriceLimit ? "Highest verified asking price in this map area: " + formatFilterAmount(activePriceLimit, mapFilters.priceCurrency) + "." : "No verified inventory maximum is connected. The range slider remains usable on an adjustable scale; this scale is not a market maximum."}</p>
+                            </section>
+                          );
+                        })()
+                      ) : (
+                        <div className="map-filter-monthly-content">
+                          <div className="map-filter-finance-terms">
+                            <div className="map-filter-finance-heading">
+                              <strong>Estimate your monthly payment</strong>
+                              <small>Enter lender terms or an assumption. No bank rate is preselected.</small>
                             </div>
-                            <div className="map-filter-price-values">
-                              <span><small>Minimum</small><strong>{range.minimum ? compactFilterAmount(minimum, mapFilters.priceCurrency) : "No min"}</strong></span>
-                              <span><small>Maximum</small><strong>{range.maximum ? compactFilterAmount(maximum, mapFilters.priceCurrency) : (activePriceLimit > 0 ? compactFilterAmount(activePriceLimit, mapFilters.priceCurrency) : "No max")}</strong></span>
+                            <div className="map-filter-finance-fields">
+                              <label>
+                                <span>Down payment ({mapFilters.priceCurrency})</span>
+                                <GroupedNumericInput ariaLabel="Down payment amount" onChange={(value) => setFinanceTerms((current) => ({ ...current, downPayment: value }))} placeholder="Enter amount" value={financeTerms.downPayment} />
+                              </label>
+                              <label>
+                                <span>Annual interest rate (%)</span>
+                                <input inputMode="decimal" min="0" max="30" onChange={(event) => setFinanceTerms((current) => ({ ...current, annualRate: event.target.value }))} placeholder="Enter rate" type="number" value={financeTerms.annualRate} />
+                              </label>
+                              <label>
+                                <span>Loan term (months)</span>
+                                <input inputMode="numeric" min="1" max="360" onChange={(event) => setFinanceTerms((current) => ({ ...current, loanMonths: event.target.value }))} placeholder="e.g. 240" type="number" value={financeTerms.loanMonths} />
+                              </label>
                             </div>
-                            <div className="map-filter-dual-slider" aria-label={range.title + " minimum and maximum"}>
-                              <div className="map-filter-dual-slider-track" aria-hidden="true" />
-                              <div className="map-filter-dual-slider-range" aria-hidden="true" style={{
-                                left: (minimum / maximumLimit * 100) + "%",
-                                width: (Math.max(0, maximum - minimum) / maximumLimit * 100) + "%"
-                              }} />
-                              {activePriceDrag ? (
-                                <output className="map-filter-slider-value" style={{ left: draggedPosition + "%" }}>
-                                  {compactFilterAmount(draggedValue, mapFilters.priceCurrency)}
-                                </output>
-                              ) : null}
-                              <input
-                                aria-label={range.title + " minimum slider"}
-                                className="map-filter-dual-slider-input map-filter-dual-slider-min"
-                                disabled={activePriceLimit <= 0}
-                                max={maximumLimit}
-                                min="0"
-                                onBlur={() => setActivePriceDrag(null)}
-                                onChange={(event) => updatePriceSlider(range.key, "min", event.target.value)}
-                                onPointerDown={() => setActivePriceDrag("min")}
-                                onPointerUp={() => setActivePriceDrag(null)}
-                                onFocus={() => setActivePriceDrag("min")}
-                                step={activePriceStep}
-                                type="range"
-                                value={minimum}
-                              />
-                              <input
-                                aria-label={range.title + " maximum slider"}
-                                className="map-filter-dual-slider-input map-filter-dual-slider-max"
-                                disabled={activePriceLimit <= 0}
-                                max={maximumLimit}
-                                min="0"
-                                onBlur={() => setActivePriceDrag(null)}
-                                onChange={(event) => updatePriceSlider(range.key, "max", event.target.value)}
-                                onPointerDown={() => setActivePriceDrag("max")}
-                                onPointerUp={() => setActivePriceDrag(null)}
-                                onFocus={() => setActivePriceDrag("max")}
-                                step={activePriceStep}
-                                type="range"
-                                value={maximum}
-                              />
+                            <p className="map-filter-note">Estimated principal and interest only. Taxes, insurance, fees, lender approval and partner-specific charges are not included.</p>
+                          </div>
+                          <section className="map-filter-price-section map-filter-monthly-range">
+                            <div className="map-filter-price-section-heading">
+                              <div><strong>Monthly payment range</strong><small>{monthlyPaymentSummary}</small></div>
+                              <span>{mapFilters.priceCurrency} / month</span>
                             </div>
                             <div className="map-filter-range-fields">
                               <label>
-                                <span>Minimum</span>
-                                <input inputMode="decimal" min="0" max={activePriceLimit || undefined} onChange={(event) => setMapFilters((current) => ({ ...current, [range.minKey]: event.target.value }))} placeholder="No min" type="number" value={range.minimum} />
+                                <span>Minimum per month</span>
+                                <GroupedNumericInput ariaLabel="Monthly payment minimum" onChange={(value) => setMapFilters((current) => ({ ...current, monthlyPaymentMin: value }))} placeholder="No min" value={mapFilters.monthlyPaymentMin} />
                               </label>
                               <label>
-                                <span>Maximum</span>
-                                <input inputMode="decimal" min="0" max={activePriceLimit || undefined} onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))} placeholder="No max" type="number" value={range.maximum} />
+                                <span>Maximum per month</span>
+                                <GroupedNumericInput ariaLabel="Monthly payment maximum" onChange={(value) => setMapFilters((current) => ({ ...current, monthlyPaymentMax: value }))} placeholder="No max" value={mapFilters.monthlyPaymentMax} />
                               </label>
                             </div>
-                            {rangeOutOfBounds ? (
-                              <p className="map-filter-validation" role="alert">The maximum current listing price in this map area is {compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)}.</p>
-                            ) : rangeInvalid ? (
+                            {mapFilters.monthlyPaymentMin && mapFilters.monthlyPaymentMax && Number(mapFilters.monthlyPaymentMin) > Number(mapFilters.monthlyPaymentMax) ? (
                               <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                             ) : null}
                           </section>
-                        );
-                      })}
+                        </div>
+                      )}
                     </div>
                     <div className="map-filter-result-footer">
                       <div>
