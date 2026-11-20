@@ -151,10 +151,10 @@ try {
       return Boolean(
         control &&
         !control.hidden &&
-        control.dataset.state === "pending" &&
         button &&
         !button.disabled &&
-        button.textContent?.trim() === "Search this area"
+        ((control.dataset.state === "pending" && button.textContent?.trim() === "Search this area") ||
+          (control.dataset.state === "complete" && button.textContent?.trim() === "Search again"))
       );
     }, undefined, { timeout: 15_000 });
 
