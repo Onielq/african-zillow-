@@ -22,7 +22,7 @@ function positiveNumber(value: string | null, maximum: number): number | null {
 
 function positiveInteger(value: string | null, maximum: number): number | null {
   if (value === null || value.trim() === "") return null;
-  if (!/^\\d+$/.test(value.trim())) return Number.NaN;
+  if (!/^\d+$/.test(value.trim())) return Number.NaN;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= maximum ? parsed : Number.NaN;
 }
