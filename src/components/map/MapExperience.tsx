@@ -1157,7 +1157,7 @@ export function MapExperience() {
     ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
     : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
   const shouldLoadMarketInventory = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
-    activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
+    activeFilterMenu === "property" || (activeFilterMenu === "measurement" && mapFilters.measurementBasis === "interior") ||
     Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax ||
       mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
       mapFilters.measurementMin || mapFilters.measurementMax);
@@ -1280,8 +1280,10 @@ export function MapExperience() {
   );
   // A missing listing feed must not disable the control. This is an explicit
   // working scale only; it is never presented as a verified inventory maximum.
-  const fallbackPriceScale = mapFilters.priceCurrency === "RWF" ? 500_000_000 : 1_000_000;
-  const sliderLimit = Math.max(activePriceLimit ?? fallbackPriceScale, enteredPriceCeiling);
+  const fallbackPriceScale = activePriceTab === "monthly"
+    ? mapFilters.priceCurrency === "RWF" ? 20_000_000 : 20_000
+    : mapFilters.priceCurrency === "RWF" ? 500_000_000 : 1_000_000;
+  const sliderLimit = Math.max(activePriceLimit ?? fallbackPriceScale, enteredPriceCeiling * 1.1);
   const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 200));
   const filterResultNote = (() => {
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
