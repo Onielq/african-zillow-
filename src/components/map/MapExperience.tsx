@@ -1234,6 +1234,12 @@ export function MapExperience() {
   };
   const parcelDataReady = parcelFilterResults?.loaded === true;
   const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
+  const measurementResultCount = mapFilters.measurementBasis === "plot"
+    ? filterResultCount
+    : marketInventory?.total ?? null;
+  const measurementResultsLoading = mapFilters.measurementBasis === "plot"
+    ? !parcelDataReady
+    : marketInventoryLoading;
   const marketMapListings = useMemo<MarketListingMapPoint[]>(() =>
     (marketInventory?.rows ?? []).flatMap((row) => {
       const latitude = Number(row.latitude);
@@ -1314,7 +1320,7 @@ export function MapExperience() {
     return mapFilters.priceCurrency === "USD" ? "Price · USD" : "Price";
   })();
   const measurementSummary = mapFilters.measurementMin || mapFilters.measurementMax
-    ? (mapFilters.measurementBasis === "plot" ? "Plot " : "Interior ") + (mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax || "∞") + " m²"
+    ? (mapFilters.measurementBasis === "plot" ? "Plot " : "Interior ") + formatGroupedInput(mapFilters.measurementMin || "0") + "–" + (mapFilters.measurementMax ? formatGroupedInput(mapFilters.measurementMax) : "∞") + " m²"
     : "Measurement";
   const bedsBathsSummary = [
     mapFilters.bedroomsMin ? mapFilters.bedroomsMin + (mapFilters.bedroomsExact ? " bd" : "+ bd") : "",
@@ -3239,12 +3245,9 @@ export function MapExperience() {
                           aria-pressed={mapFilters.measurementPreset === preset.value}
                           className={mapFilters.measurementPreset === preset.value ? "map-filter-area-preset map-filter-area-preset-active" : "map-filter-area-preset"}
                           key={preset.value}
-                          onClick={() => setMapFilters((current) => ({
-                            ...current,
-                            measurementPreset: preset.value,
-                            measurementMin: preset.min,
-                            measurementMax: preset.max
-                          }))}
+                          onClick={() => setMapFilters((current) => current.measurementPreset === preset.value
+                            ? { ...current, measurementPreset: "", measurementMin: "", measurementMax: "" }
+                            : { ...current, measurementPreset: preset.value, measurementMin: preset.min, measurementMax: preset.max })}
                           type="button"
                         >
                           <strong>{preset.label}</strong><small>m²</small>
@@ -3254,27 +3257,33 @@ export function MapExperience() {
                     <div className="map-filter-range-fields">
                       <label>
                         <span>Minimum m²</span>
-                        <input inputMode="decimal" min="0" onChange={(event) => setMapFilters((current) => ({ ...current, measurementMin: event.target.value, measurementPreset: "" }))} placeholder="0" type="number" value={mapFilters.measurementMin} />
+                        <GroupedNumericInput ariaLabel="Minimum area in square metres" onChange={(value) => setMapFilters((current) => ({ ...current, measurementMin: value, measurementPreset: "" }))} placeholder="0" value={mapFilters.measurementMin} />
                       </label>
                       <label>
                         <span>Maximum m²</span>
-                        <input inputMode="decimal" min="0" onChange={(event) => setMapFilters((current) => ({ ...current, measurementMax: event.target.value, measurementPreset: "" }))} placeholder="No limit" type="number" value={mapFilters.measurementMax} />
+                        <GroupedNumericInput ariaLabel="Maximum area in square metres" onChange={(value) => setMapFilters((current) => ({ ...current, measurementMax: value, measurementPreset: "" }))} placeholder="No limit" value={mapFilters.measurementMax} />
                       </label>
                     </div>
                     {mapFilters.measurementMin && mapFilters.measurementMax && Number(mapFilters.measurementMin) > Number(mapFilters.measurementMax) ? (
                       <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                     ) : null}
-                    {(mapFilters.measurementMin || mapFilters.measurementMax || mapFilters.measurementPreset) ? (
-                      <button className="map-filter-clear-local" onClick={() => setMapFilters((current) => ({
-                        ...current,
-                        measurementMin: "",
-                        measurementMax: "",
-                        measurementPreset: ""
-                      }))} type="button">
-                        <X aria-hidden="true" size={13} /> Clear measurement
+                    {(mapFilters.measurementMin || mapFilters.measurementMax) && !mapFilters.measurementPreset ? (
+                      <button className="map-filter-clear-local" onClick={() => setMapFilters((current) => ({ ...current, measurementMin: "", measurementMax: "", measurementPreset: "" }))} type="button">
+                        <X aria-hidden="true" size={13} /> Clear entered measurements
                       </button>
                     ) : null}
                     <p className="map-filter-note">These are search-size bands, not legal zoning standards. The area basis stays separate so plot measurements are never compared with interior floor area.</p>
+                    <div className="map-filter-result-footer">
+                      <div>
+                        <strong>{measurementResultsLoading ? "Loading measurement results" : measurementResultCount === null ? "Results unavailable" : measurementResultCount.toLocaleString("en-US") + " matching results"}</strong>
+                        <small>{mapFilters.measurementBasis === "plot"
+                          ? filterResultNote
+                          : marketInventory?.message ?? "Interior-area results use verified building and project-unit records."}</small>
+                      </div>
+                      <button disabled={measurementResultsLoading || measurementResultCount === null} onClick={closeFilterMenus} type="button">
+                        {measurementResultsLoading ? "Loading results" : "See " + (measurementResultCount ?? 0).toLocaleString("en-US") + " results"}
+                      </button>
+                    </div>
                   </FilterPopoverPortal>
                 ) : null}
               </div>
@@ -3342,8 +3351,10 @@ export function MapExperience() {
                     </div>
                     <p className="map-filter-note">Bedroom and bathroom choices apply to verified building, project-unit and property listings. Exact match replaces the “or more” rule.</p>
                     <div className="map-filter-result-footer">
-                      <div><strong>{marketInventoryLoading ? "Loading building and unit records" : marketInventory?.total ? marketInventory.total.toLocaleString() + " matching listings" : "No connected room-level inventory"}</strong><small>{marketInventory?.message ?? "The controls stay available; matching requires source-authorized building or unit records with bedroom and bathroom values."}</small></div>
-                      <button disabled={marketInventoryLoading} onClick={closeFilterMenus} type="button">Done</button>
+                      <div><strong>{marketInventoryLoading ? "Loading building and unit records" : (marketInventory?.total ?? 0).toLocaleString("en-US") + " matching listings"}</strong><small>{marketInventory?.message ?? "Bedroom and bathroom results use source-authorized building and project-unit records."}</small></div>
+                      <button disabled={marketInventoryLoading || !marketInventory} onClick={closeFilterMenus} type="button">
+                        {marketInventoryLoading ? "Loading results" : "See " + (marketInventory?.total ?? 0).toLocaleString("en-US") + " results"}
+                      </button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
