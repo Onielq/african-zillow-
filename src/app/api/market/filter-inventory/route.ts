@@ -96,11 +96,11 @@ export async function GET(request: NextRequest) {
              AND column_name IN ('license_status', 'commercial_use_allowed', 'redistribution_allowed', 'caching_allowed')
         ) AS source_permissions_ready,
         (
-          SELECT count(*) = 5
+          SELECT count(*) = 7
             FROM information_schema.columns
            WHERE table_schema = 'reja'
              AND table_name = 'exchange_listings'
-             AND column_name IN ('market_property_id', 'listing_authorization_id', 'seller_user_id', 'seller_organization_id', 'publication_status')
+             AND column_name IN ('market_property_id', 'listing_authorization_id', 'seller_user_id', 'seller_organization_id', 'publication_status', 'expires_at', 'published_at')
         ) AS exchange_authorization_ready,
         to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL AS authorization_helper_ready,
         to_regclass('reja.development_units') IS NOT NULL AS development_units_ready,
