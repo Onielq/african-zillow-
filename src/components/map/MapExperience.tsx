@@ -1070,8 +1070,7 @@ export function MapExperience() {
   });
   const [parcelFilterResults, setParcelFilterResults] = useState<ParcelFilterResults | null>(null);
   const [financeTerms, setFinanceTerms] = useState({ downPayment: "", annualRate: "", loanMonths: "" });
-  const [marketInventory, setMarketInventory] = useState<MarketInventoryResponse | null>(null);
-  const [marketInventoryLoading, setMarketInventoryLoading] = useState(false);
+  const [marketInventoryState, setMarketInventoryState] = useState<{ scopeKey: string; data: MarketInventoryResponse } | null>(null);
   const [activePriceDrag, setActivePriceDrag] = useState<"min" | "max" | null>(null);
   const filterSubnavRef = useRef<HTMLDivElement>(null);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
@@ -1082,23 +1081,17 @@ export function MapExperience() {
   const activePriceRange = activePriceTab === "list"
     ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
     : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
-  const loadedInventoryScopeKeyRef = useRef("");
+  const shouldLoadMarketInventory = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
+    activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
+    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax ||
+      mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
+      mapFilters.measurementMin || mapFilters.measurementMax);
+  const marketInventory = marketInventoryState?.scopeKey === inventoryScopeKey ? marketInventoryState.data : null;
+  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.district && !marketInventory);
   useEffect(() => {
-    const shouldLoad = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
-      activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
-      Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax ||
-        mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
-        mapFilters.measurementMin || mapFilters.measurementMax);
-    if (!shouldLoad || !inventoryScope?.district) {
-      setMarketInventory(null);
-      loadedInventoryScopeKeyRef.current = "";
-      setMarketInventoryLoading(false);
-      return;
-    }
+    if (!shouldLoadMarketInventory || !inventoryScope?.district) return;
 
-    if (loadedInventoryScopeKeyRef.current !== inventoryScopeKey) setMarketInventory(null);
     const controller = new AbortController();
-    setMarketInventoryLoading(true);
     const timeout = window.setTimeout(async () => {
       const params = new URLSearchParams({
         scopeLevel: inventoryScope.level,
@@ -1136,18 +1129,17 @@ export function MapExperience() {
         const response = await fetch("/api/market/filter-inventory?" + params.toString(), { signal: controller.signal });
         const data = await response.json() as MarketInventoryResponse;
         if (controller.signal.aborted) return;
-        loadedInventoryScopeKeyRef.current = inventoryScopeKey;
-        setMarketInventory(data);
+        setMarketInventoryState({ scopeKey: inventoryScopeKey, data });
       } catch (error) {
         if (!controller.signal.aborted) {
-          loadedInventoryScopeKeyRef.current = inventoryScopeKey;
-          setMarketInventory({
-            ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
-            histogram: [], rows: [], message: "The market inventory service could not be reached."
+          setMarketInventoryState({
+            scopeKey: inventoryScopeKey,
+            data: {
+              ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
+              histogram: [], rows: [], message: "The market inventory service could not be reached."
+            }
           });
         }
-      } finally {
-        if (!controller.signal.aborted) setMarketInventoryLoading(false);
       }
     }, 250);
 
@@ -1156,7 +1148,7 @@ export function MapExperience() {
       controller.abort();
     };
   }, [
-    activeFilterMenu, activePriceTab, activePriceRange.min, activePriceRange.max,
+    shouldLoadMarketInventory, activeFilterMenu, activePriceTab, activePriceRange.min, activePriceRange.max,
     financeTerms.annualRate, financeTerms.downPayment, financeTerms.loanMonths,
     inventoryScopeKey, mapFilters.bathroomsExact, mapFilters.bathroomsMin,
     mapFilters.bedroomsExact, mapFilters.bedroomsMin, mapFilters.measurementBasis,
