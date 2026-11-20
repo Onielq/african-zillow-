@@ -1235,15 +1235,63 @@ function pointWithinPolygon(point: [number, number], coordinates: number[][][]):
   return !coordinates.slice(1).some((hole) => ringContainsPoint(point, hole));
 }
 
+function geometryPolygons(geometry: Geometry | null): number[][][][] {
+  if (!geometry || !("coordinates" in geometry)) return [];
+  if (geometry.type === "Polygon") return [geometry.coordinates as number[][][]];
+  if (geometry.type === "MultiPolygon") return geometry.coordinates as number[][][][];
+  return [];
+}
+
 function pointWithinGeometry(point: [number, number], geometry: Geometry | null): boolean {
-  if (!geometry || !("coordinates" in geometry)) return false;
-  if (geometry.type === "Polygon") {
-    return pointWithinPolygon(point, geometry.coordinates as number[][][]);
-  }
-  if (geometry.type === "MultiPolygon") {
-    return (geometry.coordinates as number[][][][]).some((polygon) => pointWithinPolygon(point, polygon));
+  return geometryPolygons(geometry).some((polygon) => pointWithinPolygon(point, polygon));
+}
+
+function segmentsIntersect(a: [number, number], b: [number, number], c: [number, number], d: [number, number]): boolean {
+  const orientation = (p: [number, number], q: [number, number], r: [number, number]) =>
+    (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const onSegment = (p: [number, number], q: [number, number], r: [number, number]) =>
+    q[0] >= Math.min(p[0], r[0]) - 1e-10 && q[0] <= Math.max(p[0], r[0]) + 1e-10 &&
+    q[1] >= Math.min(p[1], r[1]) - 1e-10 && q[1] <= Math.max(p[1], r[1]) + 1e-10;
+  const o1 = orientation(a, b, c);
+  const o2 = orientation(a, b, d);
+  const o3 = orientation(c, d, a);
+  const o4 = orientation(c, d, b);
+  if (((o1 > 1e-10 && o2 < -1e-10) || (o1 < -1e-10 && o2 > 1e-10)) &&
+      ((o3 > 1e-10 && o4 < -1e-10) || (o3 < -1e-10 && o4 > 1e-10))) return true;
+  return (Math.abs(o1) <= 1e-10 && onSegment(a, c, b)) ||
+    (Math.abs(o2) <= 1e-10 && onSegment(a, d, b)) ||
+    (Math.abs(o3) <= 1e-10 && onSegment(c, a, d)) ||
+    (Math.abs(o4) <= 1e-10 && onSegment(c, b, d));
+}
+
+function ringsIntersect(a: number[][], b: number[][]): boolean {
+  for (let i = 0; i < a.length; i += 1) {
+    const aStart = a[i];
+    const aEnd = a[(i + 1) % a.length];
+    if (!aStart || !aEnd || !Number.isFinite(aStart[0]) || !Number.isFinite(aStart[1]) || !Number.isFinite(aEnd[0]) || !Number.isFinite(aEnd[1])) continue;
+    for (let j = 0; j < b.length; j += 1) {
+      const bStart = b[j];
+      const bEnd = b[(j + 1) % b.length];
+      if (!bStart || !bEnd || !Number.isFinite(bStart[0]) || !Number.isFinite(bStart[1]) || !Number.isFinite(bEnd[0]) || !Number.isFinite(bEnd[1])) continue;
+      if (segmentsIntersect([aStart[0], aStart[1]], [aEnd[0], aEnd[1]], [bStart[0], bStart[1]], [bEnd[0], bEnd[1]])) return true;
+    }
   }
   return false;
+}
+
+function polygonIntersectsPolygon(a: number[][][], b: number[][][]): boolean {
+  const aShell = a[0];
+  const bShell = b[0];
+  if (!aShell || !bShell) return false;
+  if (aShell.some((position) => pointWithinPolygon([position[0], position[1]], b))) return true;
+  if (bShell.some((position) => pointWithinPolygon([position[0], position[1]], a))) return true;
+  return a.some((aRing) => b.some((bRing) => ringsIntersect(aRing, bRing)));
+}
+
+function geometriesIntersect(a: Geometry | null, b: Geometry | null): boolean {
+  const aPolygons = geometryPolygons(a);
+  const bPolygons = geometryPolygons(b);
+  return aPolygons.some((aPolygon) => bPolygons.some((bPolygon) => polygonIntersectsPolygon(aPolygon, bPolygon)));
 }
 
 function zoningFeatureMatchesCodes(
@@ -1999,10 +2047,7 @@ export function MapView({
 
         if (zoningCodes.length) {
           if (zoningFilterStatusRef.current !== "ready" || matchingZones.length === 0) return false;
-          const bounds = featureBounds(feature as unknown as MapGeoJSONFeature);
-          if (!bounds) return false;
-          const center: [number, number] = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
-          if (!matchingZones.some((zone) => pointWithinGeometry(center, zone.geometry as Geometry | null))) return false;
+          if (!matchingZones.some((zone) => geometriesIntersect(feature.geometry as Geometry, zone.geometry as Geometry | null))) return false;
         }
         return true;
       });
