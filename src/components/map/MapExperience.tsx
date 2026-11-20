@@ -1030,7 +1030,8 @@ function FilterPopoverPortal({
   className,
   children
 }: FilterPopoverPortalProps) {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+  const placementRef = useRef<"below" | "above" | null>(null);
 
   useEffect(() => {
     const updatePosition = () => {
@@ -1047,17 +1048,29 @@ function FilterPopoverPortal({
             : 320;
       const popoverWidth = Math.min(preferredWidth, window.innerWidth - 32);
       const left = Math.max(16, Math.min(bounds.left, window.innerWidth - popoverWidth - 16));
-      const expectedHeight = popoverRef.current?.offsetHeight ?? 260;
-      const roomBelow = window.innerHeight - bounds.bottom - 16;
-      const top = roomBelow >= expectedHeight
+      const roomBelow = Math.max(0, window.innerHeight - bounds.bottom - 16);
+      const roomAbove = Math.max(0, bounds.top - 16);
+      if (placementRef.current === null) {
+        placementRef.current = roomBelow >= 280 || roomBelow >= roomAbove ? "below" : "above";
+      }
+      const placeBelow = placementRef.current === "below";
+      const availableHeight = Math.max(180, Math.min(window.innerHeight - 32, (placeBelow ? roomBelow : roomAbove) - 8));
+      const top = placeBelow
         ? bounds.bottom + 8
-        : Math.max(12, bounds.top - expectedHeight - 8);
+        : Math.max(12, bounds.top - availableHeight - 8);
 
-      setPosition((current) => current && current.top === top && current.left === left ? current : { top, left });
+      setPosition((current) => current && current.top === top && current.left === left && current.maxHeight === availableHeight
+        ? current
+        : { top, left, maxHeight: availableHeight });
+    };
+
+    const handleResize = () => {
+      placementRef.current = null;
+      updatePosition();
     };
 
     updatePosition();
-    window.addEventListener("resize", updatePosition);
+    window.addEventListener("resize", handleResize);
     window.addEventListener("scroll", updatePosition, true);
     const popover = popoverRef.current;
     const observer = typeof ResizeObserver !== "undefined" && popover
@@ -1066,7 +1079,7 @@ function FilterPopoverPortal({
     if (popover && observer) observer.observe(popover);
     return () => {
       observer?.disconnect();
-      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("resize", handleResize);
       window.removeEventListener("scroll", updatePosition, true);
     };
   }, [anchorRef, className, popoverRef, position]);
