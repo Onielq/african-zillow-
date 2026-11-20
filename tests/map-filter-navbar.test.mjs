@@ -151,7 +151,7 @@ test("zoning code matcher checks the available zoning and land-use source fields
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /Object\.entries\(properties\)/);
   assert.match(mapView, /zoning\|zone\|land\.\?use\|gen\.\?lu\|lu\.\?code/i);
-  assert.match(mapView, /properties\.zoning|properties\.zone_code/);
+  assert.match(mapView, /const values = Object\.entries\(properties\)/);
 });
 
 test("measurement ranges are independent, attractive and locally clearable", async () => {
