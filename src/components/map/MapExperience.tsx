@@ -78,6 +78,44 @@ type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
 type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
 
+type MarketInventoryRow = {
+  id: string;
+  asking_amount: string;
+  currency: string;
+  property_type: string;
+  district: string;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+  project_name: string | null;
+  building_name: string | null;
+  unit_label: string | null;
+  bedrooms: number | null;
+  bathrooms: string | null;
+  internal_area_sqm: string | null;
+  plot_area_sqm: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  parcel_id: string | null;
+  listing_url: string | null;
+  source_title: string | null;
+  source_publisher: string | null;
+  source_url: string | null;
+  attribution_required: boolean;
+};
+
+type MarketInventoryResponse = {
+  ok: boolean;
+  dataStatus: "available" | "no_eligible_records" | "not_configured" | "needs_finance_terms" | "unavailable" | string;
+  total: number;
+  minimum: number | null;
+  maximum: number | null;
+  histogram: Array<{ bucket: number; count: number }>;
+  rows: MarketInventoryRow[];
+  message?: string | null;
+  histogramBasis?: string;
+};
+
 const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: LucideIcon }> = [
   { value: "house", label: "Houses", Icon: House },
   { value: "townhouse", label: "Townhouse", Icon: Building },
@@ -1021,8 +1059,92 @@ export function MapExperience() {
     bathroomsExact: false
   });
   const [parcelFilterResults, setParcelFilterResults] = useState<ParcelFilterResults | null>(null);
+  const [financeTerms, setFinanceTerms] = useState({ downPayment: "", annualRate: "", loanMonths: "" });
+  const [marketInventory, setMarketInventory] = useState<MarketInventoryResponse | null>(null);
+  const [marketInventoryLoading, setMarketInventoryLoading] = useState(false);
+  const [activePriceDrag, setActivePriceDrag] = useState<"min" | "max" | null>(null);
   const filterSubnavRef = useRef<HTMLDivElement>(null);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const inventoryScope = parcelFilterResults?.scope ?? null;
+  const inventoryScopeKey = inventoryScope
+    ? [inventoryScope.level, inventoryScope.district, inventoryScope.sector, inventoryScope.cell, inventoryScope.village].join("|")
+    : "";
+  useEffect(() => {
+    const shouldLoad = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
+      activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
+      Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax ||
+        mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
+        mapFilters.measurementMin || mapFilters.measurementMax);
+    if (!shouldLoad || !inventoryScope?.district) {
+      setMarketInventory(null);
+      setMarketInventoryLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setMarketInventoryLoading(true);
+    const timeout = window.setTimeout(async () => {
+      const params = new URLSearchParams({
+        scopeLevel: inventoryScope.level,
+        district: inventoryScope.district ?? "",
+        currency: mapFilters.priceCurrency,
+        mode: activePriceTab,
+        propertyTypes: mapFilters.propertyTypes.map((value) => ({
+          house: "house",
+          townhouse: "house",
+          multifamily: "apartment",
+          condo: "apartment",
+          land: "land",
+          lots_land: "land",
+          apartment: "apartment",
+          manufactured: "other",
+          mixed_use: "mixed_use"
+        }[value] ?? value)).filter((value, index, all) => all.indexOf(value) === index).join(","),
+        bedroomsMin: mapFilters.bedroomsMin,
+        bathroomsMin: mapFilters.bathroomsMin,
+        bedroomsExact: String(mapFilters.bedroomsExact),
+        bathroomsExact: String(mapFilters.bathroomsExact),
+        areaBasis: mapFilters.measurementBasis,
+        areaMin: mapFilters.measurementMin,
+        areaMax: mapFilters.measurementMax,
+        priceMin: activePriceRange.min,
+        priceMax: activePriceRange.max,
+        downPayment: financeTerms.downPayment,
+        annualRate: financeTerms.annualRate,
+        loanMonths: financeTerms.loanMonths
+      });
+      if (inventoryScope.sector) params.set("sector", inventoryScope.sector);
+      if (inventoryScope.cell) params.set("cell", inventoryScope.cell);
+      if (inventoryScope.village) params.set("village", inventoryScope.village);
+      try {
+        const response = await fetch("/api/market/filter-inventory?" + params.toString(), { signal: controller.signal });
+        const data = await response.json() as MarketInventoryResponse;
+        if (controller.signal.aborted) return;
+        setMarketInventory(data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setMarketInventory({
+            ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
+            histogram: [], rows: [], message: "The market inventory service could not be reached."
+          });
+        }
+      } finally {
+        if (!controller.signal.aborted) setMarketInventoryLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [
+    activeFilterMenu, activePriceTab, activePriceRange.min, activePriceRange.max,
+    financeTerms.annualRate, financeTerms.downPayment, financeTerms.loanMonths,
+    inventoryScopeKey, mapFilters.bathroomsExact, mapFilters.bathroomsMin,
+    mapFilters.bedroomsExact, mapFilters.bedroomsMin, mapFilters.measurementBasis,
+    mapFilters.measurementMax, mapFilters.measurementMin, mapFilters.priceCurrency,
+    mapFilters.propertyTypes
+  ]);
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const activeFilterAnchorRef = useRef<HTMLButtonElement>(null);
   const closeFilterMenus = useCallback(() => {
@@ -1037,47 +1159,33 @@ export function MapExperience() {
         : [...current[key], value]
     }));
   };
-  const bedsBathsDisabled = mapFilters.propertyTypes.length === 0 ||
-    mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
   const parcelDataReady = parcelFilterResults?.loaded === true;
-  const parcelPriceReady = parcelDataReady && typeof parcelFilterResults?.maxPriceRwf === "number" && parcelFilterResults.maxPriceRwf > 0;
   const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
-  const activePriceLimit = mapFilters.priceCurrency === "USD"
-    ? 100_000_000
-    : dynamicParcelPriceLimit(parcelFilterResults?.maxPriceRwf);
-  const activePriceStep = Math.max(1, Math.ceil(activePriceLimit / 100));
+  const activePriceLimit = marketInventory?.maximum && marketInventory.maximum > 0
+    ? marketInventory.maximum
+    : 0;
+  const sliderLimit = activePriceLimit > 0 ? activePriceLimit : 1;
+  const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 100));
+  const activePriceRange = activePriceTab === "list"
+    ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
+    : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
   const filterResultNote = (() => {
-    if (!parcelDataReady) {
-      return "Zoom in to parcel-level coverage to search cadastral plots in the current map area.";
-    }
-    if (mapFilters.listingType !== "all") {
-      return "The cadastral parcel feed does not provide verified sale, rent or sold listing status.";
-    }
-    if (mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax) {
-      return "Monthly payment terms are not part of cadastral parcel records. Use List price for indicative parcel values.";
-    }
-    if ((mapFilters.priceMin || mapFilters.priceMax) && mapFilters.priceCurrency === "USD") {
-      return "Parcel value estimates are in RWF. A live, verified currency conversion is not connected.";
-    }
-    if ((mapFilters.measurementMin || mapFilters.measurementMax) && mapFilters.measurementBasis === "interior") {
-      return "This map contains land parcels, not building interior floor areas.";
-    }
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
       return "Loading the official zoning polygons for the current map area.";
     }
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "unavailable") {
-      return "The zoning source is temporarily unavailable. No parcel zoning match is being assumed.";
+      return "The zoning source is temporarily unavailable. Cadastral boundaries remain visible.";
     }
     if (mapFilters.zoningCodes.length) {
-      return "Zoning is matched by intersecting each cadastral parcel polygon with the published zoning polygons. Parcels that cross a zoning boundary can match more than one selected zone.";
+      return "Parcel outlines remain on the map. Matching parcels are highlighted; unmatched parcels stay visible.";
     }
-    if (mapFilters.bedroomsMin || mapFilters.bathroomsMin) {
-      return "Bedrooms and bathrooms do not apply to cadastral land parcels.";
+    if (mapFilters.measurementBasis === "interior" && (mapFilters.measurementMin || mapFilters.measurementMax)) {
+      return "Interior area is matched against source-listed building and unit records, not cadastral parcel size.";
     }
-    if (parcelFilterResults) {
-      return "Matching cadastral parcels within the current map area. Geometry-derived plot sizes are estimates, not cadastral measurements.";
+    if (mapFilters.measurementBasis === "plot" && (mapFilters.measurementMin || mapFilters.measurementMax)) {
+      return "Plot area uses cadastral parcel area where supplied; geometry-derived areas are labelled estimates.";
     }
-    return "Waiting for parcel boundaries in the current map area.";
+    return "Listing counts and prices use current, source-authorized asking-price records in the visible map area.";
   })();
   const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
   const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
@@ -1143,12 +1251,12 @@ export function MapExperience() {
     setOtherZoningOpen(false);
   };
   const updatePriceSlider = (basis: "list" | "monthly", bound: "min" | "max", rawValue: string) => {
-    const value = Math.min(activePriceLimit, Math.max(0, Number(rawValue) || 0));
+    const value = Math.min(sliderLimit, Math.max(0, Number(rawValue) || 0));
     setMapFilters((current) => {
       const minKey = basis === "list" ? "priceMin" : "monthlyPaymentMin";
       const maxKey = basis === "list" ? "priceMax" : "monthlyPaymentMax";
       const minimum = current[minKey] ? Number(current[minKey]) : 0;
-      const maximum = current[maxKey] ? Number(current[maxKey]) : activePriceLimit;
+      const maximum = current[maxKey] ? Number(current[maxKey]) : sliderLimit;
       return bound === "min"
         ? { ...current, [minKey]: String(Math.min(value, maximum)) }
         : { ...current, [maxKey]: String(Math.max(value, minimum)) };
