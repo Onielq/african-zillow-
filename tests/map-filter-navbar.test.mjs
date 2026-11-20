@@ -192,7 +192,7 @@ test("map parcel filters use cadastral measurements without pretending parcels h
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /properties\.parcel_size_m2 === "number"/);
   assert.match(mapView, /geometryAreaM2\(feature\.geometry as Geometry\)/);
-  assert.match(mapView, /filters\.measurementBasis !== "plot"/);
+  assert.match(mapView, /filters\.measurementBasis === "plot"/);
   assert.match(mapView, /minArea !== null/);
   assert.match(mapView, /maxArea !== null/);
 });
