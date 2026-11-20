@@ -3023,21 +3023,36 @@ export function MapExperience() {
                       />
                       {zoningSearch ? <button aria-label="Clear zoning search" onClick={() => setZoningSearch("")} type="button"><X size={14} /></button> : null}
                     </label>
-                    {selectedZoneCodes.length > 0 ? (
-                      <div className="map-filter-selected-zone-summary">
-                        <div><span>Selected zone</span><strong>{selectedZoneCodes.join(", ")}</strong><small>{selectedZoneDescriptions}</small></div>
-                        <div><span>Typical plot measurement</span><strong>District-plan and housing-type specific</strong></div>
-                      </div>
-                    ) : null}
                     {zoningInfoOpen ? (
                       <div className="map-filter-info-panel">
-                        <strong>How zoning works</strong>
-                        <p>Each District Land Use Plan defines which codes apply locally. This searchable catalogue combines codes from the published Kigali, Bugesera and Gakenke plan legends, plus shorthand classes used in the Ruhango plan. A code appearing here does not mean it applies in every district.</p>
-                        <p>A3 and A4 were not present in the official plan legends checked, so they are not added as assumptions.</p>
-                        <p>Plot-size rules vary by district, housing type and development conditions. The app does not treat a search-size band as a legal minimum or maximum. A legal range should appear only when the applicable plan rule is indexed for that district and typology.</p>
+                        {selectedZoneCodes.length > 0 ? (
+                          <>
+                            <strong>Planning standards · {selectedZoneCodes.join(", ")}</strong>
+                            {selectedZoneCodes.map((code) => {
+                              const isKigaliDistrict = ["Gasabo", "Kicukiro", "Nyarugenge"].includes(inventoryScope?.district ?? "");
+                              const kigaliRule = KIGALI_ZONE_PLOT_RULES[code];
+                              return (
+                                <div className="map-filter-zone-rule" key={code}>
+                                  <strong>{code} · {ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"}</strong>
+                                  <p>{isKigaliDistrict && kigaliRule
+                                    ? kigaliRule
+                                    : isKigaliDistrict
+                                      ? "The Kigali regulation does not state one universal plot-size range for this code. Check the applicable land-use and development conditions."
+                                      : "No verified plot-size rule is indexed for this district plan and zoning code yet. Kigali measurements must not be copied here."}</p>
+                                </div>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <>
+                            <strong>How zoning standards work</strong>
+                            <p>The governing district plan, plan version, land-use subtype and housing form determine the applicable rules. A code in this catalogue does not mean it applies everywhere.</p>
+                            <p>Choose a zone to see any indexed standard for the current map district. Where no local standard is indexed, the panel says so rather than guessing.</p>
+                          </>
+                        )}
                         <div className="map-filter-source-links">
-                          <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">NLA zoning regulations <span aria-hidden="true">↗</span></a>
-                          <a href="https://geodata.rw/server/rest/services/Hosted/Gakenke_DLUP_20042026/MapServer/legend" rel="noreferrer" target="_blank">Official zoning legend <span aria-hidden="true">↗</span></a>
+                          <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">National Land Authority master plans <span aria-hidden="true">↗</span></a>
+                          <a href="https://masterplan.kigalicity.gov.rw/" rel="noreferrer" target="_blank">City of Kigali Master Plan <span aria-hidden="true">↗</span></a>
                         </div>
                       </div>
                     ) : null}
