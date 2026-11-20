@@ -146,6 +146,9 @@ export async function GET(request: NextRequest) {
           FROM reja.market_listings l
           JOIN reja.sources s ON s.id = l.source_id
           LEFT JOIN reja.market_properties p ON p.id = l.property_id AND p.is_current = true
+          LEFT JOIN reja.development_units u ON u.id = p.development_unit_id
+          LEFT JOIN reja.development_projects dp ON dp.id = u.project_id
+          LEFT JOIN reja.development_buildings db ON db.id = u.building_id
          WHERE l.is_current = true
            AND l.listing_type = 'sale'
            AND l.listing_status = 'active'
@@ -176,6 +179,9 @@ export async function GET(request: NextRequest) {
                p.payload
           FROM reja.exchange_listings l
           JOIN reja.market_properties p ON p.id = l.market_property_id AND p.is_current = true
+          LEFT JOIN reja.development_units u ON u.id = p.development_unit_id
+          LEFT JOIN reja.development_projects dp ON dp.id = u.project_id
+          LEFT JOIN reja.development_buildings db ON db.id = u.building_id
          WHERE l.publication_status = 'published'
            AND (l.expires_at IS NULL OR l.expires_at > now())
            AND l.listing_type = 'sale'
