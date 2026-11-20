@@ -186,11 +186,18 @@ test("zoning information points to official plan sources and avoids universal pl
   assert.match(source, /https:\/\/www\.lands\.rw\/publications\/master-plans/);
   assert.match(source, /https:\/\/geodata\.rw\/server\/rest\/services\/Hosted\/Gakenke_DLUP_20042026\/MapServer\/legend/);
   assert.match(source, /A3 and A4 were not present in the official plan legends checked/);
-  assert.match(source, /Those figures must not be copied to other districts/);
+  assert.match(source, /Plot-size rules vary by district, housing type and development conditions/);
+  assert.match(source, /Other zoning/);
+  assert.match(source, /Commercial activity zone/);
+  assert.match(source, /Main zoning/);
+  assert.match(source, /Forestation/);
 });
 
-test("list price and monthly payment are visible as two independent side-by-side sections", async () => {
+test("list price and monthly payment use independent segmented tabs", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /className="map-filter-price-tabs"/);
+  assert.match(source, /activePriceTab === "list"/);
+  assert.match(source, /activePriceTab === "monthly"/);
   assert.match(source, /className="map-filter-price-columns"/);
   assert.match(source, /title: "List price"/);
   assert.match(source, /title: "Monthly payment"/);
@@ -203,15 +210,15 @@ test("list price and monthly payment are visible as two independent side-by-side
 });
 
 
-test("the two price sections receive separate sliders and remain side by side on desktop", async () => {
+test("price tabs keep independent list and monthly values", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
   const styles = await read("../src/app/globals.css");
   assert.match(source, /filterPriceRangeSummary\(mapFilters\.priceMin, mapFilters\.priceMax/);
   assert.match(source, /filterPriceRangeSummary\(mapFilters\.monthlyPaymentMin, mapFilters\.monthlyPaymentMax/);
   assert.match(source, /updatePriceSlider\(range\.key, "min"/);
   assert.match(source, /updatePriceSlider\(range\.key, "max"/);
-  assert.match(styles, /\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: 1fr/);
+  assert.match(styles, /\.map-filter-price-tabs\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.map-filter-price-tab-active/);
 });
 
 
@@ -247,11 +254,13 @@ test("plot measurement filters use cadastral area first and a marked geometry es
   assert.match(mapView, /maxArea !== null/);
 });
 
-test("zoning filters load official map polygons and use parcel-centre spatial matching", async () => {
+test("zoning filters load official map polygons and use parcel-polygon intersection matching", async () => {
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /fetch\("\/api\/geography\/zoning\?bbox=/);
   assert.match(mapView, /zoningFilterFeaturesRef\.current\.filter/);
-  assert.match(mapView, /pointWithinGeometry\(center, zone\.geometry/);
+  assert.match(mapView, /geometriesIntersect\(feature\.geometry as Geometry, zone\.geometry as Geometry \| null\)/);
+  assert.match(mapView, /function polygonIntersectsPolygon/);
+  assert.match(mapView, /function segmentsIntersect/);
   assert.match(mapView, /zoningStatus: zoningCodes\.length \? zoningFilterStatusRef\.current/);
 });
 

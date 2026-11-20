@@ -9,7 +9,7 @@ The row contains six separate filter cells. Each cell opens its own popover. Sel
 - **Sale / Rent:** Any status, For sale, For rent, Sold out. Sold out remains a historical market status; it is not proof of a registered transfer.
 - **Price:** List price and Monthly payment are visible side by side. Each has its own dual-handle minimum/maximum slider and editable numeric bounds. The two ranges are independent; setting or clearing one does not change the other. RWF/USD selection applies to both, with limits of RWF 0–1 trillion and USD 0–100 million. Both price-distribution panels remain honest empty states until verified observations exist.
 - **Property type:** Any, Houses, Townhouse, Multifamily, Condos, Land, Lots & Land, Apartment, Manufactured and Mixed Use. Each choice uses a Lucide icon.
-- **Zoning:** Searchable, grouped codes; All zoning; an information panel; selected-code descriptions; and links to the official plan sources.
+- **Zoning:** The default view shows R1, R1A, R2, R3, R4, CA, C2 and C3, plus a separate Forestation choice. Less common codes remain under Other zoning. The catalogue is searchable; the applicable district plan remains authoritative. CA is a catalogue label and must be confirmed against the parcel's governing plan.
 - **Measurement:** Plot area and Interior area are separate bases. Switching bases clears the previous numeric range so plot area cannot silently be reused as floor area. Quick search bands (0–300, 300–500, 500–700, 700–800 and 800+ m²) retain editable minimum/maximum inputs.
 - **Beds / Baths:** Separate bedroom and bathroom groups, minimum counts, and independent exact-match toggles. Exact match is unavailable until a bedroom/bathroom threshold is chosen. Selecting a land-only property type switches the measurement basis to plot area and clears room filters.
 
@@ -30,7 +30,7 @@ Official source references:
 
 Plot-size rules are not universal code-to-size bands. They vary with the district plan, residential typology, land use and permitted development. As one district-specific example, the 2026 Ruhango plan describes R1 villa/bungalow plots at 500 m² and R1A low-density densification plots at 300 m². These figures must not be copied to other districts. The selected-zone summary therefore shows the code meaning and states that the typical plot standard is district-plan and housing-type specific until a rule set is indexed for the selected district.
 
-The production map currently has no nationwide parcel-to-zoning filter index. The selected-parcel zoning API supports Gasabo, Kicukiro, Nyarugenge and Bugesera; this is not the same as a parcel-wide spatial search index.
+The production map requests published zoning polygons for the current map bounds and matches cadastral parcel polygons against those zoning geometries by spatial intersection, rather than assigning a zone from the parcel bounding-box centre. This is a viewport-scoped pilot, not nationwide coverage. The connected zoning layers cover the published Kigali pilot extent and Bugesera extent; parcels outside those layers cannot be assumed to have a zoning match. Selected-parcel zoning lookup remains a separate exact-UPI workflow.
 
 ## Result-count and data boundary
 
@@ -42,7 +42,7 @@ Required data connections:
 - **Sale / rent / sold and price:** authorized first-party or source-observed listing records with current market status, currency, asking amount and rent period/payment frequency.
 - **Histogram:** sufficient verified list-price/monthly-payment observations, separated by currency and price basis.
 - **Property type and beds/baths:** verified building/unit records with consistent typology and room-count values.
-- **Zoning:** district-aware parcel-wide spatial joins against applicable district-plan layers. Selected-parcel zoning alone is not a filter index.
+- **Zoning:** expand district-plan layer coverage and index plan-specific plot standards (district, zone, typology and effective plan version) before displaying legal minimum/maximum plot sizes. Current viewport filtering uses actual polygon intersections but only where published zoning layers are connected.
 - **Measurement:** preserve cadastral plot area, geometry-estimated area and building/unit interior area as separate fields and sources.
 
 Do not present a selected filter as applied to map results until its matching data source is connected and tested.
