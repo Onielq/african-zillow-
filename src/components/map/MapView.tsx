@@ -1318,7 +1318,7 @@ function zoningFeatureMatchesCodes(
   const properties = (feature.properties ?? {}) as Record<string, unknown>;
   const values = Object.entries(properties)
     .filter(([key, value]) => value !== null && value !== undefined && /zoning|zone|land.?use|gen.?lu|lu.?code/i.test(key))
-    .map(([, value]) => String(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim())
+    .map(([, value]) => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())
     .filter(Boolean);
   return codes.some((code) => {
     const pattern = new RegExp("(^|[^A-Z0-9])" + code + "($|[^A-Z0-9])", "i");
