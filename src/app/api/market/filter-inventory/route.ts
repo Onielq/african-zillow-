@@ -134,7 +134,10 @@ export async function GET(request: NextRequest) {
 
     const histogramRows = await database`
       WITH eligible AS (
-        SELECT l.asking_amount::numeric AS asking_amount,
+        SELECT COALESCE(l.property_id::text, 'source:' || l.id::text) AS property_key,
+               1 AS source_priority,
+               l.last_seen_at AS observed_at,
+               l.asking_amount::numeric AS asking_amount,
                l.currency,
                l.property_type,
                COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
@@ -168,7 +171,10 @@ export async function GET(request: NextRequest) {
            AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) >= ${areaMin})
            AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) <= ${areaMax})
         UNION ALL
-        SELECT l.asking_amount::numeric AS asking_amount,
+        SELECT COALESCE(l.market_property_id::text, 'exchange:' || l.id::text) AS property_key,
+               2 AS source_priority,
+               l.published_at AS observed_at,
+               l.asking_amount::numeric AS asking_amount,
                l.currency,
                p.property_type,
                COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
@@ -202,6 +208,11 @@ export async function GET(request: NextRequest) {
              l.seller_organization_id
            )
       ),
+      deduplicated AS (
+        SELECT DISTINCT ON (property_key) *
+          FROM eligible
+         ORDER BY property_key, source_priority DESC, observed_at DESC NULLS LAST
+      ),
       valued AS (
         SELECT CASE
           WHEN ${mode} = 'list' THEN asking_amount
@@ -209,7 +220,7 @@ export async function GET(request: NextRequest) {
           ELSE GREATEST(asking_amount - ${downPayment}, 0) * ${financeRate} /
             (1 - power(1 + ${financeRate}, -${term}))
         END AS amount
-        FROM eligible
+        FROM deduplicated
       ),
       stats AS (
         SELECT count(*)::integer AS total,
