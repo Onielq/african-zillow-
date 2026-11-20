@@ -579,6 +579,18 @@ const EMPTY_PARCEL_MAP_FILTERS: ParcelMapFilters = {
   bathroomsExact: false
 };
 
+export type MarketListingMapPoint = {
+  id: string;
+  coordinates: [number, number];
+  priceLabel: string;
+  propertyType: string;
+  projectName: string | null;
+  buildingName: string | null;
+  unitLabel: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+};
+
 export type ParcelFilterScope = {
   level: "district" | "sector" | "cell" | "village";
   district: string | null;
@@ -605,6 +617,7 @@ type MapViewProps = {
   selectedArea: SelectedArea | null;
   parcelFilters?: ParcelMapFilters;
   onParcelFilterResults?: (results: ParcelFilterResults) => void;
+  marketListings?: MarketListingMapPoint[];
   projects?: RwandaProjectRecord[];
   showProjects?: boolean;
   selectedProjectId?: string | null;
@@ -1327,6 +1340,7 @@ export function MapView({
   selectedArea,
   parcelFilters = EMPTY_PARCEL_MAP_FILTERS,
   onParcelFilterResults,
+  marketListings = [],
   projects = [],
   showProjects = false,
   selectedProjectId = null,
@@ -1335,6 +1349,8 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const projectsRef = useRef<RwandaProjectRecord[]>(projects);
+  const marketListingsRef = useRef<MarketListingMapPoint[]>(marketListings);
+  const refreshMarketListingsRef = useRef<(() => void) | null>(null);
   const showProjectsRef = useRef(showProjects);
   const selectedProjectIdRef = useRef<string | null>(selectedProjectId);
   const onProjectSelectedRef = useRef(onProjectSelected);
@@ -1431,6 +1447,11 @@ export function MapView({
     selectedAreaRef.current = selectedArea;
     selectionSyncRef.current?.(selectedArea);
   }, [selectedArea]);
+
+  useEffect(() => {
+    marketListingsRef.current = marketListings;
+    refreshMarketListingsRef.current?.();
+  }, [marketListings]);
 
   useEffect(() => {
     projectsRef.current = projects;
@@ -2069,6 +2090,28 @@ export function MapView({
     refreshParcelMapFiltersRef.current = refreshParcelMapFilters;
     refreshParcelMapFilters();
 
+    const refreshMarketListingMarkers = () => {
+      const source = map.getSource("market-listing-markers") as GeoJSONSource | undefined;
+      if (!source) return;
+      const features = marketListingsRef.current.map((listing) => ({
+        type: "Feature" as const,
+        id: listing.id,
+        geometry: { type: "Point" as const, coordinates: listing.coordinates },
+        properties: {
+          listing_id: listing.id,
+          price_label: listing.priceLabel,
+          property_type: listing.propertyType,
+          project_name: listing.projectName,
+          building_name: listing.buildingName,
+          unit_label: listing.unitLabel,
+          bedrooms: listing.bedrooms,
+          bathrooms: listing.bathrooms
+        }
+      }));
+      source.setData({ type: "FeatureCollection", features } as never);
+    };
+    refreshMarketListingsRef.current = refreshMarketListingMarkers;
+
     const refreshProjectMarkers = () => {
       const source = map.getSource("project-markers") as GeoJSONSource | undefined;
       const layerIds = ["project-clusters", "project-cluster-count", "project-marker-circles", "project-marker-labels"];
@@ -2151,6 +2194,7 @@ export function MapView({
 
       projectCentersRef.current = nextCenters;
       source.setData({ type: "FeatureCollection", features } as never);
+      refreshMarketListingsRef.current?.();
 
       const selectedId = selectedProjectIdRef.current;
       if (selectedId) {
@@ -2313,6 +2357,15 @@ export function MapView({
           cluster: true,
           clusterRadius: 42,
           clusterMaxZoom: 14
+        });
+      }
+      if (!map.getSource("market-listing-markers")) {
+        map.addSource("market-listing-markers", {
+          type: "geojson",
+          data: emptyFeatureCollection(),
+          cluster: true,
+          clusterRadius: 36,
+          clusterMaxZoom: 15
         });
       }
 
@@ -2503,6 +2556,75 @@ export function MapView({
           }
         });
       }
+      if (!map.getLayer("market-listing-clusters")) {
+        map.addLayer({
+          id: "market-listing-clusters",
+          type: "circle",
+          source: "market-listing-markers",
+          filter: ["has", "point_count"],
+          paint: {
+            "circle-radius": ["step", ["get", "point_count"], 13, 8, 17, 25, 21],
+            "circle-color": "#D71920",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("market-listing-cluster-count")) {
+        map.addLayer({
+          id: "market-listing-cluster-count",
+          type: "symbol",
+          source: "market-listing-markers",
+          filter: ["has", "point_count"],
+          layout: {
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 11,
+            "text-allow-overlap": true
+          },
+          paint: { "text-color": "#FFFFFF" }
+        });
+      }
+      if (!map.getLayer("market-listing-circles")) {
+        map.addLayer({
+          id: "market-listing-circles",
+          type: "circle",
+          source: "market-listing-markers",
+          filter: ["!", ["has", "point_count"]],
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4.5, 12, 6, 17, 8],
+            "circle-color": "#D71920",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.98
+          }
+        });
+      }
+      if (!map.getLayer("market-listing-labels")) {
+        map.addLayer({
+          id: "market-listing-labels",
+          type: "symbol",
+          source: "market-listing-markers",
+          minzoom: 14,
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            "text-field": ["get", "price_label"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.15],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false
+          },
+          paint: {
+            "text-color": "#B4232B",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.4
+          }
+        });
+      }
+
       if (!map.getLayer("project-clusters")) {
         map.addLayer({
           id: "project-clusters",
