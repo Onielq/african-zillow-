@@ -1962,7 +1962,7 @@ export function MapView({
       const maxArea = filters.measurementMax.trim() ? Number(filters.measurementMax) : null;
       const landOnly = filters.propertyTypes.length > 0 &&
         filters.propertyTypes.every((value) => value === "land" || value === "lots_land");
-      const hasParcelFilters = zoningCodes.length > 0 || hasPlotRange || landOnly ||
+      const hasParcelFilters = zoningCodes.length > 0 || hasPlotRange || hasPriceRange || landOnly ||
         (filters.listingType !== "all" && raw.features.some((feature) => feature.properties?.market_status));
 
       const confirmedAskingPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
