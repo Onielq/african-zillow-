@@ -1069,7 +1069,7 @@ export function MapExperience() {
       return "The zoning source is temporarily unavailable. No parcel zoning match is being assumed.";
     }
     if (mapFilters.zoningCodes.length) {
-      return "Zoning is matched using each parcel's map-centre point against the published zoning polygons. Check parcel details for exact overlaps.";
+      return "Zoning is matched by intersecting each cadastral parcel polygon with the published zoning polygons. Parcels that cross a zoning boundary can match more than one selected zone.";
     }
     if (mapFilters.bedroomsMin || mapFilters.bathroomsMin) {
       return "Bedrooms and bathrooms do not apply to cadastral land parcels.";
