@@ -186,7 +186,11 @@ test("zoning information points to official plan sources and avoids universal pl
   assert.match(source, /https:\/\/www\.lands\.rw\/publications\/master-plans/);
   assert.match(source, /https:\/\/geodata\.rw\/server\/rest\/services\/Hosted\/Gakenke_DLUP_20042026\/MapServer\/legend/);
   assert.match(source, /A3 and A4 were not present in the official plan legends checked/);
-  assert.match(source, /Those figures must not be copied to other districts/);
+  assert.match(source, /Plot-size rules vary by district, housing type and development conditions/);
+  assert.match(source, /Other zoning/);
+  assert.match(source, /Commercial activity zone/);
+  assert.match(source, /Main zoning/);
+  assert.match(source, /Forestation/);
 });
 
 test("list price and monthly payment are visible as two independent side-by-side sections", async () => {
@@ -247,11 +251,13 @@ test("plot measurement filters use cadastral area first and a marked geometry es
   assert.match(mapView, /maxArea !== null/);
 });
 
-test("zoning filters load official map polygons and use parcel-centre spatial matching", async () => {
+test("zoning filters load official map polygons and use parcel-polygon intersection matching", async () => {
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /fetch\("\/api\/geography\/zoning\?bbox=/);
   assert.match(mapView, /zoningFilterFeaturesRef\.current\.filter/);
-  assert.match(mapView, /pointWithinGeometry\(center, zone\.geometry/);
+  assert.match(mapView, /geometriesIntersect\(feature\.geometry as Geometry, zone\.geometry as Geometry \| null\)/);
+  assert.match(mapView, /function polygonIntersectsPolygon/);
+  assert.match(mapView, /function segmentsIntersect/);
   assert.match(mapView, /zoningStatus: zoningCodes\.length \? zoningFilterStatusRef\.current/);
 });
 
