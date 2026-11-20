@@ -2696,6 +2696,7 @@ export function MapView({
           }
         });
       }
+      refreshMarketListingsRef.current?.();
 
     };
 
