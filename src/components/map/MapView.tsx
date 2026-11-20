@@ -1553,6 +1553,61 @@ export function MapView({
     activeBasemapModeRef.current = "map";
     activeAreaLevelRef.current = activeAreaLevel(map.getZoom());
 
+    let lastSearchedViewportKey: string | null = null;
+    let lastSearchResultText = "";
+    let viewportSearchRunning = false;
+    let runViewportSearch: (() => Promise<void>) | null = null;
+    const getViewportSearchKey = () => {
+      const bounds = map.getBounds();
+      return [
+        bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(), map.getZoom()
+      ].map((value) => Number(value.toFixed(5))).join("|") + "|" + activeAreaLevel(map.getZoom());
+    };
+    const searchControl = document.createElement("div");
+    searchControl.className = "map-area-search-control";
+    searchControl.setAttribute("role", "group");
+    searchControl.setAttribute("aria-label", "Search the current map area");
+    searchControl.hidden = true;
+    const searchStatus = document.createElement("span");
+    searchStatus.className = "map-area-search-status";
+    searchStatus.setAttribute("role", "status");
+    searchStatus.setAttribute("aria-live", "polite");
+    const searchButton = document.createElement("button");
+    searchButton.className = "map-area-search-button";
+    searchButton.type = "button";
+    searchButton.textContent = "Search this area";
+    searchButton.addEventListener("click", () => {
+      if (runViewportSearch) void runViewportSearch();
+    });
+    searchControl.append(searchStatus, searchButton);
+    container.appendChild(searchControl);
+
+    const markViewportSearchPending = () => {
+      const currentKey = getViewportSearchKey();
+      if (lastSearchedViewportKey === null) {
+        lastSearchedViewportKey = currentKey;
+        return;
+      }
+      if (currentKey === lastSearchedViewportKey) {
+        if (searchControl.dataset.state === "pending" && !viewportSearchRunning) {
+          if (lastSearchResultText) {
+            searchControl.dataset.state = "complete";
+            searchButton.textContent = "Search again";
+            searchStatus.textContent = lastSearchResultText;
+          } else {
+            searchControl.hidden = true;
+          }
+        }
+        return;
+      }
+      searchControl.hidden = false;
+      searchControl.dataset.state = "pending";
+      searchControl.setAttribute("aria-busy", "false");
+      searchButton.disabled = viewportSearchRunning;
+      searchButton.textContent = "Search this area";
+      searchStatus.textContent = viewportSearchRunning ? "The map moved. The new area still needs a search." : "";
+    };
+
     const resolveActiveAreaLevel = () => {
       const level = activeAreaLevelForMap(map, areaDataRef.current, activeAreaLevelRef.current);
       activeAreaLevelRef.current = level;
@@ -4139,6 +4194,76 @@ export function MapView({
     };
     refreshZoningRef.current = scheduleZoningRefresh;
 
+    runViewportSearch = async () => {
+      if (viewportSearchRunning) return;
+      const requestedViewportKey = getViewportSearchKey();
+      viewportSearchRunning = true;
+      searchControl.hidden = false;
+      searchControl.dataset.state = "loading";
+      searchControl.setAttribute("aria-busy", "true");
+      searchButton.disabled = true;
+      searchButton.textContent = "Searching…";
+      searchStatus.textContent = "Refreshing boundaries and map layers…";
+
+      try {
+        const searchTasks: Promise<void>[] = [refreshAreas()];
+        if (showLayersRef.current.length > 0) searchTasks.push(refreshShowOverlays());
+        if (showZoningRef.current || parcelFiltersRef.current.zoningCodes.length > 0) {
+          searchTasks.push(refreshZoningOverlay());
+        }
+        await Promise.all(searchTasks);
+        await new Promise<void>((resolve) => {
+          let finished = false;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            window.clearTimeout(idleTimeout);
+            map.off("idle", finish);
+            resolve();
+          };
+          const idleTimeout = window.setTimeout(finish, 1200);
+          map.once("idle", finish);
+        });
+
+        if (getViewportSearchKey() !== requestedViewportKey) {
+          searchControl.dataset.state = "pending";
+          searchButton.textContent = "Search this area";
+          searchStatus.textContent = "The map moved. Search the new area.";
+          return;
+        }
+
+        lastSearchedViewportKey = requestedViewportKey;
+        refreshMetricBubbles();
+        const activeLevel = resolveActiveAreaLevel();
+        const layerId = AREA_LAYERS[activeLevel].fill;
+        const visibleFeatures = map.getLayer(layerId)
+          ? map.queryRenderedFeatures(undefined, { layers: [layerId] })
+          : [];
+        const visibleIds = new Set(visibleFeatures.map((feature, index) =>
+          String(getFeatureId(feature) ?? feature.properties?.map_feature_id ?? activeLevel + "-" + index)
+        ));
+        const unit = activeLevel === "parcel" ? "plots" : "areas";
+        lastSearchResultText = visibleIds.size.toLocaleString("en-RW") + " " + unit + " in this view";
+        searchControl.dataset.state = "complete";
+        searchButton.textContent = "Search again";
+        searchStatus.textContent = lastSearchResultText;
+      } catch (error) {
+        if (error instanceof Error) console.error("Map area search failed.", error.message);
+        searchControl.dataset.state = "error";
+        searchButton.textContent = "Try again";
+        searchStatus.textContent = "This area could not be refreshed. Try again.";
+      } finally {
+        viewportSearchRunning = false;
+        searchControl.setAttribute("aria-busy", "false");
+        searchButton.disabled = false;
+        if (getViewportSearchKey() !== requestedViewportKey) {
+          searchControl.dataset.state = "pending";
+          searchButton.textContent = "Search this area";
+          searchStatus.textContent = "The map moved. Search the new area.";
+        }
+      }
+    };
+
     const scheduleRefresh = () => {
       if (parcelRefreshRetryTimer !== null) {
         clearTimeout(parcelRefreshRetryTimer);
@@ -4146,16 +4271,8 @@ export function MapView({
       }
       updateLayerVisibility();
       if (lastMapPointerPoint) map.once("idle", refreshHoverAtLastPointer);
-      scheduleShowOverlayRefresh();
-      scheduleZoningRefresh();
       refreshMetricBubbles();
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
-        // Clear the handle before refreshing so an idle fallback cannot mistake
-        // an already-fired timer for a refresh that is still queued.
-        refreshTimer = null;
-        void refreshAreas();
-      }, 220);
+      markViewportSearchPending();
     };
 
     const setHover = (
@@ -4333,6 +4450,7 @@ export function MapView({
       basemapTileErrorRef.current = false;
       const styleMode = activeBasemapModeRef.current;
       const styleSequence = basemapStyleSequenceRef.current;
+      if (lastSearchedViewportKey === null) lastSearchedViewportKey = getViewportSearchKey();
       onStatusChange("loading");
       addAdministrativeLayers();
       showOverlayController?.abort();
@@ -4535,6 +4653,7 @@ export function MapView({
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
       resizeObserver?.disconnect();
+      searchControl.remove();
       map.getCanvas().removeEventListener("mouseleave", handleMapPointerLeave);
       map.remove();
       mapRef.current = null;
