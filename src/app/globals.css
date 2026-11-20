@@ -6376,16 +6376,17 @@ input {
   cursor: pointer;
 }
 
-.map-filter-other-zoning-trigger[aria-expanded="true"] svg {
+.map-filter-other-zoning-trigger[aria-expanded="true"] > span:last-child {
   transform: rotate(180deg);
 }
 
-.map-filter-other-zoning-trigger svg {
+.map-filter-other-zoning-trigger > span:last-child {
   transition: transform 150ms ease;
+  display: inline-block;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .map-filter-other-zoning-trigger svg {
+  .map-filter-other-zoning-trigger > span:last-child {
     transition: none;
   }
 }
