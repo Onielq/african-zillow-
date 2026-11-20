@@ -123,8 +123,7 @@ const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: Lucid
   { value: "townhouse", label: "Townhouse", Icon: Building },
   { value: "multifamily", label: "Multifamily", Icon: Blocks },
   { value: "condo", label: "Condos", Icon: Building2 },
-  { value: "land", label: "Land", Icon: LandPlot },
-  { value: "lots_land", label: "Lots & Land", Icon: LandPlot },
+  { value: "land", label: "Land & lots", Icon: LandPlot },
   { value: "apartment", label: "Apartment", Icon: Building2 },
   { value: "manufactured", label: "Manufactured", Icon: Warehouse },
   { value: "mixed_use", label: "Mixed Use", Icon: Factory }
@@ -1167,7 +1166,6 @@ export function MapExperience() {
           multifamily: "apartment",
           condo: "apartment",
           land: "land",
-          lots_land: "land",
           apartment: "apartment",
           manufactured: "other",
           mixed_use: "mixed_use"
@@ -3039,11 +3037,11 @@ export function MapExperience() {
                             className={active ? "map-filter-property-card map-filter-property-card-active" : "map-filter-property-card"}
                             key={option.value}
                             onClick={() => setMapFilters((current) => {
-                              const isLand = option.value === "land" || option.value === "lots_land";
+                              const isLand = option.value === "land";
                               const withoutOtherKind = current.propertyTypes.filter((value) =>
                                 isLand
-                                  ? value === "land" || value === "lots_land"
-                                  : value !== "land" && value !== "lots_land"
+                                  ? value === "land"
+                                  : value !== "land"
                               );
                               const nextTypes = withoutOtherKind.includes(option.value)
                                 ? withoutOtherKind.filter((value) => value !== option.value)
