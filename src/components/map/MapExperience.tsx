@@ -1069,6 +1069,9 @@ export function MapExperience() {
   const inventoryScopeKey = inventoryScope
     ? [inventoryScope.level, inventoryScope.district, inventoryScope.sector, inventoryScope.cell, inventoryScope.village].join("|")
     : "";
+  const activePriceRange = activePriceTab === "list"
+    ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
+    : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
   useEffect(() => {
     const shouldLoad = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
       activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
@@ -1166,9 +1169,6 @@ export function MapExperience() {
     : 0;
   const sliderLimit = activePriceLimit > 0 ? activePriceLimit : 1;
   const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 100));
-  const activePriceRange = activePriceTab === "list"
-    ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
-    : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
   const filterResultNote = (() => {
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
       return "Loading the official zoning polygons for the current map area.";
