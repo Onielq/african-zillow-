@@ -137,10 +137,10 @@ export async function GET(request: NextRequest) {
         SELECT l.asking_amount::numeric AS asking_amount,
                l.currency,
                l.property_type,
-               p.bedrooms,
-               p.bathrooms,
-               p.internal_area_sqm,
-               p.plot_area_sqm,
+               COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
+               COALESCE(p.bathrooms, u.bathrooms) AS bathrooms,
+               COALESCE(p.internal_area_sqm, u.internal_area_sqm) AS internal_area_sqm,
+               COALESCE(p.plot_area_sqm, u.plot_area_sqm) AS plot_area_sqm,
                p.cell_label,
                p.payload
           FROM reja.market_listings l
@@ -163,18 +163,18 @@ export async function GET(request: NextRequest) {
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
            AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
-           AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
-           AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
-           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+           AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
+           AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) <= ${areaMax})
         UNION ALL
         SELECT l.asking_amount::numeric AS asking_amount,
                l.currency,
                p.property_type,
-               p.bedrooms,
-               p.bathrooms,
-               p.internal_area_sqm,
-               p.plot_area_sqm,
+               COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
+               COALESCE(p.bathrooms, u.bathrooms) AS bathrooms,
+               COALESCE(p.internal_area_sqm, u.internal_area_sqm) AS internal_area_sqm,
+               COALESCE(p.plot_area_sqm, u.plot_area_sqm) AS plot_area_sqm,
                p.cell_label,
                p.payload
           FROM reja.exchange_listings l
@@ -191,10 +191,10 @@ export async function GET(request: NextRequest) {
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
            AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
-           AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
-           AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
-           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+           AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
+           AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) <= ${areaMax})
            AND reja.has_verified_listing_authorization(
              l.listing_authorization_id,
              l.market_property_id,
@@ -245,15 +245,15 @@ export async function GET(request: NextRequest) {
              l.sector_label AS sector,
              p.cell_label AS cell,
              p.payload->>'village' AS village,
-             p.project_name AS project_name,
-             p.building_name AS building_name,
-             p.unit_label AS unit_label,
-             p.bedrooms,
-             p.bathrooms::text AS bathrooms,
-             p.internal_area_sqm::text AS internal_area_sqm,
-             p.plot_area_sqm::text AS plot_area_sqm,
-             p.latitude::text AS latitude,
-             p.longitude::text AS longitude,
+             COALESCE(p.project_name, dp.name) AS project_name,
+             COALESCE(p.building_name, db.name) AS building_name,
+             COALESCE(p.unit_label, u.unit_code) AS unit_label,
+             COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
+             COALESCE(p.bathrooms, u.bathrooms)::text AS bathrooms,
+             COALESCE(p.internal_area_sqm, u.internal_area_sqm)::text AS internal_area_sqm,
+             COALESCE(p.plot_area_sqm, u.plot_area_sqm)::text AS plot_area_sqm,
+             COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END)::text AS latitude,
+             COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END)::text AS longitude,
              p.parcel_id::text AS parcel_id,
              l.listing_url,
              s.title AS source_title,
@@ -277,10 +277,10 @@ export async function GET(request: NextRequest) {
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
          AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
-         AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
-         AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
-           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+         AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
+         AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) <= ${areaMax})
          AND (
            CASE
              WHEN ${mode} = 'list' THEN l.asking_amount
@@ -312,15 +312,15 @@ export async function GET(request: NextRequest) {
              p.sector_label AS sector,
              p.cell_label AS cell,
              p.payload->>'village' AS village,
-             p.project_name AS project_name,
-             p.building_name AS building_name,
-             p.unit_label AS unit_label,
-             p.bedrooms,
-             p.bathrooms::text AS bathrooms,
-             p.internal_area_sqm::text AS internal_area_sqm,
-             p.plot_area_sqm::text AS plot_area_sqm,
-             p.latitude::text AS latitude,
-             p.longitude::text AS longitude,
+             COALESCE(p.project_name, dp.name) AS project_name,
+             COALESCE(p.building_name, db.name) AS building_name,
+             COALESCE(p.unit_label, u.unit_code) AS unit_label,
+             COALESCE(p.bedrooms, u.bedrooms) AS bedrooms,
+             COALESCE(p.bathrooms, u.bathrooms)::text AS bathrooms,
+             COALESCE(p.internal_area_sqm, u.internal_area_sqm)::text AS internal_area_sqm,
+             COALESCE(p.plot_area_sqm, u.plot_area_sqm)::text AS plot_area_sqm,
+             COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END)::text AS latitude,
+             COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END)::text AS longitude,
              p.parcel_id::text AS parcel_id,
              NULL::text AS listing_url,
              'Taiseel Exchange'::text AS source_title,
@@ -338,10 +338,10 @@ export async function GET(request: NextRequest) {
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
          AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
-         AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
-         AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-         AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
-         AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+         AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
+         AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
+         AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) >= ${areaMin})
+         AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN COALESCE(p.internal_area_sqm, u.internal_area_sqm) ELSE COALESCE(p.plot_area_sqm, u.plot_area_sqm) END) <= ${areaMax})
          AND (
            CASE
              WHEN ${mode} = 'list' THEN l.asking_amount
