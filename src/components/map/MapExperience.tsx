@@ -218,8 +218,8 @@ function filterPriceRangeSummary(
   currency: "RWF" | "USD",
   limit: number
 ): string {
-  const min = minimum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(minimum))), currency) : "";
-  const max = maximum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(maximum))), currency) : "";
+  const min = minimum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(minimum))), currency) : "";
+  const max = maximum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(maximum))), currency) : "";
   if (min && max) return min + " – " + max;
   if (min) return "From " + min;
   if (max) return "Up to " + max;
@@ -987,17 +987,23 @@ function FilterPopoverPortal({
         ? bounds.bottom + 8
         : Math.max(12, bounds.top - expectedHeight - 8);
 
-      setPosition({ top, left });
+      setPosition((current) => current && current.top === top && current.left === left ? current : { top, left });
     };
 
     updatePosition();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
+    const popover = popoverRef.current;
+    const observer = typeof ResizeObserver !== "undefined" && popover
+      ? new ResizeObserver(updatePosition)
+      : null;
+    if (popover && observer) observer.observe(popover);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [anchorRef, className, popoverRef]);
+  }, [anchorRef, className, popoverRef, position]);
 
   if (!position || typeof document === "undefined") return null;
 
@@ -1192,9 +1198,6 @@ export function MapExperience() {
   const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
   const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
-  const selectedZoneDescriptions = selectedZoneCodes
-    .map((code) => code + " · " + (ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"))
-    .join(" / ");
   const filterZoningGroups = (groups: ReadonlyArray<{ label: string; codes: readonly string[] }>) =>
     groups.map((group) => ({
       ...group,
