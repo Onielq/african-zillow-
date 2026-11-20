@@ -96,13 +96,18 @@ const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: Lucid
  * own plan remains authoritative; this catalogue is not a national parcel index.
  */
 const ZONING_FILTER_GROUPS = [
-  { label: "Residential", codes: ["R1", "R1A", "R1B", "R2", "R3", "R4", "RS"] },
-  { label: "Commercial", codes: ["C1", "C2", "C3", "C4"] },
+  { label: "Main zoning", codes: ["R1", "R1A", "R2", "R3", "R4", "CA", "C2", "C3"] },
+  { label: "Forestation", codes: ["F5"] }
+] as const;
+
+const OTHER_ZONING_FILTER_GROUPS = [
+  { label: "Other residential", codes: ["R1B", "RS"] },
+  { label: "Other commercial", codes: ["C1", "C4"] },
   { label: "Agriculture & livestock", codes: ["A", "A1", "A2"] },
   { label: "Industrial & mining", codes: ["I", "I1", "I2", "I3"] },
   { label: "Public facilities", codes: ["PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6"] },
   { label: "Buffers", codes: ["B", "B1", "B2", "B3", "B4"] },
-  { label: "Parks, forests & ecology", codes: ["ET", "F", "F1", "F2", "F3", "F4", "F5", "F6", "OS", "P1", "P2", "P3B", "P3C"] },
+  { label: "Other forests, parks & ecology", codes: ["ET", "F", "F1", "F2", "F3", "F4", "F6", "OS", "P1", "P2", "P3B", "P3C"] },
   { label: "Transport & utilities", codes: ["T", "T1", "T2", "T3", "T4", "U", "UE"] },
   { label: "Wetlands & water", codes: ["W1A", "W1B", "W2", "W3", "W4", "W5", "WB"] }
 ] as const;
@@ -116,6 +121,7 @@ const ZONING_FILTER_DESCRIPTIONS: Record<string, string> = {
   B2: "Water body buffer zone",
   B3: "National park buffer zone",
   B4: "Other buffer zone",
+  CA: "Commercial activity zone · confirm against the applicable district plan",
   C1: "Mixed use commercial zone",
   C2: "Neighbourhood commercial zone",
   C3: "City commercial zone",
@@ -993,6 +999,7 @@ export function MapExperience() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
   const [zoningInfoOpen, setZoningInfoOpen] = useState(false);
+  const [otherZoningOpen, setOtherZoningOpen] = useState(false);
   const [zoningSearch, setZoningSearch] = useState("");
   const [mapFilters, setMapFilters] = useState<ParcelMapFilters>({
     listingType: "all",
@@ -1073,17 +1080,20 @@ export function MapExperience() {
   })();
   const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
   const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
-  const selectedZoneCodes = ZONING_FILTER_GROUPS.flatMap((group) => group.codes)
+  const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
+  const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
   const selectedZoneDescriptions = selectedZoneCodes
     .map((code) => code + " · " + (ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"))
     .join(" / ");
-  const visibleZoningGroups = ZONING_FILTER_GROUPS
-    .map((group) => ({
+  const filterZoningGroups = (groups: ReadonlyArray<{ label: string; codes: readonly string[] }>) =>
+    groups.map((group) => ({
       ...group,
       codes: group.codes.filter((code) => code.toLowerCase().includes(zoningSearch.trim().toLowerCase()))
-    }))
-    .filter((group) => group.codes.length > 0);
+    })).filter((group) => group.codes.length > 0);
+  const visibleZoningGroups = filterZoningGroups(ZONING_FILTER_GROUPS);
+  const visibleOtherZoningGroups = filterZoningGroups(OTHER_ZONING_FILTER_GROUPS);
+  const hasZoningSearch = zoningSearch.trim().length > 0;
   const activeFilterCount = [
     mapFilters.listingType !== "all",
     Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax || mapFilters.priceCurrency !== "RWF"),
