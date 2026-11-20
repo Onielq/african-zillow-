@@ -166,7 +166,7 @@ test("measurement ranges are independent, attractive and locally clearable", asy
   assert.match(source, /500–700/);
   assert.match(source, /700–800/);
   assert.match(source, /800\+/);
-  assert.match(source, /Clear measurement/);
+  assert.match(source, /Clear entered measurements/);
   assert.match(styles, /\.map-filter-clear-local/);
   assert.match(source, /measurementBasis: "plot", measurementMin: "", measurementMax: ""/);
   assert.match(source, /measurementBasis: "interior", measurementMin: "", measurementMax: ""/);
