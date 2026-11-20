@@ -224,27 +224,90 @@ const KIGALI_ZONE_PLOT_RULES: Record<string, string> = {
   R4: "Minimum plot size: 750 m². Plots below 750 m² follow R2 regulations."
 };
 
+function formatFilterAmount(value: number, currency: "RWF" | "USD"): string {
+  const amount = Number.isFinite(value) && value >= 0 ? value : 0;
+  const formatted = new Intl.NumberFormat("en-US", {
+    useGrouping: true,
+    maximumFractionDigits: 2
+  }).format(amount);
+  return currency === "RWF" ? "RWF " + formatted : "$" + formatted;
+}
+
 function filterPriceRangeSummary(
   minimum: string,
   maximum: string,
   currency: "RWF" | "USD",
   limit: number
 ): string {
-  const min = minimum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(minimum))), currency) : "";
-  const max = maximum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(maximum))), currency) : "";
+  const min = minimum ? formatFilterAmount(Math.max(0, Number(minimum)), currency) : "";
+  const max = maximum ? formatFilterAmount(Math.max(0, Number(maximum)), currency) : "";
   if (min && max) return min + " – " + max;
   if (min) return "From " + min;
   if (max) return "Up to " + max;
   return "Any amount";
 }
 
-function compactFilterAmount(value: number, currency: "RWF" | "USD"): string {
-  if (!Number.isFinite(value) || value < 0) return currency === "RWF" ? "RWF 0" : "$0";
-  const compact = new Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 1
-  }).format(value);
-  return currency === "RWF" ? "RWF " + compact : "$" + compact;
+function normalizeGroupedInput(value: string, allowDecimal: boolean): string {
+  const clean = value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+  if (!allowDecimal) return clean.replace(/\./g, "");
+  const decimalIndex = clean.indexOf(".");
+  if (decimalIndex < 0) return clean;
+  return clean.slice(0, decimalIndex + 1) + clean.slice(decimalIndex + 1).replace(/\./g, "");
+}
+
+function formatGroupedInput(value: string): string {
+  if (!value) return "";
+  const [integerPart, decimalPart] = value.split(".");
+  const parsed = Number(integerPart || "0");
+  if (!Number.isFinite(parsed)) return value;
+  const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(parsed);
+  return decimalPart === undefined ? grouped : grouped + "." + decimalPart;
+}
+
+type GroupedNumericInputProps = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  allowDecimal?: boolean;
+  className?: string;
+};
+
+function GroupedNumericInput({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+  allowDecimal = true,
+  className
+}: GroupedNumericInputProps) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (!focused) setDraft(value);
+  }, [focused, value]);
+
+  return (
+    <input
+      aria-label={ariaLabel}
+      className={className}
+      inputMode={allowDecimal ? "decimal" : "numeric"}
+      onBlur={() => setFocused(false)}
+      onChange={(event) => {
+        const next = normalizeGroupedInput(event.currentTarget.value, allowDecimal);
+        setDraft(next);
+        onChange(next);
+      }}
+      onFocus={() => {
+        setFocused(true);
+        setDraft(value);
+      }}
+      placeholder={placeholder}
+      type="text"
+      value={focused ? draft : formatGroupedInput(value)}
+    />
+  );
 }
 
 function zoningEntryLabel(zone: NonNullable<SelectedArea["zoning"]>[number]): string {
@@ -1182,7 +1245,7 @@ export function MapExperience() {
       return [{
         id: row.id,
         coordinates: [longitude, latitude] as [number, number],
-        priceLabel: compactFilterAmount(askingAmount, row.currency === "USD" ? "USD" : "RWF"),
+        priceLabel: formatFilterAmount(askingAmount, row.currency === "USD" ? "USD" : "RWF"),
         propertyType: row.property_type,
         projectName: row.project_name,
         buildingName: row.building_name,
