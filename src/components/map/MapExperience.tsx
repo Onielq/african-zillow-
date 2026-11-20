@@ -1256,9 +1256,16 @@ export function MapExperience() {
     }), [marketInventory?.rows]);
   const activePriceLimit = marketInventory?.maximum && marketInventory.maximum > 0
     ? marketInventory.maximum
-    : 0;
-  const sliderLimit = activePriceLimit > 0 ? activePriceLimit : 1;
-  const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 100));
+    : null;
+  const enteredPriceCeiling = Math.max(
+    Number(activePriceRange.min) || 0,
+    Number(activePriceRange.max) || 0
+  );
+  // A missing listing feed must not disable the control. This is an explicit
+  // working scale only; it is never presented as a verified inventory maximum.
+  const fallbackPriceScale = mapFilters.priceCurrency === "RWF" ? 500_000_000 : 1_000_000;
+  const sliderLimit = Math.max(activePriceLimit ?? fallbackPriceScale, enteredPriceCeiling);
+  const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 200));
   const filterResultNote = (() => {
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
       return "Loading the official zoning polygons for the current map area.";
@@ -1277,8 +1284,8 @@ export function MapExperience() {
     }
     return "Listing counts and prices use current, source-authorized asking-price records in the visible map area.";
   })();
-  const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
-  const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
+  const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, sliderLimit);
+  const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, sliderLimit);
   const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
   const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
@@ -1338,7 +1345,7 @@ export function MapExperience() {
     setOtherZoningOpen(false);
   };
   const updatePriceSlider = (basis: "list" | "monthly", bound: "min" | "max", rawValue: string) => {
-    const value = Math.min(sliderLimit, Math.max(0, Number(rawValue) || 0));
+    const value = Math.max(0, Number(rawValue) || 0);
     setMapFilters((current) => {
       const minKey = basis === "list" ? "priceMin" : "monthlyPaymentMin";
       const maxKey = basis === "list" ? "priceMax" : "monthlyPaymentMax";
