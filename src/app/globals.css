@@ -6346,3 +6346,46 @@ input {
     font-size: 12px;
   }
 }
+
+
+/* Keep the default zoning choices short; less common plan codes stay collapsed. */
+.map-filter-zoning-grid-primary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.map-filter-other-zoning {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.map-filter-other-zoning-trigger {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-muted);
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.map-filter-other-zoning-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.map-filter-other-zoning-trigger svg {
+  transition: transform 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-filter-other-zoning-trigger svg {
+    transition: none;
+  }
+}
