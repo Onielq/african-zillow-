@@ -6661,9 +6661,30 @@ input {
 }
 
 .map-workspace .maplibregl-ctrl-top-right .maplibregl-ctrl-geolocate {
-  width: 42px;
+  display: flex;
+  width: 132px;
   height: 42px;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 34px;
+  border-radius: 10px;
+  background-color: var(--map-filter-accent-tint);
+  background-position: 12px center;
   background-size: 19px;
+  color: #7C3A0A;
+}
+
+.map-workspace .maplibregl-ctrl-top-right .maplibregl-ctrl-geolocate::after {
+  content: "Current location";
+  color: #7C3A0A;
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+
+.map-workspace .maplibregl-ctrl-top-right .maplibregl-ctrl-geolocate:hover {
+  background-color: #FFE4BF;
 }
 
 @media (max-width: 760px) {
