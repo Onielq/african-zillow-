@@ -1983,7 +1983,7 @@ export function MapView({
       const maxArea = filters.measurementMax.trim() ? Number(filters.measurementMax) : null;
       const landOnly = filters.propertyTypes.length > 0 &&
         filters.propertyTypes.every((value) => value === "land" || value === "lots_land");
-      const hasParcelFilters = zoningCodes.length > 0 || hasPlotRange || hasPriceRange || landOnly ||
+      const hasParcelFilters = zoningCodes.length > 0 || hasPlotRange || landOnly ||
         (filters.listingType !== "all" && raw.features.some((feature) => feature.properties?.market_status));
 
       const confirmedAskingPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
@@ -2113,6 +2113,7 @@ export function MapView({
     refreshMarketListingsRef.current = refreshMarketListingMarkers;
 
     const refreshProjectMarkers = () => {
+      refreshMarketListingsRef.current?.();
       const source = map.getSource("project-markers") as GeoJSONSource | undefined;
       const layerIds = ["project-clusters", "project-cluster-count", "project-marker-circles", "project-marker-labels"];
       const visibility = showProjectsRef.current ? "visible" : "none";
@@ -2194,8 +2195,6 @@ export function MapView({
 
       projectCentersRef.current = nextCenters;
       source.setData({ type: "FeatureCollection", features } as never);
-      refreshMarketListingsRef.current?.();
-
       const selectedId = selectedProjectIdRef.current;
       if (selectedId) {
         const target = nextCenters.get(selectedId);
@@ -3115,6 +3114,10 @@ export function MapView({
         "project-cluster-count",
         "project-marker-circles",
         "project-marker-labels",
+        "market-listing-clusters",
+        "market-listing-cluster-count",
+        "market-listing-circles",
+        "market-listing-labels",
         "metric-bubbles-circle",
         "metric-bubbles-label",
         "metric-bubbles-parcel-label"
