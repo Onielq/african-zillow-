@@ -1082,6 +1082,7 @@ export function MapExperience() {
   const activePriceRange = activePriceTab === "list"
     ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
     : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
+  const loadedInventoryScopeKeyRef = useRef("");
   useEffect(() => {
     const shouldLoad = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
       activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
@@ -1090,10 +1091,12 @@ export function MapExperience() {
         mapFilters.measurementMin || mapFilters.measurementMax);
     if (!shouldLoad || !inventoryScope?.district) {
       setMarketInventory(null);
+      loadedInventoryScopeKeyRef.current = "";
       setMarketInventoryLoading(false);
       return;
     }
 
+    if (loadedInventoryScopeKeyRef.current !== inventoryScopeKey) setMarketInventory(null);
     const controller = new AbortController();
     setMarketInventoryLoading(true);
     const timeout = window.setTimeout(async () => {
@@ -1133,9 +1136,11 @@ export function MapExperience() {
         const response = await fetch("/api/market/filter-inventory?" + params.toString(), { signal: controller.signal });
         const data = await response.json() as MarketInventoryResponse;
         if (controller.signal.aborted) return;
+        loadedInventoryScopeKeyRef.current = inventoryScopeKey;
         setMarketInventory(data);
       } catch (error) {
         if (!controller.signal.aborted) {
+          loadedInventoryScopeKeyRef.current = inventoryScopeKey;
           setMarketInventory({
             ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
             histogram: [], rows: [], message: "The market inventory service could not be reached."
