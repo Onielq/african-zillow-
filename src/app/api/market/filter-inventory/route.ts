@@ -260,6 +260,7 @@ export async function GET(request: NextRequest) {
 
     const rows = await database`
       SELECT l.id::text AS id,
+             l.property_id::text AS market_property_id,
              l.asking_amount::text AS asking_amount,
              (CASE WHEN ${mode} = 'list' THEN l.asking_amount WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term} ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} / (1 - power(1 + ${financeRate}, -${term})) END)::text AS filter_amount,
              l.currency,
@@ -327,6 +328,7 @@ export async function GET(request: NextRequest) {
 
     const exchangeRows = await database`
       SELECT ('exchange:' || l.id::text) AS id,
+              l.market_property_id::text AS market_property_id,
              l.asking_amount::text AS asking_amount,
              (CASE WHEN ${mode} = 'list' THEN l.asking_amount WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term} ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} / (1 - power(1 + ${financeRate}, -${term})) END)::text AS filter_amount,
              l.currency,
@@ -352,6 +354,12 @@ export async function GET(request: NextRequest) {
              false AS attribution_required
         FROM reja.exchange_listings l
         JOIN reja.market_properties p ON p.id = l.market_property_id AND p.is_current = true
+        LEFT JOIN reja.development_units u ON u.id = p.development_unit_id
+        LEFT JOIN reja.development_projects dp ON dp.id = u.project_id
+        LEFT JOIN reja.development_buildings db ON db.id = u.building_id
+        LEFT JOIN reja.development_units u ON u.id = p.development_unit_id
+        LEFT JOIN reja.development_projects dp ON dp.id = u.project_id
+        LEFT JOIN reja.development_buildings db ON db.id = u.building_id
        WHERE l.publication_status = 'published'
          AND (l.expires_at IS NULL OR l.expires_at > now())
          AND l.listing_type = 'sale'
@@ -391,7 +399,10 @@ export async function GET(request: NextRequest) {
        ORDER BY l.asking_amount ASC
        LIMIT 500
     `;
-    const combinedRows = [...rows, ...exchangeRows];
+     const deduplicatedRows = new Map<string, (typeof rows)[number]>();
+     for (const row of rows) deduplicatedRows.set(row.market_property_id ?? row.id, row);
+     for (const row of exchangeRows) deduplicatedRows.set(row.market_property_id ?? row.id, row);
+     const combinedRows = [...deduplicatedRows.values()];
     const first = histogramRows[0];
     const histogram = histogramRows
       .filter((row) => row.bucket !== null)
