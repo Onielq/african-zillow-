@@ -102,17 +102,29 @@ export async function GET(request: NextRequest) {
              AND table_name = 'exchange_listings'
              AND column_name IN ('market_property_id', 'listing_authorization_id', 'seller_user_id', 'seller_organization_id', 'publication_status')
         ) AS exchange_authorization_ready,
-        to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL AS authorization_helper_ready
+        to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL AS authorization_helper_ready,
+        to_regclass('reja.development_units') IS NOT NULL AS development_units_ready,
+        to_regclass('reja.development_projects') IS NOT NULL AS development_projects_ready,
+        to_regclass('reja.development_buildings') IS NOT NULL AS development_buildings_ready,
+        (SELECT count(*) = 1 FROM information_schema.columns WHERE table_schema = 'reja' AND table_name = 'market_properties' AND column_name = 'development_unit_id') AS property_unit_link_ready
     `;
     const schema = schemaRows[0] as {
       source_permissions_ready?: boolean;
       exchange_authorization_ready?: boolean;
       authorization_helper_ready?: boolean;
+      development_units_ready?: boolean;
+      development_projects_ready?: boolean;
+      development_buildings_ready?: boolean;
+      property_unit_link_ready?: boolean;
     } | undefined;
     if (
       !schema?.source_permissions_ready ||
       !schema.exchange_authorization_ready ||
-      !schema.authorization_helper_ready
+      !schema.authorization_helper_ready ||
+      !schema.development_units_ready ||
+      !schema.development_projects_ready ||
+      !schema.development_buildings_ready ||
+      !schema.property_unit_link_ready
     ) {
       return json(503, {
         ok: false,
@@ -122,7 +134,7 @@ export async function GET(request: NextRequest) {
         maximum: null,
         histogram: [],
         rows: [],
-        message: "The connected REJA database does not yet expose the complete source-permission and first-party authorization schema required for public inventory. Apply the reviewed REJA schema migrations before enabling live listing filters."
+        message: "The connected REJA database does not yet expose the complete source-permission, first-party authorization and linked development-unit schema required for public inventory. Apply the reviewed REJA schema migrations before enabling live listing filters."
       });
     }
 
