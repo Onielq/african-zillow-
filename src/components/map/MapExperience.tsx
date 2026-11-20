@@ -3096,8 +3096,8 @@ export function MapExperience() {
                     {visibleZoningGroups.length === 0 && visibleOtherZoningGroups.length === 0 ? <p className="map-filter-disabled-note">No zoning codes match “{zoningSearch}”.</p> : null}
                     <p className="map-filter-note">
                       {selectedZoneCodes.length > 0
-                        ? "These codes identify land use, not a universal plot-size band. The applicable district plan and housing type must be loaded before a legal minimum or maximum is shown."
-                        : "Choose a code to filter cadastral parcels against the published zoning polygons available in this map area."}
+                        ? "Selections match parcel polygons against zoning polygons connected in this map area. The information icon shows plan-specific standards when indexed."
+                        : "Choose a code to filter cadastral parcels. Coverage is currently limited to the connected Kigali and Bugesera zoning layers."}
                     </p>
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
@@ -3187,6 +3187,16 @@ export function MapExperience() {
                     {mapFilters.measurementMin && mapFilters.measurementMax && Number(mapFilters.measurementMin) > Number(mapFilters.measurementMax) ? (
                       <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                     ) : null}
+                    {(mapFilters.measurementMin || mapFilters.measurementMax || mapFilters.measurementPreset) ? (
+                      <button className="map-filter-clear-local" onClick={() => setMapFilters((current) => ({
+                        ...current,
+                        measurementMin: "",
+                        measurementMax: "",
+                        measurementPreset: ""
+                      }))} type="button">
+                        <X aria-hidden="true" size={13} /> Clear measurement
+                      </button>
+                    ) : null}
                     <p className="map-filter-note">These are search-size bands, not legal zoning standards. The area basis stays separate so plot measurements are never compared with interior floor area.</p>
                   </FilterPopoverPortal>
                 ) : null}
@@ -3215,7 +3225,7 @@ export function MapExperience() {
                     <div className="map-filter-popover-heading">
                       <div><strong>Beds & baths</strong><small>Choose the minimum or an exact count</small></div>
                     </div>
-                    <div className={bedsBathsDisabled ? "map-filter-beds-columns map-filter-beds-disabled" : "map-filter-beds-columns"}>
+                    <div className="map-filter-beds-columns">
                       <section className="map-filter-beds-section">
                         <h3>Bedrooms</h3>
                         <div className="map-filter-bed-options">
@@ -3223,7 +3233,6 @@ export function MapExperience() {
                             <button
                               aria-pressed={mapFilters.bedroomsMin === value}
                               className={mapFilters.bedroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
-                              disabled={bedsBathsDisabled}
                               key={value || "any"}
                               onClick={() => setMapFilters((current) => ({ ...current, bedroomsMin: value, bedroomsExact: value ? current.bedroomsExact : false }))}
                               type="button"
@@ -3231,7 +3240,7 @@ export function MapExperience() {
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bedroomsExact} disabled={bedsBathsDisabled || !mapFilters.bedroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bedroomsExact} disabled={!mapFilters.bedroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
@@ -3250,19 +3259,15 @@ export function MapExperience() {
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bathroomsExact} disabled={bedsBathsDisabled || !mapFilters.bathroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bathroomsExact} disabled={!mapFilters.bathroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
                     </div>
-                    {bedsBathsDisabled ? (
-                      <p className="map-filter-disabled-note">Bedrooms and bathrooms do not apply to land-only searches. Select a building property type to use these controls.</p>
-                    ) : (
-                      <p className="map-filter-note">Bedroom and bathroom values require verified unit-level records. Exact match replaces the “or more” rule.</p>
-                    )}
+                    <p className="map-filter-note">Bedroom and bathroom choices apply to verified building, project-unit and property listings. Exact match replaces the “or more” rule.</p>
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
-                      <button disabled={filterResultCount === null || bedsBathsDisabled} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
+                      <div><strong>{marketInventoryLoading ? "Loading building and unit records" : marketInventory?.total ? marketInventory.total.toLocaleString() + " matching listings" : "No connected room-level inventory"}</strong><small>{marketInventory?.message ?? "The controls stay available; matching requires source-authorized building or unit records with bedroom and bathroom values."}</small></div>
+                      <button disabled={marketInventoryLoading} onClick={closeFilterMenus} type="button">Done</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
