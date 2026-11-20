@@ -1139,6 +1139,7 @@ export function MapExperience() {
     setActiveFilterMenu(null);
     setZoningSearch("");
     setZoningInfoOpen(false);
+    setOtherZoningOpen(false);
   };
   const updatePriceSlider = (basis: "list" | "monthly", bound: "min" | "max", rawValue: string) => {
     const value = Math.min(activePriceLimit, Math.max(0, Number(rawValue) || 0));
@@ -2889,33 +2890,45 @@ export function MapExperience() {
                         <strong>How zoning works</strong>
                         <p>Each District Land Use Plan defines which codes apply locally. This searchable catalogue combines codes from the published Kigali, Bugesera and Gakenke plan legends, plus shorthand classes used in the Ruhango plan. A code appearing here does not mean it applies in every district.</p>
                         <p>A3 and A4 were not present in the official plan legends checked, so they are not added as assumptions.</p>
-                        <p>Plot-size rules vary by district and housing type. The 2026 Ruhango plan, for example, sets R1 plots at 500 m² and R1A at 300 m². Those figures must not be copied to other districts.</p>
+                        <p>Plot-size rules vary by district, housing type and development conditions. The app does not treat a search-size band as a legal minimum or maximum. A legal range should appear only when the applicable plan rule is indexed for that district and typology.</p>
                         <div className="map-filter-source-links">
                           <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">NLA zoning regulations <span aria-hidden="true">↗</span></a>
                           <a href="https://geodata.rw/server/rest/services/Hosted/Gakenke_DLUP_20042026/MapServer/legend" rel="noreferrer" target="_blank">Official zoning legend <span aria-hidden="true">↗</span></a>
                         </div>
                       </div>
                     ) : null}
-                    {visibleZoningGroups.length > 0 ? visibleZoningGroups.map((group) => (
+                    {visibleZoningGroups.map((group) => (
                       <section className="map-filter-zone-group" key={group.label}>
-                        <h3>{group.label}</h3>
-                        <div className="map-filter-zoning-grid">
+                        {group.label !== "Main zoning" ? <h3>{group.label}</h3> : null}
+                        <div className="map-filter-zoning-grid map-filter-zoning-grid-primary">
                           {group.codes.map((code) => (
-                            <button
-                              aria-pressed={mapFilters.zoningCodes.includes(code)}
-                              className={mapFilters.zoningCodes.includes(code) ? "map-filter-chip map-filter-chip-active" : "map-filter-chip"}
-                              key={code}
-                              onClick={() => toggleFilterOption("zoningCodes", code)}
-                              type="button"
-                            >{code}</button>
+                            <button aria-pressed={mapFilters.zoningCodes.includes(code)} className={mapFilters.zoningCodes.includes(code) ? "map-filter-chip map-filter-chip-active" : "map-filter-chip"} key={code} onClick={() => toggleFilterOption("zoningCodes", code)} type="button">{code}</button>
                           ))}
                         </div>
                       </section>
-                    )) : <p className="map-filter-disabled-note">No zoning codes match “{zoningSearch}”.</p>}
+                    ))}
+                    {(hasZoningSearch || visibleOtherZoningGroups.length > 0) ? (
+                      <div className="map-filter-other-zoning">
+                        <button aria-expanded={hasZoningSearch || otherZoningOpen} className="map-filter-other-zoning-trigger" onClick={() => setOtherZoningOpen((open) => !open)} type="button">
+                          <span>Other zoning</span><ChevronDown aria-hidden="true" size={15} />
+                        </button>
+                        {(hasZoningSearch || otherZoningOpen) ? visibleOtherZoningGroups.map((group) => (
+                          <section className="map-filter-zone-group" key={group.label}>
+                            <h3>{group.label}</h3>
+                            <div className="map-filter-zoning-grid">
+                              {group.codes.map((code) => (
+                                <button aria-pressed={mapFilters.zoningCodes.includes(code)} className={mapFilters.zoningCodes.includes(code) ? "map-filter-chip map-filter-chip-active" : "map-filter-chip"} key={code} onClick={() => toggleFilterOption("zoningCodes", code)} type="button">{code}</button>
+                              ))}
+                            </div>
+                          </section>
+                        )) : null}
+                      </div>
+                    ) : null}
+                    {visibleZoningGroups.length === 0 && visibleOtherZoningGroups.length === 0 ? <p className="map-filter-disabled-note">No zoning codes match “{zoningSearch}”.</p> : null}
                     <p className="map-filter-note">
                       {selectedZoneCodes.length > 0
                         ? "These codes identify land use, not a universal plot-size band. The applicable district plan and housing type must be loaded before a legal minimum or maximum is shown."
-                        : "Choose a code to view its land-use meaning. Parcel-wide matching is not connected yet."}
+                        : "Choose a code to filter cadastral parcels against the published zoning polygons available in this map area."}
                     </p>
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
