@@ -1580,7 +1580,8 @@ export function MapView({
       if (runViewportSearch) void runViewportSearch();
     });
     searchControl.append(searchStatus, searchButton);
-    container.appendChild(searchControl);
+    const searchHost = container.parentElement ?? container;
+    searchHost.appendChild(searchControl);
 
     const markViewportSearchPending = () => {
       const currentKey = getViewportSearchKey();
@@ -3362,7 +3363,9 @@ export function MapView({
       throw lastError instanceof Error ? lastError : new Error("Parcel boundary request failed.");
     };
 
+    let lastAreaRefreshSucceeded = false;
     const refreshAreas = async () => {
+      lastAreaRefreshSucceeded = false;
       const styleLoaded = map.isStyleLoaded();
       const districtSourceExists = Boolean(map.getSource("admin-districts"));
       recordE2ETrace("area-refresh-attempt", {
@@ -3681,7 +3684,8 @@ export function MapView({
           parcelRefreshRetryTimer = setTimeout(retryFailedViewport, 900);
         }
 
-        if (activeSourceCount === 0 || activeSourceSuccesses > 0) {
+        lastAreaRefreshSucceeded = activeSourceCount === 0 || activeSourceSuccesses > 0;
+        if (lastAreaRefreshSucceeded) {
           onBoundaryStatusChange("ready");
         } else if (activeSourceFailures >= activeSourceCount) {
           onBoundaryStatusChange("error");
@@ -4212,6 +4216,7 @@ export function MapView({
           searchTasks.push(refreshZoningOverlay());
         }
         await Promise.all(searchTasks);
+        if (!lastAreaRefreshSucceeded) throw new Error("Administrative boundaries could not be refreshed.");
         await new Promise<void>((resolve) => {
           let finished = false;
           const finish = () => {
