@@ -254,6 +254,72 @@ export async function GET(request: NextRequest) {
        LIMIT 500
     `;
 
+    const exchangeRows = await database`
+      SELECT ('exchange:' || l.id::text) AS id,
+             l.asking_amount::text AS asking_amount,
+             l.currency,
+             p.property_type,
+             p.district_label AS district,
+             p.sector_label AS sector,
+             p.cell_label AS cell,
+             p.payload->>'village' AS village,
+             p.project_name AS project_name,
+             p.building_name AS building_name,
+             p.unit_label AS unit_label,
+             p.bedrooms,
+             p.bathrooms::text AS bathrooms,
+             p.internal_area_sqm::text AS internal_area_sqm,
+             p.plot_area_sqm::text AS plot_area_sqm,
+             p.latitude::text AS latitude,
+             p.longitude::text AS longitude,
+             p.parcel_id::text AS parcel_id,
+             NULL::text AS listing_url,
+             'Taiseel Exchange'::text AS source_title,
+             NULL::text AS source_publisher,
+             NULL::text AS source_url,
+             false AS attribution_required
+        FROM reja.exchange_listings l
+        JOIN reja.market_properties p ON p.id = l.market_property_id AND p.is_current = true
+       WHERE l.publication_status = 'published'
+         AND (l.expires_at IS NULL OR l.expires_at > now())
+         AND l.listing_type = 'sale'
+         AND l.currency = ${currency}
+         AND lower(p.district_label) = lower(${district})
+         AND (${sector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${sector}))
+         AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
+         AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+         AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
+         AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
+         AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
+         AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
+         AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+         AND (
+           CASE
+             WHEN ${mode} = 'list' THEN l.asking_amount
+             WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term}
+             ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} /
+               (1 - power(1 + ${financeRate}, -${term}))
+           END
+         ) >= coalesce(${priceMin}, 0)
+         AND (
+           ${priceMax}::numeric IS NULL OR
+           CASE
+             WHEN ${mode} = 'list' THEN l.asking_amount
+             WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term}
+             ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} /
+               (1 - power(1 + ${financeRate}, -${term}))
+           END <= ${priceMax}
+         )
+         AND reja.has_verified_listing_authorization(
+           l.listing_authorization_id,
+           l.market_property_id,
+           l.seller_user_id,
+           l.seller_organization_id
+         )
+       ORDER BY l.asking_amount ASC
+       LIMIT 500
+    `;
+    const combinedRows = [...rows, ...exchangeRows];
     const first = histogramRows[0];
     const histogram = histogramRows
       .filter((row) => row.bucket !== null)
@@ -266,7 +332,7 @@ export async function GET(request: NextRequest) {
       minimum: first?.minimum === null || first?.minimum === undefined ? null : Number(first.minimum),
       maximum: first?.maximum === null || first?.maximum === undefined ? null : Number(first.maximum),
       histogram,
-      rows,
+      rows: combinedRows,
       histogramBasis: mode === "list" ? "authorized_current_asking_prices" : "estimated_monthly_principal_and_interest_from_authorized_asking_prices",
       financeTerms: mode === "monthly" ? { downPayment, annualRate, loanMonths } : null,
       scope: { level: scopeLevel, district, sector, cell: scopeCell, village: scopeVillage },
