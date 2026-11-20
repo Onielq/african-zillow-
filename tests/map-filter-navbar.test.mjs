@@ -306,6 +306,36 @@ test("map filter selected states use high-contrast amber without changing the gl
   assert.match(styles, /\.map-filter-price-tab-active[\s\S]*?var\(--map-filter-accent\)/);
 });
 
+test("panning and zooming prompt an explicit geographic search with a visible progress state and result count", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(mapView, /map-area-search-control/);
+  assert.match(mapView, /Search this area/);
+  assert.match(mapView, /Searching…/);
+  assert.match(mapView, /Refreshing boundaries and map layers/);
+  assert.match(mapView, /Search again/);
+  assert.match(mapView, /in this view/);
+  assert.match(mapView, /aria-live/);
+  assert.match(mapView, /Promise\.all\(searchTasks\)/);
+  assert.match(mapView, /markViewportSearchPending\(\)/);
+  assert.match(styles, /\.map-area-search-control/);
+  assert.match(styles, /\.map-area-search-button/);
+});
+
+test("camera movement does not silently launch another area search", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const scheduleStart = mapView.indexOf("const scheduleRefresh = () =>");
+  const scheduleEnd = mapView.indexOf("\n    };", scheduleStart);
+  const schedule = mapView.slice(scheduleStart, scheduleEnd);
+  assert.notEqual(scheduleStart, -1);
+  assert.doesNotMatch(schedule, /scheduleShowOverlayRefresh\(\)/);
+  assert.doesNotMatch(schedule, /scheduleZoningRefresh\(\)/);
+  assert.doesNotMatch(schedule, /refreshAreas\(\)/);
+  assert.match(mapView, /lastSearchedViewportKey = requestedViewportKey/);
+  assert.match(mapView, /visibleIds\.size\.toLocaleString/);
+  assert.match(mapView, /No mapped " \+ unit \+ " in this view/);
+});
+
 test("price tab switching keeps a stable popover placement", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
   const styles = await read("../src/app/globals.css");
