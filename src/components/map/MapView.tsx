@@ -4254,7 +4254,9 @@ export function MapView({
           String(getFeatureId(feature) ?? feature.properties?.map_feature_id ?? activeLevel + "-" + index)
         ));
         const unit = activeLevel === "parcel" ? "plots" : "areas";
-        lastSearchResultText = visibleIds.size.toLocaleString("en-RW") + " " + unit + " in this view";
+        lastSearchResultText = visibleIds.size > 0
+          ? visibleIds.size.toLocaleString("en-RW") + " " + unit + " in this view"
+          : "No mapped " + unit + " in this view";
         searchControl.dataset.state = "complete";
         searchButton.textContent = "Search again";
         searchStatus.textContent = lastSearchResultText;
