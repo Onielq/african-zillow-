@@ -4216,7 +4216,13 @@ export function MapView({
           searchTasks.push(refreshZoningOverlay());
         }
         await Promise.all(searchTasks);
-        if (!lastAreaRefreshSucceeded) throw new Error("Administrative boundaries could not be refreshed.");
+        const areaRefreshDeadline = Date.now() + 15_000;
+        while (activeController && Date.now() < areaRefreshDeadline) {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+        }
+        if (activeController || !lastAreaRefreshSucceeded) {
+          throw new Error("Administrative boundaries could not be refreshed.");
+        }
         await new Promise<void>((resolve) => {
           let finished = false;
           const finish = () => {
