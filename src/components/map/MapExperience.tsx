@@ -2914,7 +2914,7 @@ export function MapExperience() {
                     {(hasZoningSearch || visibleOtherZoningGroups.length > 0) ? (
                       <div className="map-filter-other-zoning">
                         <button aria-expanded={hasZoningSearch || otherZoningOpen} className="map-filter-other-zoning-trigger" onClick={() => setOtherZoningOpen((open) => !open)} type="button">
-                          <span>Other zoning</span><ChevronDown aria-hidden="true" size={15} />
+                          <span>Other zoning</span><span aria-hidden="true">⌄</span>
                         </button>
                         {(hasZoningSearch || otherZoningOpen) ? visibleOtherZoningGroups.map((group) => (
                           <section className="map-filter-zone-group" key={group.label}>
