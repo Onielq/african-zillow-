@@ -86,7 +86,6 @@ export async function GET(request: NextRequest) {
     }
 
     const propertyTypeArray = propertyTypes.length ? propertyTypes : null;
-    const areaColumn = areaBasis === "interior" ? "p.internal_area_sqm" : "p.plot_area_sqm";
     const scopeCell = scopeLevel === "cell" || scopeLevel === "village" ? cell : null;
     const scopeVillage = scopeLevel === "village" ? village : null;
     const financeRate = annualRate === null ? null : annualRate / 1200;
@@ -107,6 +106,7 @@ export async function GET(request: NextRequest) {
           JOIN reja.sources s ON s.id = l.source_id
           LEFT JOIN reja.market_properties p ON p.id = l.property_id AND p.is_current = true
          WHERE l.is_current = true
+           AND l.listing_type = 'sale'
            AND l.listing_status = 'active'
            AND s.is_current = true
            AND s.license_status = 'permitted'
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
            AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
            AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
            AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-           AND (${areaMin}::numeric IS NULL OR ${areaColumn} >= ${areaMin})
-           AND (${areaMax}::numeric IS NULL OR ${areaColumn} <= ${areaMax})
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
       ),
       valued AS (
         SELECT CASE
@@ -185,7 +185,8 @@ export async function GET(request: NextRequest) {
         JOIN reja.sources s ON s.id = l.source_id
         LEFT JOIN reja.market_properties p ON p.id = l.property_id AND p.is_current = true
        WHERE l.is_current = true
-         AND l.listing_status = 'active'
+         AND l.listing_type = 'sale'
+           AND l.listing_status = 'active'
          AND s.is_current = true
          AND s.license_status = 'permitted'
          AND s.commercial_use_allowed IS TRUE
@@ -199,8 +200,8 @@ export async function GET(request: NextRequest) {
          AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
          AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
          AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
-         AND (${areaMin}::numeric IS NULL OR ${areaColumn} >= ${areaMin})
-         AND (${areaMax}::numeric IS NULL OR ${areaColumn} <= ${areaMax})
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
          AND (
            CASE
              WHEN ${mode} = 'list' THEN l.asking_amount
