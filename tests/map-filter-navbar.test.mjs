@@ -188,6 +188,32 @@ test("market inventory is not fabricated when production has no authorized datab
   assert.match(api, /No eligible, source-authorized current asking-price listings/);
 });
 
+test("building and project room counts come from linked REJA development units", async () => {
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(api, /LEFT JOIN reja\.development_units u ON u\.id = p\.development_unit_id/);
+  assert.match(api, /COALESCE\(p\.bedrooms, u\.bedrooms\)/);
+  assert.match(api, /COALESCE\(p\.bathrooms, u\.bathrooms\)/);
+  assert.match(api, /COALESCE\(p\.internal_area_sqm, u\.internal_area_sqm\)/);
+  assert.match(api, /COALESCE\(p\.plot_area_sqm, u\.plot_area_sqm\)/);
+  assert.match(api, /development_units_ready/);
+  assert.match(api, /property_unit_link_ready/);
+});
+
+test("source and exchange row queries join unit metadata and deduplicate the same property", async () => {
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  const rowsStart = api.indexOf("const rows = await database");
+  const exchangeStart = api.indexOf("const exchangeRows = await database");
+  const sourceRows = api.slice(rowsStart, exchangeStart);
+  const exchangeRows = api.slice(exchangeStart);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_units u/);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_projects dp/);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_buildings db/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_units u/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_projects dp/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_buildings db/);
+  assert.match(api, /new Map<string, \(typeof rows\)\[number\]\>/);
+  assert.match(api, /for \(const row of exchangeRows\) deduplicatedRows\.set/);
+});
 test("map parcel filters use cadastral measurements without pretending parcels have building rooms", async () => {
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /properties\.parcel_size_m2 === "number"/);
