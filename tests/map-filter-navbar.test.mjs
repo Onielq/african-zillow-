@@ -324,6 +324,11 @@ test("panning and zooming prompt an explicit geographic search with a visible pr
 
 test("camera movement does not silently launch another area search", async () => {
   const mapView = await read("../src/components/map/MapView.tsx");
+  const browserSmoke = await read("../scripts/e2e-map-parcels.mjs");
+  assert.match(browserSmoke, /async function searchCurrentArea\(\)/);
+  assert.match(browserSmoke, /await page\.locator\("\.map-area-search-button"\)\.click\(\)/);
+  assert.match(browserSmoke, /loadingState !== "loading"/);
+  assert.match(browserSmoke, /viewportSearchChecks/);
   const scheduleStart = mapView.indexOf("const scheduleRefresh = () =>");
   const scheduleEnd = mapView.indexOf("\n    };", scheduleStart);
   const schedule = mapView.slice(scheduleStart, scheduleEnd);

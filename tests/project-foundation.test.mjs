@@ -120,12 +120,16 @@ test("cadastral outlines and parcel geometry are active from village zoom", asyn
   assert.match(mapView, /sourceListsMultipleCodes/);
 });
 
-test("the map idle fallback does not race the queued viewport refresh and abort cadastral requests", async () => {
+test("initial map idle recovery is preserved while camera movement requests an explicit area search", async () => {
   const mapView = await readProjectFile("src/components/map/MapView.tsx");
   const scheduledRefresh = mapView.slice(mapView.indexOf("const scheduleRefresh = () =>"), mapView.indexOf("const setHover = (", mapView.indexOf("const scheduleRefresh = () =>")));
   const idleFallback = mapView.slice(mapView.indexOf('map.once("idle", () =>'), mapView.indexOf('if (!viewportListenersAttached)', mapView.indexOf('map.once("idle", () =>')));
 
-  assert.match(scheduledRefresh, /refreshTimer = setTimeout\(\(\) => \{[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
+  assert.match(scheduledRefresh, /markViewportSearchPending\(\)/);
+  assert.doesNotMatch(scheduledRefresh, /refreshTimer = setTimeout/);
+  assert.doesNotMatch(scheduledRefresh, /void refreshAreas\(\)/);
+  assert.match(mapView, /Search this area/);
+  assert.match(mapView, /Searching…/);
   assert.match(idleFallback, /if \(needsRefresh\) \{[\s\S]*?clearTimeout\(refreshTimer\);[\s\S]*?refreshTimer = null;[\s\S]*?void refreshAreas\(\);/);
   assert.match(idleFallback, /else if \(isFirstIdleFrame\) \{[\s\S]*?void refreshAreas\(\);/);
   assert.match(idleFallback, /void refreshShowOverlays\(\);/);

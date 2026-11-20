@@ -15,7 +15,8 @@ const diagnostics = {
   areaApiResponses: [],
   placeApiResponses: [],
   basemapTileResponses: [],
-  failedBasemapTileRequests: []
+  failedBasemapTileRequests: [],
+  viewportSearchChecks: []
 };
 
 page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
@@ -143,6 +144,42 @@ try {
     return Boolean(map && map.isStyleLoaded());
   }, undefined, { timeout: 90_000 });
 
+  async function searchCurrentArea() {
+    await page.waitForFunction(() => {
+      const control = document.querySelector(".map-area-search-control");
+      const button = control?.querySelector(".map-area-search-button");
+      return Boolean(
+        control &&
+        !control.hidden &&
+        button &&
+        !button.disabled &&
+        ((control.dataset.state === "pending" && button.textContent?.trim() === "Search this area") ||
+          (control.dataset.state === "complete" && button.textContent?.trim() === "Search again"))
+      );
+    }, undefined, { timeout: 15_000 });
+
+    await page.locator(".map-area-search-button").click();
+    const loadingState = await page.locator(".map-area-search-control").getAttribute("data-state");
+    if (loadingState !== "loading") {
+      throw new Error("The map area search did not expose its loading state after the user action.");
+    }
+
+    await page.waitForFunction(() => {
+      const control = document.querySelector(".map-area-search-control");
+      return control?.dataset.state === "complete" || control?.dataset.state === "error";
+    }, undefined, { timeout: 45_000 });
+
+    const result = await page.locator(".map-area-search-control").evaluate((control) => ({
+      state: control.dataset.state ?? null,
+      status: control.querySelector(".map-area-search-status")?.textContent?.trim() ?? ""
+    }));
+    if (result.state !== "complete" || !result.status) {
+      throw new Error("The explicit area search did not complete successfully: " + JSON.stringify(result));
+    }
+    diagnostics.viewportSearchChecks.push(result);
+    return result;
+  }
+
   // Context layers must be visible from the first map view without relying
   // on a click, layer toggle, pan or a separate Overpass request.
   await page.getByRole("button", { name: "Show map overlays" }).click();
@@ -180,6 +217,7 @@ try {
     if (!map) throw new Error("Opt-in test map was not exposed.");
     map.jumpTo({ center: [30.087, -1.953], zoom: 16.6 });
   });
+  await searchCurrentArea();
 
   // Cloudflare may need one bounded GIS request plus the Vercel fallback.
   // Wait for real parcel source features, not just an arbitrary short delay.
@@ -226,6 +264,7 @@ try {
         if (!map) throw new Error("Opt-in test map was not exposed.");
         map.jumpTo({ center: [30.087, -1.953], zoom });
       }, { zoom });
+      await searchCurrentArea();
 
       const visible = await page.waitForFunction(({ layer, source }) => {
         const map = window.__RLI_E2E_MAP__;
@@ -335,6 +374,7 @@ try {
     if (!map) throw new Error("Opt-in test map was not exposed.");
     map.jumpTo({ center: [30.087, -1.953], zoom: 17.4 });
   });
+  await searchCurrentArea();
 
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
@@ -503,6 +543,7 @@ try {
     if (!map) throw new Error("Opt-in test map was not exposed.");
     map.jumpTo({ center: [30.133, -2.283], zoom: 16.6 });
   });
+  await searchCurrentArea();
   await page.waitForFunction(() => {
     const map = window.__RLI_E2E_MAP__;
     return Boolean(
