@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -49,6 +49,7 @@ import {
   type ParcelPriceType,
   type ParcelMapFilters,
   type ParcelFilterResults,
+  type MarketListingMapPoint,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -1180,6 +1181,26 @@ export function MapExperience() {
   };
   const parcelDataReady = parcelFilterResults?.loaded === true;
   const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
+  const marketMapListings = useMemo<MarketListingMapPoint[]>(() =>
+    (marketInventory?.rows ?? []).flatMap((row) => {
+      const latitude = Number(row.latitude);
+      const longitude = Number(row.longitude);
+      const askingAmount = Number(row.asking_amount);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+          latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 ||
+          !Number.isFinite(askingAmount) || askingAmount <= 0) return [];
+      return [{
+        id: row.id,
+        coordinates: [longitude, latitude] as [number, number],
+        priceLabel: compactFilterAmount(askingAmount, row.currency === "USD" ? "USD" : "RWF"),
+        propertyType: row.property_type,
+        projectName: row.project_name,
+        buildingName: row.building_name,
+        unitLabel: row.unit_label,
+        bedrooms: typeof row.bedrooms === "number" ? row.bedrooms : null,
+        bathrooms: row.bathrooms === null ? null : Number(row.bathrooms)
+      }];
+    }), [marketInventory?.rows]);
   const activePriceLimit = marketInventory?.maximum && marketInventory.maximum > 0
     ? marketInventory.maximum
     : 0;
@@ -2348,6 +2369,7 @@ export function MapExperience() {
           selectedArea={selectedArea}
           parcelFilters={mapFilters}
           onParcelFilterResults={setParcelFilterResults}
+          marketListings={marketMapListings}
           projects={RWANDA_PROJECT_RECORDS}
           showProjects={workspaceMode === "projects" || projectsOpen}
           selectedProjectId={selectedProjectId}
