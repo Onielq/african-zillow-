@@ -212,6 +212,16 @@ const ZONING_FILTER_DESCRIPTIONS: Record<string, string> = {
   WB: "Waterbody zone"
 };
 
+// City of Kigali Zoning Regulations (15 August 2020). These standards apply
+// only to Kigali's governing plan and are not nationwide Rwanda rules.
+const KIGALI_ZONE_PLOT_RULES: Record<string, string> = {
+  R1: "New R1 plots: maximum 500 m². Plots below 300 m² follow R1A rules; this is not a universal 300 m² minimum.",
+  R1A: "Maximum plot size: 300 m².",
+  R2: "Rowhousing plots: maximum 200 m². Low-rise apartments are governed by density requirements rather than one universal plot-size range.",
+  R3: "Incremental single-family plots in new subdivision plans: maximum 100 m². Rowhousing: maximum 150 m². Multifamily development is governed by density requirements.",
+  R4: "Minimum plot size: 750 m². Plots below 750 m² follow R2 regulations."
+};
+
 function filterPriceRangeSummary(
   minimum: string,
   maximum: string,
@@ -3052,7 +3062,7 @@ export function MapExperience() {
                         )}
                         <div className="map-filter-source-links">
                           <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">National Land Authority master plans <span aria-hidden="true">↗</span></a>
-                          <a href="https://masterplan.kigalicity.gov.rw/" rel="noreferrer" target="_blank">City of Kigali Master Plan <span aria-hidden="true">↗</span></a>
+                          <a href="https://www.bpmis.gov.rw/asset_uplds/kigali_master_plan/4_Kigali%20Master%20Plan_Zoning%20RegulationsLowRes.pdf" rel="noreferrer" target="_blank">Kigali zoning regulations (2020) <span aria-hidden="true">↗</span></a>
                         </div>
                       </div>
                     ) : null}
