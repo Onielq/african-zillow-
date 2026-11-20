@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -49,6 +49,7 @@ import {
   type ParcelPriceType,
   type ParcelMapFilters,
   type ParcelFilterResults,
+  type MarketListingMapPoint,
   type SelectedArea
 } from "@/components/map/MapView";
 import { RWANDA_DEVELOPER_CANDIDATES } from "@/data/developer-directory";
@@ -77,6 +78,45 @@ import { searchRwandaProjects } from "@/lib/project-search";
 type WorkspaceMode = "areas" | "projects";
 type ProjectDirectoryTab = "projects" | "developers";
 type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | "bedsBaths" | null;
+
+type MarketInventoryRow = {
+  id: string;
+  asking_amount: string;
+  filter_amount: string;
+  currency: string;
+  property_type: string;
+  district: string;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+  project_name: string | null;
+  building_name: string | null;
+  unit_label: string | null;
+  bedrooms: number | null;
+  bathrooms: string | null;
+  internal_area_sqm: string | null;
+  plot_area_sqm: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  parcel_id: string | null;
+  listing_url: string | null;
+  source_title: string | null;
+  source_publisher: string | null;
+  source_url: string | null;
+  attribution_required: boolean;
+};
+
+type MarketInventoryResponse = {
+  ok: boolean;
+  dataStatus: "available" | "no_eligible_records" | "not_configured" | "needs_finance_terms" | "unavailable" | string;
+  total: number;
+  minimum: number | null;
+  maximum: number | null;
+  histogram: Array<{ bucket: number; count: number }>;
+  rows: MarketInventoryRow[];
+  message?: string | null;
+  histogramBasis?: string;
+};
 
 const PROPERTY_FILTER_OPTIONS: Array<{ value: string; label: string; Icon: LucideIcon }> = [
   { value: "house", label: "Houses", Icon: House },
@@ -174,14 +214,24 @@ const ZONING_FILTER_DESCRIPTIONS: Record<string, string> = {
   WB: "Waterbody zone"
 };
 
+// City of Kigali Zoning Regulations (15 August 2020). These standards apply
+// only to Kigali's governing plan and are not nationwide Rwanda rules.
+const KIGALI_ZONE_PLOT_RULES: Record<string, string> = {
+  R1: "New R1 plots: maximum 500 m². Plots below 300 m² follow R1A rules; this is not a universal 300 m² minimum.",
+  R1A: "Maximum plot size: 300 m².",
+  R2: "Rowhousing plots: maximum 200 m². Low-rise apartments are governed by density requirements rather than one universal plot-size range.",
+  R3: "Incremental single-family plots in new subdivision plans: maximum 100 m². Rowhousing: maximum 150 m². Multifamily development is governed by density requirements.",
+  R4: "Minimum plot size: 750 m². Plots below 750 m² follow R2 regulations."
+};
+
 function filterPriceRangeSummary(
   minimum: string,
   maximum: string,
   currency: "RWF" | "USD",
   limit: number
 ): string {
-  const min = minimum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(minimum))), currency) : "";
-  const max = maximum ? compactFilterAmount(Math.min(limit, Math.max(0, Number(maximum))), currency) : "";
+  const min = minimum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(minimum))), currency) : "";
+  const max = maximum ? compactFilterAmount(Math.min(limit > 0 ? limit : Number.MAX_SAFE_INTEGER, Math.max(0, Number(maximum))), currency) : "";
   if (min && max) return min + " – " + max;
   if (min) return "From " + min;
   if (max) return "Up to " + max;
@@ -903,14 +953,6 @@ function getAreaParent(area: SelectedArea): string | null {
 }
 
 
-function dynamicParcelPriceLimit(maxPriceRwf: number | null | undefined): number {
-  if (typeof maxPriceRwf !== "number" || !Number.isFinite(maxPriceRwf) || maxPriceRwf <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(maxPriceRwf));
-  const ratio = maxPriceRwf / magnitude;
-  const rounded = ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10;
-  return rounded * magnitude;
-}
-
 type FilterPopoverPortalProps = {
   anchorRef: { current: HTMLButtonElement | null };
   popoverRef: { current: HTMLDivElement | null };
@@ -949,17 +991,23 @@ function FilterPopoverPortal({
         ? bounds.bottom + 8
         : Math.max(12, bounds.top - expectedHeight - 8);
 
-      setPosition({ top, left });
+      setPosition((current) => current && current.top === top && current.left === left ? current : { top, left });
     };
 
     updatePosition();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
+    const popover = popoverRef.current;
+    const observer = typeof ResizeObserver !== "undefined" && popover
+      ? new ResizeObserver(updatePosition)
+      : null;
+    if (popover && observer) observer.observe(popover);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [anchorRef, className, popoverRef]);
+  }, [anchorRef, className, popoverRef, position]);
 
   if (!position || typeof document === "undefined") return null;
 
@@ -1021,8 +1069,92 @@ export function MapExperience() {
     bathroomsExact: false
   });
   const [parcelFilterResults, setParcelFilterResults] = useState<ParcelFilterResults | null>(null);
+  const [financeTerms, setFinanceTerms] = useState({ downPayment: "", annualRate: "", loanMonths: "" });
+  const [marketInventoryState, setMarketInventoryState] = useState<{ scopeKey: string; data: MarketInventoryResponse } | null>(null);
+  const [activePriceDrag, setActivePriceDrag] = useState<"min" | "max" | null>(null);
   const filterSubnavRef = useRef<HTMLDivElement>(null);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const inventoryScope = parcelFilterResults?.scope ?? null;
+  const inventoryScopeKey = inventoryScope
+    ? [inventoryScope.level, inventoryScope.district, inventoryScope.sector, inventoryScope.cell, inventoryScope.village].join("|")
+    : "";
+  const activePriceRange = activePriceTab === "list"
+    ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
+    : { min: mapFilters.monthlyPaymentMin, max: mapFilters.monthlyPaymentMax };
+  const shouldLoadMarketInventory = activeFilterMenu === "price" || activeFilterMenu === "bedsBaths" ||
+    activeFilterMenu === "property" || activeFilterMenu === "measurement" ||
+    Boolean(mapFilters.priceMin || mapFilters.priceMax || mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax ||
+      mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
+      mapFilters.measurementMin || mapFilters.measurementMax);
+  const marketInventory = marketInventoryState?.scopeKey === inventoryScopeKey ? marketInventoryState.data : null;
+  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.district && !marketInventory);
+  useEffect(() => {
+    if (!shouldLoadMarketInventory || !inventoryScope?.district) return;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      const params = new URLSearchParams({
+        scopeLevel: inventoryScope.level,
+        district: inventoryScope.district ?? "",
+        currency: mapFilters.priceCurrency,
+        mode: activePriceTab,
+        propertyTypes: mapFilters.propertyTypes.map((value) => ({
+          house: "house",
+          townhouse: "house",
+          multifamily: "apartment",
+          condo: "apartment",
+          land: "land",
+          lots_land: "land",
+          apartment: "apartment",
+          manufactured: "other",
+          mixed_use: "mixed_use"
+        }[value] ?? value)).filter((value, index, all) => all.indexOf(value) === index).join(","),
+        bedroomsMin: mapFilters.bedroomsMin,
+        bathroomsMin: mapFilters.bathroomsMin,
+        bedroomsExact: String(mapFilters.bedroomsExact),
+        bathroomsExact: String(mapFilters.bathroomsExact),
+        areaBasis: mapFilters.measurementBasis,
+        areaMin: mapFilters.measurementMin,
+        areaMax: mapFilters.measurementMax,
+        priceMin: activePriceRange.min,
+        priceMax: activePriceRange.max,
+        downPayment: financeTerms.downPayment,
+        annualRate: financeTerms.annualRate,
+        loanMonths: financeTerms.loanMonths
+      });
+      if (inventoryScope.sector) params.set("sector", inventoryScope.sector);
+      if (inventoryScope.cell) params.set("cell", inventoryScope.cell);
+      if (inventoryScope.village) params.set("village", inventoryScope.village);
+      try {
+        const response = await fetch("/api/market/filter-inventory?" + params.toString(), { signal: controller.signal });
+        const data = await response.json() as MarketInventoryResponse;
+        if (controller.signal.aborted) return;
+        setMarketInventoryState({ scopeKey: inventoryScopeKey, data });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setMarketInventoryState({
+            scopeKey: inventoryScopeKey,
+            data: {
+              ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
+              histogram: [], rows: [], message: "The market inventory service could not be reached."
+            }
+          });
+        }
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [
+    shouldLoadMarketInventory, activeFilterMenu, activePriceTab, activePriceRange.min, activePriceRange.max,
+    financeTerms.annualRate, financeTerms.downPayment, financeTerms.loanMonths,
+    inventoryScopeKey, mapFilters.bathroomsExact, mapFilters.bathroomsMin,
+    mapFilters.bedroomsExact, mapFilters.bedroomsMin, mapFilters.measurementBasis,
+    mapFilters.measurementMax, mapFilters.measurementMin, mapFilters.priceCurrency,
+    mapFilters.propertyTypes
+  ]);
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const activeFilterAnchorRef = useRef<HTMLButtonElement>(null);
   const closeFilterMenus = useCallback(() => {
@@ -1037,56 +1169,56 @@ export function MapExperience() {
         : [...current[key], value]
     }));
   };
-  const bedsBathsDisabled = mapFilters.propertyTypes.length === 0 ||
-    mapFilters.propertyTypes.every((value) => value === "land" || value === "lots_land");
   const parcelDataReady = parcelFilterResults?.loaded === true;
-  const parcelPriceReady = parcelDataReady && typeof parcelFilterResults?.maxPriceRwf === "number" && parcelFilterResults.maxPriceRwf > 0;
   const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
-  const activePriceLimit = mapFilters.priceCurrency === "USD"
-    ? 100_000_000
-    : dynamicParcelPriceLimit(parcelFilterResults?.maxPriceRwf);
-  const activePriceStep = Math.max(1, Math.ceil(activePriceLimit / 100));
+  const marketMapListings = useMemo<MarketListingMapPoint[]>(() =>
+    (marketInventory?.rows ?? []).flatMap((row) => {
+      const latitude = Number(row.latitude);
+      const longitude = Number(row.longitude);
+      const askingAmount = Number(row.filter_amount || row.asking_amount);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+          latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 ||
+          !Number.isFinite(askingAmount) || askingAmount <= 0) return [];
+      return [{
+        id: row.id,
+        coordinates: [longitude, latitude] as [number, number],
+        priceLabel: compactFilterAmount(askingAmount, row.currency === "USD" ? "USD" : "RWF"),
+        propertyType: row.property_type,
+        projectName: row.project_name,
+        buildingName: row.building_name,
+        unitLabel: row.unit_label,
+        bedrooms: typeof row.bedrooms === "number" ? row.bedrooms : null,
+        bathrooms: row.bathrooms === null ? null : Number(row.bathrooms)
+      }];
+    }), [marketInventory?.rows]);
+  const activePriceLimit = marketInventory?.maximum && marketInventory.maximum > 0
+    ? marketInventory.maximum
+    : 0;
+  const sliderLimit = activePriceLimit > 0 ? activePriceLimit : 1;
+  const activePriceStep = Math.max(1, Math.ceil(sliderLimit / 100));
   const filterResultNote = (() => {
-    if (!parcelDataReady) {
-      return "Zoom in to parcel-level coverage to search cadastral plots in the current map area.";
-    }
-    if (mapFilters.listingType !== "all") {
-      return "The cadastral parcel feed does not provide verified sale, rent or sold listing status.";
-    }
-    if (mapFilters.monthlyPaymentMin || mapFilters.monthlyPaymentMax) {
-      return "Monthly payment terms are not part of cadastral parcel records. Use List price for indicative parcel values.";
-    }
-    if ((mapFilters.priceMin || mapFilters.priceMax) && mapFilters.priceCurrency === "USD") {
-      return "Parcel value estimates are in RWF. A live, verified currency conversion is not connected.";
-    }
-    if ((mapFilters.measurementMin || mapFilters.measurementMax) && mapFilters.measurementBasis === "interior") {
-      return "This map contains land parcels, not building interior floor areas.";
-    }
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "loading") {
       return "Loading the official zoning polygons for the current map area.";
     }
     if (mapFilters.zoningCodes.length && parcelFilterResults?.zoningStatus === "unavailable") {
-      return "The zoning source is temporarily unavailable. No parcel zoning match is being assumed.";
+      return "The zoning source is temporarily unavailable. Cadastral boundaries remain visible.";
     }
     if (mapFilters.zoningCodes.length) {
-      return "Zoning is matched by intersecting each cadastral parcel polygon with the published zoning polygons. Parcels that cross a zoning boundary can match more than one selected zone.";
+      return "Parcel outlines remain on the map. Matching parcels are highlighted; unmatched parcels stay visible.";
     }
-    if (mapFilters.bedroomsMin || mapFilters.bathroomsMin) {
-      return "Bedrooms and bathrooms do not apply to cadastral land parcels.";
+    if (mapFilters.measurementBasis === "interior" && (mapFilters.measurementMin || mapFilters.measurementMax)) {
+      return "Interior area is matched against source-listed building and unit records, not cadastral parcel size.";
     }
-    if (parcelFilterResults) {
-      return "Matching cadastral parcels within the current map area. Geometry-derived plot sizes are estimates, not cadastral measurements.";
+    if (mapFilters.measurementBasis === "plot" && (mapFilters.measurementMin || mapFilters.measurementMax)) {
+      return "Plot area uses cadastral parcel area where supplied; geometry-derived areas are labelled estimates.";
     }
-    return "Waiting for parcel boundaries in the current map area.";
+    return "Listing counts and prices use current, source-authorized asking-price records in the visible map area.";
   })();
   const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, activePriceLimit);
   const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, activePriceLimit);
   const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
   const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
-  const selectedZoneDescriptions = selectedZoneCodes
-    .map((code) => code + " · " + (ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"))
-    .join(" / ");
   const filterZoningGroups = (groups: ReadonlyArray<{ label: string; codes: readonly string[] }>) =>
     groups.map((group) => ({
       ...group,
@@ -1143,12 +1275,12 @@ export function MapExperience() {
     setOtherZoningOpen(false);
   };
   const updatePriceSlider = (basis: "list" | "monthly", bound: "min" | "max", rawValue: string) => {
-    const value = Math.min(activePriceLimit, Math.max(0, Number(rawValue) || 0));
+    const value = Math.min(sliderLimit, Math.max(0, Number(rawValue) || 0));
     setMapFilters((current) => {
       const minKey = basis === "list" ? "priceMin" : "monthlyPaymentMin";
       const maxKey = basis === "list" ? "priceMax" : "monthlyPaymentMax";
       const minimum = current[minKey] ? Number(current[minKey]) : 0;
-      const maximum = current[maxKey] ? Number(current[maxKey]) : activePriceLimit;
+      const maximum = current[maxKey] ? Number(current[maxKey]) : sliderLimit;
       return bound === "min"
         ? { ...current, [minKey]: String(Math.min(value, maximum)) }
         : { ...current, [maxKey]: String(Math.max(value, minimum)) };
@@ -2227,6 +2359,7 @@ export function MapExperience() {
           selectedArea={selectedArea}
           parcelFilters={mapFilters}
           onParcelFilterResults={setParcelFilterResults}
+          marketListings={marketMapListings}
           projects={RWANDA_PROJECT_RECORDS}
           showProjects={workspaceMode === "projects" || projectsOpen}
           selectedProjectId={selectedProjectId}
@@ -2636,6 +2769,29 @@ export function MapExperience() {
                       <button aria-pressed={activePriceTab === "list"} className={activePriceTab === "list" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("list")} type="button">List price</button>
                       <button aria-pressed={activePriceTab === "monthly"} className={activePriceTab === "monthly" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("monthly")} type="button">Monthly payment</button>
                     </div>
+                    {activePriceTab === "monthly" ? (
+                      <div className="map-filter-finance-terms">
+                        <div className="map-filter-finance-heading">
+                          <strong>Estimate your monthly payment</strong>
+                          <small>Enter lender terms or an assumption. No bank rate is preselected.</small>
+                        </div>
+                        <div className="map-filter-finance-fields">
+                          <label>
+                            <span>Down payment ({mapFilters.priceCurrency})</span>
+                            <input inputMode="decimal" min="0" onChange={(event) => setFinanceTerms((current) => ({ ...current, downPayment: event.target.value }))} placeholder="Enter amount" type="number" value={financeTerms.downPayment} />
+                          </label>
+                          <label>
+                            <span>Annual interest rate (%)</span>
+                            <input inputMode="decimal" min="0" max="30" onChange={(event) => setFinanceTerms((current) => ({ ...current, annualRate: event.target.value }))} placeholder="Enter rate" type="number" value={financeTerms.annualRate} />
+                          </label>
+                          <label>
+                            <span>Loan term (months)</span>
+                            <input inputMode="numeric" min="1" max="360" onChange={(event) => setFinanceTerms((current) => ({ ...current, loanMonths: event.target.value }))} placeholder="e.g. 240" type="number" value={financeTerms.loanMonths} />
+                          </label>
+                        </div>
+                        <p className="map-filter-note">Estimated principal and interest only. Taxes, insurance, fees, lender approval and partner-specific charges are not included.</p>
+                      </div>
+                    ) : null}
                     <div className="map-filter-price-columns">
                       {([
                         activePriceTab === "list" ? {
@@ -2656,50 +2812,69 @@ export function MapExperience() {
                           summary: monthlyPaymentSummary
                         }
                       ]).map((range) => {
-                        const minimum = Math.min(activePriceLimit, Math.max(0, Number(range.minimum) || 0));
-                        const maximum = Math.max(0, Math.min(activePriceLimit, range.maximum ? Number(range.maximum) : activePriceLimit));
-                        const rangeInvalid = range.minimum && range.maximum && Number(range.minimum) > Number(range.maximum);
-                        const rangeOutOfBounds = [range.minimum, range.maximum].some((value) =>
+                        const maximumLimit = activePriceLimit > 0 ? activePriceLimit : 1;
+                        const minimum = Math.min(maximumLimit, Math.max(0, Number(range.minimum) || 0));
+                        const maximum = Math.max(0, Math.min(maximumLimit, range.maximum ? Number(range.maximum) : maximumLimit));
+                        const rangeInvalid = Boolean(range.minimum && range.maximum && Number(range.minimum) > Number(range.maximum));
+                        const rangeOutOfBounds = activePriceLimit > 0 && [range.minimum, range.maximum].some((value) =>
                           value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > activePriceLimit)
                         );
+                        const histogram = marketInventory?.histogram ?? [];
+                        const largestBin = Math.max(1, ...histogram.map((bin) => bin.count));
+                        const draggedValue = activePriceDrag === "min" ? minimum : maximum;
+                        const draggedPosition = Math.max(0, Math.min(100, draggedValue / maximumLimit * 100));
                         return (
                           <section className="map-filter-price-section" key={range.key}>
                             <div className="map-filter-price-section-heading">
                               <div><strong>{range.title}</strong><small>{range.summary}</small></div>
                               <span>{mapFilters.priceCurrency}</span>
                             </div>
-                            <div className="map-filter-histogram" aria-label={range.title + " distribution preview"}>
-                              <div className="map-filter-histogram-empty">
-                                <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
-                                <span>Price distribution</span>
-                                <small>{range.key === "monthly" ? "Monthly payments are not supplied by the cadastral parcel source." : mapFilters.priceCurrency === "USD" ? "Parcel estimates are in RWF; live currency conversion is not connected." : "Estimates use the map's transaction-price benchmarks and parcel area, not verified asking prices."}</small>
-                              </div>
+                            <div className="map-filter-histogram" aria-label={range.title + " listing price distribution"}>
+                              {histogram.length > 0 ? (
+                                <div className="map-filter-histogram-bars" aria-hidden="true">
+                                  {Array.from({ length: 24 }, (_, index) => {
+                                    const count = histogram.find((bin) => bin.bucket === index + 1)?.count ?? 0;
+                                    return <span className="map-filter-histogram-bar" key={index} style={{ height: Math.max(2, count / largestBin * 100) + "%" }} />;
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="map-filter-histogram-empty">
+                                  <BarChart3 aria-hidden="true" size={20} strokeWidth={1.6} />
+                                  <span>{marketInventoryLoading ? "Loading price distribution" : "Price distribution"}</span>
+                                  <small>{marketInventory?.message ?? (marketInventory?.dataStatus === "needs_finance_terms" ? "Enter the down payment, interest rate and loan term above to calculate a monthly estimate." : "No current, source-authorized asking-price records are connected for this map area yet.")}</small>
+                                </div>
+                              )}
                               <div className="map-filter-histogram-axis">
                                 <span>{mapFilters.priceCurrency === "USD" ? "$0" : "RWF 0"}</span>
-                                <span>{compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)}</span>
+                                <span>{activePriceLimit > 0 ? compactFilterAmount(activePriceLimit, mapFilters.priceCurrency) : "No inventory maximum"}</span>
                               </div>
                             </div>
                             <div className="map-filter-price-values">
-                              <span><small>Minimum</small><strong>{compactFilterAmount(minimum, mapFilters.priceCurrency)}</strong></span>
-                              <span><small>Maximum</small><strong>{compactFilterAmount(maximum, mapFilters.priceCurrency)}</strong></span>
+                              <span><small>Minimum</small><strong>{range.minimum ? compactFilterAmount(minimum, mapFilters.priceCurrency) : "No min"}</strong></span>
+                              <span><small>Maximum</small><strong>{range.maximum ? compactFilterAmount(maximum, mapFilters.priceCurrency) : (activePriceLimit > 0 ? compactFilterAmount(activePriceLimit, mapFilters.priceCurrency) : "No max")}</strong></span>
                             </div>
                             <div className="map-filter-dual-slider" aria-label={range.title + " minimum and maximum"}>
                               <div className="map-filter-dual-slider-track" aria-hidden="true" />
-                              <div
-                                className="map-filter-dual-slider-range"
-                                aria-hidden="true"
-                                style={{
-                                  left: (minimum / activePriceLimit * 100) + "%",
-                                  width: (Math.max(0, maximum - minimum) / activePriceLimit * 100) + "%"
-                                }}
-                              />
+                              <div className="map-filter-dual-slider-range" aria-hidden="true" style={{
+                                left: (minimum / maximumLimit * 100) + "%",
+                                width: (Math.max(0, maximum - minimum) / maximumLimit * 100) + "%"
+                              }} />
+                              {activePriceDrag ? (
+                                <output className="map-filter-slider-value" style={{ left: draggedPosition + "%" }}>
+                                  {compactFilterAmount(draggedValue, mapFilters.priceCurrency)}
+                                </output>
+                              ) : null}
                               <input
                                 aria-label={range.title + " minimum slider"}
                                 className="map-filter-dual-slider-input map-filter-dual-slider-min"
-                                disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
-                                max={activePriceLimit}
+                                disabled={activePriceLimit <= 0}
+                                max={maximumLimit}
                                 min="0"
+                                onBlur={() => setActivePriceDrag(null)}
                                 onChange={(event) => updatePriceSlider(range.key, "min", event.target.value)}
+                                onPointerDown={() => setActivePriceDrag("min")}
+                                onPointerUp={() => setActivePriceDrag(null)}
+                                onFocus={() => setActivePriceDrag("min")}
                                 step={activePriceStep}
                                 type="range"
                                 value={minimum}
@@ -2707,10 +2882,14 @@ export function MapExperience() {
                               <input
                                 aria-label={range.title + " maximum slider"}
                                 className="map-filter-dual-slider-input map-filter-dual-slider-max"
-                                disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
-                                max={activePriceLimit}
+                                disabled={activePriceLimit <= 0}
+                                max={maximumLimit}
                                 min="0"
+                                onBlur={() => setActivePriceDrag(null)}
                                 onChange={(event) => updatePriceSlider(range.key, "max", event.target.value)}
+                                onPointerDown={() => setActivePriceDrag("max")}
+                                onPointerUp={() => setActivePriceDrag(null)}
+                                onFocus={() => setActivePriceDrag("max")}
                                 step={activePriceStep}
                                 type="range"
                                 value={maximum}
@@ -2719,35 +2898,15 @@ export function MapExperience() {
                             <div className="map-filter-range-fields">
                               <label>
                                 <span>Minimum</span>
-                                <input
-                                  inputMode="decimal"
-                                  min="0"
-                                  max={activePriceLimit}
-                                  disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
-                                  onChange={(event) => setMapFilters((current) => ({ ...current, [range.minKey]: event.target.value }))}
-                                  placeholder="0"
-                                  type="number"
-                                  value={range.minimum}
-                                />
+                                <input inputMode="decimal" min="0" max={activePriceLimit || undefined} onChange={(event) => setMapFilters((current) => ({ ...current, [range.minKey]: event.target.value }))} placeholder="No min" type="number" value={range.minimum} />
                               </label>
                               <label>
                                 <span>Maximum</span>
-                                <input
-                                  inputMode="decimal"
-                                  min="0"
-                                  max={activePriceLimit}
-                                  disabled={range.key === "monthly" || !parcelPriceReady || mapFilters.priceCurrency === "USD"}
-                                  onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))}
-                                  placeholder="No max"
-                                  type="number"
-                                  value={range.maximum}
-                                />
+                                <input inputMode="decimal" min="0" max={activePriceLimit || undefined} onChange={(event) => setMapFilters((current) => ({ ...current, [range.maxKey]: event.target.value }))} placeholder="No max" type="number" value={range.maximum} />
                               </label>
                             </div>
                             {rangeOutOfBounds ? (
-                              <p className="map-filter-validation" role="alert">
-                                Values must stay between zero and {compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)} for the current map area.
-                              </p>
+                              <p className="map-filter-validation" role="alert">The maximum current listing price in this map area is {compactFilterAmount(activePriceLimit, mapFilters.priceCurrency)}.</p>
                             ) : rangeInvalid ? (
                               <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                             ) : null}
@@ -2756,8 +2915,11 @@ export function MapExperience() {
                       })}
                     </div>
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
-                      <button disabled={filterResultCount === null} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
+                      <div>
+                        <strong>{marketInventoryLoading ? "Loading listing inventory" : marketInventory?.total ? marketInventory.total.toLocaleString() + " current listings in this area" : "No current listing records"}</strong>
+                        <small>{marketInventory?.message ?? (marketInventory?.dataStatus === "available" ? "Counts are grouped from authorized asking-price records in the current map scope." : "The scale and distribution will use current asking prices, not transaction benchmarks.")}</small>
+                      </div>
+                      <button disabled={marketInventoryLoading} onClick={closeFilterMenus} type="button">Done</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
@@ -2883,21 +3045,36 @@ export function MapExperience() {
                       />
                       {zoningSearch ? <button aria-label="Clear zoning search" onClick={() => setZoningSearch("")} type="button"><X size={14} /></button> : null}
                     </label>
-                    {selectedZoneCodes.length > 0 ? (
-                      <div className="map-filter-selected-zone-summary">
-                        <div><span>Selected zone</span><strong>{selectedZoneCodes.join(", ")}</strong><small>{selectedZoneDescriptions}</small></div>
-                        <div><span>Typical plot measurement</span><strong>District-plan and housing-type specific</strong></div>
-                      </div>
-                    ) : null}
                     {zoningInfoOpen ? (
                       <div className="map-filter-info-panel">
-                        <strong>How zoning works</strong>
-                        <p>Each District Land Use Plan defines which codes apply locally. This searchable catalogue combines codes from the published Kigali, Bugesera and Gakenke plan legends, plus shorthand classes used in the Ruhango plan. A code appearing here does not mean it applies in every district.</p>
-                        <p>A3 and A4 were not present in the official plan legends checked, so they are not added as assumptions.</p>
-                        <p>Plot-size rules vary by district, housing type and development conditions. The app does not treat a search-size band as a legal minimum or maximum. A legal range should appear only when the applicable plan rule is indexed for that district and typology.</p>
+                        {selectedZoneCodes.length > 0 ? (
+                          <>
+                            <strong>Planning standards · {selectedZoneCodes.join(", ")}</strong>
+                            {selectedZoneCodes.map((code) => {
+                              const isKigaliDistrict = ["Gasabo", "Kicukiro", "Nyarugenge"].includes(inventoryScope?.district ?? selectedArea?.district ?? "");
+                              const kigaliRule = KIGALI_ZONE_PLOT_RULES[code];
+                              return (
+                                <div className="map-filter-zone-rule" key={code}>
+                                  <strong>{code} · {ZONING_FILTER_DESCRIPTIONS[code] ?? "Local plan classification"}</strong>
+                                  <p>{isKigaliDistrict && kigaliRule
+                                    ? kigaliRule
+                                    : isKigaliDistrict
+                                      ? "The Kigali regulation does not state one universal plot-size range for this code. Check the applicable land-use and development conditions."
+                                      : "No verified plot-size rule is indexed for this district plan and zoning code yet. Kigali measurements must not be copied here."}</p>
+                                </div>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <>
+                            <strong>How zoning standards work</strong>
+                            <p>The governing district plan, plan version, land-use subtype and housing form determine the applicable rules. A code in this catalogue does not mean it applies everywhere.</p>
+                            <p>Choose a zone to see any indexed standard for the current map district. Where no local standard is indexed, the panel says so rather than guessing.</p>
+                          </>
+                        )}
                         <div className="map-filter-source-links">
-                          <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">NLA zoning regulations <span aria-hidden="true">↗</span></a>
-                          <a href="https://geodata.rw/server/rest/services/Hosted/Gakenke_DLUP_20042026/MapServer/legend" rel="noreferrer" target="_blank">Official zoning legend <span aria-hidden="true">↗</span></a>
+                          <a href="https://www.lands.rw/publications/master-plans" rel="noreferrer" target="_blank">National Land Authority master plans <span aria-hidden="true">↗</span></a>
+                          <a href="https://www.bpmis.gov.rw/asset_uplds/kigali_master_plan/4_Kigali%20Master%20Plan_Zoning%20RegulationsLowRes.pdf" rel="noreferrer" target="_blank">Kigali zoning regulations (2020) <span aria-hidden="true">↗</span></a>
                         </div>
                       </div>
                     ) : null}
@@ -2931,8 +3108,8 @@ export function MapExperience() {
                     {visibleZoningGroups.length === 0 && visibleOtherZoningGroups.length === 0 ? <p className="map-filter-disabled-note">No zoning codes match “{zoningSearch}”.</p> : null}
                     <p className="map-filter-note">
                       {selectedZoneCodes.length > 0
-                        ? "These codes identify land use, not a universal plot-size band. The applicable district plan and housing type must be loaded before a legal minimum or maximum is shown."
-                        : "Choose a code to filter cadastral parcels against the published zoning polygons available in this map area."}
+                        ? "Selections match parcel polygons against zoning polygons connected in this map area. The information icon shows plan-specific standards when indexed."
+                        : "Choose a code to filter cadastral parcels. Coverage is currently limited to the connected Kigali and Bugesera zoning layers."}
                     </p>
                     <div className="map-filter-result-footer">
                       <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
@@ -3022,6 +3199,16 @@ export function MapExperience() {
                     {mapFilters.measurementMin && mapFilters.measurementMax && Number(mapFilters.measurementMin) > Number(mapFilters.measurementMax) ? (
                       <p className="map-filter-validation" role="alert">Maximum must be greater than minimum.</p>
                     ) : null}
+                    {(mapFilters.measurementMin || mapFilters.measurementMax || mapFilters.measurementPreset) ? (
+                      <button className="map-filter-clear-local" onClick={() => setMapFilters((current) => ({
+                        ...current,
+                        measurementMin: "",
+                        measurementMax: "",
+                        measurementPreset: ""
+                      }))} type="button">
+                        <X aria-hidden="true" size={13} /> Clear measurement
+                      </button>
+                    ) : null}
                     <p className="map-filter-note">These are search-size bands, not legal zoning standards. The area basis stays separate so plot measurements are never compared with interior floor area.</p>
                   </FilterPopoverPortal>
                 ) : null}
@@ -3050,7 +3237,7 @@ export function MapExperience() {
                     <div className="map-filter-popover-heading">
                       <div><strong>Beds & baths</strong><small>Choose the minimum or an exact count</small></div>
                     </div>
-                    <div className={bedsBathsDisabled ? "map-filter-beds-columns map-filter-beds-disabled" : "map-filter-beds-columns"}>
+                    <div className="map-filter-beds-columns">
                       <section className="map-filter-beds-section">
                         <h3>Bedrooms</h3>
                         <div className="map-filter-bed-options">
@@ -3058,7 +3245,6 @@ export function MapExperience() {
                             <button
                               aria-pressed={mapFilters.bedroomsMin === value}
                               className={mapFilters.bedroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
-                              disabled={bedsBathsDisabled}
                               key={value || "any"}
                               onClick={() => setMapFilters((current) => ({ ...current, bedroomsMin: value, bedroomsExact: value ? current.bedroomsExact : false }))}
                               type="button"
@@ -3066,7 +3252,7 @@ export function MapExperience() {
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bedroomsExact} disabled={bedsBathsDisabled || !mapFilters.bedroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bedroomsExact} disabled={!mapFilters.bedroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bedroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
@@ -3077,27 +3263,22 @@ export function MapExperience() {
                             <button
                               aria-pressed={mapFilters.bathroomsMin === value}
                               className={mapFilters.bathroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
-                              disabled={bedsBathsDisabled}
-                              key={value || "any"}
+                                                            key={value || "any"}
                               onClick={() => setMapFilters((current) => ({ ...current, bathroomsMin: value, bathroomsExact: value ? current.bathroomsExact : false }))}
                               type="button"
                             >{index === 0 ? "Any" : value + "+"}</button>
                           ))}
                         </div>
                         <label className="map-filter-exact-toggle">
-                          <input checked={mapFilters.bathroomsExact} disabled={bedsBathsDisabled || !mapFilters.bathroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
+                          <input checked={mapFilters.bathroomsExact} disabled={!mapFilters.bathroomsMin} onChange={(event) => setMapFilters((current) => ({ ...current, bathroomsExact: event.target.checked }))} type="checkbox" />
                           <span>Use exact match</span>
                         </label>
                       </section>
                     </div>
-                    {bedsBathsDisabled ? (
-                      <p className="map-filter-disabled-note">Bedrooms and bathrooms do not apply to land-only searches. Select a building property type to use these controls.</p>
-                    ) : (
-                      <p className="map-filter-note">Bedroom and bathroom values require verified unit-level records. Exact match replaces the “or more” rule.</p>
-                    )}
+                    <p className="map-filter-note">Bedroom and bathroom choices apply to verified building, project-unit and property listings. Exact match replaces the “or more” rule.</p>
                     <div className="map-filter-result-footer">
-                      <div><strong>{filterResultCount === null ? "Loading map parcels" : filterResultCount.toLocaleString() + " matching parcels"}</strong><small>{filterResultCount === null ? filterResultNote : filterResultNote}</small></div>
-                      <button disabled={filterResultCount === null || bedsBathsDisabled} onClick={closeFilterMenus} type="button">{filterResultCount === null ? "Loading parcels" : "Show " + filterResultCount.toLocaleString() + " parcels"}</button>
+                      <div><strong>{marketInventoryLoading ? "Loading building and unit records" : marketInventory?.total ? marketInventory.total.toLocaleString() + " matching listings" : "No connected room-level inventory"}</strong><small>{marketInventory?.message ?? "The controls stay available; matching requires source-authorized building or unit records with bedroom and bathroom values."}</small></div>
+                      <button disabled={marketInventoryLoading} onClick={closeFilterMenus} type="button">Done</button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}

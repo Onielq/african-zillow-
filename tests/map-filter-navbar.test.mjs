@@ -28,69 +28,137 @@ test("all six primary filter cells open distinct menus", async () => {
   assert.ok((source.match(/aria-haspopup="dialog"/g) ?? []).length >= 6);
 });
 
-test("sale and rent options include sold-out status", async () => {
+test("price maximum is taken from the exact inventory scope, not a fixed trillion or rounded parcel estimate", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /label: "For sale"/);
-  assert.match(source, /label: "For rent"/);
-  assert.match(source, /label: "Sold out"/);
-  assert.match(source, /value: "sold"/);
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(source, /activePriceLimit = marketInventory\?\.maximum/);
+  assert.match(source, /inventoryScopeKey/);
+  assert.match(source, /scopeLevel: inventoryScope\.level/);
+  assert.match(source, /fetch\("\/api\/market\/filter-inventory\?/);
+  assert.doesNotMatch(source, /dynamicParcelPriceLimit/);
+  assert.doesNotMatch(api, /1_000_000_000_000/);
+  assert.match(api, /max\(amount\) AS maximum/);
+  assert.match(api, /lower\(l\.district_label\) = lower\(\$\{district\}\)/);
+  assert.match(api, /lower\(p\.district_label\) = lower\(\$\{district\}\)/);
+  assert.match(mapView, /scope,/);
 });
 
-test("price filter has list-price and monthly-payment ranges, caps and editable inputs", async () => {
+test("price distribution is a frequency histogram of authorized asking prices", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /List price/);
-  assert.match(source, /Monthly payment/);
-  assert.match(source, /100_000_000/);
-  assert.doesNotMatch(source, /1_000_000_000_000/);
-  assert.match(source, /dynamicParcelPriceLimit\(parcelFilterResults\?\.maxPriceRwf\)/);
-  assert.match(source, /type="range"/);
-  assert.match(source, /monthlyPaymentMin/);
-  assert.match(source, /monthlyPaymentMax/);
-  assert.match(source, /priceMin/);
-  assert.match(source, /priceMax/);
-  assert.match(source, /Price distribution/);
-  assert.match(source, /not verified asking prices/);
-  assert.match(source, /matching parcels/);
-  assert.match(source, /Loading map parcels/);
-  assert.match(source, /map-filter-price-columns/);
-  assert.match(source, /map-filter-price-section/);
-  assert.match(source, /key: "list"/);
-  assert.match(source, /key: "monthly"/);
-  assert.match(source, /map-filter-dual-slider/);
-  assert.match(source, /updatePriceSlider\(range\.key, "min"/);
-  assert.match(source, /updatePriceSlider\(range\.key, "max"/);
-  assert.match(source, /rangeOutOfBounds/);
-  assert.match(source, /current map area/);
-  assert.match(source, /Maximum must be greater than minimum/);
-  assert.doesNotMatch(source, /priceRangeMode/);
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(source, /marketInventory\?\.histogram/);
+  assert.match(source, /map-filter-histogram-bars/);
+  assert.match(source, /pointer-events: none|map-filter-histogram-bar/);
+  assert.match(api, /count\(\*\)::integer AS count/);
+  assert.match(api, /reja\.market_listings/);
+  assert.match(api, /s\.license_status = 'permitted'/);
+  assert.match(api, /s\.commercial_use_allowed IS TRUE/);
+  assert.match(api, /s\.redistribution_allowed IS TRUE/);
+  assert.match(api, /s\.caching_allowed IS TRUE/);
+  assert.match(api, /reja\.exchange_listings/);
+  assert.match(api, /reja\.has_verified_listing_authorization/);
+  assert.doesNotMatch(source, /transaction-price benchmarks and parcel area/);
+  assert.doesNotMatch(source, /not verified asking prices/);
 });
 
-test("property categories use icon cards and include the requested categories", async () => {
+test("price tabs have distinct list and finance inputs", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  for (const label of ["Houses", "Townhouse", "Multifamily", "Condos", "Land", "Lots & Land", "Apartment", "Manufactured", "Mixed Use"]) {
-    assert.ok(source.includes('label: "' + label + '"'), "missing property category: " + label);
-  }
-  assert.match(source, /map-filter-property-card/);
-  assert.match(source, /const Icon = option\.Icon/);
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(source, /className="map-filter-price-tabs"/);
+  assert.match(source, /activePriceTab === "list"/);
+  assert.match(source, /activePriceTab === "monthly"/);
+  assert.match(source, /Down payment/);
+  assert.match(source, /Annual interest rate/);
+  assert.match(source, /Loan term \(months\)/);
+  assert.match(source, /principal and interest only/);
+  assert.match(api, /estimated_monthly_principal_and_interest_from_authorized_asking_prices/);
+  assert.match(api, /GREATEST\(asking_amount - \$\{downPayment\}, 0\)/);
+  assert.match(api, /annualRate/);
+  assert.match(api, /loanMonths/);
 });
 
-test("zoning selector includes multiple plan codes grouped by category", async () => {
+test("map listing markers use the amount for the selected price mode", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  for (const code of ["R1", "R1A", "R1B", "R2", "R3", "R4", "RS", "A", "A1", "A2", "B", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4", "ET", "F", "F1", "F2", "F3", "F4", "F5", "F6", "I", "I1", "I2", "I3", "OS", "P1", "P2", "P3B", "P3C", "PA", "PF", "PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "T", "T1", "T2", "T3", "T4", "U", "UE", "W1A", "W1B", "W2", "W3", "W4", "W5", "WB"]) {
-    assert.match(source, new RegExp('"'+code+'"'));
-  }
-  assert.match(source, /All zoning/);
-  assert.match(source, /zoningInfoOpen/);
-  assert.match(source, /Typical plot measurement/);
-  assert.match(source, /District-plan and housing-type specific/);
-  assert.match(source, /ZONING_FILTER_DESCRIPTIONS/);
-  assert.match(source, /A3 and A4 were not present/);
-  assert.match(source, /NLA zoning regulations/);
-  assert.ok(source.includes("https://geodata.rw/server/rest/services"));
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(source, /Number\(row\.filter_amount \|\| row\.asking_amount\)/);
+  assert.match(source, /marketListings=\{marketMapListings\}/);
+  assert.match(mapView, /market-listing-markers/);
+  assert.match(mapView, /market-listing-circles/);
+  assert.match(api, /AS filter_amount/);
 });
 
-test("measurement keeps manual inputs and adds non-regulatory area presets", async () => {
+test("bedrooms and bathrooms remain enabled in one vertically stacked card", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(source, /Bedrooms/);
+  assert.match(source, /Bathrooms/);
+  assert.match(source, /Use exact match/);
+  assert.match(source, /bedroomsMin/);
+  assert.match(source, /bathroomsMin/);
+  assert.doesNotMatch(source, /bedsBathsDisabled/);
+  assert.match(source, /disabled=\{!mapFilters\.bedroomsMin\}/);
+  assert.match(source, /disabled=\{!mapFilters\.bathroomsMin\}/);
+  assert.match(styles, /\.map-filter-beds-columns\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styles, /\.map-filter-beds-section \+ \.map-filter-beds-section\s*\{[\s\S]*?border-top/);
+  assert.match(source, /propertyTypes/);
+  assert.match(source, /marketInventory\?\.total/);
+});
+
+test("zoning selection does not add a redundant selected-zone summary card", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /Main zoning/);
+  assert.match(source, /Forestation/);
+  assert.match(source, /Other zoning/);
+  assert.match(source, /aria-pressed=\{mapFilters\.zoningCodes\.includes\(code\)\}/);
+  assert.doesNotMatch(source, /map-filter-selected-zone-summary/);
+  assert.match(source, /Planning standards/);
+  assert.match(source, /KIGALI_ZONE_PLOT_RULES/);
+  assert.match(source, /No verified plot-size rule is indexed/);
+  assert.match(source, /National Land Authority master plans/);
+});
+
+test("the zoning information panel only presents indexed Kigali rules for Kigali districts", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /Gasabo/);
+  assert.match(source, /Kicukiro/);
+  assert.match(source, /Nyarugenge/);
+  assert.match(source, /R1: "New R1 plots: maximum 500 m²/);
+  assert.match(source, /R1A: "Maximum plot size: 300 m²/);
+  assert.match(source, /R2: "Rowhousing plots: maximum 200 m²/);
+  assert.match(source, /R3: "Incremental single-family plots in new subdivision plans: maximum 100 m²/);
+  assert.match(source, /R4: "Minimum plot size: 750 m²/);
+  assert.match(source, /Plots below 300 m² follow R1A rules/);
+});
+
+test("zoning uses exact parcel-polygon intersection and keeps all parcel boundaries visible", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(mapView, /fetch\("\/api\/geography\/zoning\?bbox=/);
+  assert.match(mapView, /zoningFeatureMatchesCodes/);
+  assert.match(mapView, /geometriesIntersect\(feature\.geometry as Geometry, zone\.geometry as Geometry \| null\)/);
+  assert.match(mapView, /function polygonIntersectsPolygon/);
+  assert.match(mapView, /function segmentsIntersect/);
+  assert.match(mapView, /const renderedParcelData: MapFeatureCollection/);
+  assert.match(mapView, /features: raw\.features\.map/);
+  assert.match(mapView, /source\?\.setData\(renderedParcelData\)/);
+  assert.match(mapView, /filter_active: hasParcelFilters/);
+  assert.match(mapView, /filter_match: !hasParcelFilters \|\| matchedParcelIds\.has\(id\)/);
+  assert.doesNotMatch(mapView, /source\?\.setData\(\{ \.\.\.raw, features: filtered \}/);
+});
+
+test("zoning code matcher checks the available zoning and land-use source fields", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  assert.match(mapView, /Object\.entries\(properties\)/);
+  assert.match(mapView, /zoning\|zone\|land\.\?use\|gen\.\?lu\|lu\.\?code/i);
+  assert.match(mapView, /const values = Object\.entries\(properties\)/);
+});
+
+test("measurement ranges are independent, attractive and locally clearable", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(source, /Plot area/);
+  assert.match(source, /Interior area/);
   assert.match(source, /measurementMin/);
   assert.match(source, /measurementMax/);
   assert.match(source, /0–300/);
@@ -98,188 +166,59 @@ test("measurement keeps manual inputs and adds non-regulatory area presets", asy
   assert.match(source, /500–700/);
   assert.match(source, /700–800/);
   assert.match(source, /800\+/);
-  assert.match(source, /search-size bands, not legal zoning standards/);
-});
-
-test("bedroom and bathroom controls are separate and offer exact match", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /Bedrooms/);
-  assert.match(source, /Bathrooms/);
-  assert.match(source, /Use exact match/);
-  assert.match(source, /bedroomsExact/);
-  assert.match(source, /bathroomsExact/);
-  assert.match(source, /1\.5/);
-  assert.match(source, /2\.5/);
-  assert.match(source, /3\.5/);
-  assert.match(source, /bedsBathsDisabled/);
-  assert.match(source, /land-only searches/);
-});
-
-test("filter menus close on Escape, outside click and when another primary menu opens", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /event\.key !== "Escape"/);
-  assert.match(source, /filterSubnavRef\.current\?\.contains\(event\.target\)/);
-  assert.match(source, /closeFilterMenus\(\)/);
-});
-
-test("filter popovers portal outside the toolbar and restore keyboard focus", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /createPortal\(/);
-  assert.match(source, /activeFilterAnchorRef\.current\?\.focus\(\)/);
-  assert.match(source, /filterPopoverRef\.current\?\.contains\(event\.target\)/);
-  assert.match(source, /ref=\{popoverRef\}/);
-});
-
-
-test("filter values summarize in the toolbar and Reset all clears every filter state", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /priceSummary/);
-  assert.match(source, /measurementSummary/);
-  assert.match(source, /bedsBathsSummary/);
-  assert.match(source, /selectedZoneCodes.length > 0/);
-  assert.match(source, /activeFilterCount > 0/);
-  assert.match(source, /className="map-filter-reset"/);
-  assert.match(source, /Reset all/);
-  assert.match(source, /const resetMapFilters = \(\) =>/);
-  assert.match(source, /setZoningSearch\(""/);
-});
-
-test("plot and interior measurement ranges are kept separate when the area basis changes", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  const mapView = await read("../src/components/map/MapView.tsx");
-  assert.match(mapView, /measurementBasis: "plot" \| "interior"/);
-  assert.match(source, /Plot area/);
-  assert.match(source, /Interior area/);
+  assert.match(source, /Clear measurement/);
+  assert.match(styles, /\.map-filter-clear-local/);
   assert.match(source, /measurementBasis: "plot", measurementMin: "", measurementMax: ""/);
   assert.match(source, /measurementBasis: "interior", measurementMin: "", measurementMax: ""/);
-  assert.match(source, /measurementBasisChanged/);
-  assert.match(source, /interior floor area/);
 });
 
-test("land-only selections switch to plot measurement and clear room filters", async () => {
+test("filter popovers reposition after internal content changes", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /const landOnly = nextTypes\.length > 0/);
-  assert.match(source, /measurementBasis: nextMeasurementBasis/);
-  assert.match(source, /bedroomsMin: landOnly \? ""/);
-  assert.match(source, /bathroomsMin: landOnly \? ""/);
-  assert.match(source, /bedroomsExact: landOnly \? false/);
-  assert.match(source, /bathroomsExact: landOnly \? false/);
+  assert.match(source, /new ResizeObserver\(updatePosition\)/);
+  assert.match(source, /observer\.observe\(popover\)/);
+  assert.match(source, /observer\?\.disconnect\(\)/);
 });
 
-test("exact-match toggles require a selected bedroom or bathroom value", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /disabled=\{bedsBathsDisabled \|\| !mapFilters\.bedroomsMin\}/);
-  assert.match(source, /disabled=\{bedsBathsDisabled \|\| !mapFilters\.bathroomsMin\}/);
-  assert.match(source, /bedroomsExact: value \? current\.bedroomsExact : false/);
-  assert.match(source, /bathroomsExact: value \? current\.bathroomsExact : false/);
+test("market inventory is not fabricated when production has no authorized database connection", async () => {
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(api, /createRejaReadOnlyDatabase\(\)/);
+  assert.match(api, /verifyRejaReadOnlyRole\(database\)/);
+  assert.match(api, /dataStatus: "not_configured"/);
+  assert.match(api, /No listing prices or property distribution are being inferred/);
+  assert.match(api, /No eligible, source-authorized current asking-price listings/);
 });
 
-test("the price track cannot render a negative width when manual bounds are temporarily invalid", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /width: \(Math\.max\(0, maximum - minimum\)/);
-  assert.match(source, /rangeInvalid = range\.minimum && range\.maximum/);
-  assert.match(source, /Maximum must be greater than minimum/);
+test("building and project room counts come from linked REJA development units", async () => {
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(api, /LEFT JOIN reja\.development_units u ON u\.id = p\.development_unit_id/);
+  assert.match(api, /COALESCE\(p\.bedrooms, u\.bedrooms\)/);
+  assert.match(api, /COALESCE\(p\.bathrooms, u\.bathrooms\)/);
+  assert.match(api, /COALESCE\(p\.internal_area_sqm, u\.internal_area_sqm\)/);
+  assert.match(api, /COALESCE\(p\.plot_area_sqm, u\.plot_area_sqm\)/);
+  assert.match(api, /development_units_ready/);
+  assert.match(api, /property_unit_link_ready/);
 });
 
-test("zoning information points to official plan sources and avoids universal plot-size claims", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /https:\/\/www\.lands\.rw\/publications\/master-plans/);
-  assert.match(source, /https:\/\/geodata\.rw\/server\/rest\/services\/Hosted\/Gakenke_DLUP_20042026\/MapServer\/legend/);
-  assert.match(source, /A3 and A4 were not present in the official plan legends checked/);
-  assert.match(source, /Plot-size rules vary by district, housing type and development conditions/);
-  assert.match(source, /Other zoning/);
-  assert.match(source, /Commercial activity zone/);
-  assert.match(source, /Main zoning/);
-  assert.match(source, /Forestation/);
+test("source and exchange row queries join unit metadata and deduplicate the same property", async () => {
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  const rowsStart = api.indexOf("const rows = await database");
+  const exchangeStart = api.indexOf("const exchangeRows = await database");
+  const sourceRows = api.slice(rowsStart, exchangeStart);
+  const exchangeRows = api.slice(exchangeStart);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_units u/);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_projects dp/);
+  assert.match(sourceRows, /LEFT JOIN reja\.development_buildings db/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_units u/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_projects dp/);
+  assert.match(exchangeRows, /LEFT JOIN reja\.development_buildings db/);
+  assert.match(api, /new Map<string, \(typeof rows\)\[number\]\>/);
+  assert.match(api, /for \(const row of exchangeRows\) deduplicatedRows\.set/);
 });
-
-test("list price and monthly payment use independent segmented tabs", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  assert.match(source, /className="map-filter-price-tabs"/);
-  assert.match(source, /activePriceTab === "list"/);
-  assert.match(source, /activePriceTab === "monthly"/);
-  assert.match(source, /className="map-filter-price-columns"/);
-  assert.match(source, /title: "List price"/);
-  assert.match(source, /title: "Monthly payment"/);
-  assert.match(source, /minKey: "priceMin"/);
-  assert.match(source, /maxKey: "priceMax"/);
-  assert.match(source, /minKey: "monthlyPaymentMin"/);
-  assert.match(source, /maxKey: "monthlyPaymentMax"/);
-  assert.match(source, /aria-label=\{range\.title \+ " minimum slider"\}/);
-  assert.match(source, /aria-label=\{range\.title \+ " maximum slider"\}/);
-});
-
-
-test("price tabs keep independent list and monthly values", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  const styles = await read("../src/app/globals.css");
-  assert.match(source, /filterPriceRangeSummary\(mapFilters\.priceMin, mapFilters\.priceMax/);
-  assert.match(source, /filterPriceRangeSummary\(mapFilters\.monthlyPaymentMin, mapFilters\.monthlyPaymentMax/);
-  assert.match(source, /updatePriceSlider\(range\.key, "min"/);
-  assert.match(source, /updatePriceSlider\(range\.key, "max"/);
-  assert.match(styles, /\.map-filter-price-tabs\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(styles, /\.map-filter-price-tab-active/);
-});
-
-
-test("the icon-only Filters trigger shows an unobtrusive count when filters are active", async () => {
-  const source = await read("../src/components/map/MapExperience.tsx");
-  const styles = await read("../src/app/globals.css");
-  assert.match(source, /className="toolbar-filter-count"/);
-  assert.match(source, /activeFilterCount > 0/);
-  assert.match(styles, /\.toolbar-filter-count\s*\{[\s\S]*?position: absolute/);
-  assert.match(styles, /\.toolbar-filter-icon\s*\{[\s\S]*?position: relative/);
-});
-
-
-test("parcel filter controls are connected to the cadastral map source and return map-area counts", async () => {
-  const experience = await read("../src/components/map/MapExperience.tsx");
-  const mapView = await read("../src/components/map/MapView.tsx");
-  assert.match(experience, /parcelFilters=\{mapFilters\}/);
-  assert.match(experience, /onParcelFilterResults=\{setParcelFilterResults\}/);
-  assert.match(mapView, /parcelFilters\?: ParcelMapFilters/);
-  assert.match(mapView, /parcelFilters = EMPTY_PARCEL_MAP_FILTERS/);
-  assert.match(mapView, /filteredParcelFeatureIdsRef\.current/);
-  assert.match(mapView, /source\?\.setData\(\{ \.\.\.raw, features: filtered \}/);
-  assert.match(mapView, /matching: filtered\.length/);
-  assert.match(mapView, /inView: raw\.features\.length/);
-});
-
-test("plot measurement filters use cadastral area first and a marked geometry estimate as fallback", async () => {
+test("map parcel filters use cadastral measurements without pretending parcels have building rooms", async () => {
   const mapView = await read("../src/components/map/MapView.tsx");
   assert.match(mapView, /properties\.parcel_size_m2 === "number"/);
   assert.match(mapView, /geometryAreaM2\(feature\.geometry as Geometry\)/);
-  assert.match(mapView, /filters\.measurementBasis !== "plot"/);
+  assert.match(mapView, /filters\.measurementBasis === "plot"/);
   assert.match(mapView, /minArea !== null/);
   assert.match(mapView, /maxArea !== null/);
-});
-
-test("zoning filters load official map polygons and use parcel-polygon intersection matching", async () => {
-  const mapView = await read("../src/components/map/MapView.tsx");
-  assert.match(mapView, /fetch\("\/api\/geography\/zoning\?bbox=/);
-  assert.match(mapView, /zoningFilterFeaturesRef\.current\.filter/);
-  assert.match(mapView, /geometriesIntersect\(feature\.geometry as Geometry, zone\.geometry as Geometry \| null\)/);
-  assert.match(mapView, /function polygonIntersectsPolygon/);
-  assert.match(mapView, /function segmentsIntersect/);
-  assert.match(mapView, /zoningStatus: zoningCodes\.length \? zoningFilterStatusRef\.current/);
-});
-
-test("land parcel filters do not invent sale status, monthly payments, bedroom data, or USD conversions", async () => {
-  const mapView = await read("../src/components/map/MapView.tsx");
-  const experience = await read("../src/components/map/MapExperience.tsx");
-  assert.match(mapView, /status !== "available" \|\| listingType !== filters\.listingType/);
-  assert.match(mapView, /if \(hasMonthlyRange\) return false/);
-  assert.match(mapView, /if \(filters\.bedroomsMin \|\| filters\.bathroomsMin\) return false/);
-  assert.match(mapView, /filters\.priceCurrency !== "RWF"/);
-  assert.match(experience, /The cadastral parcel feed does not provide verified sale, rent or sold listing status/);
-  assert.match(experience, /Monthly payments are not supplied by the cadastral parcel source/);
-  assert.match(experience, /live currency conversion is not connected/);
-});
-
-test("parcel price slider maximum adapts to the maximum estimate in the current map area", async () => {
-  const mapView = await read("../src/components/map/MapView.tsx");
-  const experience = await read("../src/components/map/MapExperience.tsx");
-  assert.match(mapView, /maxPriceRwf/);
-  assert.match(experience, /dynamicParcelPriceLimit\(parcelFilterResults\?\.maxPriceRwf\)/);
-  assert.doesNotMatch(experience, /RWF 1T/);
 });

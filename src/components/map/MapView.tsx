@@ -579,11 +579,31 @@ const EMPTY_PARCEL_MAP_FILTERS: ParcelMapFilters = {
   bathroomsExact: false
 };
 
+export type MarketListingMapPoint = {
+  id: string;
+  coordinates: [number, number];
+  priceLabel: string;
+  propertyType: string;
+  projectName: string | null;
+  buildingName: string | null;
+  unitLabel: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+};
+
+export type ParcelFilterScope = {
+  level: "district" | "sector" | "cell" | "village";
+  district: string | null;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+};
+
 export type ParcelFilterResults = {
   loaded: boolean;
   matching: number;
   inView: number;
-  maxPriceRwf: number | null;
+  scope: ParcelFilterScope | null;
   zoningStatus: "not-required" | "loading" | "ready" | "unavailable";
 };
 
@@ -597,6 +617,7 @@ type MapViewProps = {
   selectedArea: SelectedArea | null;
   parcelFilters?: ParcelMapFilters;
   onParcelFilterResults?: (results: ParcelFilterResults) => void;
+  marketListings?: MarketListingMapPoint[];
   projects?: RwandaProjectRecord[];
   showProjects?: boolean;
   selectedProjectId?: string | null;
@@ -1295,14 +1316,10 @@ function zoningFeatureMatchesCodes(
   codes: string[]
 ): boolean {
   const properties = (feature.properties ?? {}) as Record<string, unknown>;
-  const values = [
-    properties.zoning,
-    properties.new_zoning,
-    properties.zone_code,
-    properties.gen_lu,
-    properties.land_use,
-    properties.zoning_class
-  ].filter((value) => value !== null && value !== undefined).map(String);
+  const values = Object.entries(properties)
+    .filter(([key, value]) => value !== null && value !== undefined && /zoning|zone|land.?use|gen.?lu|lu.?code/i.test(key))
+    .map(([, value]) => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim())
+    .filter(Boolean);
   return codes.some((code) => {
     const pattern = new RegExp("(^|[^A-Z0-9])" + code + "($|[^A-Z0-9])", "i");
     return values.some((value) => pattern.test(value));
@@ -1323,6 +1340,7 @@ export function MapView({
   selectedArea,
   parcelFilters = EMPTY_PARCEL_MAP_FILTERS,
   onParcelFilterResults,
+  marketListings = [],
   projects = [],
   showProjects = false,
   selectedProjectId = null,
@@ -1331,6 +1349,8 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const projectsRef = useRef<RwandaProjectRecord[]>(projects);
+  const marketListingsRef = useRef<MarketListingMapPoint[]>(marketListings);
+  const refreshMarketListingsRef = useRef<(() => void) | null>(null);
   const showProjectsRef = useRef(showProjects);
   const selectedProjectIdRef = useRef<string | null>(selectedProjectId);
   const onProjectSelectedRef = useRef(onProjectSelected);
@@ -1427,6 +1447,11 @@ export function MapView({
     selectedAreaRef.current = selectedArea;
     selectionSyncRef.current?.(selectedArea);
   }, [selectedArea]);
+
+  useEffect(() => {
+    marketListingsRef.current = marketListings;
+    refreshMarketListingsRef.current?.();
+  }, [marketListings]);
 
   useEffect(() => {
     projectsRef.current = projects;
@@ -1950,67 +1975,34 @@ export function MapView({
       const matchingZones = zoningCodes.length
         ? zoningFilterFeaturesRef.current.filter((feature) => zoningFeatureMatchesCodes(feature, zoningCodes))
         : [];
-
-      const findAreaRate = (
-        level: "cell" | "sector" | "district",
-        district: string,
-        sector?: string | null,
-        cell?: string | null
-      ): number | null => {
-        const candidates = areaDataRef.current[level]?.features ?? [];
-        const found = candidates.find((feature) => {
-          const properties = feature.properties ?? {};
-          if (normalizeMetricKeyPart(properties.district) !== normalizeMetricKeyPart(district)) return false;
-          if (level !== "district" && normalizeMetricKeyPart(properties.sector) !== normalizeMetricKeyPart(sector)) return false;
-          if (level === "cell" && normalizeMetricKeyPart(properties.cell) !== normalizeMetricKeyPart(cell)) return false;
-          return true;
-        });
-        const value = found?.properties?.average_land_price_per_m2;
-        return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
-      };
-
-      const parcelPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
-        const properties = feature.properties ?? {};
-        if (
-          isParcelPriceType(properties.parcel_price_type) &&
-          typeof properties.parcel_price_value === "number" &&
-          Number.isFinite(properties.parcel_price_value) &&
-          properties.parcel_price_value > 0
-        ) return properties.parcel_price_value;
-
-        const area = typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
-          ? properties.parcel_size_m2
-          : geometryAreaM2(feature.geometry as Geometry);
-        if (!area) return null;
-        const district = properties.district ?? "";
-        if (!district) return null;
-        const rate =
-          (typeof properties.average_land_price_per_m2 === "number" && properties.average_land_price_per_m2 > 0
-            ? properties.average_land_price_per_m2
-            : null) ??
-          findAreaRate("cell", district, properties.sector, properties.cell) ??
-          findAreaRate("sector", district, properties.sector) ??
-          findAreaRate("district", district);
-        return rate ? calculateParcelAskingPrice(area, rate) : null;
-      };
-
       const hasPriceRange = Boolean(filters.priceMin || filters.priceMax);
-      const hasMonthlyRange = Boolean(filters.monthlyPaymentMin || filters.monthlyPaymentMax);
-      const hasPlotRange = Boolean(filters.measurementMin || filters.measurementMax);
-      const priceValues = raw.features.map((feature) => parcelPrice(feature));
-      const availablePrices = priceValues.filter((value): value is number => typeof value === "number" && value > 0);
-      const maxPriceRwf = availablePrices.length ? Math.max(...availablePrices) : null;
+      const hasPlotRange = Boolean(filters.measurementMin || filters.measurementMax) && filters.measurementBasis === "plot";
       const minPrice = filters.priceMin.trim() ? Number(filters.priceMin) : null;
       const maxPrice = filters.priceMax.trim() ? Number(filters.priceMax) : null;
       const minArea = filters.measurementMin.trim() ? Number(filters.measurementMin) : null;
       const maxArea = filters.measurementMax.trim() ? Number(filters.measurementMax) : null;
+      const landOnly = filters.propertyTypes.length > 0 &&
+        filters.propertyTypes.every((value) => value === "land" || value === "lots_land");
+      const zoningCanBeApplied = zoningCodes.length > 0 && zoningFilterStatusRef.current === "ready";
+      const hasParcelFilters = zoningCanBeApplied || hasPlotRange || landOnly ||
+        (filters.listingType !== "all" && raw.features.some((feature) => feature.properties?.market_status));
 
-      const filtered = raw.features.filter((feature, index) => {
+      const confirmedAskingPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
+        const properties = feature.properties ?? {};
+        if (
+          properties.parcel_price_type !== "confirmed-asking-price" ||
+          typeof properties.parcel_price_value !== "number" ||
+          !Number.isFinite(properties.parcel_price_value) ||
+          properties.parcel_price_value <= 0 ||
+          typeof properties.parcel_price_source !== "string" ||
+          !properties.parcel_price_source.trim()
+        ) return null;
+        return properties.parcel_price_value;
+      };
+
+      const filtered = raw.features.filter((feature) => {
         const properties = (feature.properties ?? {}) as Record<string, unknown>;
-        if (filters.propertyTypes.length && !filters.propertyTypes.every((value) => value === "land" || value === "lots_land")) {
-          return false;
-        }
-        if (filters.bedroomsMin || filters.bathroomsMin) return false;
+        if (filters.propertyTypes.length > 0 && !landOnly) return true;
 
         if (filters.listingType !== "all") {
           const status = String(properties.market_status ?? "").trim().toLowerCase().replace(/[ _]+/g, "-");
@@ -2022,17 +2014,14 @@ export function MapView({
           }
         }
 
-        if (hasMonthlyRange) return false;
         if (hasPriceRange) {
-          if (filters.priceCurrency !== "RWF") return false;
-          const price = priceValues[index];
-          if (price === null || price === undefined) return false;
+          const price = confirmedAskingPrice(feature);
+          if (price === null || filters.priceCurrency !== "RWF") return false;
           if (minPrice !== null && (!Number.isFinite(minPrice) || price < minPrice)) return false;
           if (maxPrice !== null && (!Number.isFinite(maxPrice) || price > maxPrice)) return false;
         }
 
         if (hasPlotRange) {
-          if (filters.measurementBasis !== "plot") return false;
           const area = typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
             ? properties.parcel_size_m2
             : geometryAreaM2(feature.geometry as Geometry);
@@ -2043,22 +2032,58 @@ export function MapView({
 
         if (zoningCodes.length) {
           if (zoningFilterStatusRef.current !== "ready" || matchingZones.length === 0) return false;
-          if (!matchingZones.some((zone) => geometriesIntersect(feature.geometry as Geometry, zone.geometry as Geometry | null))) return false;
+          if (!matchingZones.some((zone) =>
+            geometriesIntersect(feature.geometry as Geometry, zone.geometry as Geometry | null)
+          )) return false;
         }
         return true;
       });
 
-      filteredParcelFeatureIdsRef.current = new Set(
-        filtered.map((feature) => String(feature.id ?? feature.properties?.upi ?? ""))
-      );
+      const matchedParcelIds = new Set(filtered.map((feature) =>
+        String(feature.properties?.upi ?? feature.id ?? "")
+      ));
+      filteredParcelFeatureIdsRef.current = hasParcelFilters ? matchedParcelIds : null;
+
+      // Preserve every cadastral polygon. Filters change its visual match state;
+      // they never remove the underlying boundary geometry from the map source.
+      const renderedParcelData: MapFeatureCollection = {
+        ...raw,
+        features: raw.features.map((feature) => {
+          const id = String(feature.properties?.upi ?? feature.id ?? "");
+          return {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              filter_active: hasParcelFilters,
+              filter_match: !hasParcelFilters || matchedParcelIds.has(id)
+            }
+          };
+        })
+      };
       const source = map.getSource(AREA_LAYERS.parcel.source) as GeoJSONSource | undefined;
-      source?.setData({ ...raw, features: filtered } as MapFeatureCollection);
+      source?.setData(renderedParcelData);
+
+      const currentLevel = activeAreaLevelRef.current === "parcel" ? "village" : activeAreaLevelRef.current;
+      const mapCenter = map.getCenter();
+      const center: [number, number] = [mapCenter.lng, mapCenter.lat];
+      const scopeFeature = (areaDataRef.current[currentLevel]?.features ?? []).find((feature) =>
+        feature.geometry ? geometryContainsPoint(feature.geometry as Geometry, center) : false
+      );
+      const scopeProperties = (scopeFeature?.properties ?? {}) as Record<string, unknown>;
+      const selectedScope = selectedAreaRef.current;
+      const scope = {
+        level: currentLevel as "district" | "sector" | "cell" | "village",
+        district: typeof scopeProperties.district === "string" ? scopeProperties.district : selectedScope?.district ?? null,
+        sector: typeof scopeProperties.sector === "string" ? scopeProperties.sector : selectedScope?.sector ?? null,
+        cell: typeof scopeProperties.cell === "string" ? scopeProperties.cell : selectedScope?.cell ?? null,
+        village: typeof scopeProperties.village === "string" ? scopeProperties.village : selectedScope?.village ?? null
+      };
 
       onParcelFilterResultsRef.current?.({
         loaded: parcelDataLoadedRef.current,
         matching: filtered.length,
         inView: raw.features.length,
-        maxPriceRwf,
+        scope,
         zoningStatus: zoningCodes.length ? zoningFilterStatusRef.current : "not-required"
       });
       refreshMetricBubbles();
@@ -2066,7 +2091,30 @@ export function MapView({
     refreshParcelMapFiltersRef.current = refreshParcelMapFilters;
     refreshParcelMapFilters();
 
+    const refreshMarketListingMarkers = () => {
+      const source = map.getSource("market-listing-markers") as GeoJSONSource | undefined;
+      if (!source) return;
+      const features = marketListingsRef.current.map((listing) => ({
+        type: "Feature" as const,
+        id: listing.id,
+        geometry: { type: "Point" as const, coordinates: listing.coordinates },
+        properties: {
+          listing_id: listing.id,
+          price_label: listing.priceLabel,
+          property_type: listing.propertyType,
+          project_name: listing.projectName,
+          building_name: listing.buildingName,
+          unit_label: listing.unitLabel,
+          bedrooms: listing.bedrooms,
+          bathrooms: listing.bathrooms
+        }
+      }));
+      source.setData({ type: "FeatureCollection", features } as never);
+    };
+    refreshMarketListingsRef.current = refreshMarketListingMarkers;
+
     const refreshProjectMarkers = () => {
+      refreshMarketListingsRef.current?.();
       const source = map.getSource("project-markers") as GeoJSONSource | undefined;
       const layerIds = ["project-clusters", "project-cluster-count", "project-marker-circles", "project-marker-labels"];
       const visibility = showProjectsRef.current ? "visible" : "none";
@@ -2148,7 +2196,6 @@ export function MapView({
 
       projectCentersRef.current = nextCenters;
       source.setData({ type: "FeatureCollection", features } as never);
-
       const selectedId = selectedProjectIdRef.current;
       if (selectedId) {
         const target = nextCenters.get(selectedId);
@@ -2312,6 +2359,15 @@ export function MapView({
           clusterMaxZoom: 14
         });
       }
+      if (!map.getSource("market-listing-markers")) {
+        map.addSource("market-listing-markers", {
+          type: "geojson",
+          data: emptyFeatureCollection(),
+          cluster: true,
+          clusterRadius: 36,
+          clusterMaxZoom: 15
+        });
+      }
 
       // Add every fill first, then outlines, then labels. This keeps the base
       // road map visible underneath and makes boundary lines crisp at every level.
@@ -2352,6 +2408,7 @@ export function MapView({
               "case",
               ["boolean", ["feature-state", "selected"], false], "#149DB0",
               ["boolean", ["feature-state", "hover"], false], "#2CAFC1",
+              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], true]], "#159C83",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
@@ -2369,6 +2426,7 @@ export function MapView({
               "case",
               ["boolean", ["feature-state", "selected"], false], 0.98,
               ["boolean", ["feature-state", "hover"], false], 0.96,
+              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], false]], 0.55,
               level === "parcel" ? 0.95 : 0.92
             ]
           }
@@ -2498,6 +2556,75 @@ export function MapView({
           }
         });
       }
+      if (!map.getLayer("market-listing-clusters")) {
+        map.addLayer({
+          id: "market-listing-clusters",
+          type: "circle",
+          source: "market-listing-markers",
+          filter: ["has", "point_count"],
+          paint: {
+            "circle-radius": ["step", ["get", "point_count"], 13, 8, 17, 25, 21],
+            "circle-color": "#D71920",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.96
+          }
+        });
+      }
+      if (!map.getLayer("market-listing-cluster-count")) {
+        map.addLayer({
+          id: "market-listing-cluster-count",
+          type: "symbol",
+          source: "market-listing-markers",
+          filter: ["has", "point_count"],
+          layout: {
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 11,
+            "text-allow-overlap": true
+          },
+          paint: { "text-color": "#FFFFFF" }
+        });
+      }
+      if (!map.getLayer("market-listing-circles")) {
+        map.addLayer({
+          id: "market-listing-circles",
+          type: "circle",
+          source: "market-listing-markers",
+          filter: ["!", ["has", "point_count"]],
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4.5, 12, 6, 17, 8],
+            "circle-color": "#D71920",
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.98
+          }
+        });
+      }
+      if (!map.getLayer("market-listing-labels")) {
+        map.addLayer({
+          id: "market-listing-labels",
+          type: "symbol",
+          source: "market-listing-markers",
+          minzoom: 14,
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            "text-field": ["get", "price_label"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular", "Arial Unicode MS Regular"],
+            "text-size": 10,
+            "text-offset": [0, 1.15],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false
+          },
+          paint: {
+            "text-color": "#B4232B",
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 1.4
+          }
+        });
+      }
+
       if (!map.getLayer("project-clusters")) {
         map.addLayer({
           id: "project-clusters",
@@ -2570,6 +2697,7 @@ export function MapView({
           }
         });
       }
+      refreshMarketListingsRef.current?.();
 
     };
 
@@ -2988,6 +3116,10 @@ export function MapView({
         "project-cluster-count",
         "project-marker-circles",
         "project-marker-labels",
+        "market-listing-clusters",
+        "market-listing-cluster-count",
+        "market-listing-circles",
+        "market-listing-labels",
         "metric-bubbles-circle",
         "metric-bubbles-label",
         "metric-bubbles-parcel-label"
@@ -3436,7 +3568,7 @@ export function MapView({
               loaded: false,
               matching: 0,
               inView: 0,
-              maxPriceRwf: null,
+              scope: null,
               zoningStatus: parcelFiltersRef.current.zoningCodes.length ? zoningFilterStatusRef.current : "not-required"
             });
           }

@@ -6425,3 +6425,193 @@ input {
 .map-filter-price-columns {
   grid-template-columns: minmax(0, 1fr);
 }
+
+
+/* Price frequency bars are a passive distribution view; the range thumb is the only control. */
+.map-filter-histogram-bars {
+  display: grid;
+  min-height: 92px;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  padding: 14px 2px 7px;
+}
+
+.map-filter-histogram-bar {
+  display: block;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--brand);
+  opacity: .82;
+  pointer-events: none;
+}
+
+.map-filter-slider-value {
+  position: absolute;
+  z-index: 4;
+  top: -16px;
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-floating);
+  font-size: 10px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.map-filter-finance-terms {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.map-filter-finance-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.map-filter-finance-heading strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.map-filter-finance-heading small {
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.map-filter-finance-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.map-filter-finance-fields label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.map-filter-finance-fields label span {
+  color: var(--ink-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.map-filter-finance-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-filter-clear-local {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.map-filter-clear-local:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.map-filter-beds-columns {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.map-filter-beds-section {
+  padding: 12px 0;
+}
+
+.map-filter-beds-section + .map-filter-beds-section {
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--border);
+  border-left: 0;
+}
+
+.map-filter-beds-section h3 {
+  font-size: 12px;
+}
+
+.map-filter-bed-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.map-filter-bed-option {
+  min-width: 0;
+  min-height: 40px;
+}
+
+.map-filter-area-presets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.map-filter-area-preset {
+  min-height: 48px;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.map-filter-zone-rule {
+  display: grid;
+  gap: 4px;
+  padding: 9px 0 2px;
+}
+
+.map-filter-zone-rule strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.map-filter-zone-rule p {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .map-filter-finance-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .map-filter-bed-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
