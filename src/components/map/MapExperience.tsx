@@ -82,6 +82,7 @@ type MapFilterMenu = "sale" | "price" | "property" | "zoning" | "measurement" | 
 type MarketInventoryRow = {
   id: string;
   asking_amount: string;
+  filter_amount: string;
   currency: string;
   property_type: string;
   district: string;
@@ -1185,7 +1186,7 @@ export function MapExperience() {
     (marketInventory?.rows ?? []).flatMap((row) => {
       const latitude = Number(row.latitude);
       const longitude = Number(row.longitude);
-      const askingAmount = Number(row.asking_amount);
+      const askingAmount = Number(row.filter_amount || row.asking_amount);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
           latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 ||
           !Number.isFinite(askingAmount) || askingAmount <= 0) return [];
@@ -3061,7 +3062,7 @@ export function MapExperience() {
                           <>
                             <strong>Planning standards · {selectedZoneCodes.join(", ")}</strong>
                             {selectedZoneCodes.map((code) => {
-                              const isKigaliDistrict = ["Gasabo", "Kicukiro", "Nyarugenge"].includes(inventoryScope?.district ?? "");
+                              const isKigaliDistrict = ["Gasabo", "Kicukiro", "Nyarugenge"].includes(inventoryScope?.district ?? selectedArea?.district ?? "");
                               const kigaliRule = KIGALI_ZONE_PLOT_RULES[code];
                               return (
                                 <div className="map-filter-zone-rule" key={code}>
@@ -3273,8 +3274,7 @@ export function MapExperience() {
                             <button
                               aria-pressed={mapFilters.bathroomsMin === value}
                               className={mapFilters.bathroomsMin === value ? "map-filter-bed-option map-filter-bed-option-active" : "map-filter-bed-option"}
-                              disabled={bedsBathsDisabled}
-                              key={value || "any"}
+                                                            key={value || "any"}
                               onClick={() => setMapFilters((current) => ({ ...current, bathroomsMin: value, bathroomsExact: value ? current.bathroomsExact : false }))}
                               type="button"
                             >{index === 0 ? "Any" : value + "+"}</button>
