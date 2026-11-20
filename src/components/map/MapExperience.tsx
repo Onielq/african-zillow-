@@ -953,14 +953,6 @@ function getAreaParent(area: SelectedArea): string | null {
 }
 
 
-function dynamicParcelPriceLimit(maxPriceRwf: number | null | undefined): number {
-  if (typeof maxPriceRwf !== "number" || !Number.isFinite(maxPriceRwf) || maxPriceRwf <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(maxPriceRwf));
-  const ratio = maxPriceRwf / magnitude;
-  const rounded = ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 5 ? 5 : 10;
-  return rounded * magnitude;
-}
-
 type FilterPopoverPortalProps = {
   anchorRef: { current: HTMLButtonElement | null };
   popoverRef: { current: HTMLDivElement | null };
