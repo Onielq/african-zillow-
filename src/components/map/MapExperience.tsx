@@ -1000,6 +1000,7 @@ export function MapExperience() {
   const [activeFilterMenu, setActiveFilterMenu] = useState<MapFilterMenu>(null);
   const [zoningInfoOpen, setZoningInfoOpen] = useState(false);
   const [otherZoningOpen, setOtherZoningOpen] = useState(false);
+  const [activePriceTab, setActivePriceTab] = useState<"list" | "monthly">("list");
   const [zoningSearch, setZoningSearch] = useState("");
   const [mapFilters, setMapFilters] = useState<ParcelMapFilters>({
     listingType: "all",
@@ -2631,9 +2632,13 @@ export function MapExperience() {
                         <option value="USD">USD · US dollars</option>
                       </select>
                     </div>
-                                        <div className="map-filter-price-columns">
+                                        <div className="map-filter-price-tabs" role="tablist" aria-label="Price range type">
+                      <button aria-pressed={activePriceTab === "list"} className={activePriceTab === "list" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("list")} type="button">List price</button>
+                      <button aria-pressed={activePriceTab === "monthly"} className={activePriceTab === "monthly" ? "map-filter-price-tab map-filter-price-tab-active" : "map-filter-price-tab"} onClick={() => setActivePriceTab("monthly")} type="button">Monthly payment</button>
+                    </div>
+                    <div className="map-filter-price-columns">
                       {([
-                        {
+                        activePriceTab === "list" ? {
                           key: "list" as const,
                           title: "List price",
                           minimum: mapFilters.priceMin,
@@ -2641,8 +2646,7 @@ export function MapExperience() {
                           minKey: "priceMin" as const,
                           maxKey: "priceMax" as const,
                           summary: listPriceSummary
-                        },
-                        {
+                        } : {
                           key: "monthly" as const,
                           title: "Monthly payment",
                           minimum: mapFilters.monthlyPaymentMin,
