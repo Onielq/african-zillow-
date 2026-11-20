@@ -236,7 +236,6 @@ function filterPriceRangeSummary(
   minimum: string,
   maximum: string,
   currency: "RWF" | "USD",
-  limit: number
 ): string {
   const min = minimum ? formatFilterAmount(Math.max(0, Number(minimum)), currency) : "";
   const max = maximum ? formatFilterAmount(Math.max(0, Number(maximum)), currency) : "";
@@ -282,10 +281,6 @@ function GroupedNumericInput({
 }: GroupedNumericInputProps) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(value);
-
-  useEffect(() => {
-    if (!focused) setDraft(value);
-  }, [focused, value]);
 
   return (
     <input
@@ -1303,8 +1298,8 @@ export function MapExperience() {
     }
     return "Listing counts and prices use current, source-authorized asking-price records in the visible map area.";
   })();
-  const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency, sliderLimit);
-  const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency, sliderLimit);
+  const listPriceSummary = filterPriceRangeSummary(mapFilters.priceMin, mapFilters.priceMax, mapFilters.priceCurrency);
+  const monthlyPaymentSummary = filterPriceRangeSummary(mapFilters.monthlyPaymentMin, mapFilters.monthlyPaymentMax, mapFilters.priceCurrency);
   const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
   const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
@@ -3061,7 +3056,7 @@ export function MapExperience() {
                               const nextTypes = withoutOtherKind.includes(option.value)
                                 ? withoutOtherKind.filter((value) => value !== option.value)
                                 : [...withoutOtherKind, option.value];
-                              const landOnly = nextTypes.length > 0 && nextTypes.every((value) => value === "land" || value === "lots_land");
+                              const landOnly = nextTypes.length > 0 && nextTypes.every((value) => value === "land");
                               const nextMeasurementBasis = landOnly ? "plot" : nextTypes.length > 0 ? "interior" : current.measurementBasis;
                               const measurementBasisChanged = nextMeasurementBasis !== current.measurementBasis;
                               return {
