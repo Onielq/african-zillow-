@@ -217,8 +217,8 @@ test("price tabs keep independent list and monthly values", async () => {
   assert.match(source, /filterPriceRangeSummary\(mapFilters\.monthlyPaymentMin, mapFilters\.monthlyPaymentMax/);
   assert.match(source, /updatePriceSlider\(range\.key, "min"/);
   assert.match(source, /updatePriceSlider\(range\.key, "max"/);
-  assert.match(styles, /\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.map-filter-price-columns\s*\{[\s\S]*?grid-template-columns: 1fr/);
+  assert.match(styles, /\.map-filter-price-tabs\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.map-filter-price-tab-active/);
 });
 
 
