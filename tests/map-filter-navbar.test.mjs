@@ -333,6 +333,7 @@ test("camera movement does not silently launch another area search", async () =>
   assert.doesNotMatch(schedule, /refreshAreas\(\)/);
   assert.match(mapView, /lastSearchedViewportKey = requestedViewportKey/);
   assert.match(mapView, /visibleIds\.size\.toLocaleString/);
+  assert.match(mapView, /No mapped " \+ unit \+ " in this view/);
 });
 
 test("price tab switching keeps a stable popover placement", async () => {
