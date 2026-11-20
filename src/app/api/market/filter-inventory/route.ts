@@ -123,6 +123,37 @@ export async function GET(request: NextRequest) {
            AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
            AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
            AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+        UNION ALL
+        SELECT l.asking_amount::numeric AS asking_amount,
+               l.currency,
+               p.property_type,
+               p.bedrooms,
+               p.bathrooms,
+               p.internal_area_sqm,
+               p.plot_area_sqm,
+               p.cell_label,
+               p.payload
+          FROM reja.exchange_listings l
+          JOIN reja.market_properties p ON p.id = l.market_property_id AND p.is_current = true
+         WHERE l.publication_status = 'published'
+           AND (l.expires_at IS NULL OR l.expires_at > now())
+           AND l.listing_type = 'sale'
+           AND l.currency = ${currency}
+           AND lower(p.district_label) = lower(${district})
+           AND (${sector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${sector}))
+           AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
+           AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+           AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
+           AND (${bedroomsMin}::int IS NULL OR p.bedrooms IS NOT NULL AND (${bedroomsExact} IS TRUE AND p.bedrooms = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND p.bedrooms >= ${bedroomsMin}))
+           AND (${bathroomsMin}::numeric IS NULL OR p.bathrooms IS NOT NULL AND (${bathroomsExact} IS TRUE AND p.bathrooms = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND p.bathrooms >= ${bathroomsMin}))
+           AND (${areaMin}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) >= ${areaMin})
+           AND (${areaMax}::numeric IS NULL OR (CASE WHEN ${areaBasis} = 'interior' THEN p.internal_area_sqm ELSE p.plot_area_sqm END) <= ${areaMax})
+           AND reja.has_verified_listing_authorization(
+             l.listing_authorization_id,
+             l.market_property_id,
+             l.seller_user_id,
+             l.seller_organization_id
+           )
       ),
       valued AS (
         SELECT CASE
