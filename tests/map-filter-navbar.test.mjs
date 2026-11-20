@@ -166,7 +166,7 @@ test("measurement ranges are independent, attractive and locally clearable", asy
   assert.match(source, /500–700/);
   assert.match(source, /700–800/);
   assert.match(source, /800\+/);
-  assert.match(source, /Clear measurement/);
+  assert.match(source, /Clear entered measurements/);
   assert.match(styles, /\.map-filter-clear-local/);
   assert.match(source, /measurementBasis: "plot", measurementMin: "", measurementMax: ""/);
   assert.match(source, /measurementBasis: "interior", measurementMin: "", measurementMax: ""/);
@@ -221,4 +221,97 @@ test("map parcel filters use cadastral measurements without pretending parcels h
   assert.match(mapView, /filters\.measurementBasis === "plot"/);
   assert.match(mapView, /minArea !== null/);
   assert.match(mapView, /maxArea !== null/);
+});
+
+
+test("measurement presets select on first click and clear on the second click", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /current\.measurementPreset === preset\.value\s*\? \{ \.\.\.current, measurementPreset: "", measurementMin: "", measurementMax: "" \}/);
+  assert.match(source, /measurementPreset: preset\.value, measurementMin: preset\.min, measurementMax: preset\.max/);
+  assert.match(source, /Clear entered measurements/);
+  assert.match(source, /\(mapFilters\.measurementMin \|\| mapFilters\.measurementMax\) && !mapFilters\.measurementPreset/);
+});
+
+test("measurement and room filters provide a See results action", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /measurementResultCount/);
+  assert.match(source, /See " \+ \(measurementResultCount/);
+  assert.match(source, /marketInventory\?\.total/);
+  assert.match(source, /See " \+ \(marketInventory\?\.total/);
+  assert.match(source, /Bedrooms/);
+  assert.match(source, /Bathrooms/);
+});
+
+test("monthly payment does not render a histogram; list price retains the histogram and draggable handles", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const listStart = source.indexOf('activePriceTab === "list" ?');
+  const monthlyStart = source.indexOf('<div className="map-filter-monthly-content">', listStart);
+  const listPanel = source.slice(listStart, monthlyStart);
+  const monthlyEnd = source.indexOf('</div>\n                    </div>\n                    <div className="map-filter-result-footer">', monthlyStart);
+  const monthlyPanel = source.slice(monthlyStart, monthlyEnd);
+  assert.notEqual(listStart, -1);
+  assert.notEqual(monthlyStart, -1);
+  assert.match(listPanel, /map-filter-histogram/);
+  assert.match(listPanel, /type="range"/);
+  assert.match(listPanel, /updatePriceSlider\("list"/);
+  assert.doesNotMatch(monthlyPanel, /map-filter-histogram/);
+  assert.doesNotMatch(monthlyPanel, /type="range"/);
+  assert.match(source, /className="map-filter-price-content"/);
+  assert.match(source, /className="map-filter-monthly-content"/);
+  assert.doesNotMatch(listPanel, /disabled=\{activePriceLimit/);
+  assert.match(source, /fallbackPriceScale/);
+  assert.match(source, /No verified inventory maximum is connected/);
+});
+
+test("filter money and area inputs show thousands separators", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /new Intl\.NumberFormat\("en-US", \{\s*useGrouping: true/);
+  assert.match(source, /function formatGroupedInput/);
+  assert.match(source, /function GroupedNumericInput/);
+  assert.match(source, /GroupedNumericInput ariaLabel="List price minimum"/);
+  assert.match(source, /GroupedNumericInput ariaLabel="List price maximum"/);
+  assert.match(source, /GroupedNumericInput ariaLabel="Minimum area in square metres"/);
+  assert.match(source, /GroupedNumericInput ariaLabel="Maximum area in square metres"/);
+  assert.match(source, /GroupedNumericInput ariaLabel="Down payment amount"/);
+});
+
+test("land and lots are one property category", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /value: "land", label: "Land & lots"/);
+  assert.doesNotMatch(source, /value: "lots_land", label: "Lots & Land"/);
+  assert.doesNotMatch(source, /const isLand = option\.value === "land" \|\| option\.value === "lots_land"/);
+  assert.match(source, /nextTypes\.every\(\(value\) => value === "land"\)/);
+});
+
+test("current location is available through the map's geolocation control", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(mapView, /GeolocateControl/);
+  assert.match(mapView, /enableHighAccuracy: true/);
+  assert.match(mapView, /trackUserLocation: false/);
+  assert.match(mapView, /showUserLocation: true/);
+  assert.match(mapView, /showAccuracyCircle: true/);
+  assert.match(mapView, /fitBoundsOptions: \{ maxZoom: 16\.5 \}/);
+  assert.match(mapView, /"top-right"/);
+  assert.match(styles, /\.maplibregl-ctrl-geolocate/);
+});
+
+test("map filter selected states use high-contrast amber without changing the global brand palette", async () => {
+  const styles = await read("../src/app/globals.css");
+  assert.match(styles, /--map-filter-accent: #B45309/);
+  assert.match(styles, /--map-filter-accent-tint: #FFF1DF/);
+  assert.match(styles, /\.map-filter-trigger-active[\s\S]*?var\(--map-filter-accent\)/);
+  assert.match(styles, /\.map-filter-area-preset-active[\s\S]*?var\(--map-filter-accent\)/);
+  assert.match(styles, /\.map-filter-dual-slider-range[\s\S]*?var\(--map-filter-accent\)/);
+  assert.match(styles, /\.map-filter-price-tab-active[\s\S]*?var\(--map-filter-accent\)/);
+});
+
+test("price tab switching keeps a stable popover placement", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  assert.match(source, /placementRef = useRef<"below" \| "above" \| null>\(null\)/);
+  assert.match(source, /placementRef\.current = roomBelow >= 280 \|\| roomBelow >= roomAbove \? "below" : "above"/);
+  assert.match(source, /maxHeight: availableHeight/);
+  assert.match(styles, /\.map-filter-price-content\s*\{[\s\S]*?min-height: 320px/);
+  assert.match(styles, /\.map-filter-monthly-content\s*\{[\s\S]*?min-height: 320px/);
 });

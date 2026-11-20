@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   AttributionControl,
+  GeolocateControl,
   Map as MapLibreMap,
   NavigationControl,
   ScaleControl,
@@ -1531,6 +1532,16 @@ export function MapView({
     map.addControl(
       new NavigationControl({ showCompass: true, visualizePitch: false }),
       "bottom-right"
+    );
+    map.addControl(
+      new GeolocateControl({
+        positionOptions: { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
+        trackUserLocation: false,
+        showUserLocation: true,
+        showAccuracyCircle: true,
+        fitBoundsOptions: { maxZoom: 16.5 }
+      }),
+      "top-right"
     );
     map.addControl(new ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
     map.addControl(
