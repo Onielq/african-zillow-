@@ -6424,9 +6424,9 @@ input {
 
 .map-filter-price-tab-active {
   border-color: var(--map-filter-accent);
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 7%);
+  background: var(--map-filter-accent-tint);
+  color: var(--map-filter-accent);
+  box-shadow: 0 1px 2px rgb(180 83 9 / 12%);
 }
 
 .map-filter-price-columns {
