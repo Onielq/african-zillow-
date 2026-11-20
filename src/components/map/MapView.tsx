@@ -579,11 +579,19 @@ const EMPTY_PARCEL_MAP_FILTERS: ParcelMapFilters = {
   bathroomsExact: false
 };
 
+export type ParcelFilterScope = {
+  level: "district" | "sector" | "cell" | "village";
+  district: string | null;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+};
+
 export type ParcelFilterResults = {
   loaded: boolean;
   matching: number;
   inView: number;
-  maxPriceRwf: number | null;
+  scope: ParcelFilterScope | null;
   zoningStatus: "not-required" | "loading" | "ready" | "unavailable";
 };
 
@@ -1295,14 +1303,10 @@ function zoningFeatureMatchesCodes(
   codes: string[]
 ): boolean {
   const properties = (feature.properties ?? {}) as Record<string, unknown>;
-  const values = [
-    properties.zoning,
-    properties.new_zoning,
-    properties.zone_code,
-    properties.gen_lu,
-    properties.land_use,
-    properties.zoning_class
-  ].filter((value) => value !== null && value !== undefined).map(String);
+  const values = Object.entries(properties)
+    .filter(([key, value]) => value !== null && value !== undefined && /zoning|zone|land.?use|gen.?lu|lu.?code/i.test(key))
+    .map(([, value]) => String(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim())
+    .filter(Boolean);
   return codes.some((code) => {
     const pattern = new RegExp("(^|[^A-Z0-9])" + code + "($|[^A-Z0-9])", "i");
     return values.some((value) => pattern.test(value));
