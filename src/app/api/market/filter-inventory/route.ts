@@ -17,14 +17,14 @@ function json(status: number, data: Record<string, unknown>) {
 function positiveNumber(value: string | null, maximum: number): number | null {
   if (value === null || value.trim() === "") return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= maximum ? parsed : null;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= maximum ? parsed : Number.NaN;
 }
 
 function positiveInteger(value: string | null, maximum: number): number | null {
   if (value === null || value.trim() === "") return null;
-  if (!/^\\d+$/.test(value.trim())) return null;
+  if (!/^\\d+$/.test(value.trim())) return Number.NaN;
   const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= maximum ? parsed : null;
+  return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= maximum ? parsed : Number.NaN;
 }
 
 export async function GET(request: NextRequest) {
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
   const areaBasis = params.get("areaBasis") === "interior" ? "interior" : "plot";
   const areaMin = positiveNumber(params.get("areaMin"), 10_000_000);
   const areaMax = positiveNumber(params.get("areaMax"), 10_000_000);
-  const priceMin = positiveNumber(params.get("priceMin"), 1_000_000_000_000);
-  const priceMax = positiveNumber(params.get("priceMax"), 1_000_000_000_000);
-  const downPayment = positiveNumber(params.get("downPayment"), 1_000_000_000_000);
+  const priceMin = positiveNumber(params.get("priceMin"), Number.MAX_SAFE_INTEGER);
+  const priceMax = positiveNumber(params.get("priceMax"), Number.MAX_SAFE_INTEGER);
+  const downPayment = positiveNumber(params.get("downPayment"), Number.MAX_SAFE_INTEGER);
   const annualRate = positiveNumber(params.get("annualRate"), 30);
   const loanMonths = positiveInteger(params.get("loanMonths"), 360);
 
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
   if (scopeLevel === "cell" && !cell) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its cell." });
   if (scopeLevel === "village" && !village) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its village." });
   if (!["RWF", "USD"].includes(currency)) return json(400, { ok: false, dataStatus: "invalid_currency", message: "Choose one supported listing currency." });
+  if ([priceMin, priceMax, downPayment, annualRate, bathroomsMin, areaMin, areaMax, bedroomsMin, loanMonths].some((value) => value !== null && Number.isNaN(value))) return json(400, { ok: false, dataStatus: "invalid_numeric_value", message: "Filter and finance values must be valid non-negative numbers within supported input limits." });
   if (!["list", "monthly"].includes(mode)) return json(400, { ok: false, dataStatus: "invalid_mode", message: "Price mode must be list or monthly." });
   if (priceMin !== null && priceMax !== null && priceMin > priceMax) return json(400, { ok: false, dataStatus: "invalid_price_range", message: "Maximum price must be greater than minimum." });
   if (areaMin !== null && areaMax !== null && areaMin > areaMax) return json(400, { ok: false, dataStatus: "invalid_area_range", message: "Maximum area must be greater than minimum." });
@@ -191,6 +192,7 @@ export async function GET(request: NextRequest) {
     const rows = await database`
       SELECT l.id::text AS id,
              l.asking_amount::text AS asking_amount,
+             (CASE WHEN ${mode} = 'list' THEN l.asking_amount WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term} ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} / (1 - power(1 + ${financeRate}, -${term})) END)::text AS filter_amount,
              l.currency,
              l.property_type,
              l.district_label AS district,
@@ -257,6 +259,7 @@ export async function GET(request: NextRequest) {
     const exchangeRows = await database`
       SELECT ('exchange:' || l.id::text) AS id,
              l.asking_amount::text AS asking_amount,
+             (CASE WHEN ${mode} = 'list' THEN l.asking_amount WHEN ${financeRate} = 0 THEN GREATEST(l.asking_amount - ${downPayment}, 0) / ${term} ELSE GREATEST(l.asking_amount - ${downPayment}, 0) * ${financeRate} / (1 - power(1 + ${financeRate}, -${term})) END)::text AS filter_amount,
              l.currency,
              p.property_type,
              p.district_label AS district,
