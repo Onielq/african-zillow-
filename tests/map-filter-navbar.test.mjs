@@ -193,8 +193,11 @@ test("zoning information points to official plan sources and avoids universal pl
   assert.match(source, /Forestation/);
 });
 
-test("list price and monthly payment are visible as two independent side-by-side sections", async () => {
+test("list price and monthly payment use independent segmented tabs", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /className="map-filter-price-tabs"/);
+  assert.match(source, /activePriceTab === "list"/);
+  assert.match(source, /activePriceTab === "monthly"/);
   assert.match(source, /className="map-filter-price-columns"/);
   assert.match(source, /title: "List price"/);
   assert.match(source, /title: "Monthly payment"/);
@@ -207,7 +210,7 @@ test("list price and monthly payment are visible as two independent side-by-side
 });
 
 
-test("the two price sections receive separate sliders and remain side by side on desktop", async () => {
+test("price tabs keep independent list and monthly values", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
   const styles = await read("../src/app/globals.css");
   assert.match(source, /filterPriceRangeSummary\(mapFilters\.priceMin, mapFilters\.priceMax/);
