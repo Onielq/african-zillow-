@@ -86,6 +86,46 @@ export async function GET(request: NextRequest) {
       return json(503, { ok: false, dataStatus: "unsafe_database_role", message: "The market inventory requires the restricted read-only database role." });
     }
 
+    const schemaRows = await database`
+      SELECT
+        (
+          SELECT count(*) = 4
+            FROM information_schema.columns
+           WHERE table_schema = 'reja'
+             AND table_name = 'sources'
+             AND column_name IN ('license_status', 'commercial_use_allowed', 'redistribution_allowed', 'caching_allowed')
+        ) AS source_permissions_ready,
+        (
+          SELECT count(*) = 5
+            FROM information_schema.columns
+           WHERE table_schema = 'reja'
+             AND table_name = 'exchange_listings'
+             AND column_name IN ('market_property_id', 'listing_authorization_id', 'seller_user_id', 'seller_organization_id', 'publication_status')
+        ) AS exchange_authorization_ready,
+        to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL AS authorization_helper_ready
+    `;
+    const schema = schemaRows[0] as {
+      source_permissions_ready?: boolean;
+      exchange_authorization_ready?: boolean;
+      authorization_helper_ready?: boolean;
+    } | undefined;
+    if (
+      !schema?.source_permissions_ready ||
+      !schema.exchange_authorization_ready ||
+      !schema.authorization_helper_ready
+    ) {
+      return json(503, {
+        ok: false,
+        dataStatus: "schema_incomplete",
+        total: 0,
+        minimum: null,
+        maximum: null,
+        histogram: [],
+        rows: [],
+        message: "The connected REJA database does not yet expose the complete source-permission and first-party authorization schema required for public inventory. Apply the reviewed REJA schema migrations before enabling live listing filters."
+      });
+    }
+
     const propertyTypeArray = propertyTypes.length ? propertyTypes : null;
     const scopeCell = scopeLevel === "cell" || scopeLevel === "village" ? cell : null;
     const scopeVillage = scopeLevel === "village" ? village : null;
