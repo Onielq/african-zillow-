@@ -604,6 +604,7 @@ export type ParcelFilterResults = {
   loaded: boolean;
   matching: number;
   inView: number;
+  bounds: [number, number, number, number];
   scope: ParcelFilterScope | null;
   zoningStatus: "not-required" | "loading" | "ready" | "unavailable";
 };
@@ -1381,6 +1382,8 @@ export function MapView({
   const zoningFilterStatusRef = useRef<ParcelFilterResults["zoningStatus"]>("not-required");
   const filteredParcelFeatureIdsRef = useRef<Set<string> | null>(null);
   const parcelDataLoadedRef = useRef(false);
+  const runViewportSearchRef = useRef<(() => Promise<void>) | null>(null);
+  const viewportSearchPendingRef = useRef(false);
 
   // Change only the style, not the map instance. Camera position and the
   // administrative zoom hierarchy therefore remain connected to the same map.
@@ -1493,6 +1496,10 @@ export function MapView({
     const previousZones = parcelFiltersRef.current.zoningCodes.join("|");
     parcelFiltersRef.current = parcelFilters;
     onParcelFilterResultsRef.current = onParcelFilterResults;
+    if (viewportSearchPendingRef.current && runViewportSearchRef.current) {
+      void runViewportSearchRef.current();
+      return;
+    }
     if (previousZones !== parcelFilters.zoningCodes.join("|")) {
       zoningFilterStatusRef.current = parcelFilters.zoningCodes.length ? "loading" : "not-required";
       refreshParcelMapFiltersRef.current?.();
@@ -1587,9 +1594,11 @@ export function MapView({
       const currentKey = getViewportSearchKey();
       if (lastSearchedViewportKey === null) {
         lastSearchedViewportKey = currentKey;
+        viewportSearchPendingRef.current = false;
         return;
       }
       if (currentKey === lastSearchedViewportKey) {
+        viewportSearchPendingRef.current = false;
         if (searchControl.dataset.state === "pending" && !viewportSearchRunning) {
           if (lastSearchResultText) {
             searchControl.dataset.state = "complete";
@@ -1601,6 +1610,7 @@ export function MapView({
         }
         return;
       }
+      viewportSearchPendingRef.current = true;
       searchControl.hidden = false;
       searchControl.dataset.state = "pending";
       searchControl.setAttribute("aria-busy", "false");
@@ -2043,6 +2053,7 @@ export function MapView({
         ? zoningFilterFeaturesRef.current.filter((feature) => zoningFeatureMatchesCodes(feature, zoningCodes))
         : [];
       const hasPriceRange = Boolean(filters.priceMin || filters.priceMax);
+      const hasParcelPriceRange = hasPriceRange && filters.priceCurrency === "RWF";
       const hasPlotRange = Boolean(filters.measurementMin || filters.measurementMax) && filters.measurementBasis === "plot";
       const minPrice = filters.priceMin.trim() ? Number(filters.priceMin) : null;
       const maxPrice = filters.priceMax.trim() ? Number(filters.priceMax) : null;
@@ -2051,26 +2062,101 @@ export function MapView({
       const landOnly = filters.propertyTypes.length > 0 &&
         filters.propertyTypes.every((value) => value === "land" || value === "lots_land");
       const zoningCanBeApplied = zoningCodes.length > 0 && zoningFilterStatusRef.current === "ready";
-      const hasParcelFilters = zoningCanBeApplied || hasPlotRange || landOnly ||
+      const hasParcelFilters = zoningCanBeApplied || hasParcelPriceRange || hasPlotRange || landOnly ||
         (filters.listingType !== "all" && raw.features.some((feature) => feature.properties?.market_status));
 
-      const confirmedAskingPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
+      const priceByCell = new Map<string, number>();
+      for (const feature of (areaDataRef.current.cell ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (typeof unitPrice === "number" && Number.isFinite(unitPrice) && unitPrice > 0) {
+          priceByCell.set(normalizedMetricKey(properties.district, properties.sector, properties.cell), unitPrice);
+        }
+      }
+      const priceBySector = new Map<string, number>();
+      for (const feature of (areaDataRef.current.sector ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (
+          typeof unitPrice === "number" && Number.isFinite(unitPrice) && unitPrice > 0 &&
+          properties.district && properties.sector
+        ) {
+          priceBySector.set(normalizedMetricKey(properties.district, properties.sector), unitPrice);
+        }
+      }
+      const priceByDistrict = new Map<string, number>();
+      for (const feature of (areaDataRef.current.district ?? emptyFeatureCollection()).features) {
+        const properties = feature.properties ?? {};
+        const unitPrice = properties.average_land_price_per_m2;
+        if (typeof unitPrice === "number" && Number.isFinite(unitPrice) && unitPrice > 0 && properties.district) {
+          priceByDistrict.set(normalizeMetricKeyPart(properties.district), unitPrice);
+        }
+      }
+
+      // Match exactly the price capsule used by the parcel layer: a sourced
+      // parcel value first, otherwise parcel area × the best available
+      // transaction-price-per-m² snapshot. This remains an estimate, not a
+      // verified listing price.
+      const parcelMapPrice = (feature: MapFeatureCollection["features"][number]): number | null => {
         const properties = feature.properties ?? {};
         if (
-          properties.parcel_price_type !== "confirmed-asking-price" ||
-          typeof properties.parcel_price_value !== "number" ||
-          !Number.isFinite(properties.parcel_price_value) ||
-          properties.parcel_price_value <= 0 ||
-          typeof properties.parcel_price_source !== "string" ||
-          !properties.parcel_price_source.trim()
-        ) return null;
-        return properties.parcel_price_value;
+          isParcelPriceType(properties.parcel_price_type) &&
+          typeof properties.parcel_price_value === "number" &&
+          Number.isFinite(properties.parcel_price_value) &&
+          properties.parcel_price_value > 0 &&
+          typeof properties.parcel_price_source === "string" &&
+          properties.parcel_price_source.trim().length > 0
+        ) return properties.parcel_price_value;
+
+        const cadastralArea = typeof properties.parcel_size_m2 === "number" && properties.parcel_size_m2 > 0
+          ? properties.parcel_size_m2
+          : null;
+        const parcelArea = cadastralArea ?? geometryAreaM2(feature.geometry as Geometry);
+        if (parcelArea === null || !Number.isFinite(parcelArea) || parcelArea <= 0) return null;
+
+        const directUnitPrice = properties.average_land_price_per_m2;
+        const cellPrice = priceByCell.get(normalizedMetricKey(properties.district, properties.sector, properties.cell));
+        const sectorPrice = properties.district && properties.sector
+          ? priceBySector.get(normalizedMetricKey(properties.district, properties.sector))
+          : undefined;
+        const districtPrice = properties.district
+          ? priceByDistrict.get(normalizeMetricKeyPart(properties.district))
+          : undefined;
+        const unitPrice = typeof directUnitPrice === "number" && Number.isFinite(directUnitPrice) && directUnitPrice > 0
+          ? directUnitPrice
+          : cellPrice ?? sectorPrice ?? districtPrice;
+        if (typeof unitPrice !== "number" || !Number.isFinite(unitPrice) || unitPrice <= 0) return null;
+        return calculateParcelAskingPrice(parcelArea, unitPrice);
       };
 
-      const filtered = raw.features.filter((feature) => {
-        const properties = (feature.properties ?? {}) as Record<string, unknown>;
-        if (filters.propertyTypes.length > 0 && !landOnly) return true;
+      // A map filter applies to the exact screen footprint, not every parcel
+      // included in the coarser cached boundary request.
+      const bounds = map.getBounds();
+      const viewportBounds: ViewBounds = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ];
+      const viewportGeometry: Geometry = {
+        type: "Polygon",
+        coordinates: [[
+          [viewportBounds[0], viewportBounds[1]],
+          [viewportBounds[2], viewportBounds[1]],
+          [viewportBounds[2], viewportBounds[3]],
+          [viewportBounds[0], viewportBounds[3]],
+          [viewportBounds[0], viewportBounds[1]]
+        ]]
+      };
+      const viewportFeatures = raw.features.filter((feature) =>
+        feature.geometry && geometriesIntersect(feature.geometry as Geometry, viewportGeometry)
+      );
 
+      const filtered = viewportFeatures.filter((feature) => {
+        const properties = (feature.properties ?? {}) as Record<string, unknown>;
+        // Property type and room-count filters apply to verified listing/unit
+        // records, not cadastral geometry. They must not short-circuit parcel
+        // zoning, size, or map-price filters.
         if (filters.listingType !== "all") {
           const status = String(properties.market_status ?? "").trim().toLowerCase().replace(/[ _]+/g, "-");
           const listingType = String(properties.listing_type ?? "").trim().toLowerCase();
@@ -2081,9 +2167,9 @@ export function MapView({
           }
         }
 
-        if (hasPriceRange) {
-          const price = confirmedAskingPrice(feature);
-          if (price === null || filters.priceCurrency !== "RWF") return false;
+        if (hasParcelPriceRange) {
+          const price = parcelMapPrice(feature);
+          if (price === null) return false;
           if (minPrice !== null && (!Number.isFinite(minPrice) || price < minPrice)) return false;
           if (maxPrice !== null && (!Number.isFinite(maxPrice) || price > maxPrice)) return false;
         }
@@ -2149,7 +2235,8 @@ export function MapView({
       onParcelFilterResultsRef.current?.({
         loaded: parcelDataLoadedRef.current,
         matching: filtered.length,
-        inView: raw.features.length,
+        inView: viewportFeatures.length,
+        bounds: viewportBounds,
         scope,
         zoningStatus: zoningCodes.length ? zoningFilterStatusRef.current : "not-required"
       });
@@ -2158,7 +2245,7 @@ export function MapView({
     refreshParcelMapFiltersRef.current = refreshParcelMapFilters;
     refreshParcelMapFilters();
 
-    const refreshMarketListingMarkers = () => {
+        const refreshMarketListingMarkers = () => {
       const source = map.getSource("market-listing-markers") as GeoJSONSource | undefined;
       if (!source) return;
       const features = marketListingsRef.current.map((listing) => ({
@@ -4244,6 +4331,8 @@ export function MapView({
         }
 
         lastSearchedViewportKey = requestedViewportKey;
+        viewportSearchPendingRef.current = false;
+        refreshParcelMapFiltersRef.current?.();
         refreshMetricBubbles();
         const activeLevel = resolveActiveAreaLevel();
         const layerId = AREA_LAYERS[activeLevel].fill;
@@ -4276,6 +4365,7 @@ export function MapView({
         }
       }
     };
+    runViewportSearchRef.current = runViewportSearch;
 
     const scheduleRefresh = () => {
       if (parcelRefreshRetryTimer !== null) {
@@ -4662,6 +4752,8 @@ export function MapView({
       refreshShowOverlaysRef.current = null;
       refreshZoningRef.current = null;
       refreshMetricBubblesRef.current = null;
+      runViewportSearchRef.current = null;
+      viewportSearchPendingRef.current = false;
       areaDataRef.current = {};
       if (fallbackTimer) clearTimeout(fallbackTimer);
       activeController?.abort();
