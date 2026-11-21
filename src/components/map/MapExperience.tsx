@@ -1161,7 +1161,26 @@ export function MapExperience() {
   const filterPopoverRef = useRef<HTMLDivElement>(null);
   const inventoryScope = parcelFilterResults?.scope ?? null;
   const inventoryScopeKey = inventoryScope
-    ? [inventoryScope.level, inventoryScope.district, ...inventoryScope.bounds].join("|")
+    ? [
+        inventoryScope.level,
+        inventoryScope.district,
+        ...inventoryScope.bounds,
+        mapFilters.priceCurrency,
+        activePriceTab,
+        activePriceTab === "list" ? mapFilters.priceMin : mapFilters.monthlyPaymentMin,
+        activePriceTab === "list" ? mapFilters.priceMax : mapFilters.monthlyPaymentMax,
+        mapFilters.propertyTypes.join(","),
+        mapFilters.measurementBasis,
+        mapFilters.measurementMin,
+        mapFilters.measurementMax,
+        mapFilters.bedroomsMin,
+        mapFilters.bathroomsMin,
+        mapFilters.bedroomsExact,
+        mapFilters.bathroomsExact,
+        financeTerms.downPayment,
+        financeTerms.annualRate,
+        financeTerms.loanMonths
+      ].join("|")
     : "";
   const activePriceRange = activePriceTab === "list"
     ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
