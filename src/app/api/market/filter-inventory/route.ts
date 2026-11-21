@@ -27,10 +27,26 @@ function positiveInteger(value: string | null, maximum: number): number | null {
   return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= maximum ? parsed : Number.NaN;
 }
 
+type ViewBounds = [number, number, number, number];
+
+function parseViewBounds(value: string | null): ViewBounds | null {
+  if (value === null) return null;
+  const parts = value.split(",").map((part) => Number(part.trim()));
+  if (parts.length !== 4 || !parts.every(Number.isFinite)) return null;
+  const [west, south, east, north] = parts;
+  if (west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) return null;
+  return [west, south, east, north];
+}
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const district = params.get("district")?.trim() ?? "";
   const scopeLevel = params.get("scopeLevel") ?? "district";
+  const boundsParam = params.get("bbox");
+  const bounds = parseViewBounds(boundsParam);
+  if (boundsParam !== null && !bounds) {
+    return json(400, { ok: false, dataStatus: "invalid_bounds", message: "Map bounds must be west,south,east,north in WGS84 coordinates." });
+  }
   const sector = params.get("sector")?.trim() || null;
   const cell = params.get("cell")?.trim() || null;
   const village = params.get("village")?.trim() || null;
@@ -52,18 +68,18 @@ export async function GET(request: NextRequest) {
   const annualRate = positiveNumber(params.get("annualRate"), 30);
   const loanMonths = positiveInteger(params.get("loanMonths"), 360);
 
-  if (!district || district.length > 100) return json(400, { ok: false, dataStatus: "invalid_scope", message: "A district is required to scope the map inventory." });
+  if (!district || district.length > 100) return json(400, { ok: false, dataStatus: "invalid_scope", message: "A district and visible map boundary are required to scope the map inventory." });
   if (!["district", "sector", "cell", "village"].includes(scopeLevel)) return json(400, { ok: false, dataStatus: "invalid_scope", message: "Unsupported map scope." });
-  if (scopeLevel !== "district" && !sector) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its sector." });
-  if (scopeLevel === "cell" && !cell) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its cell." });
-  if (scopeLevel === "village" && !village) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its village." });
+  if (!bounds && scopeLevel !== "district" && !sector) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its sector." });
+  if (!bounds && scopeLevel === "cell" && !cell) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its cell." });
+  if (!bounds && scopeLevel === "village" && !village) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its village." });
   if (!["RWF", "USD"].includes(currency)) return json(400, { ok: false, dataStatus: "invalid_currency", message: "Choose one supported listing currency." });
   if ([priceMin, priceMax, downPayment, annualRate, bathroomsMin, areaMin, areaMax, bedroomsMin, loanMonths].some((value) => value !== null && Number.isNaN(value))) return json(400, { ok: false, dataStatus: "invalid_numeric_value", message: "Filter and finance values must be valid non-negative numbers within supported input limits." });
   if (!["list", "monthly"].includes(mode)) return json(400, { ok: false, dataStatus: "invalid_mode", message: "Price mode must be list or monthly." });
   if (priceMin !== null && priceMax !== null && priceMin > priceMax) return json(400, { ok: false, dataStatus: "invalid_price_range", message: "Maximum price must be greater than minimum." });
   if (areaMin !== null && areaMax !== null && areaMin > areaMax) return json(400, { ok: false, dataStatus: "invalid_area_range", message: "Maximum area must be greater than minimum." });
   if (mode === "monthly" && (downPayment === null || annualRate === null || loanMonths === null)) {
-    return json(200, { ok: true, dataStatus: "needs_finance_terms", total: 0, minimum: null, maximum: null, histogram: [], rows: [], message: "Enter a down payment, annual interest rate and loan term to calculate an estimated monthly principal-and-interest payment." });
+    return json(200, { ok: true, dataStatus: "needs_finance_terms", total: 0, matching: 0, minimum: null, maximum: null, histogram: [], rows: [], message: "Enter a down payment, annual interest rate and loan term to calculate an estimated monthly principal-and-interest payment." });
   }
   if (mode === "monthly" && downPayment === null) return json(400, { ok: false, dataStatus: "invalid_finance_terms", message: "Down payment must be a non-negative amount." });
 
@@ -73,6 +89,7 @@ export async function GET(request: NextRequest) {
       ok: false,
       dataStatus: "not_configured",
       total: 0,
+      matching: 0,
       minimum: null,
       maximum: null,
       histogram: [],
@@ -130,6 +147,7 @@ export async function GET(request: NextRequest) {
         ok: false,
         dataStatus: "schema_incomplete",
         total: 0,
+        matching: 0,
         minimum: null,
         maximum: null,
         histogram: [],
@@ -139,8 +157,13 @@ export async function GET(request: NextRequest) {
     }
 
     const propertyTypeArray = propertyTypes.length ? propertyTypes : null;
-    const scopeCell = scopeLevel === "cell" || scopeLevel === "village" ? cell : null;
-    const scopeVillage = scopeLevel === "village" ? village : null;
+    // A supplied map bounding box is the complete geographic filter. Do not
+    // restrict it again to the map-centre sector, cell or village.
+    const scopeDistrict = district;
+    const scopeSector = bounds ? null : sector;
+    const scopeCell = bounds ? null : scopeLevel === "cell" || scopeLevel === "village" ? cell : null;
+    const scopeVillage = bounds ? null : scopeLevel === "village" ? village : null;
+    const [west, south, east, north] = bounds ?? [null, null, null, null];
     const financeRate = annualRate === null ? null : annualRate / 1200;
     const term = loanMonths;
 
@@ -173,10 +196,12 @@ export async function GET(request: NextRequest) {
            AND s.redistribution_allowed IS TRUE
            AND s.caching_allowed IS TRUE
            AND l.currency = ${currency}
-           AND lower(l.district_label) = lower(${district})
-           AND (${sector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${sector}))
+           AND lower(l.district_label) = lower(${scopeDistrict})
+           AND (${scopeSector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${scopeSector}))
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+           AND (${west}::double precision IS NULL OR COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END) BETWEEN ${west} AND ${east})
+           AND (${south}::double precision IS NULL OR COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END) BETWEEN ${south} AND ${north})
            AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
            AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
            AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
@@ -204,10 +229,12 @@ export async function GET(request: NextRequest) {
            AND (l.expires_at IS NULL OR l.expires_at > now())
            AND l.listing_type = 'sale'
            AND l.currency = ${currency}
-           AND lower(p.district_label) = lower(${district})
-           AND (${sector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${sector}))
+           AND lower(p.district_label) = lower(${scopeDistrict})
+           AND (${scopeSector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${scopeSector}))
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+           AND (${west}::double precision IS NULL OR COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END) BETWEEN ${west} AND ${east})
+           AND (${south}::double precision IS NULL OR COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END) BETWEEN ${south} AND ${north})
            AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
            AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
            AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
@@ -240,6 +267,12 @@ export async function GET(request: NextRequest) {
                max(amount) AS maximum
           FROM valued
       ),
+      filtered_stats AS (
+        SELECT count(*)::integer AS matching
+          FROM valued
+         WHERE amount >= coalesce(${priceMin}, 0)
+           AND (${priceMax}::numeric IS NULL OR amount <= ${priceMax})
+      ),
       bins AS (
         SELECT
           CASE
@@ -252,8 +285,9 @@ export async function GET(request: NextRequest) {
         GROUP BY 1
       )
       SELECT stats.total, stats.minimum::text AS minimum, stats.maximum::text AS maximum,
-             bins.bucket, bins.count
+             filtered_stats.matching, bins.bucket, bins.count
         FROM stats
+        CROSS JOIN filtered_stats
         LEFT JOIN bins ON true
        ORDER BY bins.bucket
     `;
@@ -299,10 +333,12 @@ export async function GET(request: NextRequest) {
          AND s.redistribution_allowed IS TRUE
          AND s.caching_allowed IS TRUE
          AND l.currency = ${currency}
-         AND lower(l.district_label) = lower(${district})
-         AND (${sector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${sector}))
+         AND lower(l.district_label) = lower(${scopeDistrict})
+         AND (${scopeSector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${scopeSector}))
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+           AND (${west}::double precision IS NULL OR COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END) BETWEEN ${west} AND ${east})
+           AND (${south}::double precision IS NULL OR COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END) BETWEEN ${south} AND ${north})
          AND (${propertyTypeArray}::text[] IS NULL OR l.property_type = ANY(${propertyTypeArray}::text[]))
          AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
          AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
@@ -364,10 +400,12 @@ export async function GET(request: NextRequest) {
          AND (l.expires_at IS NULL OR l.expires_at > now())
          AND l.listing_type = 'sale'
          AND l.currency = ${currency}
-         AND lower(p.district_label) = lower(${district})
-         AND (${sector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${sector}))
+         AND lower(p.district_label) = lower(${scopeDistrict})
+         AND (${scopeSector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${scopeSector}))
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
+           AND (${west}::double precision IS NULL OR COALESCE(p.longitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_X(dp.location::geometry) END) BETWEEN ${west} AND ${east})
+           AND (${south}::double precision IS NULL OR COALESCE(p.latitude, CASE WHEN GeometryType(dp.location::geometry) = 'POINT' THEN ST_Y(dp.location::geometry) END) BETWEEN ${south} AND ${north})
          AND (${propertyTypeArray}::text[] IS NULL OR p.property_type = ANY(${propertyTypeArray}::text[]))
          AND (${bedroomsMin}::int IS NULL OR COALESCE(p.bedrooms, u.bedrooms) IS NOT NULL AND (${bedroomsExact} IS TRUE AND COALESCE(p.bedrooms, u.bedrooms) = ${bedroomsMin} OR ${bedroomsExact} IS FALSE AND COALESCE(p.bedrooms, u.bedrooms) >= ${bedroomsMin}))
          AND (${bathroomsMin}::numeric IS NULL OR COALESCE(p.bathrooms, u.bathrooms) IS NOT NULL AND (${bathroomsExact} IS TRUE AND COALESCE(p.bathrooms, u.bathrooms) = ${bathroomsMin} OR ${bathroomsExact} IS FALSE AND COALESCE(p.bathrooms, u.bathrooms) >= ${bathroomsMin}))
@@ -408,17 +446,19 @@ export async function GET(request: NextRequest) {
       .filter((row) => row.bucket !== null)
       .map((row) => ({ bucket: Number(row.bucket), count: Number(row.count) }));
     const total = Number(first?.total ?? 0);
+    const matching = Number(first?.matching ?? 0);
     return json(200, {
       ok: true,
       dataStatus: total > 0 ? "available" : "no_eligible_records",
       total,
+      matching,
       minimum: first?.minimum === null || first?.minimum === undefined ? null : Number(first.minimum),
       maximum: first?.maximum === null || first?.maximum === undefined ? null : Number(first.maximum),
       histogram,
       rows: combinedRows,
       histogramBasis: mode === "list" ? "authorized_current_asking_prices" : "estimated_monthly_principal_and_interest_from_authorized_asking_prices",
       financeTerms: mode === "monthly" ? { downPayment, annualRate, loanMonths } : null,
-      scope: { level: scopeLevel, district, sector, cell: scopeCell, village: scopeVillage },
+      scope: { level: scopeLevel, district: scopeDistrict, bounds, sector: scopeSector, cell: scopeCell, village: scopeVillage },
       message: total > 0 ? null : "No eligible, source-authorized current asking-price listings are connected in this map area. This does not mean no properties are available."
     });
   } catch (error) {
@@ -427,6 +467,7 @@ export async function GET(request: NextRequest) {
       ok: false,
       dataStatus: "unavailable",
       total: 0,
+      matching: 0,
       minimum: null,
       maximum: null,
       histogram: [],
