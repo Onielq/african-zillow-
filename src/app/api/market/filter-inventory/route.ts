@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
   const annualRate = positiveNumber(params.get("annualRate"), 30);
   const loanMonths = positiveInteger(params.get("loanMonths"), 360);
 
-  if ((!district && !bounds) || district.length > 100) return json(400, { ok: false, dataStatus: "invalid_scope", message: "A district or visible map boundary is required to scope the map inventory." });
+  if (!district || district.length > 100) return json(400, { ok: false, dataStatus: "invalid_scope", message: "A district and visible map boundary are required to scope the map inventory." });
   if (!["district", "sector", "cell", "village"].includes(scopeLevel)) return json(400, { ok: false, dataStatus: "invalid_scope", message: "Unsupported map scope." });
   if (!bounds && scopeLevel !== "district" && !sector) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its sector." });
   if (!bounds && scopeLevel === "cell" && !cell) return json(400, { ok: false, dataStatus: "invalid_scope", message: "The current map scope is missing its cell." });
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
     const propertyTypeArray = propertyTypes.length ? propertyTypes : null;
     // A supplied map bounding box is the complete geographic filter. Do not
     // restrict it again to the map-centre sector, cell or village.
-    const scopeDistrict = bounds ? null : district;
+    const scopeDistrict = district;
     const scopeSector = bounds ? null : sector;
     const scopeCell = bounds ? null : scopeLevel === "cell" || scopeLevel === "village" ? cell : null;
     const scopeVillage = bounds ? null : scopeLevel === "village" ? village : null;
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
            AND s.redistribution_allowed IS TRUE
            AND s.caching_allowed IS TRUE
            AND l.currency = ${currency}
-           AND (${scopeDistrict}::text IS NULL OR lower(l.district_label) = lower(${scopeDistrict}))
+           AND lower(l.district_label) = lower(${scopeDistrict})
            AND (${scopeSector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${scopeSector}))
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
            AND (l.expires_at IS NULL OR l.expires_at > now())
            AND l.listing_type = 'sale'
            AND l.currency = ${currency}
-           AND (${scopeDistrict}::text IS NULL OR lower(p.district_label) = lower(${scopeDistrict}))
+           AND lower(p.district_label) = lower(${scopeDistrict})
            AND (${scopeSector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${scopeSector}))
            AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
            AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
@@ -333,7 +333,7 @@ export async function GET(request: NextRequest) {
          AND s.redistribution_allowed IS TRUE
          AND s.caching_allowed IS TRUE
          AND l.currency = ${currency}
-         AND (${scopeDistrict}::text IS NULL OR lower(l.district_label) = lower(${scopeDistrict}))
+         AND lower(l.district_label) = lower(${scopeDistrict})
          AND (${scopeSector}::text IS NULL OR lower(coalesce(l.sector_label, '')) = lower(${scopeSector}))
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
@@ -400,7 +400,7 @@ export async function GET(request: NextRequest) {
          AND (l.expires_at IS NULL OR l.expires_at > now())
          AND l.listing_type = 'sale'
          AND l.currency = ${currency}
-         AND (${scopeDistrict}::text IS NULL OR lower(p.district_label) = lower(${scopeDistrict}))
+         AND lower(p.district_label) = lower(${scopeDistrict})
          AND (${scopeSector}::text IS NULL OR lower(coalesce(p.sector_label, '')) = lower(${scopeSector}))
          AND (${scopeCell}::text IS NULL OR lower(coalesce(p.cell_label, '')) = lower(${scopeCell}))
          AND (${scopeVillage}::text IS NULL OR lower(coalesce(p.payload->>'village', '')) = lower(${scopeVillage}))
