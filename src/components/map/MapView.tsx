@@ -1784,7 +1784,7 @@ export function MapView({
         if (
           level === "parcel" &&
           filteredParcelFeatureIdsRef.current !== null &&
-          !filteredParcelFeatureIdsRef.current.has(String(feature.id ?? feature.properties?.upi ?? ""))
+          !filteredParcelFeatureIdsRef.current.has(String(feature.properties?.upi ?? feature.id ?? ""))
         ) return [];
         if (!feature.geometry || !("coordinates" in feature.geometry)) return [];
         const bounds = featureBounds({
@@ -2562,7 +2562,7 @@ export function MapView({
               "case",
               ["boolean", ["feature-state", "selected"], false], "#149DB0",
               ["boolean", ["feature-state", "hover"], false], "#2CAFC1",
-              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], true]], "#159C83",
+              ["all", ["==", ["get", "filter_active"], true], ["==", ["get", "filter_match"], true]], "#149DB0",
               level === "parcel"
                 ? "#FFFFFF"
                 : level === "village"
