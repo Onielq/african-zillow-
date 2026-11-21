@@ -39,7 +39,11 @@ test("price maximum is taken from the exact inventory scope, not a fixed trillio
   assert.doesNotMatch(source, /dynamicParcelPriceLimit/);
   assert.doesNotMatch(api, /1_000_000_000_000/);
   assert.match(api, /max\(amount\) AS maximum/);
-  assert.match(api, /scopeDistrict = bounds \? null : district/);
+  assert.match(api, /scopeDistrict = district/);
+  assert.match(api, /scopeSector = bounds \? null : sector/);
+  assert.match(api, /scopeCell = bounds \? null/);
+  assert.match(api, /scopeVillage = bounds \? null/);
+  assert.match(api, /parseViewBounds/);
   assert.match(api, /lower\(l\.district_label\) = lower\(\$\{scopeDistrict\}\)/);
   assert.match(api, /lower\(p\.district_label\) = lower\(\$\{scopeDistrict\}\)/);
   assert.match(mapView, /scope,/);
