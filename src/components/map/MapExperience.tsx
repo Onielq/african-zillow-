@@ -1172,9 +1172,9 @@ export function MapExperience() {
       mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
       mapFilters.measurementMin || mapFilters.measurementMax);
   const marketInventory = marketInventoryState?.scopeKey === inventoryScopeKey ? marketInventoryState.data : null;
-  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.district && !marketInventory);
+  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.bounds && !marketInventory);
   useEffect(() => {
-    if (!shouldLoadMarketInventory || !inventoryScope?.district) return;
+    if (!shouldLoadMarketInventory || !inventoryScope?.bounds) return;
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
@@ -1264,6 +1264,10 @@ export function MapExperience() {
       ? marketInventory?.matching ?? null
       : marketInventory?.total ?? null;
   const priceResultsLoading = priceUsesParcelMapEstimate ? !parcelDataReady : marketInventoryLoading;
+  const parcelMapFilters = useMemo<ParcelMapFilters>(
+    () => ({ ...mapFilters, priceMode: activePriceTab }),
+    [mapFilters, activePriceTab]
+  );
   const measurementResultCount = mapFilters.measurementBasis === "plot"
     ? filterResultCount
     : marketInventory?.matching ?? null;
@@ -2470,7 +2474,7 @@ export function MapExperience() {
           onBoundaryStatusChange={handleBoundaryStatus}
           onAreaSelected={handleAreaSelected}
           selectedArea={selectedArea}
-          parcelFilters={mapFilters}
+          parcelFilters={parcelMapFilters}
           onParcelFilterResults={setParcelFilterResults}
           marketListings={marketMapListings}
           projects={RWANDA_PROJECT_RECORDS}
