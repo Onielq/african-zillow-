@@ -367,9 +367,9 @@ test("RWF parcel price filtering uses the displayed map estimate and highlights 
   assert.match(mapView, /filter_active: hasParcelFilters/);
   assert.match(mapView, /filter_match: !hasParcelFilters \|\| matchedParcelIds\.has\(id\)/);
   assert.doesNotMatch(mapView, /if \(filters\.propertyTypes\.length > 0 && !landOnly\) return true/);
-  assert.match(mapView, /priceMode: activePriceTab/);
+  assert.match(experience, /priceMode: activePriceTab/);
   assert.match(experience, /Parcel matches use the same displayed map estimate/);
-  assert.match(experience, /See " \+ priceResultCount\.toLocaleString\(\) \+ " results"/);
+  assert.match(experience, /See " \+ \(priceResultCount \?\? 0\)\.toLocaleString\(\) \+ " results"/);
 });
 
 test("price and zoning results are restricted to the visible map bounds", async () => {
