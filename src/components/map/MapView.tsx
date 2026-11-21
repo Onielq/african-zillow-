@@ -3723,10 +3723,12 @@ export function MapView({
           if (level === "parcel") {
             parcelDataLoadedRef.current = false;
             filteredParcelFeatureIdsRef.current = new Set();
+            const currentBounds = map.getBounds();
             onParcelFilterResultsRef.current?.({
               loaded: false,
               matching: 0,
               inView: 0,
+              bounds: [currentBounds.getWest(), currentBounds.getSouth(), currentBounds.getEast(), currentBounds.getNorth()],
               scope: null,
               zoningStatus: parcelFiltersRef.current.zoningCodes.length ? zoningFilterStatusRef.current : "not-required"
             });
