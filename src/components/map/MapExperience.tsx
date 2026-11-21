@@ -29,6 +29,10 @@ import {
   SlidersHorizontal,
   Warehouse,
   Waves,
+  Route,
+  GraduationCap,
+  Stethoscope,
+  Bus,
   X,
   type LucideIcon
 } from "lucide-react";
@@ -110,6 +114,7 @@ type MarketInventoryResponse = {
   ok: boolean;
   dataStatus: "available" | "no_eligible_records" | "not_configured" | "needs_finance_terms" | "unavailable" | string;
   total: number;
+  matching: number;
   minimum: number | null;
   maximum: number | null;
   histogram: Array<{ bucket: number; count: number }>;
@@ -583,6 +588,16 @@ type NearbyAccessResponse = {
   message?: string;
 };
 type NearbyAccessState = NearbyAccessResponse | { status: "loading"; items: []; source: string; note: string } | null;
+
+const NEARBY_ACCESS_ICONS: Record<NearbyAccessCategory, LucideIcon> = {
+  "Main road": Route,
+  "School": GraduationCap,
+  "Clinic / hospital": Stethoscope,
+  "Public transport": Bus,
+  "Landmark": MapPinned,
+  "Village office": Landmark
+};
+
 type TransactionEstimateResponse = {
   estimate: number | null;
   status: "reported-current-month-unverified" | "historical-monthly-baseline" | "parcel-share-model" | "unavailable";
@@ -1146,7 +1161,7 @@ export function MapExperience() {
   const filterPopoverRef = useRef<HTMLDivElement>(null);
   const inventoryScope = parcelFilterResults?.scope ?? null;
   const inventoryScopeKey = inventoryScope
-    ? [inventoryScope.level, inventoryScope.district, inventoryScope.sector, inventoryScope.cell, inventoryScope.village].join("|")
+    ? [inventoryScope.level, inventoryScope.district, ...inventoryScope.bounds].join("|")
     : "";
   const activePriceRange = activePriceTab === "list"
     ? { min: mapFilters.priceMin, max: mapFilters.priceMax }
@@ -1191,6 +1206,7 @@ export function MapExperience() {
         annualRate: financeTerms.annualRate,
         loanMonths: financeTerms.loanMonths
       });
+      params.set("bbox", inventoryScope.bounds.join(","));
       if (inventoryScope.sector) params.set("sector", inventoryScope.sector);
       if (inventoryScope.cell) params.set("cell", inventoryScope.cell);
       if (inventoryScope.village) params.set("village", inventoryScope.village);
@@ -1204,7 +1220,7 @@ export function MapExperience() {
           setMarketInventoryState({
             scopeKey: inventoryScopeKey,
             data: {
-              ok: false, dataStatus: "unavailable", total: 0, minimum: null, maximum: null,
+              ok: false, dataStatus: "unavailable", total: 0, matching: 0, minimum: null, maximum: null,
               histogram: [], rows: [], message: "The market inventory service could not be reached."
             }
           });
@@ -1240,9 +1256,17 @@ export function MapExperience() {
   };
   const parcelDataReady = parcelFilterResults?.loaded === true;
   const filterResultCount = parcelDataReady ? parcelFilterResults?.matching ?? 0 : null;
+  const hasListPriceRange = Boolean(mapFilters.priceMin || mapFilters.priceMax);
+  const priceUsesParcelMapEstimate = activePriceTab === "list" && mapFilters.priceCurrency === "RWF" && hasListPriceRange;
+  const priceResultCount = priceUsesParcelMapEstimate
+    ? filterResultCount
+    : hasListPriceRange || activePriceTab === "monthly"
+      ? marketInventory?.matching ?? null
+      : marketInventory?.total ?? null;
+  const priceResultsLoading = priceUsesParcelMapEstimate ? !parcelDataReady : marketInventoryLoading;
   const measurementResultCount = mapFilters.measurementBasis === "plot"
     ? filterResultCount
-    : marketInventory?.total ?? null;
+    : marketInventory?.matching ?? null;
   const measurementResultsLoading = mapFilters.measurementBasis === "plot"
     ? !parcelDataReady
     : marketInventoryLoading;
@@ -1303,6 +1327,11 @@ export function MapExperience() {
   const allZoningGroups = [...ZONING_FILTER_GROUPS, ...OTHER_ZONING_FILTER_GROUPS];
   const selectedZoneCodes = allZoningGroups.flatMap((group) => group.codes)
     .filter((code) => mapFilters.zoningCodes.includes(code));
+  const zoningSummary = selectedZoneCodes.length === 0
+    ? "Zoning"
+    : selectedZoneCodes.length <= 2
+      ? "Zoning · " + selectedZoneCodes.join(", ")
+      : "Zoning · " + selectedZoneCodes[0] + " +" + (selectedZoneCodes.length - 1);
   const filterZoningGroups = (groups: ReadonlyArray<{ label: string; codes: readonly string[] }>) =>
     groups.map((group) => ({
       ...group,
@@ -2995,10 +3024,27 @@ export function MapExperience() {
                     </div>
                     <div className="map-filter-result-footer">
                       <div>
-                        <strong>{marketInventoryLoading ? "Loading listing inventory" : marketInventory?.total ? marketInventory.total.toLocaleString() + " current listings in this area" : "No current listing records"}</strong>
-                        <small>{marketInventory?.message ?? (marketInventory?.dataStatus === "available" ? "Counts are grouped from authorized asking-price records in the current map scope." : "The scale and distribution will use current asking prices, not transaction benchmarks.")}</small>
+                        <strong>
+                          {priceResultsLoading
+                            ? "Loading map results"
+                            : priceResultCount === null
+                              ? "Results unavailable"
+                              : priceResultCount.toLocaleString() + (priceUsesParcelMapEstimate ? " matching parcels" : " matching listings")}
+                        </strong>
+                        <small>
+                          {priceUsesParcelMapEstimate
+                            ? "Parcel matches use the same displayed map estimate: parcel area × available average transaction price per m². This is not a verified asking-price listing."
+                            : marketInventory?.message ?? (marketInventory?.dataStatus === "available"
+                              ? "Counts include current, source-authorized listings inside the visible map bounds."
+                              : "Listing counts use current source-authorized asking-price records inside the visible map bounds.")}
+                          {priceUsesParcelMapEstimate && marketInventory
+                            ? " " + marketInventory.matching.toLocaleString() + " matching source-authorized listings in the same view."
+                            : ""}
+                        </small>
                       </div>
-                      <button disabled={marketInventoryLoading} onClick={closeFilterMenus} type="button">Done</button>
+                      <button disabled={priceResultsLoading || priceResultCount === null} onClick={closeFilterMenus} type="button">
+                        {priceResultsLoading ? "Loading results…" : "See " + priceResultCount.toLocaleString() + " results"}
+                      </button>
                     </div>
                   </FilterPopoverPortal>
                 ) : null}
@@ -3096,7 +3142,7 @@ export function MapExperience() {
                   }}
                   type="button"
                 >
-                  {selectedZoneCodes.length > 0 ? selectedZoneCodes.length + " zones" : "Zoning"} <span aria-hidden="true">⌄</span>
+                  {zoningSummary} <span aria-hidden="true">⌄</span>
                 </button>
                 {activeFilterMenu === "zoning" ? (
                   <FilterPopoverPortal
@@ -3111,7 +3157,7 @@ export function MapExperience() {
                     </div>
                     <div className="map-filter-zoning-toolbar">
                       <button aria-pressed={mapFilters.zoningCodes.length === 0} className={mapFilters.zoningCodes.length === 0 ? "map-filter-all-zones map-filter-all-zones-active" : "map-filter-all-zones"} onClick={() => setMapFilters((current) => ({ ...current, zoningCodes: [] }))} type="button">All zoning</button>
-                      <span>{mapFilters.zoningCodes.length ? mapFilters.zoningCodes.length + " selected" : "No zoning restriction"}</span>
+                      <span aria-live="polite">{mapFilters.zoningCodes.length ? selectedZoneCodes.join(", ") : "No zoning restriction"}</span>
                     </div>
                     <label className="map-filter-zone-search">
                       <Search aria-hidden="true" size={15} />
@@ -4076,7 +4122,10 @@ export function MapExperience() {
                   <ul className="parcel-access-list">
                     {nearbyAccess.items.map((item) => (
                       <li key={item.id}>
-                        <span className="parcel-access-category">{item.category}</span>
+                        {(() => {
+                          const CategoryIcon = NEARBY_ACCESS_ICONS[item.category] ?? MapPin;
+                          return <span className="parcel-access-category"><CategoryIcon aria-hidden="true" size={14} /><span>{item.category}</span></span>;
+                        })()}
                         <strong>{item.name}</strong>
                         <small>
                           {item.routeStatus === "routed" && item.distanceKm !== null && item.timeMinutes !== null
