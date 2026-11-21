@@ -3990,13 +3990,15 @@ input {
   gap: 8px;
   min-width: 0;
 }
-.parcel-access-category { color: #758279; font-size: 9px; font-weight: 750; }
+.parcel-access-category { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: #758279; font-size: 9px; font-weight: 750; white-space: nowrap; }
+.parcel-access-category svg { flex: 0 0 auto; color: #526d5b; stroke-width: 1.8; }
 .parcel-access-list li strong { min-width: 0; color: #34463a; font-size: 10px; font-weight: 700; overflow-wrap: anywhere; }
 .parcel-access-list li small { color: #286548; font-size: 9px; font-weight: 750; text-align: right; white-space: nowrap; }
 .parcel-access-message, .parcel-access-note { margin: 0; color: #78857c; font-size: 9px; line-height: 1.4; }
 @media (max-width: 460px) {
-  .parcel-access-list li { grid-template-columns: minmax(70px, auto) minmax(0, 1fr); }
-  .parcel-access-list li small { grid-column: 2; text-align: left; }
+  .parcel-access-list li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .parcel-access-category { white-space: normal; }
+  .parcel-access-list li small { grid-column: 1; text-align: left; }
 }
 
 
