@@ -595,6 +595,7 @@ export type MarketListingMapPoint = {
 
 export type ParcelFilterScope = {
   level: "district" | "sector" | "cell" | "village";
+  bounds: [number, number, number, number];
   district: string | null;
   sector: string | null;
   cell: string | null;
@@ -2227,6 +2228,7 @@ export function MapView({
       const selectedScope = selectedAreaRef.current;
       const scope = {
         level: currentLevel as "district" | "sector" | "cell" | "village",
+        bounds: viewportBounds,
         district: typeof scopeProperties.district === "string" ? scopeProperties.district : selectedScope?.district ?? null,
         sector: typeof scopeProperties.sector === "string" ? scopeProperties.sector : selectedScope?.sector ?? null,
         cell: typeof scopeProperties.cell === "string" ? scopeProperties.cell : selectedScope?.cell ?? null,
