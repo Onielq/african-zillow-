@@ -3047,7 +3047,7 @@ export function MapExperience() {
                         </small>
                       </div>
                       <button disabled={priceResultsLoading || priceResultCount === null} onClick={closeFilterMenus} type="button">
-                        {priceResultsLoading ? "Loading results…" : "See " + priceResultCount.toLocaleString() + " results"}
+                        {priceResultsLoading ? "Loading results…" : "See " + (priceResultCount ?? 0).toLocaleString() + " results"}
                       </button>
                     </div>
                   </FilterPopoverPortal>
