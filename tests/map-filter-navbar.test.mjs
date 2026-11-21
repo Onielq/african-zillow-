@@ -39,8 +39,9 @@ test("price maximum is taken from the exact inventory scope, not a fixed trillio
   assert.doesNotMatch(source, /dynamicParcelPriceLimit/);
   assert.doesNotMatch(api, /1_000_000_000_000/);
   assert.match(api, /max\(amount\) AS maximum/);
-  assert.match(api, /lower\(l\.district_label\) = lower\(\$\{district\}\)/);
-  assert.match(api, /lower\(p\.district_label\) = lower\(\$\{district\}\)/);
+  assert.match(api, /scopeDistrict = bounds \? null : district/);
+  assert.match(api, /lower\(l\.district_label\) = lower\(\$\{scopeDistrict\}\)/);
+  assert.match(api, /lower\(p\.district_label\) = lower\(\$\{scopeDistrict\}\)/);
   assert.match(mapView, /scope,/);
 });
 
@@ -236,8 +237,8 @@ test("measurement and room filters provide a See results action", async () => {
   const source = await read("../src/components/map/MapExperience.tsx");
   assert.match(source, /measurementResultCount/);
   assert.match(source, /See " \+ \(measurementResultCount/);
-  assert.match(source, /marketInventory\?\.total/);
-  assert.match(source, /See " \+ \(marketInventory\?\.total/);
+  assert.match(source, /marketInventory\?\.matching/);
+  assert.match(source, /See " \+ \(measurementResultCount/);
   assert.match(source, /Bedrooms/);
   assert.match(source, /Bathrooms/);
 });
@@ -349,4 +350,61 @@ test("price tab switching keeps a stable popover placement", async () => {
   assert.match(source, /maxHeight: availableHeight/);
   assert.match(styles, /\.map-filter-price-content\s*\{[\s\S]*?min-height: 320px/);
   assert.match(styles, /\.map-filter-monthly-content\s*\{[\s\S]*?min-height: 320px/);
+});
+
+
+test("RWF parcel price filtering uses the displayed map estimate and highlights matches", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const experience = await read("../src/components/map/MapExperience.tsx");
+  assert.match(mapView, /filters\.priceMode !== "monthly"/);
+  assert.match(mapView, /const hasParcelPriceRange = hasPriceRange && filters\.priceCurrency === "RWF"/);
+  assert.match(mapView, /const hasParcelFilters = zoningCanBeApplied \|\| hasParcelPriceRange/);
+  assert.match(mapView, /calculateParcelAskingPrice\(parcelArea, unitPrice\)/);
+  assert.match(mapView, /filter_active: hasParcelFilters/);
+  assert.match(mapView, /filter_match: !hasParcelFilters \|\| matchedParcelIds\.has\(id\)/);
+  assert.doesNotMatch(mapView, /if \(filters\.propertyTypes\.length > 0 && !landOnly\) return true/);
+  assert.match(mapView, /priceMode: activePriceTab/);
+  assert.match(experience, /Parcel matches use the same displayed map estimate/);
+  assert.match(experience, /See " \+ priceResultCount\.toLocaleString\(\) \+ " results"/);
+});
+
+test("price and zoning results are restricted to the visible map bounds", async () => {
+  const mapView = await read("../src/components/map/MapView.tsx");
+  const experience = await read("../src/components/map/MapExperience.tsx");
+  const api = await read("../src/app/api/market/filter-inventory/route.ts");
+  assert.match(mapView, /bounds\.getWest\(\)/);
+  assert.match(mapView, /bounds\.getSouth\(\)/);
+  assert.match(mapView, /raw\.features\.filter\(\(feature\) =>\s*feature\.geometry && geometriesIntersect\(feature\.geometry as Geometry, viewportGeometry\)/);
+  assert.match(mapView, /bounds: viewportBounds/);
+  assert.match(experience, /inventoryScope\.bounds\.join\(","\)/);
+  assert.match(experience, /\.\.\.inventoryScope\.bounds/);
+  assert.match(api, /function parseViewBounds/);
+  assert.match(api, /const scopeDistrict = bounds \? null : district/);
+  assert.match(api, /const scopeSector = bounds \? null : sector/);
+  assert.match(api, /ST_X\(dp\.location::geometry\) END\) BETWEEN \$\{west\} AND \$\{east\}/);
+  assert.match(api, /ST_Y\(dp\.location::geometry\) END\) BETWEEN \$\{south\} AND \$\{north\}/);
+  assert.match(api, /filtered_stats AS/);
+  assert.match(api, /filtered_stats\.matching/);
+});
+
+test("zoning selection displays the actual zone codes", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  assert.match(source, /const zoningSummary = selectedZoneCodes\.length/);
+  assert.match(source, /selectedZoneCodes\.join\(", "\)/);
+  assert.match(source, /aria-live="polite">\{mapFilters\.zoningCodes\.length \? selectedZoneCodes\.join\(", "\)/);
+  assert.doesNotMatch(source, /mapFilters\.zoningCodes\.length \? mapFilters\.zoningCodes\.length \+ " selected"/);
+});
+
+test("parcel location access uses a distinct Lucide icon for each nearby category", async () => {
+  const source = await read("../src/components/map/MapExperience.tsx");
+  const styles = await read("../src/app/globals.css");
+  for (const category of ["Main road", "School", "Clinic / hospital", "Public transport", "Landmark", "Village office"]) {
+    assert.ok(source.includes('"' + category + '"'), "missing category " + category);
+  }
+  for (const icon of ["Route", "GraduationCap", "Stethoscope", "Bus", "MapPinned", "Landmark"]) {
+    assert.match(source, new RegExp("\\b" + icon + "\\b"));
+  }
+  assert.match(source, /NEARBY_ACCESS_ICONS\[item\.category\]/);
+  assert.match(source, /<CategoryIcon aria-hidden="true" size=\{14\}/);
+  assert.match(styles, /\.parcel-access-category svg/);
 });
