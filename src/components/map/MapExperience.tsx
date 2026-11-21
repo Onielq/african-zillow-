@@ -1172,9 +1172,9 @@ export function MapExperience() {
       mapFilters.bedroomsMin || mapFilters.bathroomsMin || mapFilters.propertyTypes.length ||
       mapFilters.measurementMin || mapFilters.measurementMax);
   const marketInventory = marketInventoryState?.scopeKey === inventoryScopeKey ? marketInventoryState.data : null;
-  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.bounds && !marketInventory);
+  const marketInventoryLoading = Boolean(shouldLoadMarketInventory && inventoryScope?.district && inventoryScope.bounds && !marketInventory);
   useEffect(() => {
-    if (!shouldLoadMarketInventory || !inventoryScope?.bounds) return;
+    if (!shouldLoadMarketInventory || !inventoryScope?.district || !inventoryScope.bounds) return;
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
