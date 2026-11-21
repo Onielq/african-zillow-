@@ -31,6 +31,7 @@ export type RwandaProjectRecord = {
   latitude?: number;
   longitude?: number;
   imageUrl?: string;
+  videoUrl?: string;
   locationPrecision: ProjectLocationPrecision;
 };
 
