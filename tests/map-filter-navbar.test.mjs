@@ -379,7 +379,7 @@ test("price and zoning results are restricted to the visible map bounds", async 
   assert.match(experience, /inventoryScope\.bounds\.join\(","\)/);
   assert.match(experience, /\.\.\.inventoryScope\.bounds/);
   assert.match(api, /function parseViewBounds/);
-  assert.match(api, /const scopeDistrict = bounds \? null : district/);
+  assert.match(api, /const scopeDistrict = district/);
   assert.match(api, /const scopeSector = bounds \? null : sector/);
   assert.match(api, /ST_X\(dp\.location::geometry\) END\) BETWEEN \$\{west\} AND \$\{east\}/);
   assert.match(api, /ST_Y\(dp\.location::geometry\) END\) BETWEEN \$\{south\} AND \$\{north\}/);
