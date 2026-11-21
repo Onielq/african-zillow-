@@ -1169,6 +1169,7 @@ export function MapExperience() {
         activePriceTab,
         activePriceTab === "list" ? mapFilters.priceMin : mapFilters.monthlyPaymentMin,
         activePriceTab === "list" ? mapFilters.priceMax : mapFilters.monthlyPaymentMax,
+        mapFilters.listingType,
         mapFilters.propertyTypes.join(","),
         mapFilters.measurementBasis,
         mapFilters.measurementMin,
