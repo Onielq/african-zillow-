@@ -545,6 +545,7 @@ function withStableAreaFeatureIds(
 export type ParcelMapFilters = {
   listingType: "all" | "sale" | "rent" | "sold";
   priceCurrency: "RWF" | "USD";
+  priceMode?: "list" | "monthly";
   priceMin: string;
   priceMax: string;
   monthlyPaymentMin: string;
@@ -2052,7 +2053,7 @@ export function MapView({
       const matchingZones = zoningCodes.length
         ? zoningFilterFeaturesRef.current.filter((feature) => zoningFeatureMatchesCodes(feature, zoningCodes))
         : [];
-      const hasPriceRange = Boolean(filters.priceMin || filters.priceMax);
+      const hasPriceRange = filters.priceMode !== "monthly" && Boolean(filters.priceMin || filters.priceMax);
       const hasParcelPriceRange = hasPriceRange && filters.priceCurrency === "RWF";
       const hasPlotRange = Boolean(filters.measurementMin || filters.measurementMax) && filters.measurementBasis === "plot";
       const minPrice = filters.priceMin.trim() ? Number(filters.priceMin) : null;
