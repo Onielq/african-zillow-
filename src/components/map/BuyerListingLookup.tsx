@@ -5,8 +5,8 @@ import { ExternalLink, FileSearch, MapPin, X } from "lucide-react";
 import styles from "./buyer-listing-lookup.module.css";
 
 export type BuyerListingRecord = {
-  inventoryKind?: "external_source" | "first_party_taiseel";
-  listingReference?: string | null;
+  inventoryKind: "external_source" | "first_party_taiseel";
+  listingReference: string | null;
   sourceListingId: string | null;
   sourceKey: string | null;
   sourceTitle: string | null;
