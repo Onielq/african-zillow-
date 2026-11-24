@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("first-party listing profile resolves only a Taiseel-owned listing reference", async () => {
   const route = await read("../src/app/api/market/exchange/listing-profile/route.ts");
-  assert.match(route, /params\.get\("listingReference"\)/);
+  assert.match(route, /request\.nextUrl\.searchParams\.get\("listingReference"\)/);
   assert.match(route, /l\.listing_reference = \$\{listingReference\}/);
   assert.match(route, /FROM reja\.exchange_listings l/);
   assert.doesNotMatch(route, /FROM reja\.market_listings/);
