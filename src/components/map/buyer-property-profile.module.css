@@ -139,6 +139,16 @@
   line-height: 1.45;
 }
 
+.listingEvidence {
+  display: grid;
+  gap: 5px;
+  margin-top: 3px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
 .sourceLink {
   width: fit-content;
   color: var(--brand);

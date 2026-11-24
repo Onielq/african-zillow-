@@ -107,3 +107,8 @@ The buyer-profile UI must reflect these boundaries. Do not seed sample records o
 - Asking prices, calculated estimates, transaction-price benchmarks, recorded-sale evidence and formal valuations remain distinct.
 - The UI explains that mapped information is not proof of ownership or permission to build.
 - The profile remains usable on mobile and by keyboard, without hiding the map or clipping the UPI and source details.
+
+
+## Listing-ID entry path
+
+A buyer can enter a source key and the source's own listing ID. The canonical app resolves that exact current listing only when the source permits commercial use, redistribution and caching. It attaches the listing to a parcel only when the database returns one independently reviewed `primary_site` relationship whose UPI resolves to exactly one parcel in the connected cadastral map. No coordinate, address, district or nearest-feature match is accepted as property identity. Listings without a verified primary-site link remain visible as separate market records. The current lookup supports external source-observed listings; first-party Taiseel Exchange listing IDs need their own relationship contract before they can enter this resolver.

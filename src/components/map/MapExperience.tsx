@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { BrandImage } from "@/components/directories/BrandImage";
 import { BuyerPropertyProfile } from "@/components/map/BuyerPropertyProfile";
+import { BuyerListingLookup, type BuyerListingRecord, type BuyerVerifiedParcelLink } from "@/components/map/BuyerListingLookup";
 import { ProjectReportModal } from "@/components/map/ProjectReportModal";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
@@ -1433,6 +1434,7 @@ export function MapExperience() {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
   const [globalSearchStatus, setGlobalSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [selectedBuyerListing, setSelectedBuyerListing] = useState<{ listing: BuyerListingRecord; link: BuyerVerifiedParcelLink } | null>(null);
   const [landPriceRows, setLandPriceRows] = useState<LandPriceRow[]>([]);
   const [landPriceLoadStatus, setLandPriceLoadStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [cellParcels, setCellParcels] = useState<CellParcelRecord[]>([]);
@@ -1604,6 +1606,7 @@ export function MapExperience() {
       globalSearchMarkerRef.current = null;
       setGlobalSearchOpen(false);
       setSelectedProjectId(null);
+      setSelectedBuyerListing(null);
       setSelectedArea(area);
     },
     []
@@ -1657,6 +1660,7 @@ export function MapExperience() {
   };
 
   const selectGlobalSearchResult = async (result: GlobalSearchResult) => {
+    setSelectedBuyerListing(null);
     setWorkspaceMode("areas");
     setGlobalSearchOpen(false);
     setGlobalSearch("");
@@ -1759,6 +1763,36 @@ export function MapExperience() {
         zoom: maxZoom[area.level],
         duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
       });
+    }
+  };
+
+  const openBuyerListingParcel = async (
+    upi: string,
+    listing: BuyerListingRecord,
+    link: BuyerVerifiedParcelLink
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        "/api/geography/areas/search?q=" + encodeURIComponent(upi),
+        { cache: "no-store" }
+      );
+      if (!response.ok) return false;
+      const payload = await response.json() as AreaSearchResponse;
+      const exactMatches = (payload.areas ?? []).filter((area) =>
+        area.level === "parcel" &&
+        area.upi?.trim().toLocaleUpperCase("en") === upi.trim().toLocaleUpperCase("en")
+      );
+
+      // The listing relationship proves the UPI association, not that a
+      // cadastral polygon is currently available in the map's pilot sources.
+      // Open only one exact UPI result; never fall back to address or proximity.
+      if (exactMatches.length !== 1) return false;
+
+      await selectGlobalSearchResult(exactMatches[0]);
+      setSelectedBuyerListing({ listing, link });
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -2703,6 +2737,7 @@ export function MapExperience() {
                 </div>
               ) : null}
             </div>
+            <BuyerListingLookup onParcelSelected={openBuyerListingParcel} />
             <button
               aria-expanded={developersOpen}
               className={developersOpen ? "toolbar-action toolbar-action-active" : "toolbar-action"}
@@ -4006,6 +4041,8 @@ export function MapExperience() {
                 priceEvidenceLabel={parcelPriceDisplayLabel}
                 priceEvidenceNote={buyerProfilePriceEvidenceNote}
                 transactionBenchmarkPerM2={parcelUnitPriceEstimate?.pricePerM2 ?? null}
+                linkedListing={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en") === selectedArea.upi.trim().toLocaleUpperCase("en") ? selectedBuyerListing.listing : null}
+                listingParcelLink={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en") === selectedArea.upi.trim().toLocaleUpperCase("en") ? selectedBuyerListing.link : null}
               />
             ) : null}
 
