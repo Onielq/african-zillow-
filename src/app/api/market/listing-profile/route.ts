@@ -129,6 +129,7 @@ export async function GET(request: NextRequest) {
       WHERE link.listing_id = ${listing.recordId}::bigint
         AND link.is_current = true
         AND link.claim_status = 'verified'
+        AND link.relationship_role = 'primary_site'
         AND link.reviewed_by_user_id IS NOT NULL
         AND link.reviewed_at IS NOT NULL
         AND link.reviewed_by_user_id <> link.submitted_by_user_id
@@ -153,17 +154,17 @@ export async function GET(request: NextRequest) {
         ok: true,
         dataStatus: "available",
         linkStatus: parcelLinks.length === 0
-          ? "no_verified_link"
+          ? "no_verified_primary_site_link"
           : parcelLinks.length === 1
             ? "verified"
             : "multiple_verified_links",
         listing: publicListing,
         parcelLinks,
         note: parcelLinks.length === 0
-          ? "The listing is available as a source record, but no independently verified parcel link was found. It remains separate; no location-based match is inferred."
+          ? "The listing is available as a source record, but no independently verified primary-site parcel link was found. It remains separate; no location-based match is inferred."
           : parcelLinks.length === 1
-            ? "The listing has one current, independently reviewed parcel link. Confirm the displayed source evidence before making a decision."
-            : "The listing has multiple current, independently reviewed parcel links. Choose the parcel that matches the advertised property; no single parcel is selected automatically."
+            ? "The listing has one current, independently reviewed primary-site parcel link. Confirm the displayed source evidence before making a decision."
+            : "The listing has multiple current, independently reviewed primary-site parcel links. Choose the parcel that matches the advertised property; no single parcel is selected automatically."
       },
       { headers: { "Cache-Control": "no-store" } }
     );
