@@ -98,7 +98,7 @@ export function BuyerPropertyProfile({
             <div className={styles.pillarHeading}>
               <h4>Development &amp; Regulatory Intelligence</h4>
               <span className={linkedProject ? styles.statusFound : styles.statusPending}>
-                {linkedProject ? "Project record linked" : "No UPI-linked project"}
+                {linkedProject ? "Exact-UPI project match" : "No exact-UPI project match"}
               </span>
             </div>
             {linkedProject ? (
