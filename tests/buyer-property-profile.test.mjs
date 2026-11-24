@@ -16,7 +16,7 @@ test("selected cadastral parcels render one buyer profile with three independent
   assert.match(profile, /Land Intelligence/);
   assert.match(profile, /Development &amp; Regulatory Intelligence/);
   assert.match(profile, /Marketplace &amp; Market Intelligence/);
-  assert.match(profile, /UPI \{area\.upi\}/);
+  assert.match(profile, /area\.upi \? "UPI "/);
   assert.match(profile, /area\.parcelSizeSource === "geometry-estimate"/);
   assert.match(profile, /area\.parcelSizeSource === "cadastral-attribute"/);
 });
