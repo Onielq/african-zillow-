@@ -122,3 +122,49 @@ test("listing history does not invent an original price when no snapshots exist"
   assert.match(route, /historyBasis: observations\.length > 0 \? "source_observations" : "no_observations"/);
   assert.match(route, /A current asking price cannot establish the original price/);
 });
+
+
+test("listing profile resolves only a source key plus the source's exact listing ID", async () => {
+  const route = await read("../src/app/api/market/listing-profile/route.ts");
+  assert.match(route, /params\.get\("sourceKey"\)/);
+  assert.match(route, /params\.get\("listingId"\)/);
+  assert.match(route, /source_record_key = \$\{sourceListingId\}/);
+  assert.match(route, /lower\(s\.source_key\) = lower\(\$\{sourceKey\}\)/);
+  assert.match(route, /l\.is_current = true/);
+  assert.match(route, /s\.license_status = 'permitted'/);
+  assert.match(route, /s\.commercial_use_allowed IS TRUE/);
+  assert.match(route, /s\.redistribution_allowed IS TRUE/);
+  assert.match(route, /s\.caching_allowed IS TRUE/);
+});
+
+test("listing profile returns parcel associations only after independent UPI review", async () => {
+  const route = await read("../src/app/api/market/listing-profile/route.ts");
+  assert.match(route, /FROM reja\.market_listing_parcel_links link/);
+  assert.match(route, /link\.claim_status = 'verified'/);
+  assert.match(route, /link\.is_current = true/);
+  assert.match(route, /link\.reviewed_by_user_id <> link\.submitted_by_user_id/);
+  assert.match(route, /link\.reviewed_at IS NOT NULL/);
+  assert.match(route, /p\.upi IS NOT NULL/);
+  assert.match(route, /no_verified_link/);
+  assert.match(route, /multiple_verified_links/);
+  assert.match(route, /No location-based match is inferred/);
+  assert.doesNotMatch(route, /ST_DWithin|ST_Distance|ST_Intersects|nearest coordinates/i);
+});
+
+test("listing profile keeps internal review references and internal row IDs private", async () => {
+  const route = await read("../src/app/api/market/listing-profile/route.ts");
+  assert.doesNotMatch(route, /evidence_reference|evidenceReference/);
+  assert.match(route, /Object\.entries\(listing\)\.filter\(\(\[key\]\) => key !== "recordId"\)/);
+  assert.match(route, /listing: publicListing/);
+  assert.doesNotMatch(route, /\b(?:INSERT INTO|UPDATE reja\.|DELETE FROM)\b/i);
+});
+
+test("listing profile endpoint uses the public read-only database role and GET only", async () => {
+  const route = await read("../src/app/api/market/listing-profile/route.ts");
+  assert.match(route, /export async function GET/);
+  assert.match(route, /createRejaReadOnlyDatabase/);
+  assert.match(route, /verifyRejaReadOnlyRole/);
+  assert.match(route, /LISTING_PROFILE_NOT_CONFIGURED/);
+  assert.match(route, /LISTING_READ_ROLE_UNSAFE/);
+  assert.match(route, /Cache-Control/);
+});
