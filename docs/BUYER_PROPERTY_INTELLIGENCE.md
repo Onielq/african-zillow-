@@ -112,3 +112,14 @@ The buyer-profile UI must reflect these boundaries. Do not seed sample records o
 ## Listing-ID entry path
 
 A buyer can enter a source key and the source's own listing ID. The canonical app resolves that exact current listing only when the source permits commercial use, redistribution and caching. It attaches the listing to a parcel only when the database returns one independently reviewed `primary_site` relationship whose UPI resolves to exactly one parcel in the connected cadastral map. No coordinate, address, district or nearest-feature match is accepted as property identity. Listings without a verified primary-site link remain visible as separate market records. The current lookup supports external source-observed listings; first-party Taiseel Exchange listing IDs need their own relationship contract before they can enter this resolver.
+
+
+### First-party Taiseel Exchange listing lookup
+
+Taiseel-owned marketplace inventory has its own entry path:
+`GET /api/market/exchange/listing-profile?listingReference=<taiseel-reference>`.
+
+The resolver uses the exact public listing reference, and returns only listings that are currently published, not expired, and still covered by verified seller authorization. It reads parcel relationships from `reja.exchange_listing_parcel_links`, not the external-source relationship table.
+
+A first-party listing joins a cadastral parcel profile only through a current, independently reviewed `primary_site` link whose UPI snapshot was checked against the canonical parcel. Seller-provided address, coordinates, or `market_properties.parcel_id` alone never establish the association. Listings with no reviewed parcel link remain separate marketplace records.
+
