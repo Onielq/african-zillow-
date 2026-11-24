@@ -48,7 +48,7 @@ export type BuyerVerifiedParcelLink = {
 type BuyerListingLookupResponse = {
   ok: true;
   dataStatus: "available";
-  linkStatus: "no_verified_link" | "verified" | "multiple_verified_links";
+  linkStatus: "no_verified_primary_site_link" | "verified" | "multiple_verified_links";
   listing: BuyerListingRecord;
   parcelLinks: BuyerVerifiedParcelLink[];
   note: string;
