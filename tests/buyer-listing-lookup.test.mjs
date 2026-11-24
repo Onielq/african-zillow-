@@ -13,7 +13,7 @@ test("buyer listing lookup requires a source key and source-owned listing ID", a
   assert.match(lookup, /Source listing ID/);
   assert.match(lookup, /new URLSearchParams\(\{ sourceKey: source, listingId: id \}\)/);
   assert.match(lookup, /\/api\/market\/listing-profile/);
-  assert.match(lookup, //listing ID supplied by its source//);
+  assert.ok(lookup.includes("Use the listing ID supplied by its source."));
 });
 
 test("unlinked listings remain separate and multiple parcel links require an explicit choice", async () => {
@@ -40,8 +40,8 @@ test("listing-to-parcel navigation requires exactly one cadastral result for the
 test("verified listing context is shown inside the three-layer property profile only for the linked UPI", async () => {
   const experience = await read("src/components/map/MapExperience.tsx");
   const profile = await read("src/components/map/BuyerPropertyProfile.tsx");
-  assert.match(experience, /linkedListing=\{selectedBuyerListing\?\.link\.upi === selectedArea\.upi/);
-  assert.match(experience, /listingParcelLink=\{selectedBuyerListing\?\.link\.upi === selectedArea\.upi/);
+  assert.ok(experience.includes('linkedListing={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en")'));
+  assert.ok(experience.includes('listingParcelLink={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en")'));
   assert.match(profile, /Verified source listing attached/);
   assert.match(profile, /Asking price:/);
   assert.match(profile, /Source-reported status:/);
