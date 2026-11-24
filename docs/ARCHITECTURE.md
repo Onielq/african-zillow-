@@ -23,6 +23,49 @@ flowchart TD
 
 Vercel and Cloudflare each serve a deployed application and remain independently buildable. If every primary parcel query fails inside Cloudflare, the Worker makes one bounded server-to-server request to the Vercel production parcel API and accepts only GeoJSON features marked as cadastral parcels with a UPI. The Vercel route does not use this fallback, preventing recursion. The response records the fallback source and primary-provider warning. If the fallback fails validation or times out, the Worker returns its explicit 502 rather than inventing parcel outlines.
 
+## Buyer property intelligence flow
+
+The buyer-facing target is one property profile composed from three independent evidence layers. The UPI identifies a parcel; it is not a listing ID. A listing starts as its own source record and can be attached to the parcel only after an explicit, independently checked listing-to-UPI relationship exists.
+
+The diagram below is the **target buyer flow**. The cadastral UPI lookup and part of the project directory already exist. Listing-ID resolution, a verified relationship workflow and complete regulatory and transaction evidence remain integration work; the diagram must not be read as proof that those feeds are live.
+
+```mermaid
+flowchart TD
+  BUYER[Buyer search] --> UPI[UPI]
+  BUYER --> LISTING[Source + listing ID]
+  UPI --> PARCEL[Exact cadastral parcel resolution]
+  LISTING --> LINK[Verified listing-to-UPI relationship]
+  LINK -. only after independent check .-> PARCEL
+  LINK -. pending or conflicting .-> UNLINKED[Keep listing separate]
+  PARCEL --> PROFILE[One connected property profile]
+  PROFILE --> LAND[01 Land Intelligence]
+  PROFILE --> DEV[02 Development and Regulatory Intelligence]
+  PROFILE --> MARKET[03 Marketplace and Market Intelligence]
+  LAND --> SOURCES[Source, date, evidence state and limitations]
+  DEV --> SOURCES
+  MARKET --> SOURCES
+```
+
+### Layer boundaries
+
+| Layer | Canonical subject | Evidence that belongs here | Never infer |
+|---|---|---|---|
+| Land Intelligence | Parcel / UPI | Cadastral geometry and attributes, mapped area, zoning and sourced planning constraints | Ownership, title, encumbrances, permission to build or physical access |
+| Development and Regulatory Intelligence | Project, developer and authority record | Project register, registration where required, approvals, conditions and source-dated compliance evidence | Approval or compliance from a project directory entry or nearby project marker |
+| Marketplace and Market Intelligence | Source listing, comparable and transaction record | Advertiser, listing status, asking price, comparable observations and completed transactions | Sale from an advert disappearing, transaction from asking price, or parcel price from an area average |
+
+A profile may show all three layers even when some are incomplete. Each fact carries its own evidence state. Do not collapse the whole profile into one “verified” status. A missing record means it was not found in the connected source; it does not establish that the real-world feature or event does not exist.
+
+### Listing-to-parcel identity gate
+
+- Preserve the listing's source name and source listing ID.
+- Preserve the candidate UPI and the method/evidence used to associate the listing with it.
+- Require an independent check before the association is treated as verified.
+- Keep pending, rejected, expired or conflicting relationships separate from the parcel's confirmed profile.
+- Never use nearest coordinates, a shared street, matching district/sector text or a fuzzy property name as identity proof.
+
+See [Buyer Property Intelligence](BUYER_PROPERTY_INTELLIGENCE.md) for the buyer-facing contract, source maturity and acceptance criteria.
+
 ## Parcel evidence path
 
 ~~~mermaid
