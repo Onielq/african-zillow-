@@ -13,7 +13,7 @@ test("buyer listing lookup requires a source key and source-owned listing ID", a
   assert.match(lookup, /Source listing ID/);
   assert.match(lookup, /new URLSearchParams\(\{ sourceKey: source, listingId: id \}\)/);
   assert.match(lookup, /\/api\/market\/listing-profile/);
-  assert.match(lookup, /The source's own listing ID/);
+  assert.match(lookup, //listing ID supplied by its source//);
 });
 
 test("unlinked listings remain separate and multiple parcel links require an explicit choice", async () => {
