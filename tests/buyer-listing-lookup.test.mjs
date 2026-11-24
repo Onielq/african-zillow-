@@ -23,7 +23,7 @@ test("unlinked listings remain separate and multiple parcel links require an exp
   assert.match(lookup, /result\.parcelLinks\.length === 1/);
   assert.match(lookup, /result\.parcelLinks\.map/);
   assert.match(lookup, /Choose the linked parcel/);
-  assert.match(lookup, /No location is guessed/);
+  assert.match(lookup, /No location was guessed/);
 });
 
 test("listing-to-parcel navigation requires exactly one cadastral result for the verified UPI", async () => {
