@@ -141,11 +141,12 @@ test("listing profile returns parcel associations only after independent UPI rev
   const route = await read("../src/app/api/market/listing-profile/route.ts");
   assert.match(route, /FROM reja\.market_listing_parcel_links link/);
   assert.match(route, /link\.claim_status = 'verified'/);
+  assert.match(route, /link\.relationship_role = 'primary_site'/);
   assert.match(route, /link\.is_current = true/);
   assert.match(route, /link\.reviewed_by_user_id <> link\.submitted_by_user_id/);
   assert.match(route, /link\.reviewed_at IS NOT NULL/);
   assert.match(route, /p\.upi IS NOT NULL/);
-  assert.match(route, /no_verified_link/);
+  assert.match(route, /no_verified_primary_site_link/);
   assert.match(route, /multiple_verified_links/);
   assert.match(route, /No location-based match is inferred/);
   assert.doesNotMatch(route, /ST_DWithin|ST_Distance|ST_Intersects|nearest coordinates/i);
