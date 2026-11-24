@@ -148,7 +148,7 @@ test("listing profile returns parcel associations only after independent UPI rev
   assert.match(route, /p\.upi IS NOT NULL/);
   assert.match(route, /no_verified_primary_site_link/);
   assert.match(route, /multiple_verified_links/);
-  assert.match(route, /No location-based match is inferred/);
+  assert.match(route, /no location-based match is inferred/i);
   assert.doesNotMatch(route, /ST_DWithin|ST_Distance|ST_Intersects|nearest coordinates/i);
 });
 
