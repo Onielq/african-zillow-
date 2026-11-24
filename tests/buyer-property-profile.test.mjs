@@ -48,5 +48,5 @@ test("listing records cannot be joined to a parcel using proximity alone", async
   assert.match(contract, /independently checked listing-to-UPI relationship/);
   assert.match(contract, /Do not link a listing to a parcel using nearest coordinates/);
   assert.match(architecture, /Never use nearest coordinates/);
-  assert.match(contract, /not proof of title/);
+  assert.match(contract, /does not prove legal ownership, title/);
 });
