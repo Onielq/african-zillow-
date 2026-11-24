@@ -14,6 +14,14 @@ Taiseel is a Rwanda-first land-intelligence product. The map is the main workspa
 - Do not invent listings, developers, prices, project status, payment plans, source dates, or verified coverage.
 - Preserve source attribution and disclose data-quality, licensing, completeness, and freshness limitations.
 
+## Buyer property profile contract
+
+- The buyer journey starts with a UPI or a property listing and resolves to one connected property profile only when the identity relationship is supported by evidence.
+- Keep the three pillars separate inside that profile: Land Intelligence; Development and Regulatory Intelligence; Marketplace and Market Intelligence.
+- A listing may join a parcel only through an explicit, independently checked listing-to-UPI relationship. Never attach records using nearest coordinates, a similar address, or neighbourhood proximity.
+- A mapped parcel is not proof of title. A project-directory record is not proof of registration or approval. An asking price or area benchmark is not proof of a completed transaction.
+- Show the evidence state for each fact. Missing source coverage, conflicting records, estimates and unavailable services must remain visible.
+
 ## Design system
 
 Before styling, read [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md). Reuse CSS custom properties in src/app/globals.css. Prefer a small number of deliberate, consistent patterns over new one-off colors, shadows, borders, and radii.
@@ -34,6 +42,7 @@ The map remains the visual focus. Keep controls compact but operable, keep parce
 
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [System architecture and data flow](docs/ARCHITECTURE.md)
+- [Buyer property intelligence profile](docs/BUYER_PROPERTY_INTELLIGENCE.md)
 - [Engineering and release workflow](docs/ENGINEERING_WORKFLOW.md)
 - [Agent tooling map](docs/AGENT_TOOLING.md)
 - [Presentation workflow](docs/PRESENTATION_WORKFLOW.md)

@@ -1,0 +1,171 @@
+.profile {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 12px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.header {
+  display: grid;
+  gap: 4px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.header h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 730;
+  line-height: 1.35;
+}
+
+.intro {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pillars {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pillar {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.step {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.content {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pillarHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.pillarHeading h4 {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 740;
+  line-height: 1.35;
+}
+
+.statusReady,
+.statusFound,
+.statusPending {
+  flex: 0 0 auto;
+  max-width: 46%;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.statusReady {
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.statusFound {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.statusPending {
+  background: var(--surface-muted);
+  color: var(--ink-secondary);
+}
+
+.primary,
+.detail,
+.caveat {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.primary {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.detail {
+  color: var(--ink-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.caveat {
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.sourceLink {
+  width: fit-content;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sourceLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+@media (max-width: 460px) {
+  .profile {
+    padding: 11px;
+  }
+
+  .pillarHeading {
+    flex-wrap: wrap;
+  }
+
+  .statusReady,
+  .statusFound,
+  .statusPending {
+    max-width: 100%;
+  }
+}
