@@ -4041,8 +4041,8 @@ export function MapExperience() {
                 priceEvidenceLabel={parcelPriceDisplayLabel}
                 priceEvidenceNote={buyerProfilePriceEvidenceNote}
                 transactionBenchmarkPerM2={parcelUnitPriceEstimate?.pricePerM2 ?? null}
-                linkedListing={selectedBuyerListing?.link.upi === selectedArea.upi ? selectedBuyerListing.listing : null}
-                listingParcelLink={selectedBuyerListing?.link.upi === selectedArea.upi ? selectedBuyerListing.link : null}
+                linkedListing={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en") === selectedArea.upi.trim().toLocaleUpperCase("en") ? selectedBuyerListing.listing : null}
+                listingParcelLink={selectedBuyerListing && selectedArea.upi && selectedBuyerListing.link.upi.trim().toLocaleUpperCase("en") === selectedArea.upi.trim().toLocaleUpperCase("en") ? selectedBuyerListing.link : null}
               />
             ) : null}
 
