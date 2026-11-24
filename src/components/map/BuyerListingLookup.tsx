@@ -214,7 +214,7 @@ export function BuyerListingLookup({ onParcelSelected }: Props) {
               />
             </label>
             <p className={styles.help}>
-              Use the source's own listing ID. A street address or nearby location is not used to link it to a parcel.
+              Use the listing ID supplied by its source. A street address or nearby location is not used to link it to a parcel.
             </p>
             <button className={styles.submit} disabled={status === "loading"} type="submit">
               {status === "loading" ? "Checking listing…" : "Find listing"}
