@@ -3,6 +3,7 @@
 import styles from "./buyer-property-profile.module.css";
 import type { SelectedArea } from "./MapView";
 import type { RwandaProjectRecord } from "@/data/project-directory";
+import type { BuyerListingRecord, BuyerVerifiedParcelLink } from "@/components/map/BuyerListingLookup";
 
 type BuyerPropertyProfileProps = {
   area: SelectedArea;
@@ -10,10 +11,28 @@ type BuyerPropertyProfileProps = {
   priceEvidenceLabel: string;
   priceEvidenceNote: string;
   transactionBenchmarkPerM2: number | null;
+  linkedListing: BuyerListingRecord | null;
+  listingParcelLink: BuyerVerifiedParcelLink | null;
 };
 
 function formatRwfPerM2(value: number): string {
   return new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(value) + " RWF/m²";
+}
+
+function formatListingAskingPrice(listing: BuyerListingRecord): string {
+  const amount = Number(listing.askingAmount);
+  if (!Number.isFinite(amount) || amount <= 0) return "Asking price not supplied";
+  const formatted = new Intl.NumberFormat("en-RW", { maximumFractionDigits: 0 }).format(amount);
+  const period = listing.listingType === "rent" && listing.rentPeriod !== "not_applicable"
+    ? " / " + listing.rentPeriod
+    : "";
+  return formatted + " " + listing.currency + period;
+}
+
+function formatEvidenceDate(value: string): string | null {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-RW", { dateStyle: "medium" }).format(date);
 }
 
 function zoningSummary(area: SelectedArea): string {
@@ -31,7 +50,9 @@ export function BuyerPropertyProfile({
   linkedProject,
   priceEvidenceLabel,
   priceEvidenceNote,
-  transactionBenchmarkPerM2
+  transactionBenchmarkPerM2,
+  linkedListing,
+  listingParcelLink
 }: BuyerPropertyProfileProps) {
   const hasMappedParcelIdentity = area.sourceType === "cadastral-parcel" && Boolean(area.upi);
   const areaLabel = typeof area.parcelSizeM2 === "number" && area.parcelSizeM2 > 0
@@ -146,11 +167,41 @@ export function BuyerPropertyProfile({
                 ? "A source-labelled parcel sale-price record is attached. Confirm the date and transfer evidence with the competent registry."
                 : "No parcel-specific completed-sale record is connected."}
             </p>
+            {linkedListing && listingParcelLink ? (
+              <div className={styles.listingEvidence}>
+                <p className={styles.primary}>Verified source listing attached</p>
+                <p className={styles.detail}>
+                  {linkedListing.sourcePublisher ?? linkedListing.sourceTitle ?? linkedListing.sourceKey}
+                  {" · Listing ID " + linkedListing.sourceListingId}
+                </p>
+                <p className={styles.detail}>
+                  Asking price: {formatListingAskingPrice(linkedListing)} · Source-reported status: {linkedListing.sourceReportedStatus}
+                </p>
+                <p className={styles.detail}>
+                  Link role: {listingParcelLink.relationshipRole.replaceAll("_", " ")} · Evidence checked: {listingParcelLink.evidenceType.replaceAll("_", " ")}
+                  {formatEvidenceDate(listingParcelLink.reviewedAt)
+                    ? " · Reviewed " + formatEvidenceDate(listingParcelLink.reviewedAt)
+                    : ""}
+                </p>
+                {linkedListing.listingUrl ? (
+                  <a className={styles.sourceLink} href={linkedListing.listingUrl} rel="noreferrer" target="_blank">
+                    Open original listing
+                  </a>
+                ) : linkedListing.sourceUrl ? (
+                  <a className={styles.sourceLink} href={linkedListing.sourceUrl} rel="noreferrer" target="_blank">
+                    Open listing source
+                  </a>
+                ) : null}
+                {linkedListing.attributionRequired ? (
+                  <p className={styles.caveat}>Source attribution is required for this listing record.</p>
+                ) : null}
+              </div>
+            ) : null}
             <p className={styles.detail}>
               Advertiser identity and a verified comparable-listing set are not connected to this parcel yet.
             </p>
             <p className={styles.caveat}>
-              A listing joins this profile only after its listing ID has an independently checked link to this exact UPI.
+              A listing joins this profile only after its source record has an independently checked UPI relationship.
             </p>
           </div>
         </li>
