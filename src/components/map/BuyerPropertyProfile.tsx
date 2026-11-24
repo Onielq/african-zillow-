@@ -169,13 +169,22 @@ export function BuyerPropertyProfile({
             </p>
             {linkedListing && listingParcelLink ? (
               <div className={styles.listingEvidence}>
-                <p className={styles.primary}>Verified source listing attached</p>
-                <p className={styles.detail}>
-                  {linkedListing.sourcePublisher ?? linkedListing.sourceTitle ?? linkedListing.sourceKey}
-                  {" · Listing ID " + linkedListing.sourceListingId}
+                <p className={styles.primary}>
+                  {linkedListing.inventoryKind === "first_party_taiseel"
+                    ? "Verified Taiseel Exchange listing attached"
+                    : "Verified source listing attached"}
                 </p>
                 <p className={styles.detail}>
-                  Asking price: {formatListingAskingPrice(linkedListing)} · Source-reported status: {linkedListing.sourceReportedStatus}
+                  {linkedListing.inventoryKind === "first_party_taiseel"
+                    ? "Taiseel Exchange · Listing reference " + (linkedListing.listingReference ?? "not supplied")
+                    : (linkedListing.sourcePublisher ?? linkedListing.sourceTitle ?? linkedListing.sourceKey ?? "External source") +
+                      " · Listing ID " + (linkedListing.sourceListingId ?? "not supplied")}
+                </p>
+                <p className={styles.detail}>
+                  Asking price: {formatListingAskingPrice(linkedListing)}
+                  {" · "}
+                  {linkedListing.inventoryKind === "first_party_taiseel" ? "Taiseel publication status: " : "Source-reported status: "}
+                  {linkedListing.sourceReportedStatus}
                 </p>
                 <p className={styles.detail}>
                   Link role: {listingParcelLink.relationshipRole.replaceAll("_", " ")} · Evidence checked: {listingParcelLink.evidenceType.replaceAll("_", " ")}

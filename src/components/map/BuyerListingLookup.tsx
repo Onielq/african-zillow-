@@ -5,8 +5,10 @@ import { ExternalLink, FileSearch, MapPin, X } from "lucide-react";
 import styles from "./buyer-listing-lookup.module.css";
 
 export type BuyerListingRecord = {
-  sourceListingId: string;
-  sourceKey: string;
+  inventoryKind: "external_source" | "first_party_taiseel";
+  listingReference: string | null;
+  sourceListingId: string | null;
+  sourceKey: string | null;
   sourceTitle: string | null;
   sourcePublisher: string | null;
   sourceUrl: string | null;
@@ -41,7 +43,6 @@ export type BuyerVerifiedParcelLink = {
   parcelRecordStatus: string;
   relationshipRole: string;
   evidenceType: string;
-  evidenceReference: string;
   reviewedAt: string;
 };
 
@@ -75,11 +76,15 @@ function formatAskingPrice(listing: BuyerListingRecord): string {
 }
 
 function listingKindLabel(listing: BuyerListingRecord): string {
+  if (listing.inventoryKind === "first_party_taiseel") {
+    return listing.listingType === "rent" ? "Taiseel listing for rent" : "Taiseel listing for sale";
+  }
   return listing.listingType === "rent" ? "Advertised for rent" : "Advertised for sale";
 }
 
 export function BuyerListingLookup({ onParcelSelected }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [lookupMode, setLookupMode] = useState<"external_source" | "first_party_taiseel">("external_source");
   const [sourceKey, setSourceKey] = useState("");
   const [listingId, setListingId] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -92,7 +97,7 @@ export function BuyerListingLookup({ onParcelSelected }: Props) {
     event.preventDefault();
     const source = sourceKey.trim();
     const id = listingId.trim();
-    if (!source || !id) return;
+    if (!id || (lookupMode === "external_source" && !source)) return;
 
     setStatus("loading");
     setResult(null);
@@ -101,8 +106,13 @@ export function BuyerListingLookup({ onParcelSelected }: Props) {
     setSelectingUpi(null);
 
     try {
-      const params = new URLSearchParams({ sourceKey: source, listingId: id });
-      const response = await fetch("/api/market/listing-profile?" + params.toString(), {
+      const params = lookupMode === "external_source"
+        ? new URLSearchParams({ sourceKey: source, listingId: id })
+        : new URLSearchParams({ listingReference: id });
+      const endpoint = lookupMode === "external_source"
+        ? "/api/market/listing-profile?"
+        : "/api/market/exchange/listing-profile?";
+      const response = await fetch(endpoint + params.toString(), {
         cache: "no-store"
       });
       const payload = await response.json() as BuyerListingLookupResponse | {
@@ -191,30 +201,66 @@ export function BuyerListingLookup({ onParcelSelected }: Props) {
           </header>
 
           <form className={styles.form} onSubmit={findListing}>
+            <div className={styles.modeSwitch} role="group" aria-label="Listing inventory">
+              <button
+                aria-pressed={lookupMode === "external_source"}
+                className={lookupMode === "external_source" ? styles.modeOptionActive : styles.modeOption}
+                onClick={() => {
+                  setLookupMode("external_source");
+                  setStatus("idle");
+                  setResult(null);
+                  setErrorMessage("");
+                  setSelectionMessage("");
+                }}
+                type="button"
+              >
+                External source
+              </button>
+              <button
+                aria-pressed={lookupMode === "first_party_taiseel"}
+                className={lookupMode === "first_party_taiseel" ? styles.modeOptionActive : styles.modeOption}
+                onClick={() => {
+                  setLookupMode("first_party_taiseel");
+                  setStatus("idle");
+                  setResult(null);
+                  setErrorMessage("");
+                  setSelectionMessage("");
+                }}
+                type="button"
+              >
+                Taiseel Exchange
+              </button>
+            </div>
+            {lookupMode === "external_source" ? (
+              <label className={styles.field}>
+                <span>Listing source key</span>
+                <input
+                  autoComplete="off"
+                  maxLength={100}
+                  onChange={(event) => setSourceKey(event.target.value)}
+                  placeholder="For example: source-key"
+                  required
+                  value={sourceKey}
+                />
+              </label>
+            ) : null}
             <label className={styles.field}>
-              <span>Listing source key</span>
+              <span>{lookupMode === "first_party_taiseel" ? "Taiseel listing reference" : "Source listing ID"}</span>
               <input
                 autoComplete="off"
-                maxLength={100}
-                onChange={(event) => setSourceKey(event.target.value)}
-                placeholder="For example: source-key"
-                required
-                value={sourceKey}
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Source listing ID</span>
-              <input
-                autoComplete="off"
-                maxLength={200}
+                maxLength={lookupMode === "first_party_taiseel" ? 120 : 200}
                 onChange={(event) => setListingId(event.target.value)}
-                placeholder="Paste the ID from the listing source"
+                placeholder={lookupMode === "first_party_taiseel"
+                  ? "Paste the reference shown on the Taiseel listing"
+                  : "Paste the ID from the listing source"}
                 required
                 value={listingId}
               />
             </label>
             <p className={styles.help}>
-              Use the listing ID supplied by its source. A street address or nearby location is not used to link it to a parcel.
+              {lookupMode === "first_party_taiseel"
+                ? "Taiseel references resolve only published listings with valid seller authorization. A seller's address or map location does not prove parcel identity."
+                : "Use the listing ID supplied by its source. A street address or nearby location is not used to link it to a parcel."}
             </p>
             <button className={styles.submit} disabled={status === "loading"} type="submit">
               {status === "loading" ? "Checking listing…" : "Find listing"}
@@ -229,9 +275,15 @@ export function BuyerListingLookup({ onParcelSelected }: Props) {
             <div className={styles.result} aria-live="polite">
               <div className={styles.resultHeader}>
                 <span className={styles.sourceLabel}>
-                  {result.listing.sourcePublisher ?? result.listing.sourceTitle ?? result.listing.sourceKey}
+                  {result.listing.inventoryKind === "first_party_taiseel"
+                    ? "Taiseel Exchange"
+                    : result.listing.sourcePublisher ?? result.listing.sourceTitle ?? result.listing.sourceKey ?? "External source"}
                 </span>
-                <span className={styles.sourceStatus}>Source reported · {result.listing.sourceReportedStatus}</span>
+                <span className={styles.sourceStatus}>
+                  {result.listing.inventoryKind === "first_party_taiseel"
+                    ? "Taiseel status · " + result.listing.sourceReportedStatus
+                    : "Source reported · " + result.listing.sourceReportedStatus}
+                </span>
               </div>
               <p className={styles.resultTitle}>
                 {result.listing.projectName ?? result.listing.buildingName ?? result.listing.address ?? result.listing.propertyType}
