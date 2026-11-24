@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
     const listingRows = await database`
       SELECT
         l.id::text AS "recordId",
+        'external_source'::text AS "inventoryKind",
+        NULL::text AS "listingReference",
         l.source_record_key AS "sourceListingId",
         s.source_key AS "sourceKey",
         s.title AS "sourceTitle",
