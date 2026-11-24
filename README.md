@@ -15,6 +15,18 @@ The linked Bugesera Masterplan service provides administrative boundaries and pl
 **These layers are not proof of ownership or encumbrance status.** Buyers should verify title, ownership, restrictions, and current records with the competent land authority before a transaction. The source maps' version, access and reuse terms also need confirmation before commercial production.
 
 
+## Buyer starting point
+
+A buyer begins with a parcel UPI or a property listing. Taiseel brings the available evidence into one connected property profile:
+
+- **Land Intelligence:** parcel identity, boundary, area, zoning and mapped planning constraints.
+- **Development and Regulatory Intelligence:** linked projects, developers, required registration, approvals and compliance evidence.
+- **Marketplace and Market Intelligence:** advertiser, listings, asking prices, comparable properties and completed-transaction evidence.
+
+A listing joins a parcel profile only after an explicit, independently checked listing-to-UPI relationship. A mapped parcel, project-directory entry, asking price or area benchmark must never be presented as proof of title, approval, availability or a completed sale.
+
+See [the buyer property intelligence contract](docs/BUYER_PROPERTY_INTELLIGENCE.md) for the full model and the current connection limits. The three pillars are the product architecture; they are not a claim that every source feed is live today.
+
 ## Contact and email readiness
 
 The `/contact` page supports enquiries by email or a request for a call-back. The `/api/contact` endpoint sends through Resend only when `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (from a verified sender domain), and `RESEND_TO_EMAIL` are configured at runtime. These values are blank in `.env.example`; the page is not email-ready until a controlled message is received successfully. Set `NEXT_PUBLIC_CONTACT_PHONE` to show a direct call link. Never commit real keys or private phone numbers.
