@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         p.bathrooms::text AS bathrooms,
         p.internal_area_sqm::text AS "internalAreaSqm",
         p.plot_area_sqm::text AS "plotAreaSqm",
-        p.internal_area_sqm::text AS "propertyAreaSqm",
+        coalesce(p.internal_area_sqm, p.plot_area_sqm)::text AS "propertyAreaSqm",
         NULL::text AS "listingUrl",
         l.publication_status AS "sourceReportedStatus",
         l.published_at AS "firstSeenAt",
