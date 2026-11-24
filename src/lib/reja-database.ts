@@ -32,6 +32,7 @@ type SchemaReadinessRow = {
   exchange_listing_observations: boolean;
   exchange_listing_events: boolean;
   listing_authorization_helper: boolean;
+  listing_parcel_links: boolean;
 };
 
 const REQUIRED_SCHEMA = [
@@ -49,7 +50,8 @@ const REQUIRED_SCHEMA = [
   ["listing_authorizations", "seller listing authorizations"],
   ["exchange_listing_observations", "first-party listing observations"],
   ["exchange_listing_events", "first-party listing event history"],
-  ["listing_authorization_helper", "verified seller authorization check"]
+  ["listing_authorization_helper", "verified seller authorization check"],
+  ["listing_parcel_links", "independently reviewed listing-to-parcel links"]
 ] as const;
 
 function integration(
@@ -233,7 +235,8 @@ export async function checkRejaDatabaseIntegration(): Promise<RejaDatabaseHealth
         to_regclass('reja.exchange_listing_observations') IS NOT NULL AS exchange_listing_observations,
         to_regclass('reja.exchange_listing_events') IS NOT NULL AS exchange_listing_events,
         to_regprocedure('reja.has_verified_listing_authorization(bigint,bigint,uuid,bigint)') IS NOT NULL
-          AS listing_authorization_helper
+          AS listing_authorization_helper,
+        to_regclass('reja.market_listing_parcel_links') IS NOT NULL AS listing_parcel_links
     `;
 
     const row = rows[0] as SchemaReadinessRow | undefined;
