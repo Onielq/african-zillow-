@@ -37,6 +37,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { BrandImage } from "@/components/directories/BrandImage";
+import { BuyerPropertyProfile } from "@/components/map/BuyerPropertyProfile";
 import { ProjectReportModal } from "@/components/map/ProjectReportModal";
 import { websiteFaviconUrl } from "@/lib/brand-assets";
 import { gsap } from "gsap";
@@ -1992,6 +1993,20 @@ export function MapExperience() {
     : hasParcelUnitPriceOnly
       ? "Average transaction price / m²"
       : parcelPriceTypeLabel("calculated-asking-price");
+  const parcelPriceDisplayLabel = hasSourcedParcelPrice
+    ? displayedParcelPriceTypeLabel
+    : hasParcelAskingPrice
+      ? "Calculated estimate"
+      : hasParcelUnitPriceOnly
+        ? "Average transaction price / m²"
+        : "Price information";
+  const buyerProfilePriceEvidenceNote = hasSourcedParcelPrice
+    ? "Source-supplied price record. Review the named source and its observation date before relying on it."
+    : hasParcelAskingPrice
+      ? "Calculated from parcel area × average transaction price per m². This is not a verified listing or completed-sale price."
+      : hasParcelUnitPriceOnly
+        ? "An area-level price per square metre is available, but no parcel total is calculated."
+        : "No parcel-specific price or usable area-level benchmark is available.";
   const selectedDistrictPriceBenchmark = selectedArea
     ? getDistrictLandPriceBenchmark(selectedArea.district)
     : null;
@@ -3935,9 +3950,9 @@ export function MapExperience() {
               </div>
             ) : null}
             {selectedArea.level === "parcel" ? (
-              <section className="parcel-price-kpi" aria-label="Parcel asking price">
+              <section className="parcel-price-kpi" aria-label="Parcel price evidence">
                 <div className="parcel-price-kpi-header">
-                  <span className="parcel-asking-label">Asking price</span>
+                  <span className="parcel-asking-label">{parcelPriceDisplayLabel}</span>
                   {selectedArea.parcelMarketStatus ? (
                     <span
                       className={"parcel-market-status-inline parcel-market-status-inline-" + selectedArea.parcelMarketStatus}
@@ -3958,9 +3973,9 @@ export function MapExperience() {
                     </span>
                   )}
                 </div>
-                <div className="parcel-price-headline" aria-label={displayedParcelPriceTypeLabel}>
+                <div className="parcel-price-headline" aria-label={parcelPriceDisplayLabel}>
                   <button
-                    aria-label={isCompactParcelPrice ? "Show full parcel asking price" : "Show rounded parcel asking price"}
+                    aria-label={isCompactParcelPrice ? "Show full price amount" : "Show rounded price amount"}
                     className="parcel-price-value-button"
                     onClick={() => {
                       if (!parcelPriceIdentity) return;
@@ -3982,6 +3997,16 @@ export function MapExperience() {
             ) : null}
             {selectedArea.level === "parcel" && hasSourcedParcelPrice && selectedArea.parcelPriceSource ? (
               <p className="parcel-price-source">Source: {selectedArea.parcelPriceSource}</p>
+            ) : null}
+
+            {selectedArea.level === "parcel" ? (
+              <BuyerPropertyProfile
+                area={selectedArea}
+                linkedProject={selectedParcelProject}
+                priceEvidenceLabel={parcelPriceDisplayLabel}
+                priceEvidenceNote={buyerProfilePriceEvidenceNote}
+                transactionBenchmarkPerM2={parcelUnitPriceEstimate?.pricePerM2 ?? null}
+              />
             ) : null}
 
             {selectedArea.level === "parcel" ? (
