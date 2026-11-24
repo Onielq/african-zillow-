@@ -5,7 +5,6 @@ import { ExternalLink, FileSearch, MapPin, X } from "lucide-react";
 import styles from "./buyer-listing-lookup.module.css";
 
 export type BuyerListingRecord = {
-  recordId: string;
   sourceListingId: string;
   sourceKey: string;
   sourceTitle: string | null;
