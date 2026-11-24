@@ -123,7 +123,6 @@ export async function GET(request: NextRequest) {
         p.record_status AS "parcelRecordStatus",
         link.relationship_role AS "relationshipRole",
         link.evidence_type AS "evidenceType",
-        link.evidence_reference AS "evidenceReference",
         link.reviewed_at AS "reviewedAt"
       FROM reja.market_listing_parcel_links link
       JOIN reja.parcels p ON p.id = link.parcel_id
@@ -145,6 +144,8 @@ export async function GET(request: NextRequest) {
         p.upi ASC
     `;
 
+    const { recordId, ...publicListing } = listing;
+
     return NextResponse.json(
       {
         ok: true,
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
           : parcelLinks.length === 1
             ? "verified"
             : "multiple_verified_links",
-        listing,
+        listing: publicListing,
         parcelLinks,
         note: parcelLinks.length === 0
           ? "The listing is available as a source record, but no independently verified parcel link was found. It remains separate; no location-based match is inferred."
