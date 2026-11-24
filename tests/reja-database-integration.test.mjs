@@ -25,7 +25,8 @@ test("database health check detects the four-pillar schema without exposing cred
     "reja.parcels",
     "reja.development_units",
     "reja.exchange_listings",
-    "reja.market_verified_transactions"
+    "reja.market_verified_transactions",
+    "reja.market_listing_parcel_links"
   ]) {
     assert.ok(db.includes(objectName), "missing readiness probe for " + objectName);
   }
