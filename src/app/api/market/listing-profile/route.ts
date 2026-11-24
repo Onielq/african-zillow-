@@ -144,7 +144,9 @@ export async function GET(request: NextRequest) {
         p.upi ASC
     `;
 
-    const { recordId, ...publicListing } = listing;
+    const publicListing = Object.fromEntries(
+      Object.entries(listing).filter(([key]) => key !== "recordId")
+    );
 
     return NextResponse.json(
       {
