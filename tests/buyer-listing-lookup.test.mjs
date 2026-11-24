@@ -33,7 +33,7 @@ test("listing-to-parcel navigation requires exactly one cadastral result for the
   assert.match(experience, /area\.level === "parcel"/);
   assert.match(experience, /area\.upi\?\.trim\(\)\.toLocaleUpperCase\("en"\)/);
   assert.match(experience, /exactMatches\.length !== 1/);
-  assert.match(experience, /No location was guessed/);
+  assert.match(experience, /never fall back to address or proximity/);
   assert.match(experience, /<BuyerListingLookup onParcelSelected=\{openBuyerListingParcel\}/);
 });
 
@@ -52,7 +52,7 @@ test("verified listing context is shown inside the three-layer property profile 
 test("buyer listing lookup never treats an advertised location as parcel identity", async () => {
   const lookup = await read("src/components/map/BuyerListingLookup.tsx");
   const route = await read("src/app/api/market/listing-profile/route.ts");
-  assert.match(lookup, /no parcel link/);
+  assert.match(lookup, /No verified parcel link/i);
   assert.match(route, /independently verified UPI relationships/);
   assert.doesNotMatch(lookup + route, /ST_DWithin|ST_Distance|nearest coordinates|coordinates match/i);
 });
